@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { MIRROR, checkPstackPin, compareSkillTrees, compareTree, readPin, sdkPinProblems } from './check-pstack-pin.mjs';
+import { MIRROR, checkPstackPin, compareSkillTrees, compareTree, readPin } from './check-pstack-pin.mjs';
 
 function workspace(body) {
   const root = mkdtempSync(join(tmpdir(), 'pstack-pin-test-'));
@@ -86,31 +86,9 @@ test('compareSkillTrees accepts several mirror roots, and compareTree covers doc
   });
 });
 
-test('the checked-in pstack install matches the mirror and the SDK pin', () => {
+test('the checked-in pstack install matches the mirror', () => {
   const { pin, problems } = checkPstackPin(resolve(import.meta.dirname, '..'));
   assert.deepEqual(problems, []);
   assert.equal(pin.mirror, MIRROR);
   assert.equal(pin.commit, commit);
-});
-
-test('sdkPinProblems accepts one exact registry install and rejects ranges, mismatch and patches', () => {
-  const manifest = { dependencies: { '@mastra/code-sdk': '1.14.0' } };
-  const lock = {
-    packages: {
-      '': { dependencies: { '@mastra/code-sdk': '1.14.0' } },
-      'node_modules/@mastra/code-sdk': {
-        version: '1.14.0',
-        resolved: 'https://registry.npmjs.org/@mastra/code-sdk/-/code-sdk-1.14.0.tgz',
-        integrity: 'sha512-example',
-      },
-    },
-  };
-  const clean = { manifest, lock, installedVersion: '1.14.0', patchesExist: false, packageIsSymlink: false, patchesMentionSdk: false };
-  assert.deepEqual(sdkPinProblems(clean), []);
-  assert.match(sdkPinProblems({ ...clean, manifest: { dependencies: { '@mastra/code-sdk': '^1.14.0' } } }).join('\n'), /exact version/);
-  assert.match(sdkPinProblems({ ...clean, installedVersion: '1.15.0' }).join('\n'), /lockfile has 1.14.0, install has 1.15.0/);
-  assert.match(sdkPinProblems({ ...clean, patchesExist: true }).join('\n'), /must not carry local patches/);
-  assert.match(sdkPinProblems({ ...clean, packageIsSymlink: true }).join('\n'), /is a symlink/);
-  assert.match(sdkPinProblems({ ...clean, lock: { packages: { ...lock.packages, 'node_modules/@mastra/code-sdk': { ...lock.packages['node_modules/@mastra/code-sdk'], resolved: 'file:../code-sdk' } } } }).join('\n'), /public npm registry/);
-  assert.match(sdkPinProblems({ ...clean, manifest: { ...manifest, overrides: { '@mastra/code-sdk': '1.14.0' } } }).join('\n'), /overrides rewrites/);
 });

@@ -1,1 +1,0 @@
-{"exit": 0, "command": ["node", "scripts/julia-agents.mjs", "--", "node", "--experimental-strip-types", "/home/ubuntu/julia-jul-250-delivery/docs/agents/jul-250/evidence/2026-10-22-0924/server-admission.mjs"]}

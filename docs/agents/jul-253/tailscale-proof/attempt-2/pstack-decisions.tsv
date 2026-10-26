@@ -1,5 +1,0 @@
-decision	why	evidence	result
-Use Feature playbook for the fixture	A new marker file is requested; it is not a runtime bug fix	Saved JUL-254 card and feature.md	Feature steps tracked
-Skip subsystem design exploration	Exact root-level filename and exact bytes leave no function boundary or design fork	git ls-tree -r HEAD -- JUL-253-START-PRACTICE.txt returned no path	Single text-file data shape selected
-Leave Start and billing proof with host	This session is already the saved-card Start job and cannot recreate the incoming request or query the host's ledger from repository state	Saved card and harness Build-only instruction	Do not claim unseen Start response or ledger entries
-Use DeepSeek as the coding delegate	Feature step 4 requires review separation even for a single exact-bytes file	Delegate report and independent node Buffer equality check of JUL-253-START-PRACTICE.txt	One uncommitted 41-byte file, no tracked changes

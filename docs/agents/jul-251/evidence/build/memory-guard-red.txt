@@ -1,4 +1,0 @@
-couldn't start daemon: open /run/user/1000/op-daemon.pid: read-only file system
-(node:25) ExperimentalWarning: SQLite is an experimental feature and might change at any time
-(Use `node --trace-warnings ...` to show where the warning was created)
-{"mutation":"stock-memory-disabled","detectedBy":"memory.mjs requires an active stock OM engine","exitCode":1,"requests":0,"spentNano":0}

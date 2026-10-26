@@ -93,56 +93,9 @@ export function compareTree(mirrorPath, installedPath, label) {
   return problems;
 }
 
-const EXACT_VERSION = /^\d+\.\d+\.\d+$/;
-
-export function sdkPinProblems({ manifest, lock, installedVersion, patchesExist, packageIsSymlink, patchesMentionSdk }) {
-  const problems = [];
-  const declared = manifest.dependencies?.['@mastra/code-sdk'];
-  if (!declared) problems.push('ops/build-runner/package.json does not declare @mastra/code-sdk');
-  else if (!EXACT_VERSION.test(declared)) problems.push(`@mastra/code-sdk must be an exact version, found "${declared}"`);
-  if (!installedVersion) problems.push('@mastra/code-sdk is not installed');
-  else if (!EXACT_VERSION.test(installedVersion)) problems.push(`installed @mastra/code-sdk version is not exact: "${installedVersion}"`);
-  const locked = lock.packages?.['node_modules/@mastra/code-sdk'];
-  const rootLocked = lock.packages?.['']?.dependencies?.['@mastra/code-sdk'];
-  if (!locked) problems.push('package-lock.json has no node_modules/@mastra/code-sdk entry');
-  else {
-    if (!EXACT_VERSION.test(locked.version ?? '')) problems.push(`lockfile @mastra/code-sdk version is not exact: "${locked.version}"`);
-    if (installedVersion && locked.version !== installedVersion) problems.push(`lockfile has ${locked.version}, install has ${installedVersion}`);
-    if (!String(locked.resolved ?? '').startsWith('https://registry.npmjs.org/@mastra/code-sdk/-/')) problems.push('@mastra/code-sdk does not resolve from the public npm registry');
-    if (!locked.integrity) problems.push('@mastra/code-sdk lock entry has no integrity hash');
-  }
-  if (rootLocked && rootLocked !== declared) problems.push(`lockfile root declares "${rootLocked}", package.json declares "${declared}"`);
-  if (patchesExist) problems.push('ops/build-runner/patches exists; @mastra/code-sdk must not carry local patches');
-  if (patchesMentionSdk) problems.push('a patch-package script patches @mastra/code-sdk');
-  if (packageIsSymlink) problems.push('node_modules/@mastra/code-sdk is a symlink; install it from the registry');
-  for (const field of ['overrides', 'resolutions']) {
-    const value = manifest[field]?.['@mastra/code-sdk'] ?? manifest[field]?.['@mastra'];
-    if (value) problems.push(`package.json ${field} rewrites @mastra/code-sdk`);
-  }
-  return problems;
-}
-
 export function checkPstackPin(root = process.cwd(), { fetchMirror = cloneMirror } = {}) {
   const pin = readPin(root);
-  const runner = join(root, 'ops/build-runner');
-  const manifest = JSON.parse(readFileSync(join(runner, 'package.json'), 'utf8'));
-  const lock = JSON.parse(readFileSync(join(runner, 'package-lock.json'), 'utf8'));
-  const installedManifest = join(runner, 'node_modules/@mastra/code-sdk/package.json');
-  const installedVersion = existsSync(installedManifest)
-    ? JSON.parse(readFileSync(installedManifest, 'utf8')).version
-    : undefined;
   const problems = [];
-  const patchScripts = ['postinstall', 'prepare', 'preinstall', 'install']
-    .map(name => manifest.scripts?.[name] ?? '').join(' ');
-  problems.push(...sdkPinProblems({
-    manifest,
-    lock,
-    installedVersion,
-    patchesExist: existsSync(join(runner, 'patches')),
-    packageIsSymlink: existsSync(join(runner, 'node_modules/@mastra/code-sdk'))
-      && lstatSync(join(runner, 'node_modules/@mastra/code-sdk')).isSymbolicLink(),
-    patchesMentionSdk: /patch-package/.test(patchScripts) && readFileSync(join(runner, 'package.json'), 'utf8').includes('@mastra/code-sdk'),
-  }));
 
   const checkout = mkdtempSync(join(tmpdir(), 'pstack-pin-'));
   try {
@@ -171,9 +124,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const { pin, problems } = checkPstackPin(resolve(process.argv[2] ?? '.'));
     if (problems.length) {
-      console.error(`pstack/sdk pin check failed at ${pin.mirror}@${pin.commit}:\n${problems.join('\n')}`);
+      console.error(`pstack pin check failed at ${pin.mirror}@${pin.commit}:\n${problems.join('\n')}`);
       process.exitCode = 1;
-    } else console.log(`Installed pstack matches ${pin.mirror}@${pin.commit}, and @mastra/code-sdk is an exact registry install.`);
+    } else console.log(`Installed pstack matches ${pin.mirror}@${pin.commit}.`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

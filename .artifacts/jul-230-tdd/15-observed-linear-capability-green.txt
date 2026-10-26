@@ -1,8 +1,0 @@
-Command: npm run test:jul-230
-Working directory: ops/mastra-agents/reviewer
-Exit code: 0
-
-11 tests passed, 0 failed. The observed Linear capability test exercised one
-query and one mutation at the request seam and measured each as exactly one.
-The production role workflow sensitivity test and restart persistence tests
-also passed.

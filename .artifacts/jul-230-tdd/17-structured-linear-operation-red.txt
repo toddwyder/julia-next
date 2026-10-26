@@ -1,4 +1,0 @@
-Independent review of candidate 906a23fe failed because the observed Linear
-client accepted arbitrary fetch bodies through a caller-selected query method,
-and the regression test used a mutation keyword search. A mutation could be
-mislabelled as a query, so the zero mutation count was not fail-closed.

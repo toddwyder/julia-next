@@ -1,9 +1,0 @@
-Command: npx tsx --test test/jul-230.test.ts
-Working directory: ops/mastra-agents/reviewer
-Exit code: 1
-
-SyntaxError: The requested module '../src/mastra/initialization-observability.ts'
-does not provide an export named 'createObservedLinearClient'
-
-The new contract test failed before implementation, proving the production
-query/mutation capability was absent.

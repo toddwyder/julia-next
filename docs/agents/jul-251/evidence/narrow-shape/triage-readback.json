@@ -1,9 +1,0 @@
-{
-  "status": "Triage",
-  "relatedToJul249": true,
-  "guardrailsUnchanged": true,
-  "acceptanceCriteriaMatch": true,
-  "url": "https://linear.app/julia-next/issue/JUL-251/hybrid-trial-model-neutral-connection-core-with-a-dollar1-card-ceiling",
-  "shapeCommit": "a4538e2",
-  "modelSpendUsd": 0
-}

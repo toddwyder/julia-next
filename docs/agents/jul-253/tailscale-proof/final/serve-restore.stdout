@@ -1,7 +1,0 @@
-Available within your tailnet:
-
-https://ovh.tail91f394.ts.net/
-|-- proxy http://127.0.0.1:43126
-
-Serve started and running in the background.
-To disable the proxy, run: tailscale serve --https=443 off

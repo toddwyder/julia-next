@@ -1,1 +1,0 @@
-{"matchedRules":[{"prefixRuleMatch":{"matchedPrefix":["systemctl","restart"],"decision":"forbidden","justification":"Use the fixed no-argument Julia helper."}}],"decision":"forbidden"}

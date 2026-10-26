@@ -1,9 +1,0 @@
-Commands: npm run test:jul-225; npm run test:jul-230; npm run typecheck
-Working directory: ops/mastra-agents/reviewer
-Exit code: 0
-
-The production Linear client now owns endpoint, authorization, serialization,
-and separate query/mutation request methods. Ready-card discovery accepts only
-the query capability, and the tests exercise both measured operations without
-keyword scanning. A malformed terminal-styled Claude model ID is also rejected
-before it can be probed as a provider model.

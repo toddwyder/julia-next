@@ -1,9 +1,0 @@
-Maker self-check, 23 October 2026.
-PASS: all 25 relative evidence links in the retrospective resolve.
-PASS: GitHub snapshot is open PR #314 at a22a340cf14ad4e984e22887fed6b907cc17cbc1.
-PASS: package-tests, web, server-tests and checks conclude SUCCESS on that head.
-PASS: Linear snapshot has Ready status and obsolete Triage wording in its description.
-PASS: proof.md still contains the obsolete connector-publication blocker.
-PASS: mutations.json explicitly excludes transaction-lock removal.
-PASS: git diff --check reports no whitespace errors.
-This validates the report's links and factual comparisons; implementation tests and live proofs were not rerun.

@@ -1,9 +1,0 @@
-[Unit]
-Description=Observe Julia main for merged machine updates
-
-[Timer]
-OnBootSec=1min
-OnUnitInactiveSec=1min
-
-[Install]
-WantedBy=timers.target

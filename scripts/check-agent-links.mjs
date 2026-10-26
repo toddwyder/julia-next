@@ -16,8 +16,6 @@ function agentReadFiles(root) {
   };
   visit(resolve(root, '.agents/skills'));
   visit(resolve(root, '.claude/skills'));
-  const recoveryPrompt = resolve(root, 'scripts/julia-delivery-recovery.mjs');
-  if (existsSync(recoveryPrompt)) files.push(recoveryPrompt);
   return files;
 }
 

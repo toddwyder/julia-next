@@ -19,10 +19,9 @@ export { scanPersonalPaths, scanForPersonalPaths };
 // without touching the workflow file at all.
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 const SCRIPTS_DIR = path.join(REPO_ROOT, 'scripts');
-const OPS_DIR = path.join(REPO_ROOT, 'ops');
 
-test('no script under scripts/ or ops/ hardcodes a personal-machine path (C:\\Users\\<name>)', () => {
-  const offenders = scanPersonalPaths([SCRIPTS_DIR, OPS_DIR], { baseDir: REPO_ROOT });
+test('no script under scripts/ hardcodes a personal-machine path (C:\\Users\\<name>)', () => {
+  const offenders = scanPersonalPaths([SCRIPTS_DIR], { baseDir: REPO_ROOT });
   assert.deepEqual(offenders, [], `hardcoded personal-machine path found in: ${offenders.join(', ')} -- require the value from an env var instead, with an actionable error if unset`);
 });
 

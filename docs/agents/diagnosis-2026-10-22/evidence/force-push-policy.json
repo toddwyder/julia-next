@@ -1,1 +1,0 @@
-{"matchedRules":[{"prefixRuleMatch":{"matchedPrefix":["git","push"],"decision":"allow"}},{"prefixRuleMatch":{"matchedPrefix":["git","push","--force"],"decision":"forbidden","justification":"Force-push is forbidden. Use an ordinary push after review."}}],"decision":"forbidden"}
