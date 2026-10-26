@@ -270,7 +270,7 @@ export function buildScorecard({ card, threads, prices, tracing, pulls, pings, u
   return {
     card, windows: windows.length, runs, stops, cost, pull, uat,
     usd: cost.reduce((a, c) => a + c.usd, 0),
-    success: uat ? counted.length === 0 : undefined,
+    success: uat && windows.length ? counted.length === 0 : undefined,
     stopsBeforeUat: counted.length,
   };
 }
@@ -288,10 +288,10 @@ export function renderScorecard(s, generatedAt = new Date()) {
   lines.push(`Generated ${utc(generatedAt.getTime())} UTC by \`node scripts/scorecard.mjs ${s.card} --write\` from Mastra Code's records (see docs/adr/0024-run-scorecard-and-stop-ping.md).`, '');
   lines.push('## Result', '');
   const pr = s.pull ? `PR #${s.pull.number}, opened ${utc(Date.parse(s.pull.createdAt))}` : 'no PR yet';
-  const verdict = s.success === undefined ? 'not decided yet (no UAT yes recorded)' : s.success ? 'yes' : 'no';
+  const verdict = !s.windows ? 'not decided yet (no matching run records)' : s.success === undefined ? 'not decided yet (no UAT yes recorded)' : s.success ? 'yes' : 'no';
   const uat = s.uat ? `${utc(Date.parse(s.uat.yesAt))} ("${cell(s.uat.said)}")` : 'not recorded';
   lines.push(`- Success: **${verdict}**. Stops before Todd's UAT yes: ${s.stopsBeforeUat}. Todd's UAT yes: ${uat}.`);
-  lines.push(`- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.`);
+  lines.push(s.cost.length ? `- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.` : '- Cost: **unknown**. No usage records found for this card.');
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
@@ -311,7 +311,8 @@ export function renderScorecard(s, generatedAt = new Date()) {
     s.stops.forEach((x, i) => {
       lines.push(`${i + 1}. ${x.kind === 'question' ? 'Asked' : 'Last said'} at ${utc(x.since)}:`, '');
       lines.push(...quote(x.question), '');
-      lines.push(`   Reply at ${new Date(x.resumed).toISOString().slice(11, 19)} UTC: ${x.reply?.trim() ? `"${cell(x.reply)}"` : '(empty)'}`, '');
+      lines.push(`   Reply at ${new Date(x.resumed).toISOString().slice(11, 19)} UTC:${x.reply?.trim() ? '' : ' (empty)'}`, '');
+      if (x.reply?.trim()) lines.push(...quote(x.reply), '');
     });
   }
   lines.push('', '## Runs', '');

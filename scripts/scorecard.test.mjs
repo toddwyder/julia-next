@@ -102,6 +102,22 @@ test('a card scorecard prices its share of the thread, lists its subagents and j
   assert.equal(card272(undefined).success, undefined);
 });
 
+test('missing run records cannot establish success or zero spend', () => {
+  const s = buildScorecard({ card: 'JUL-272', threads: [], prices, tracing: { metrics: [], requested: [] }, pulls: [], pings: [], uat: { yesAt: T('18:40'), said: 'Yes' } });
+  assert.equal(s.success, undefined);
+  const markdown = renderScorecard(s);
+  assert.match(markdown, /no matching run records/);
+  assert.match(markdown, /Cost: \*\*unknown\*\*/);
+  assert.doesNotMatch(markdown, /every row priced|\$0\.00/);
+});
+
+test('detailed stop replies retain their complete multiline text', () => {
+  const reply = 'A long reply '.repeat(30) + '\nIMPORTANT_END_OF_REPLY';
+  const events = threadEvents([user('18:00', 'Card: JUL-272'), assistant('18:01', [step('18:01'), say('18:02', 'Ready?')]), user('18:20', reply)]);
+  const s = buildScorecard({ card: 'JUL-272', threads: [{ ...thread, events }], prices, tracing: { metrics: [], requested: [] }, pulls: [], pings: [] });
+  assert.match(renderScorecard(s), /\n   > IMPORTANT_END_OF_REPLY/);
+});
+
 test('a stop takes only a ping recorded inside it, never one from just before', () => {
   const ping = at => ({ id: at, at: T(at), thread: 'thread-1', card: 'JUL-272', comment: `https://linear.app/${at}`, notified: true });
   const s = buildScorecard({ card: 'JUL-272', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls: [], pings: [ping('18:03'), ping('18:31')] });
