@@ -112,3 +112,13 @@ Deferred until doing it by hand gets in the way (Todd, 25 Oct):
 - UAT and merge: notification, accept/send-back, automatic merge, GitHub merge protection, live check, revert/rollback.
 - Automatic retro: `/correct` after merge, plain-English list, Todd approves. Waits for a history of real Julia cards.
 The clean-up is built by the planner agent in a fresh session. From card 5 on, the machine builds the cards itself (Start's admission check accepts the current triage card shape, confirmed on JUL-263 on 24 Oct, and card 1 lets the machine use paid models); the planner agent shapes cards with Todd.
+
+## 25 October evening decisions (Todd): fresh pstack and Mastra Code
+
+- **Milestone 1 is a Julia card.** Before the machine runs any card, one setup and one practice Julia card are run by hand in Mastra Code on the server, with Todd watching.
+- **Start fresh.** pstack is set up as its guide says. Nothing from the old machine's behaviour on top of pstack is carried over unless a real run shows it is needed. The old machine's code stays untouched until milestone 1 passes, then it is deleted.
+- **Harness.** Mastra Code's stock coding agent and stock subagents. No custom agents.
+- **pstack source.** pstack comes from the `backnotprop/pstack` mirror at commit `fad8d01` (version 0.15.32), not Cursor's copy, because the mirror's harness rewrites are what let pstack run outside Cursor.
+- **Models for pstack.** The chat itself runs on Opus 5.5. These roles run on Sol 6.1: hardest tasks; judgment and prose; how explainer; why synthesizer; reflect judgment, divergent, synthesizer. These roles run on DeepSeek V4.1 Flash: feature and refactoring; bug-fix; perf-issue; hillclimb; how explorer; why investigators; reflect tooling; swarm workers. Panels (arena runners, arena cross-judge pool, architect runners, interrogate reviewers) are Sol 6.1 plus DeepSeek V4.1 Flash. Budget: medium. All of this is set by running `/setup-pstack` during the hand run, not written by hand.
+- **At setup.** Accept the generated verification skill, which replaces `verify-julia`. Decline formal verification; JUL-271 owes it. Setup's changes reach `main` through a pull request using pstack's Opening a PR and Babysit; pstack's Shipping lands it. The proof is the generator's end-to-end proof plus a screenshot of the home page taken on the server.
+- **JUL-252 is canceled as superseded.** The evidence-review instruction agreed earlier on 25 October is superseded and must not be sent.
