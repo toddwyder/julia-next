@@ -49,6 +49,22 @@ test('a stop lasts from the last agent activity to the reply; an ask_user answer
   assert.equal(stops[1].question, 'PR is open.');
 });
 
+// JUL-272 on 26 October: the agent resumed one second after the answer, before the empty user row was written.
+test('an ask_user wait ends at the answer, even when the agent resumes before the user row is written', () => {
+  const at = s => Date.parse(`2026-10-26T${s}.000Z`);
+  const events = threadEvents([
+    { role: 'user', type: 'v2', createdAt: '2026-10-26T19:00:53.000Z', content: JSON.stringify({ parts: [{ type: 'text', text: 'continue' }] }) },
+    { role: 'assistant', type: 'v2', createdAt: '2026-10-26T19:00:58.000Z', content: JSON.stringify({ metadata: opus, parts: [
+      { type: 'text', text: 'PR is open.', createdAt: at('19:00:58') },
+      { type: 'tool-invocation', createdAt: at('19:00:58'), updatedAt: at('19:30:18'), toolInvocation: { toolName: 'ask_user', args: { question: 'Merge it?' } } },
+      { type: 'step-start', createdAt: at('19:30:19') - 400 },
+    ] }) },
+    { role: 'user', type: 'v2', createdAt: '2026-10-26T19:30:19.000Z', content: JSON.stringify({ parts: [{ type: 'text', text: '' }] }) },
+  ]);
+  const stops = findStops(events);
+  assert.deepEqual(stops.map(s => [s.kind, s.question, Math.round((s.resumed - s.since) / 1000)]), [['question', 'Merge it?', 1760]]);
+});
+
 test('thread usage is split into fresh input, cache reads, cache writes and output, with 1-hour writes at 1.6x', () => {
   const priced = priceThreadUsage(thread.usage, prices.anthropic.models['claude-opus-5-5'].cost);
   assert.deepEqual(priced.tokens, { input: 10_000, cacheRead: 900_000, cacheWrite: 90_000, output: 10_000 });

@@ -93,13 +93,15 @@ export function findStops(events) {
   const stops = [];
   let previousUser = -Infinity;
   for (const user of events.users) {
-    const since = events.activity.filter(t => t < user.at).at(-1);
     const after = previousUser;
     previousUser = user.at;
+    // An ask_user answer resumes the agent before its user row is written, so the wait ends at the answer.
+    const ask = events.asks.find(a => a.answeredAt && a.answeredAt <= user.at && a.answeredAt > after);
+    const resumed = ask ? ask.answeredAt : user.at;
+    const since = events.activity.filter(t => t < resumed).at(-1);
     if (since === undefined || since < after) continue;
-    const ask = events.asks.find(a => a.answeredAt && a.answeredAt <= user.at && a.answeredAt >= since - 1000);
     const lastText = events.texts.filter(t => t.at <= since + 1000).at(-1)?.text ?? '';
-    stops.push({ since, resumed: user.at, kind: ask ? 'question' : 'turn ended', question: ask ? ask.question : lastText, reply: user.text });
+    stops.push({ since, resumed, kind: ask ? 'question' : 'turn ended', question: ask ? ask.question : lastText, reply: user.text });
   }
   return stops;
 }
