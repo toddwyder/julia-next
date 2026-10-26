@@ -11,10 +11,9 @@ All commands run in bash from the repository root. Each command below reads the 
 
 ## Launch
 
-Install the locked dependencies when `node_modules` is missing or `package-lock.json` changed, then start one run:
+Start one run. On a fresh checkout with no `node_modules`, launch runs `npm ci` first. If `package-lock.json` changed since the last install, run `npm ci` yourself before launch.
 
 ```bash
-npm ci
 node .agents/skills/verify-julia/verify-julia.mjs launch                 # local candidate
 node .agents/skills/verify-julia/verify-julia.mjs launch --url https://<preview-address>/   # a deployed build
 eval "$(node -e 'const r=require("./.artifacts/verify-julia/run.json");console.log(`RUN_URL=${r.url} RUN_SESSION=${r.session} EVIDENCE=${r.evidenceDir}`)')"
@@ -22,7 +21,7 @@ eval "$(node -e 'const r=require("./.artifacts/verify-julia/run.json");console.l
 
 Local launch picks a free port on 127.0.0.1, starts `next dev` in its own process group with its own `.next/verify-julia/<run>` output folder, and logs to `$EVIDENCE/server.log`. So it runs beside any other Julia server, including one on port 3000. Remote launch starts nothing.
 
-Launch returns only when Julia is usable: `/api/health` answers `{"status":"ok"}` and `/` returns 200 with a `<main>` element. The first local compile takes about 10 to 30 seconds; the limit is 120 seconds. Launch writes `$EVIDENCE/launch.json` with the run ID, URL, browser session name, commit, branch, dirty flag, worktree SHA-256, and Node, Next.js and Playwright versions. It refuses to start while another run is active; run Cleanup first.
+Launch returns only when Julia is usable: `/api/health` answers `{"status":"ok"}` and `/` returns 200 with a `<main>` element. The first local compile takes about 10 to 30 seconds; the limit is 120 seconds. If Julia is not usable by then, including a `--url` that cannot be reached, launch exits 1 with `Julia did not become usable at <url>` and the last probe result. Launch writes `$EVIDENCE/launch.json` before it waits, and again with the readiness result, with the run ID, URL, browser session name, commit, branch, dirty flag, worktree SHA-256, and Node, Next.js and Playwright versions. It refuses to start while another run is active; run Cleanup first. If launch is interrupted or fails, run Cleanup: it stops the server launch started and keeps the evidence.
 
 ## Doctor
 
@@ -54,7 +53,7 @@ For repeat checks, run the saved Playwright specs against this exact server. The
 node .agents/skills/verify-julia/verify-julia.mjs test .agents/skills/verify-julia/tests/home.spec.mjs
 ```
 
-Output and exit code go to `$EVIDENCE/playwright-test.txt`. A nonzero exit is a failed proof.
+Each call appends its command, output and exit code to `$EVIDENCE/playwright-test.txt`, so separate calls for separate specs all stay in the proof. A nonzero exit is a failed proof.
 
 ## Evidence
 
