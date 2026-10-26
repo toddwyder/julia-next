@@ -50,6 +50,10 @@ julia-verification-maintenance.service        active=inactive   enabled=static
 
 No `server-main.mjs`, `worker.mjs`, or verification-maintenance process is running. Unit files and code remain in place. A detached `tmux julia-codex` shell remains in `/home/ubuntu/julia-machine-main`; it is a shell, not a service.
 
+## Server-owned tests
+
+The server-owned tests pass on this candidate: 4 + 2 + 1 tests, exit 0. The receipt is published at `refs/notes/julia-server-tests/<candidate head>`. The worker was run once by hand with its service PATH because the `julia-server-tests` timer is off; the timer stays off.
+
 ## Mastra Code program
 
 The program is the separate package `mastracode`, not `@mastra/code-sdk` (`node_modules/mastracode/package.json:2-3`, bin at `:21`). Version 0.47.1 declares `@mastra/code-sdk: ^1.14.0` (`:103`). It is installed with that dependency pinned to 1.14.0:
