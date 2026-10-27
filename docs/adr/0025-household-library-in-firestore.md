@@ -26,7 +26,8 @@ The card also asks for stock Firebase first, with custom code only where none ex
 
 ## Consequences
 
-- The Firebase project, its Google sign-in, the `household/members` list and the service account are Todd's to create; until they exist the app cannot reach a real library.
+- Creating the two projects needs one signed-in Google account, once: only a signed-in person can create a project or grant its first service account a role. Everything else — Firestore, sign-in providers, authorised domains, web apps, both membership lists, rules, and the key into 1Password — is `scripts/provision-firebase.mjs`, and a rerun finishes whatever a failure left undone.
+- The household project holds no service account key, because the app needs none: `/api/recipe-events` verifies a token against the project id alone. So the storage proof runs on the proof project's real Firestore with the same rules file, which is why the proof project exists as well as the video.
 - Only two local verifications can run at once on this server, because the emulator ports are fixed. A run that finds both emulators already answering reuses them and leaves them running.
 - The household web config is committed to `lib/firebase-household-config.js` by `scripts/provision-firebase.mjs`, so Vercel needs no extra environment for it; the browser holds no key that grants anything on its own, because the rules and not the key decide access.
 - Provisioning both projects takes one approved Google login, because only a signed-in person can create a project and grant a service account a role. After that the rest of the setup runs unattended.
