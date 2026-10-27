@@ -52,14 +52,38 @@ export async function firebaseProject(project, token) {
   return projectFrom(status, answer);
 }
 
+export async function gcpProject(project, token) {
+  const { status, answer } = await google(`${RESOURCE_MANAGER}/projects/${project.id}`, { token });
+  return projectFrom(status, answer);
+}
+
 export async function ensureProject(project, token) {
   if (await firebaseProject(project, token)) return 'already there';
-  cli(['projects:create', project.id, '--display-name', project.displayName]);
-  for (let waited = 0; waited < 180_000; waited += 5000) {
+  if (!(await gcpProject(project, token))) {
+    const created = await google(`${RESOURCE_MANAGER}/projects`, {
+      token,
+      method: 'POST',
+      body: { projectId: project.id, name: project.displayName },
+    });
+    if (!created.ok) throw new Error(`could not create ${project.id}: ${JSON.stringify(created.answer)}`);
+    for (let waited = 0; waited < 300_000; waited += 5000) {
+      const operation = await google(`${RESOURCE_MANAGER}/${created.answer.name}`, { token });
+      if (operation.answer.done) {
+        if (operation.answer.error) throw new Error(`${project.id} was not created: ${operation.answer.error.message}`);
+        break;
+      }
+      await sleep(5000);
+    }
+  }
+  const added = await google(`${FIREBASE_API}/projects/${project.id}:addFirebase`, { token, method: 'POST', body: {} });
+  if (!added.ok && added.status !== 409) {
+    throw new Error(`could not make ${project.id} a Firebase project: ${JSON.stringify(added.answer)}`);
+  }
+  for (let waited = 0; waited < 240_000; waited += 5000) {
     if (await firebaseProject(project, token)) return 'created';
     await sleep(5000);
   }
-  throw new Error(`${project.id} was created but Firebase does not answer for it yet`);
+  throw new Error(`${project.id} exists but Firebase does not answer for it yet`);
 }
 
 export async function ensureFirestore(project, token) {
