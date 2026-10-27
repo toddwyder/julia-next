@@ -28,7 +28,7 @@ test('no proof identity is on the household list', () => {
   for (const email of PROOF_EMAILS) assert.ok(!household.has(email), `${email} is both a proof user and a household member`);
   assert.deepEqual(HOUSEHOLD_EMAILS, ['toddwyder@gmail.com', 'katinawyder@gmail.com']);
   assert.equal(PROOF.id, 'julia-household-proof');
-  assert.equal(HOUSEHOLD.id, 'julia-household');
+  assert.equal(HOUSEHOLD.id, 'julia-household-512904');
 });
 
 test('the household key names the vault the storage proof reads from', async () => {

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { accessToken } from './firebase-session.mjs';
 
-export const HOUSEHOLD = { id: 'julia-household', displayName: 'Julia household' };
+export const HOUSEHOLD = { id: 'julia-household-512904', displayName: 'Julia household' };
 export const PROOF = { id: 'julia-household-proof', displayName: 'Julia household proof' };
 export const HOUSEHOLD_EMAILS = ['toddwyder@gmail.com', 'katinawyder@gmail.com'];
 export const PROOF_EMAILS = ['todd@household.test', 'katina@household.test', 'stranger@elsewhere.test'];
@@ -17,6 +17,7 @@ export const AUTHORISED_DOMAIN = 'julia-next.vercel.app';
 
 const CLI = fileURLToPath(new URL('../node_modules/.bin/firebase', import.meta.url));
 const FIREBASE_API = 'https://firebase.googleapis.com/v1beta1';
+const SERVICE_USAGE = 'https://serviceusage.googleapis.com/v1';
 const IDENTITY_API = 'https://identitytoolkit.googleapis.com/admin/v2';
 const IAM_API = 'https://iam.googleapis.com/v1';
 const RESOURCE_MANAGER = 'https://cloudresourcemanager.googleapis.com/v1';
@@ -75,7 +76,23 @@ export async function ensureProject(project, token) {
       await sleep(5000);
     }
   }
+  const enabled = await google(`${SERVICE_USAGE}/projects/${project.id}/services/firebase.googleapis.com:enable`, {
+    token,
+    method: 'POST',
+    body: {},
+  });
+  if (!enabled.ok && enabled.status !== 409) {
+    throw new Error(`could not switch Firebase on for ${project.id}: ${JSON.stringify(enabled.answer)}`);
+  }
   const added = await google(`${FIREBASE_API}/projects/${project.id}:addFirebase`, { token, method: 'POST', body: {} });
+  if (added.status === 403) {
+    throw new Error(
+      `${project.id} is a Cloud project but this account may not make it a Firebase one (403). ` +
+        'Add it from https://console.firebase.google.com as the account that owns it, once: the console ' +
+        'records the acceptance Google asks for and no API offers that call (Firebase methods: ' +
+        'addFirebase, get, list, patch, searchApps, the analytics pair, getAdminSdkConfig).',
+    );
+  }
   if (!added.ok && added.status !== 409) {
     throw new Error(`could not make ${project.id} a Firebase project: ${JSON.stringify(added.answer)}`);
   }
