@@ -11,6 +11,7 @@
     "check:recipes-model": "node scripts/check-recipes-model.mjs",
     "prove:recipe-events": "node scripts/prove-recipe-events.mjs",
     "prove:household-rules": "node scripts/prove-household-rules.mjs",
+    "login:firebase": "node scripts/firebase-login-link.mjs",
     "provision:firebase": "node scripts/provision-firebase.mjs",
     "proof:record": "node scripts/record-proof.mjs"
   },
