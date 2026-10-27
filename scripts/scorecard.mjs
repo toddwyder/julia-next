@@ -282,6 +282,15 @@ const tok = n => (n == null ? '' : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 
 const cell = s => String(s).replace(/\s+/g, ' ').replace(/\|/g, '\\|').slice(0, 160);
 const quote = s => String(s).trim().split('\n').map(l => `   > ${l}`.trimEnd());
 
+// An unpriced row is unknown spend, never $0, so a total that leaves it out is a floor.
+function costHeadline(cost, total) {
+  const unpriced = cost.filter(c => c.unpriced).length;
+  if (!cost.length) return '**unknown**. No usage records found for this card.';
+  if (unpriced === cost.length) return '**unknown** at published API prices: no row has a price. Tokens are in the table below.';
+  if (unpriced) return `**at least ${usd(total)}** at published API prices; ${unpriced} ${unpriced === 1 ? 'row' : 'rows'} below ${unpriced === 1 ? 'is' : 'are'} unpriced.`;
+  return `**${usd(total)}** at published API prices, every row priced.`;
+}
+
 export function renderScorecard(s, generatedAt = new Date()) {
   const lines = [];
   lines.push(`# Scorecard: ${s.card}`, '');
@@ -291,7 +300,7 @@ export function renderScorecard(s, generatedAt = new Date()) {
   const verdict = !s.windows ? 'not decided yet (no matching run records)' : s.success === undefined ? 'not decided yet (no UAT yes recorded)' : s.success ? 'yes' : 'no';
   const uat = s.uat ? `${utc(Date.parse(s.uat.yesAt))} ("${cell(s.uat.said)}")` : 'not recorded';
   lines.push(`- Success: **${verdict}**. Stops before Todd's UAT yes: ${s.stopsBeforeUat}. Todd's UAT yes: ${uat}.`);
-  lines.push(s.cost.length ? `- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.` : '- Cost: **unknown**. No usage records found for this card.');
+  lines.push(`- Cost: ${costHeadline(s.cost, s.usd)}`);
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');

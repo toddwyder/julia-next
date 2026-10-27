@@ -160,3 +160,17 @@ test('every stop comment mentions Todd and passes the For-Todd guard', () => {
     assert.deepEqual(checkForToddGuard(body), { ok: true });
   }
 });
+
+// Replays the JUL-208 scorecard merged in #360: 53.6M cache-read tokens on one
+// unpriced row, and the headline said "$0.00".
+test('a headline never states a dollar total that unpriced rows leave out', () => {
+  const row = { agent: 'Code Agent (main chat)', requested: 'anthropic.messages/claude-opus-5-5, commandcode.chat/deepseek/deepseek-v4.1-flash', answered: 'not recorded before tracing', tokens: { input: 1.04e6, cacheRead: 53.6e6, cacheWrite: 312.9e3, output: 387.4e3 }, usd: 0, unpriced: true, basis: 'thread total; no published price' };
+  const base = { card: 'JUL-208', windows: 1, runs: [], stops: [], stopsBeforeUat: 0, pull: undefined, uat: undefined };
+  const allUnpriced = renderScorecard({ ...base, cost: [row], usd: 0 });
+  assert.doesNotMatch(allUnpriced, /Cost: \*\*\$/);
+  assert.match(allUnpriced, /Cost: \*\*unknown\*\*/);
+  const priced = { ...row, agent: 'Code Agent', tokens: {}, usd: 5.66, unpriced: false };
+  const someUnpriced = renderScorecard({ ...base, cost: [priced, row], usd: 5.66 });
+  assert.match(someUnpriced, /Cost: \*\*at least \$5\.66\*\*/);
+  assert.match(renderScorecard({ ...base, cost: [priced], usd: 5.66 }), /Cost: \*\*\$5\.66\*\* at published API prices, every row priced/);
+});
