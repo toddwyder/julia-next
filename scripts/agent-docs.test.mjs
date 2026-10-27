@@ -38,7 +38,8 @@ test('agent instructions use the trial rulebook and the runbook marks Factory re
   assert.doesNotMatch(trial, /one \$10 total model budget|Spending is \$0|cost readback above \$0 stops/);
   assert.match(trial, /Linear holds cards and requirements\. GitHub holds code/);
   assert.match(trial, /node scripts\/julia-agents\.mjs/);
-  assert.match(trial, /open PR to main/);
+  assert.match(trial, /PR is merged to main/);
+  assert.match(trial, /Complete in Linear/);
   assert.match(read('docs/agents/work-execution.md'), /historical evidence only/);
   const tracker = read('docs/agents/issue-tracker.md');
   assert.match(tracker, /New Julia and machine cards live.*Linear/i);

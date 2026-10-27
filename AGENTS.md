@@ -1,28 +1,27 @@
 # AGENTS.md — Julia
 
-Julia uses the pstack way of working, adopted 22 October 2026 and kept after the JUL-231 retro on 23 October. pstack builds and proves. This file is the whole rulebook.
+Julia uses pstack (adopted 22 October 2026). pstack builds and proves. This file is the whole rulebook.
 
 ## Work
 - Build with the poteto-mode skill and follow it as written.
-- In Mastra Code, read `docs/harness/mastra-code.md` once per session and read the pstack models file it names at task start when it exists.
-- Todd's agreed delivery flow, decisions and order of work: [docs/plans/path-forward.md](docs/plans/path-forward.md).
+- In Mastra Code, read `docs/harness/mastra-code.md` once per session and the pstack models file it names at task start.
+- Before planning a card, read [docs/plans/path-forward.md](docs/plans/path-forward.md) for Todd's delivery flow and decisions.
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
-- Every card gets a scorecard of its spend at published API prices, its models and its stops, rebuilt from Mastra Code's records with `node scripts/scorecard.mjs JUL-<n> --write` into `docs/scorecards/` and committed with the card's PR. Money never stops a card. Every stop comments on the card and sets Todd a Linear reminder. Record Todd's UAT yes in `docs/scorecards/uat.json`. See [docs/adr/0024-run-scorecard-and-stop-ping.md](docs/adr/0024-run-scorecard-and-stop-ping.md).
+- Every card's PR includes its scorecard, built with `node scripts/scorecard.mjs JUL-<n> --write`, and every stop pings Todd; the rest is in [docs/adr/0024-run-scorecard-and-stop-ping.md](docs/adr/0024-run-scorecard-and-stop-ping.md). Money never stops a card.
 - Framework facts come from the installed packages and their version-matched official docs.
-- Commit and push as you go.
-- Publish with gh using the ordinary signed-in GitHub access.
+- Commit and push as you go; publish with gh using the ordinary signed-in GitHub access.
 
 ## Todd
-Ask Todd only when a step needs him in his own account or a choice changes what Julia does for the household. Continue all independent work while an account action is pending. Decide everything else and record it in the decision log.
+Todd decides what Julia does for the household and gives UAT. Everything else is yours: decide it and record it in the decision log. When a step truly needs his own account, show that nothing else can do it, reduce it to one approval he clicks, and keep working while it is pending.
 
 ## Server
 - Agents run as ubuntu with admin rights; Todd accepts the risks.
-- Commands needing Julia keys: node scripts/julia-agents.mjs -- <command>.
-- Server: docs/agents/server-runbook.md. Domain words: [GLOSSARY.md](GLOSSARY.md).
+- Commands needing Julia keys: `node scripts/julia-agents.mjs -- <command>`.
+- Before changing the server, read `docs/agents/server-runbook.md`. When a card uses a Julia word you don't know, read [GLOSSARY.md](GLOSSARY.md).
 - Linear holds cards and requirements. GitHub holds code.
 
 ## Finish
-An open PR to main with the proof in it and CI green.
+A card is finished when its PR is merged to main (after Todd's UAT yes when the card changes something he uses), main CI is green on the merge commit, and the card is Complete in Linear with that commit in a comment.
 
 ## Enforced rules
 
