@@ -6,11 +6,12 @@
 //
 //   node scripts/prove-household-rules.mjs [--target emulator|project]
 //
-// Against the real project it needs FIREBASE_SERVICE_ACCOUNT (the JSON Todd put
-// in 1Password) or GOOGLE_APPLICATION_CREDENTIALS, and it adds temporary proof
+// Against the real project it reads the service-account key from FIREBASE_SERVICE_ACCOUNT,
+// GOOGLE_APPLICATION_CREDENTIALS, or 1Password (where provisioning stores it), and it adds temporary proof
 // identities to household/members for the run, then removes them and their
 // recipes. Nothing the household wrote is touched.
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -41,11 +42,23 @@ export function verdict(checks) {
   return { pass: wrong.length === 0, wrong: wrong.map(check => `${check.what}: expected ${check.expected}, got ${check.got}`) };
 }
 
-function serviceAccount() {
+// Provisioning stores each project's key in the Julia Agents vault, so a real
+// run should not need anyone to copy a key by hand.
+export const VAULT_ITEMS = ['Julia Firebase proof', 'Julia Firebase'];
+
+export function vaultKey(spawn = spawnSync) {
+  for (const item of VAULT_ITEMS) {
+    const read = spawn('op', ['read', `op://Julia Agents/${item}/FIREBASE_SERVICE_ACCOUNT`], { encoding: 'utf8' });
+    if (read.status === 0 && read.stdout.trim()) return JSON.parse(read.stdout);
+  }
+  return null;
+}
+
+export function serviceAccount(spawn) {
   const inline = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (inline) return JSON.parse(inline);
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) return JSON.parse(readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8'));
-  return null;
+  return vaultKey(spawn);
 }
 
 async function emulatorsAnswer() {
@@ -60,8 +73,7 @@ function emulatorAdminApp() {
   return initializeApp({ projectId: 'demo-julia' }, 'household-proof');
 }
 
-function target(flag) {
-  const account = serviceAccount();
+export function target(flag, account = serviceAccount()) {
   if (flag === 'emulator' || (!flag && !account)) {
     return {
       name: 'emulator',
@@ -73,7 +85,7 @@ function target(flag) {
       emulated: true,
     };
   }
-  if (!account) throw new Error('A real-project run needs FIREBASE_SERVICE_ACCOUNT or GOOGLE_APPLICATION_CREDENTIALS.');
+  if (!account) throw new Error('A real-project run needs FIREBASE_SERVICE_ACCOUNT, GOOGLE_APPLICATION_CREDENTIALS, or the key in the Julia Agents vault (npm run provision:firebase stores it).');
   const projectId = account.project_id;
   return {
     name: `project ${projectId}`,
