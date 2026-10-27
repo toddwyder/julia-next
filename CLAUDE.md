@@ -2,4 +2,4 @@
 
 @AGENTS.md
 
-Claude copies of the project skills live in `.claude/skills/`; their sources are in `.agents/skills/`.
+Skills live in `.agents/skills/` (pstack and Julia's own) and `.claude/skills/`; edit a skill in the folder it lives in.
