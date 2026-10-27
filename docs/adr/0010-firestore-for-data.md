@@ -19,7 +19,9 @@ Spark limits (50,000 reads and 20,000 writes a day, 1 GiB stored).
 ADR 0005 turned down Firebase for two reasons from the old Julia. Each is answered here:
 
 - **Java emulators overloaded the runner.** We don't use the Firestore emulator. Tests run
-  against a second, free Firebase project: real Firestore, no Java, no fakes.
+  against a second, free Firebase project: real Firestore, no Java, no fakes. (The security rules
+  have no such second project to run against, so [0025](0025-household-library-in-firestore.md)
+  runs them, and the local browser specs, on the emulator.)
 - **Agents worked around Firebase's offline quirks.** Factory's tests and its independent review
   now stand between a builder and a merge. Offline behaviour is covered by integration tests
   against the real test project.
