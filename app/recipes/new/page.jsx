@@ -31,7 +31,7 @@ export default function NewRecipePage() {
     try {
       await saveRecipe(db, id, fields);
     } catch (thrown) {
-      await reportRecipeEvent(user, { action: 'save', outcome: 'failed', code: errorCode(thrown) });
+      reportRecipeEvent(user, { action: 'save', outcome: 'failed', code: errorCode(thrown) });
       setError('Julia could not save this recipe. Nothing is lost: check the connection and press Save Recipe again.');
       setSaving(false);
       return;

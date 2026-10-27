@@ -40,23 +40,23 @@ export default function HouseholdGate({ children }) {
         await getDoc(doc(db, 'household', 'members'));
       } catch (thrown) {
         if (errorCode(thrown) === 'permission-denied') {
-          await reportRecipeEvent(user, { action: 'sign-in', outcome: 'turned-away' });
+          reportRecipeEvent(user, { action: 'sign-in', outcome: 'turned-away' });
           setState({ status: 'turned-away', email: user.email });
           await signOut(auth);
           return;
         }
-        await reportRecipeEvent(user, { action: 'sign-in', outcome: 'failed', code: errorCode(thrown) });
+        reportRecipeEvent(user, { action: 'sign-in', outcome: 'failed', code: errorCode(thrown) });
         setState({ status: 'signed-out', error: 'Julia could not reach the recipe library. Check the connection and sign in again.' });
         await signOut(auth);
         return;
       }
-      if (freshSignIn) await reportRecipeEvent(user, { action: 'sign-in', outcome: 'ok' });
+      if (freshSignIn) reportRecipeEvent(user, { action: 'sign-in', outcome: 'ok' });
       let moveError = '';
       try {
         const count = await moveBrowserRecipes(db, window.localStorage);
-        if (count > 0) await reportRecipeEvent(user, { action: 'move', outcome: 'ok', count });
+        if (count > 0) reportRecipeEvent(user, { action: 'move', outcome: 'ok', count });
       } catch (thrown) {
-        await reportRecipeEvent(user, { action: 'move', outcome: 'failed', code: errorCode(thrown) });
+        reportRecipeEvent(user, { action: 'move', outcome: 'failed', code: errorCode(thrown) });
         moveError = 'Some recipes saved in this browser could not join the library yet. Julia will try again next time.';
       }
       setState({ status: 'member', db, user, moveError });
