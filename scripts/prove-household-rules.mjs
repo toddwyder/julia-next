@@ -48,6 +48,12 @@ function serviceAccount() {
   return null;
 }
 
+async function emulatorsAnswer() {
+  const roots = ['http://127.0.0.1:8080/', 'http://127.0.0.1:9099/'];
+  const answers = await Promise.all(roots.map(root => fetch(root).then(() => true).catch(() => false)));
+  return answers.every(Boolean);
+}
+
 function emulatorAdminApp() {
   process.env.FIREBASE_AUTH_EMULATOR_HOST ??= '127.0.0.1:9099';
   process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:8080';
@@ -117,14 +123,18 @@ async function writeMembers(where, emails) {
 async function main() {
   const flag = process.argv.includes('--target') ? process.argv[process.argv.indexOf('--target') + 1] : undefined;
   const where = target(flag);
+  const emulators = where.emulated && !(await emulatorsAnswer())
+    ? await (await import('./firebase-emulators.mjs')).startEmulators()
+    : null;
   const recipeUrl = `${where.firestore}/recipes/${DOCUMENT}`;
   const checks = [];
   const check = (what, expected, got) => checks.push({ what, expected, got, pass: expected === got });
 
-  const stored = await getFirestore(where.adminApp).doc('household/members').get();
-  const originalEmails = stored.exists ? stored.data().emails : [];
+  let originalEmails = [];
 
   try {
+    const stored = await getFirestore(where.adminApp).doc('household/members').get();
+    originalEmails = stored.exists ? stored.data().emails : [];
     await writeMembers(where, [...originalEmails, PROOF_MEMBER]);
     const member = await identityIdToken(where, PROOF_MEMBER);
     const stranger = await identityIdToken(where, PROOF_STRANGER);
@@ -151,6 +161,7 @@ async function main() {
     for (const email of [PROOF_MEMBER, PROOF_STRANGER]) {
       await getAuth(where.adminApp).getUserByEmail(email).then(user => getAuth(where.adminApp).deleteUser(user.uid)).catch(() => {});
     }
+    if (emulators) await emulators.stop();
   }
 }
 
