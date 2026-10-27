@@ -7,17 +7,27 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint:framework": "node scripts/lint-framework.mjs"
+    "lint:framework": "node scripts/lint-framework.mjs",
+    "check:recipes-model": "node scripts/check-recipes-model.mjs",
+    "prove:recipe-events": "node scripts/prove-recipe-events.mjs",
+    "prove:household-rules": "node scripts/prove-household-rules.mjs",
+    "login:firebase": "node scripts/firebase-login-link.mjs",
+    "provision:firebase": "node scripts/provision-firebase.mjs",
+    "proof:record": "node scripts/record-proof.mjs"
   },
   "dependencies": {
     "@sentry/node": "^10.75.0",
+    "firebase": "13.1.0",
+    "firebase-admin": "14.5.0",
     "next": "^16.3.5",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
+    "@firebase/rules-unit-testing": "6.0.0",
     "@playwright/test": "1.63.0",
-    "eslint": "^10.11.0"
+    "eslint": "^10.11.0",
+    "firebase-tools": "15.34.1"
   }
 }

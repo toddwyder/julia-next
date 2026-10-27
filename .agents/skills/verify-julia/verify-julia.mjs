@@ -22,6 +22,14 @@ function candidate() {
   };
 }
 
+const emulatorHosts = ['127.0.0.1:8080', '127.0.0.1:9099'];
+async function emulatorsReady() {
+  for (const host of emulatorHosts) {
+    try { await fetch(`http://${host}/`); } catch { return false; }
+  }
+  return true;
+}
+
 function freePort() {
   return new Promise((done, fail) => {
     const server = createServer().once('error', fail).listen(0, '127.0.0.1', () => {
@@ -74,14 +82,29 @@ async function launch(args) {
   } else {
     const port = await freePort();
     const distDir = join('.next', 'verify-julia', runId);
+    let emulators = { state: 'reused', pid: null };
+    if (!(await emulatorsReady())) {
+      const emulatorLog = openSync(join(evidenceDir, 'emulators.log'), 'a');
+      const emulatorChild = spawn(process.execPath, [join(root, 'scripts/firebase-emulators.mjs')], {
+        cwd: root, detached: true, stdio: ['ignore', emulatorLog, emulatorLog],
+      });
+      emulatorChild.unref();
+      emulators = { state: 'started', pid: emulatorChild.pid };
+    }
     const log = openSync(join(evidenceDir, 'server.log'), 'a');
     const command = [join(root, 'node_modules/next/dist/bin/next'), 'dev', '--hostname', '127.0.0.1', '--port', String(port)];
     const child = spawn(process.execPath, command, {
       cwd: root, detached: true, stdio: ['ignore', log, log],
-      env: { ...process.env, JULIA_VERIFY_DIST_DIR: distDir, NEXT_TELEMETRY_DISABLED: '1' },
+      env: {
+        ...process.env,
+        JULIA_VERIFY_DIST_DIR: distDir,
+        NEXT_TELEMETRY_DISABLED: '1',
+        NEXT_PUBLIC_FIREBASE_EMULATOR: '1',
+        FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099',
+      },
     });
     child.unref();
-    Object.assign(run, { mode: 'local', url: `http://127.0.0.1:${port}/`, port, pid: child.pid, distDir, command: [process.execPath, ...command] });
+    Object.assign(run, { mode: 'local', url: `http://127.0.0.1:${port}/`, port, pid: child.pid, distDir, emulators, command: [process.execPath, ...command] });
   }
   writeFileSync(runFile, JSON.stringify(run, null, 2));
   writeFileSync(join(evidenceDir, 'launch.json'), JSON.stringify(run, null, 2));
@@ -90,6 +113,11 @@ async function launch(args) {
   let last = null;
   while (Date.now() < deadline) {
     if (run.mode === 'local' && !alive(run.pid)) break;
+    if (run.mode === 'local' && !(await emulatorsReady())) {
+      last = { emulators: 'starting' };
+      await new Promise(r => setTimeout(r, 1000));
+      continue;
+    }
     try { last = await probe(run.url); if (usable(last)) break; } catch (error) { last = { error: error.message }; }
     await new Promise(r => setTimeout(r, 1000));
   }
@@ -111,6 +139,7 @@ async function doctor() {
     const owners = checks.serverAlive ? listeners(run.port) : [];
     checks.portOwnedByRun = owners.length > 0 && owners.every(pid => alive(pid) && processGroup(pid) === run.pid);
     checks.listenerPids = owners;
+    checks.emulators = await emulatorsReady();
   }
   try {
     checks.probe = await probe(run.url);
@@ -149,9 +178,15 @@ async function cleanup() {
     if (alive(run.pid)) process.kill(-run.pid, 'SIGKILL');
   }
   if (run.distDir) rmSync(join(root, run.distDir), { recursive: true, force: true });
+  const emulators = run.emulators?.pid && alive(run.emulators.pid) ? run.emulators.pid : null;
+  if (emulators) {
+    process.kill(-emulators, 'SIGTERM');
+    for (let i = 0; i < 500 && alive(emulators); i++) await new Promise(r => setTimeout(r, 100));
+    if (alive(emulators)) process.kill(-emulators, 'SIGKILL');
+  }
   rmSync(runFile);
   const kept = existsSync(join(run.evidenceDir, 'launch.json'));
-  console.log(JSON.stringify({ stopped: run.mode === 'local' ? !alive(run.pid) : 'nothing to stop', evidenceDir: run.evidenceDir, evidenceKept: kept }, null, 2));
+  console.log(JSON.stringify({ stopped: run.mode === 'local' ? !alive(run.pid) : 'nothing to stop', emulators: emulators ? !alive(emulators) : run.emulators?.state ?? 'none', evidenceDir: run.evidenceDir, evidenceKept: kept }, null, 2));
   if (!kept) process.exitCode = 1;
 }
 

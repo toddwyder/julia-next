@@ -11,5 +11,10 @@
   "JUL-274": {
     "yesAt": "2026-10-26T22:56:19.847Z",
     "said": "UAT yes on JUL-274: the scorecards are right, the AGENTS.md removals are accepted, and the reminder reached my phone."
+  },
+  "JUL-208": {
+    "yesAt": "2026-10-27T11:50:07Z",
+    "said": "UAT passed: I saved a recipe on desktop, opened it on my phone with Google sign-in, and it was unchanged. This is my yes for the sign-in and sync behavior only.",
+    "scope": "sign-in and sync only; merge waits on the Sentry/Axiom save-failure proof and the formal verification being shown on JUL-208"
   }
 }

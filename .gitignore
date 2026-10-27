@@ -17,3 +17,17 @@ playwright-report/
 
 # Command Code local session state
 .commandcode/
+
+# Firebase emulator run logs
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
+
+# TLA+ model checker downloaded by scripts/check-recipes-model.mjs
+formal/.tools/
+
+# proof project credentials and the vault template written while provisioning
+.firebase-proof.json
+.firebase-proof-keys/
+.firebase-vault-*.json
+.proof/

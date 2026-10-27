@@ -3,7 +3,8 @@
 import { Fragment, use, useEffect, useState } from 'react';
 import Link from 'next/link';
 
-import { openRecipeLibrary } from '../../../lib/recipes';
+import { getRecipe } from '../../../lib/recipes';
+import { useHousehold } from '../household-gate';
 import styles from '../recipes.module.css';
 
 // One row per written line, joined by the original newlines, so the element's
@@ -20,15 +21,16 @@ function WrittenLines({ text, rowClass }) {
 export default function RecipePage({ params }) {
   const { id } = use(params);
   const [read, setRead] = useState({ status: 'reading', recipe: null, error: '' });
+  const { db } = useHousehold();
 
   useEffect(() => {
-    try {
-      const recipe = openRecipeLibrary(window.localStorage).get(id);
-      setRead({ status: recipe ? 'stored' : 'missing', recipe, error: '' });
-    } catch (thrown) {
-      setRead({ status: 'missing', recipe: null, error: thrown.message });
-    }
-  }, [id]);
+    let current = true;
+    getRecipe(db, id).then(
+      recipe => { if (current) setRead({ status: recipe ? 'stored' : 'missing', recipe, error: '' }); },
+      () => { if (current) setRead({ status: 'missing', recipe: null, error: 'Julia could not reach the recipe library. Check the connection and try again.' }); },
+    );
+    return () => { current = false; };
+  }, [db, id]);
 
   if (read.status === 'reading') {
     return (
@@ -43,7 +45,7 @@ export default function RecipePage({ params }) {
       <main className={`vintage-column ${styles.page}`}>
         <div className={styles.stack}>
           <div className={styles.emptyBox}>
-            <p className={styles.emptyHeading}>This recipe is not on this device.</p>
+            <p className={styles.emptyHeading}>This recipe is not in the household library.</p>
           </div>
           {read.error ? <p className={styles.error} role="alert">{read.error}</p> : null}
           <div>

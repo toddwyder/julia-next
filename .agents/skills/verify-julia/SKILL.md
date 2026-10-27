@@ -5,7 +5,7 @@ description: "Drive Julia (the household Next.js web app) the way a user does on
 
 # Verify Julia
 
-Julia is a Next.js web app. Its user surface today is one page (`/`) plus the install manifest and icons. `/api/health` is a machine check, not a user surface. There is no login, database or household data yet, so verification has no persistent side effect.
+Julia is a Next.js web app. Its user surface is the home page (`/`), the install manifest and icons, and the household recipe library (`/recipes`) behind a Google sign-in. `/api/health` is a machine check, not a user surface. A local run uses the Firebase Auth and Firestore emulators, so nothing touches the household's real library; specs sign in as the fake household accounts in `tests/household.mjs`.
 
 All commands run in bash from the repository root. Each command below reads the active run from `.artifacts/verify-julia/run.json`, so a new shell picks the run back up.
 
@@ -19,9 +19,9 @@ node .agents/skills/verify-julia/verify-julia.mjs launch --url https://<preview-
 eval "$(node -e 'const r=require("./.artifacts/verify-julia/run.json");console.log(`RUN_URL=${r.url} RUN_SESSION=${r.session} EVIDENCE=${r.evidenceDir}`)')"
 ```
 
-Local launch picks a free port on 127.0.0.1, starts `next dev` in its own process group with its own `.next/verify-julia/<run>` output folder, and logs to `$EVIDENCE/server.log`. So it runs beside any other Julia server, including one on port 3000. Remote launch starts nothing.
+Local launch picks a free port on 127.0.0.1, starts `next dev` in its own process group with its own `.next/verify-julia/<run>` output folder, and logs to `$EVIDENCE/server.log`. So it runs beside any other Julia server, including one on port 3000. Local launch also starts the Auth and Firestore emulators through `scripts/firebase-emulators.mjs`, logging to `$EVIDENCE/emulators.log`, unless both emulator ports already answer, in which case it reuses them and leaves them running at Cleanup. The emulator ports are fixed at 127.0.0.1:8080 and 127.0.0.1:9099, so one local run at a time. Remote launch starts nothing.
 
-Launch returns only when Julia is usable: `/api/health` answers `{"status":"ok"}` and `/` returns 200 with a `<main>` element. The first local compile takes about 10 to 30 seconds; the limit is 120 seconds. If Julia is not usable by then, including a `--url` that cannot be reached, launch exits 1 with `Julia did not become usable at <url>` and the last probe result. Launch writes `$EVIDENCE/launch.json` before it waits, and again with the readiness result, with the run ID, URL, browser session name, commit, branch, dirty flag, worktree SHA-256, and Node, Next.js and Playwright versions. It refuses to start while another run is active; run Cleanup first. If launch is interrupted or fails, run Cleanup: it stops the server launch started and keeps the evidence.
+Launch returns only when Julia is usable: both emulators answer, `/api/health` answers `{"status":"ok"}` and `/` returns 200 with a `<main>` element. The first local compile takes about 10 to 30 seconds and the emulators about 20, so a first launch can take 40; the limit is 120 seconds. If Julia is not usable by then, including a `--url` that cannot be reached, launch exits 1 with `Julia did not become usable at <url>` and the last probe result. Launch writes `$EVIDENCE/launch.json` before it waits, and again with the readiness result, with the run ID, URL, browser session name, commit, branch, dirty flag, worktree SHA-256, and Node, Next.js and Playwright versions. It refuses to start while another run is active; run Cleanup first. If launch is interrupted or fails, run Cleanup: it stops the server and emulators launch started and keeps the evidence.
 
 ## Doctor
 
@@ -31,7 +31,7 @@ Run before driving and whenever anything looks wrong:
 node .agents/skills/verify-julia/verify-julia.mjs doctor
 ```
 
-It is read-only and writes `$EVIDENCE/doctor.json`. For a local run it checks that the commit and worktree digest still match the launch record (an edit since launch fails it), the server process is alive, and every listener on the port is in that process group. For both modes it checks that health and home are usable. A remote run reports `servedCommit` from `/api/health` (Vercel sets it); compare it to the commit you meant to check. Exit code 1 means do not drive. Clean up and launch again.
+It is read-only and writes `$EVIDENCE/doctor.json`. For a local run it checks that the commit and worktree digest still match the launch record (an edit since launch fails it), the server process is alive, every listener on the port is in that process group, and both emulators still answer. For both modes it checks that health and home are usable. A remote run reports `servedCommit` from `/api/health` (Vercel sets it); compare it to the commit you meant to check. Exit code 1 means do not drive. Clean up and launch again.
 
 ## Drive
 
@@ -74,7 +74,7 @@ node .agents/skills/verify-julia/verify-julia.mjs cleanup
 ls "$EVIDENCE"
 ```
 
-Cleanup closes this run's browser session, stops only the process group it started (SIGTERM, then SIGKILL after 5 seconds), removes that run's `.next/verify-julia/<run>` folder, and clears `run.json`. It never kills by name or port. It keeps `$EVIDENCE` and exits 1 if `launch.json` is missing afterwards. Run it after every failed attempt too.
+Cleanup closes this run's browser session, stops only the process groups it started (SIGTERM, then SIGKILL after 5 seconds for the server and 50 for the emulators, which stop their Java children themselves), removes that run's `.next/verify-julia/<run>` folder, and clears `run.json`. It never kills by name or port. It keeps `$EVIDENCE` and exits 1 if `launch.json` is missing afterwards. Run it after every failed attempt too.
 
 ## Helpers
 

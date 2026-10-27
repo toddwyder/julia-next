@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 
+import { TODD, resetHousehold, signIn } from './household.mjs';
+
 // Every expected colour and font is read from the design document, so these
 // checks fail when the screens drift from DESIGN-LANGUAGE.md or the document changes.
 const DESIGN = readFileSync(new URL('../../../../docs/design/vintage/DESIGN-LANGUAGE.md', import.meta.url), 'utf8');
@@ -42,7 +44,12 @@ function style(locator) {
   });
 }
 
+test.beforeEach(async () => {
+  await resetHousehold();
+});
+
 test('the design fonts are loaded, not only named', async ({ page }) => {
+  await signIn(page, TODD);
   await page.goto('/recipes/new');
   const loaded = await page.evaluate(async () => {
     await document.fonts.ready;
@@ -52,9 +59,7 @@ test('the design fonts are loaded, not only named', async ({ page }) => {
 });
 
 test('Library uses the vintage paper, ink, greens and fonts', async ({ page }) => {
-  await page.goto('/');
-  await page.evaluate(() => window.localStorage.clear());
-  await page.goto('/recipes');
+  await signIn(page, TODD);
 
   expect(await style(page.locator('body'))).toEqual({ color: INK, background: PAPER, font: SERIF });
   expect(await style(page.getByRole('heading', { level: 1, name: 'Library' }))).toMatchObject({ color: HEADING, font: SERIF });
@@ -66,6 +71,7 @@ test('Library uses the vintage paper, ink, greens and fonts', async ({ page }) =
 });
 
 test('Enter a Recipe uses the vintage buttons, inputs and fonts', async ({ page }) => {
+  await signIn(page, TODD);
   await page.goto('/recipes/new');
 
   expect(await style(page.getByRole('heading', { level: 1, name: 'Enter a Recipe' }))).toMatchObject({ color: HEADING, font: SERIF });
@@ -78,6 +84,7 @@ test('Enter a Recipe uses the vintage buttons, inputs and fonts', async ({ page 
 });
 
 test('a Recipe uses the vintage title, sections and fonts', async ({ page }) => {
+  await signIn(page, TODD);
   await page.goto('/recipes/new');
   await page.getByLabel('Recipe Title').fill('Coq au Vin');
   await page.getByLabel('Ingredients').fill('1 chicken\n12 shallots');

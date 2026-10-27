@@ -5,7 +5,12 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const MIRROR = 'https://github.com/backnotprop/pstack';
-export const JULIA_SKILLS = new Set(['adversarial-review', 'playwright-cli', 'verify-julia']);
+export const JULIA_SKILLS = new Set([
+  'adversarial-review',
+  'playwright-cli',
+  'verify-julia',
+  'verify-recipes-formally',
+]);
 const ALLOWED_TOP_LEVEL_FILES = new Set(['PSTACK-SOURCE.md', 'PSTACK-LICENSE.txt']);
 
 export function readPin(root = process.cwd()) {
