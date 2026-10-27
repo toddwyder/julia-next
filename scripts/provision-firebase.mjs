@@ -43,9 +43,13 @@ function cli(args) {
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+export function projectFrom(status, answer) {
+  return status === 200 && answer?.projectId ? answer : null;
+}
+
 export async function firebaseProject(project, token) {
   const { status, answer } = await google(`${FIREBASE_API}/projects/${project.id}`, { token });
-  return status === 404 ? null : answer;
+  return projectFrom(status, answer);
 }
 
 export async function ensureProject(project, token) {

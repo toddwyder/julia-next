@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { HOUSEHOLD, HOUSEHOLD_EMAILS, PROOF, PROOF_EMAILS, membersBody, vaultItemFor } from './provision-firebase.mjs';
+import { HOUSEHOLD, HOUSEHOLD_EMAILS, PROOF, PROOF_EMAILS, membersBody, projectFrom, vaultItemFor } from './provision-firebase.mjs';
+
+test('only a project the account can actually use counts as there', () => {
+  assert.equal(projectFrom(200, { projectId: 'julia-household', lifecycleState: 'ACTIVE' }).projectId, 'julia-household');
+  assert.equal(projectFrom(404, {}), null);
+  assert.equal(projectFrom(403, { error: { status: 'PERMISSION_DENIED' } }), null);
+  assert.equal(projectFrom(200, { name: 'projects/whatever' }), null);
+});
 
 test('the household list is written as the array of emails the rules check', () => {
   assert.deepEqual(membersBody(['toddwyder@gmail.com', 'katinawyder@gmail.com']), {
