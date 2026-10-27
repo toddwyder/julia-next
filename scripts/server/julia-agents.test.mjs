@@ -6,11 +6,11 @@ import { mkdtempSync,writeFileSync,chmodSync,existsSync,rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 const script=fileURLToPath(new URL('../julia-agents.mjs',import.meta.url))
-test('server agents route resolves all eight fields and forwards literal arguments through real op',()=>{
- const child="const assert=require('node:assert/strict');for(const k of ['COMMANDCODE_API_KEY','LINEAR_API_KEY','SENTRY_AUTH_TOKEN','NEXT_PUBLIC_SENTRY_DSN','SENTRY_ORG','SENTRY_PROJECT','AXIOM_TOKEN','AXIOM_DATASET'])assert.ok(process.env[k]&&!process.env[k].startsWith('op://'));assert.equal(process.argv[1],'literal ; $(do-not-run)');console.log('resolved eight fields; literal argv received')"
+test('server agents route resolves all nine fields and forwards literal arguments through real op',()=>{
+ const child="const assert=require('node:assert/strict');for(const k of ['COMMANDCODE_API_KEY','LINEAR_API_KEY','SENTRY_AUTH_TOKEN','NEXT_PUBLIC_SENTRY_DSN','SENTRY_ORG','SENTRY_PROJECT','AXIOM_TOKEN','AXIOM_DATASET','STITCH_API_KEY'])assert.ok(process.env[k]&&!process.env[k].startsWith('op://'));assert.equal(process.argv[1],'literal ; $(do-not-run)');console.log('resolved nine fields; literal argv received')"
  const result=spawnSync(process.execPath,[script,'--',process.execPath,'-e',child,'literal ; $(do-not-run)'],{encoding:'utf8',timeout:60000})
  assert.equal(result.status,0,result.stderr)
- assert.equal(result.stdout.trim(),'resolved eight fields; literal argv received')
+ assert.equal(result.stdout.trim(),'resolved nine fields; literal argv received')
 })
 test('unavailable agent passes fail before child effects without inherited authentication fallback',()=>{
  const directory=mkdtempSync(join(tmpdir(),'julia-agents-pass-'))
