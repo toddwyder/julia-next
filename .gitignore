@@ -28,5 +28,6 @@ formal/.tools/
 
 # proof project credentials and the vault template written while provisioning
 .firebase-proof.json
+.firebase-proof-keys/
 .firebase-vault-*.json
 .proof/

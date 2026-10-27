@@ -42,9 +42,29 @@ export function verdict(checks) {
   return { pass: wrong.length === 0, wrong: wrong.map(check => `${check.what}: expected ${check.expected}, got ${check.got}`) };
 }
 
-// Provisioning stores each project's key in the Julia Agents vault, so a real
-// run should not need anyone to copy a key by hand.
+// Provisioning writes each project's key next to the repo (gitignored, mode
+// 0600) and into the Julia Agents vault when that account may write. The
+// 1Password service account on this server is read-only, so the local file is
+// the copy a real run actually finds.
 export const VAULT_ITEMS = ['Julia Firebase proof', 'Julia Firebase'];
+
+export function localKey(projectId = 'julia-household-proof', read = readFileSync) {
+  try {
+    return JSON.parse(read(new URL(`../.firebase-proof-keys/${projectId}.json`, import.meta.url), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+// The proof project's web config, as provisioning wrote it, so a real run needs
+// no environment set up by hand.
+export function proofWebKey(read = readFileSync) {
+  try {
+    return JSON.parse(read(new URL('../.firebase-proof.json', import.meta.url), 'utf8')).web.apiKey;
+  } catch {
+    return undefined;
+  }
+}
 
 export function vaultKey(spawn = spawnSync) {
   for (const item of VAULT_ITEMS) {
@@ -54,11 +74,11 @@ export function vaultKey(spawn = spawnSync) {
   return null;
 }
 
-export function serviceAccount(spawn) {
+export function serviceAccount(spawn, read = readFileSync) {
   const inline = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (inline) return JSON.parse(inline);
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) return JSON.parse(readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8'));
-  return vaultKey(spawn);
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) return JSON.parse(read(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8'));
+  return localKey('julia-household-proof', read) ?? vaultKey(spawn);
 }
 
 async function emulatorsAnswer() {
@@ -74,7 +94,7 @@ function emulatorAdminApp() {
 }
 
 export function target(flag, account = serviceAccount()) {
-  if (flag === 'emulator' || (!flag && !account)) {
+  if (flag !== 'project') {
     return {
       name: 'emulator',
       projectId: 'demo-julia',
@@ -85,12 +105,12 @@ export function target(flag, account = serviceAccount()) {
       emulated: true,
     };
   }
-  if (!account) throw new Error('A real-project run needs FIREBASE_SERVICE_ACCOUNT, GOOGLE_APPLICATION_CREDENTIALS, or the key in the Julia Agents vault (npm run provision:firebase stores it).');
+  if (!account) throw new Error('A real-project run needs FIREBASE_SERVICE_ACCOUNT, GOOGLE_APPLICATION_CREDENTIALS, the key file npm run provision:firebase writes, or the key in the Julia Agents vault.');
   const projectId = account.project_id;
   return {
     name: `project ${projectId}`,
     projectId,
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? proofWebKey(),
     auth: 'https://identitytoolkit.googleapis.com/v1',
     firestore: `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`,
     adminApp: getApps().some(app => app.name === 'household-proof')
@@ -104,6 +124,13 @@ async function identityIdToken(where, email, verified = true) {
   const auth = getAuth(where.adminApp);
   const user = await auth.createUser({ email, emailVerified: verified }).catch(thrown => {
     if (thrown.code === 'auth/email-already-exists') return auth.getUserByEmail(email);
+    if (/UNAUTHENTICATED|CONFIGURATION_NOT_FOUND|configuration-not-found|no configuration/i.test(`${thrown.code} ${thrown.message}`)) {
+      throw new Error(
+        `${where.projectId} has no Firebase Authentication config yet, so it cannot make the ` +
+          'identities this proof needs, and no API creates one. Press "Get started" once at ' +
+          `https://console.firebase.google.com/project/${where.projectId}/authentication and run this again.`,
+      );
+    }
     throw thrown;
   });
   const customToken = await auth.createCustomToken(user.uid);

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { documentBody, serviceAccount, verdict } from './prove-household-rules.mjs';
+import { documentBody, serviceAccount, target, verdict } from './prove-household-rules.mjs';
+
+const nothingOnDisk = () => {
+  throw new Error('no key file on this machine');
+};
 
 test('a whole recipe is what the proof writes, under the id it names', () => {
   const body = documentBody('proof-recipe', 'Proof Coq au Vin');
@@ -24,7 +28,7 @@ test('the real run finds its key in the vault provisioning filled, not in a huma
     return asked.length === 2
       ? { status: 0, stdout: '{ "project_id": "julia-household-proof" }' }
       : { status: 1, stdout: '' };
-  });
+  }, nothingOnDisk);
   assert.equal(found.project_id, 'julia-household-proof');
   assert.deepEqual(asked, [
     ['op', 'read', 'op://Julia Agents/Julia Firebase proof/FIREBASE_SERVICE_ACCOUNT'],
@@ -35,5 +39,11 @@ test('the real run finds its key in the vault provisioning filled, not in a huma
 test('no vault entry and no key in the environment means no real run', () => {
   delete process.env.FIREBASE_SERVICE_ACCOUNT;
   delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  assert.equal(serviceAccount(() => ({ status: 1, stdout: '' })), null);
+  assert.equal(serviceAccount(() => ({ status: 1, stdout: '' }), nothingOnDisk), null);
+});
+
+test('a run without --target project never touches the real project', () => {
+  assert.equal(target(undefined).name, 'emulator');
+  assert.equal(target('emulator').name, 'emulator');
+  assert.equal(target('project', { project_id: 'julia-household-proof' }).name, 'project julia-household-proof');
 });
