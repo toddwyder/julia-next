@@ -1,4 +1,6 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, readdirSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Starts the Auth and Firestore emulators from firebase.json under the
@@ -6,6 +8,28 @@ import { fileURLToPath } from 'node:url';
 export const EMULATOR_PROJECT_ID = 'demo-julia';
 export const EMULATOR_HOSTS = { auth: '127.0.0.1:9099', firestore: '127.0.0.1:8080' };
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
+// firebase-tools 15 refuses to start the emulators on an older runtime, and some
+// machines (CI images included) keep a newer JDK beside the one on PATH.
+const MINIMUM_JAVA = 21;
+
+function javaMajor(home) {
+  const binary = home ? join(home, 'bin/java') : 'java';
+  const result = spawnSync(binary, ['-version'], { encoding: 'utf8' });
+  const version = /version "(\d+)/.exec(`${result.stdout}${result.stderr}`);
+  return version ? Number(version[1]) : 0;
+}
+
+function supportedJavaHome() {
+  const jvm = '/usr/lib/jvm';
+  const candidates = [
+    process.env.JAVA_HOME,
+    ...Object.entries(process.env).filter(([name]) => name.startsWith('JAVA_HOME_') && name !== 'JAVA_HOME').map(([, value]) => value),
+    ...(existsSync(jvm) ? readdirSync(jvm).map(name => join(jvm, name)) : []),
+  ].filter(Boolean);
+  const found = candidates.find(home => existsSync(join(home, 'bin/java')) && javaMajor(home) >= MINIMUM_JAVA);
+  if (found) return found;
+  return javaMajor(null) >= MINIMUM_JAVA ? 'mine' : null;
+}
 
 async function reachable(host) {
   try {
@@ -21,10 +45,14 @@ async function reachable(host) {
  * @returns {Promise<{ stop: () => Promise<void> }>}
  */
 export async function startEmulators({ timeoutMs = 120_000, signal } = {}) {
+  const javaHome = supportedJavaHome();
   const child = spawn('npx', ['--no-install', 'firebase', 'emulators:start', '--only', 'auth,firestore', '--project', EMULATOR_PROJECT_ID], {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
     detached: true,
+    env: javaHome && javaHome !== 'mine'
+      ? { ...process.env, JAVA_HOME: javaHome, PATH: `${join(javaHome, 'bin')}${delimiter}${process.env.PATH}` }
+      : process.env,
   });
   let output = '';
   child.stdout.on('data', chunk => { output += chunk; });
@@ -55,6 +83,8 @@ export async function startEmulators({ timeoutMs = 120_000, signal } = {}) {
   }
   return { stop };
 }
+
+export { supportedJavaHome };
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const shutdown = new AbortController();
