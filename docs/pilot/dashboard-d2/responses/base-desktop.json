@@ -1,0 +1,29 @@
+{
+  "id": 1793139223561,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/43fc5d81e9ec45428ac8659793f81de2\",\"title\":\"Todd's Software Factory Board\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/788f0120dc38499f9a83c425613c551d\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/788f0120dc38499f9a83c425613c551d:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/d994bc51960447948a6ed83c862e43e2\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d994bc51960447948a6ed83c862e43e2:download\",\"mimeType\":\"text/html\"},\"width\":\"2560\",\"height\":\"2048\",\"deviceType\":\"DESKTOP\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "DESKTOP",
+      "height": "2048",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d994bc51960447948a6ed83c862e43e2:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/d994bc51960447948a6ed83c862e43e2"
+      },
+      "name": "projects/12943705270951129641/screens/43fc5d81e9ec45428ac8659793f81de2",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/788f0120dc38499f9a83c425613c551d:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/788f0120dc38499f9a83c425613c551d"
+      },
+      "title": "Todd's Software Factory Board",
+      "width": "2560"
+    }
+  }
+}

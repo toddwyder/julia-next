@@ -1,0 +1,29 @@
+{
+  "id": 1793140210495,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/d38eb35e2b52405ea7fa25af24bce7d2\",\"title\":\"Todd's Factory Board - Warm Editorial\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/2a389694d88a44e296022de7e27a1610\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/2a389694d88a44e296022de7e27a1610:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/81c87f4f940541dd9b8ec027e0b1ae5a\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/81c87f4f940541dd9b8ec027e0b1ae5a:download\",\"mimeType\":\"text/html\"},\"width\":\"2560\",\"height\":\"2048\",\"deviceType\":\"DESKTOP\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "DESKTOP",
+      "height": "2048",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/81c87f4f940541dd9b8ec027e0b1ae5a:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/81c87f4f940541dd9b8ec027e0b1ae5a"
+      },
+      "name": "projects/12943705270951129641/screens/d38eb35e2b52405ea7fa25af24bce7d2",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/2a389694d88a44e296022de7e27a1610:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/2a389694d88a44e296022de7e27a1610"
+      },
+      "title": "Todd's Factory Board - Warm Editorial",
+      "width": "2560"
+    }
+  }
+}

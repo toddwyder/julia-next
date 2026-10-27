@@ -1,0 +1,126 @@
+{
+  "issues": {
+    "nodes": [
+      {
+        "identifier": "JUL-274",
+        "title": "Scorecard for every run, plus a Linear ping when a run waits on Todd",
+        "url": "https://linear.app/julia-next/issue/JUL-274/scorecard-for-every-run-plus-a-linear-ping-when-a-run-waits-on-todd"
+      },
+      {
+        "identifier": "JUL-273",
+        "title": "Recipe screens look like Julia's vintage design (JUL-208 slice 1b)",
+        "url": "https://linear.app/julia-next/issue/JUL-273/recipe-screens-look-like-julias-vintage-design-jul-208-slice-1b"
+      },
+      {
+        "identifier": "JUL-272",
+        "title": "Add a recipe and find it by title (JUL-208 slice 1, single user)",
+        "url": "https://linear.app/julia-next/issue/JUL-272/add-a-recipe-and-find-it-by-title-jul-208-slice-1-single-user"
+      },
+      {
+        "identifier": "JUL-271",
+        "title": "New machine: retry and pause",
+        "url": "https://linear.app/julia-next/issue/JUL-271/new-machine-retry-and-pause"
+      },
+      {
+        "identifier": "JUL-269",
+        "title": "JUL-252 practice: real failure path",
+        "url": "https://linear.app/julia-next/issue/JUL-269/jul-252-practice-real-failure-path"
+      },
+      {
+        "identifier": "JUL-257",
+        "title": "Practice structurally fenced JUL-253 Start retry",
+        "url": "https://linear.app/julia-next/issue/JUL-257/practice-structurally-fenced-jul-253-start-retry"
+      },
+      {
+        "identifier": "JUL-237",
+        "title": "Show trustworthy Review failures and incomplete outcomes",
+        "url": "https://linear.app/julia-next/issue/JUL-237/show-trustworthy-review-failures-and-incomplete-outcomes"
+      },
+      {
+        "identifier": "JUL-222",
+        "title": "Bring my Samsung Food recipes into Julia",
+        "url": "https://linear.app/julia-next/issue/JUL-222/bring-my-samsung-food-recipes-into-julia"
+      },
+      {
+        "identifier": "JUL-216",
+        "title": "Import a link or text and Keep exactly one recipe",
+        "url": "https://linear.app/julia-next/issue/JUL-216/import-a-link-or-text-and-keep-exactly-one-recipe"
+      },
+      {
+        "identifier": "JUL-215",
+        "title": "Delete recipes with Undo",
+        "url": "https://linear.app/julia-next/issue/JUL-215/delete-recipes-with-undo"
+      },
+      {
+        "identifier": "JUL-211",
+        "title": "Find recipes offline and change displayed units and yield",
+        "url": "https://linear.app/julia-next/issue/JUL-211/find-recipes-offline-and-change-displayed-units-and-yield"
+      },
+      {
+        "identifier": "JUL-210",
+        "title": "See and correct Julia's understanding while entering a recipe",
+        "url": "https://linear.app/julia-next/issue/JUL-210/see-and-correct-julias-understanding-while-entering-a-recipe"
+      },
+      {
+        "identifier": "JUL-209",
+        "title": "Reopen the whole library and add recipes offline",
+        "url": "https://linear.app/julia-next/issue/JUL-209/reopen-the-whole-library-and-add-recipes-offline"
+      },
+      {
+        "identifier": "JUL-208",
+        "title": "Keep a private recipe",
+        "url": "https://linear.app/julia-next/issue/JUL-208/keep-a-private-recipe"
+      },
+      {
+        "identifier": "JUL-206",
+        "title": "Enforce verification and retain failure proof in existing GitHub CI",
+        "url": "https://linear.app/julia-next/issue/JUL-206/enforce-verification-and-retain-failure-proof-in-existing-github-ci"
+      },
+      {
+        "identifier": "JUL-101",
+        "title": "When work fails: a readable test failure, remediation, two rounds",
+        "url": "https://linear.app/julia-next/issue/JUL-101/when-work-fails-a-readable-test-failure-remediation-two-rounds"
+      },
+      {
+        "identifier": "JUL-36",
+        "title": "Finding a recipe in the library: search, order, and what a row shows",
+        "url": "https://linear.app/julia-next/issue/JUL-36/finding-a-recipe-in-the-library-search-order-and-what-a-row-shows"
+      },
+      {
+        "identifier": "JUL-26",
+        "title": "The Lab: what creating a new recipe should feel like",
+        "url": "https://linear.app/julia-next/issue/JUL-26/the-lab-what-creating-a-new-recipe-should-feel-like"
+      },
+      {
+        "identifier": "JUL-25",
+        "title": "What FlavorGraph and Sharma's flavor equation are, and how they could drive recipe creation",
+        "url": "https://linear.app/julia-next/issue/JUL-25/what-flavorgraph-and-sharmas-flavor-equation-are-and-how-they-could"
+      },
+      {
+        "identifier": "JUL-23",
+        "title": "Vintage interface: match it exactly, or keep its spirit?",
+        "url": "https://linear.app/julia-next/issue/JUL-23/vintage-interface-match-it-exactly-or-keep-its-spirit"
+      },
+      {
+        "identifier": "JUL-22",
+        "title": "Extract the vintage design language from the live app",
+        "url": "https://linear.app/julia-next/issue/JUL-22/extract-the-vintage-design-language-from-the-live-app"
+      },
+      {
+        "identifier": "JUL-15",
+        "title": "Manual entry, editing, and deleting: anything beyond the vintage screens?",
+        "url": "https://linear.app/julia-next/issue/JUL-15/manual-entry-editing-and-deleting-anything-beyond-the-vintage-screens"
+      },
+      {
+        "identifier": "JUL-13",
+        "title": "Recipe import from a URL or pasted text: what \"good enough\" means",
+        "url": "https://linear.app/julia-next/issue/JUL-13/recipe-import-from-a-url-or-pasted-text-what-good-enough-means"
+      },
+      {
+        "identifier": "JUL-12",
+        "title": "What a recipe is: its fields, what's derived, and how it scales",
+        "url": "https://linear.app/julia-next/issue/JUL-12/what-a-recipe-is-its-fields-whats-derived-and-how-it-scales"
+      }
+    ]
+  }
+}

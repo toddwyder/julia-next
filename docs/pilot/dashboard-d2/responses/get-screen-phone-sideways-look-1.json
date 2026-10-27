@@ -1,0 +1,29 @@
+{
+  "id": 1793140622579,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/ab1c9032cf2e4339adbdf718d42c3a4b\",\"title\":\"Todd's Factory - Grit Mint & Tangerine\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/8a923bb9cb4a4878827a9a5a855a7bc9\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/8a923bb9cb4a4878827a9a5a855a7bc9:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/d8774488be3b4c36ac0f5bb3c9a66ccc\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d8774488be3b4c36ac0f5bb3c9a66ccc:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"1768\",\"deviceType\":\"MOBILE\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "MOBILE",
+      "height": "1768",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d8774488be3b4c36ac0f5bb3c9a66ccc:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/d8774488be3b4c36ac0f5bb3c9a66ccc"
+      },
+      "name": "projects/12943705270951129641/screens/ab1c9032cf2e4339adbdf718d42c3a4b",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/8a923bb9cb4a4878827a9a5a855a7bc9:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/8a923bb9cb4a4878827a9a5a855a7bc9"
+      },
+      "title": "Todd's Factory - Grit Mint & Tangerine",
+      "width": "780"
+    }
+  }
+}

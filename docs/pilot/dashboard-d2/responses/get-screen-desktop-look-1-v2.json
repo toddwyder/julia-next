@@ -1,0 +1,29 @@
+{
+  "id": 1793140392634,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/6531734b410645e3a713a0be49c7d8e2\",\"title\":\"Todd's Factory Board - 8 Columns Compact\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/d65b9bef60614d22880aec63f47b7e7a\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d65b9bef60614d22880aec63f47b7e7a:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/0176fd9907f747ccb5490eb31d83ef72\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/0176fd9907f747ccb5490eb31d83ef72:download\",\"mimeType\":\"text/html\"},\"width\":\"2560\",\"height\":\"2048\",\"deviceType\":\"DESKTOP\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "DESKTOP",
+      "height": "2048",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/0176fd9907f747ccb5490eb31d83ef72:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/0176fd9907f747ccb5490eb31d83ef72"
+      },
+      "name": "projects/12943705270951129641/screens/6531734b410645e3a713a0be49c7d8e2",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d65b9bef60614d22880aec63f47b7e7a:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/d65b9bef60614d22880aec63f47b7e7a"
+      },
+      "title": "Todd's Factory Board - 8 Columns Compact",
+      "width": "2560"
+    }
+  }
+}

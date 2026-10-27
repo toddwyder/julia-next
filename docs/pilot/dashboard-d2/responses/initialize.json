@@ -1,0 +1,20 @@
+{
+  "id": 1793139006347,
+  "jsonrpc": "2.0",
+  "result": {
+    "capabilities": {
+      "resources": {
+        "listChanged": false,
+        "subscribe": false
+      },
+      "tools": {
+        "listChanged": false
+      }
+    },
+    "protocolVersion": "2024-11-05",
+    "serverInfo": {
+      "name": "StatelessServer",
+      "version": "scaffolding on HTTPServer2"
+    }
+  }
+}

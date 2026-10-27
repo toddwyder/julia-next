@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Todd's Factory - Panoramic Pipeline Board</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<!-- Typography: Space Grotesk + Plus Jakarta Sans / Lexend vibe for high-energy modern neo-brutalist pop playful style -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Space+Grotesk:wght@500;600;700&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "canvas-bg": "#F4F5FB",
+            "outline-variant": "#d9deeb",
+            "on-primary": "#ffffff",
+            "on-surface-variant": "#4d5568",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-low": "#edf1fc",
+            "surface": "#F4F5FB",
+            "surface-container": "#e8ecf8",
+            "surface-container-high": "#dfe5f5",
+            "surface-container-highest": "#d3dcfa",
+            "outline": "#6c768e",
+            "primary": "#1d58f5", // Electric Azure
+            "primary-container": "#2563eb",
+            "primary-fixed": "#dce6ff",
+            "secondary": "#059669", // Mint / emerald
+            "secondary-container": "#6ee7b7",
+            "tertiary": "#d97706", // Vivid warm amber
+            "tertiary-container": "#fef3c7",
+            "error": "#e11d48", // Pop punch rose
+            "error-container": "#ffe4e8",
+            "on-surface": "#0f172a"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.375rem",
+            "lg": "0.625rem",
+            "xl": "0.875rem",
+            "2xl": "1rem",
+            "3xl": "1.25rem",
+            "full": "9999px"
+          },
+          "boxShadow": {
+            "pop": "0 2px 0 0 rgba(15, 23, 42, 0.08)",
+            "pop-card": "0 2px 6px -1px rgba(23, 37, 84, 0.05), 0 1px 3px 0 rgba(0, 0, 0, 0.02)",
+            "neo-1": "0 2px 0 0 #0f172a",
+            "neo-2": "0 3px 0 0 #0f172a",
+            "neo-accent": "0 3px 0 0 rgba(37, 99, 235, 0.3)"
+          },
+          "fontFamily": {
+            "heading": ["Space Grotesk", "Plus Jakarta Sans", "sans-serif"],
+            "body-md": ["Plus Jakarta Sans", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #eaeffa;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #c7d2ea;
+      border-radius: 9999px;
+      border: 2px solid #eaeffa;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-[#F4F5FB] text-slate-900 min-h-screen flex flex-col font-body-md antialiased overflow-x-hidden selection:bg-blue-200 selection:text-blue-900">
+<!-- Top Navigation Bar (Neo-brutalist pop clean header) -->
+<header class="w-full px-6 flex justify-between items-center h-16 bg-white/95 backdrop-blur-md border-b-2 border-slate-900/10 shadow-xs docked full-width top-0 z-40 sticky">
+<div class="flex items-center gap-5">
+<div class="flex items-center gap-2.5">
+<div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-pop border border-slate-900/10 ring-2 ring-blue-500/20">
+<span class="material-symbols-outlined text-[22px]" data-icon="precision_manufacturing">precision_manufacturing</span>
+</div>
+<span class="font-heading text-[19px] font-extrabold text-slate-900 tracking-tight">Todd's Factory</span>
+</div>
+<!-- Live Factory Health / Overview Chips -->
+<div class="hidden lg:flex items-center gap-2 pl-2">
+<div class="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 rounded-full border border-emerald-300 shadow-xs">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="font-heading text-xs font-bold text-emerald-900 tracking-tight">8 lanes online</span>
+</div>
+<div class="flex items-center gap-1.5 px-3 py-1 bg-amber-50 rounded-full border border-amber-300 shadow-xs">
+<span class="material-symbols-outlined text-[15px] text-amber-700" data-icon="payments">payments</span>
+<span class="font-heading text-xs text-amber-900 font-bold font-mono">$3.42 daily spend</span>
+</div>
+<div class="flex items-center gap-1.5 px-3 py-1 bg-rose-50 rounded-full border border-rose-300 shadow-xs">
+<span class="material-symbols-outlined text-[15px] text-rose-600" data-icon="notifications_active">notifications_active</span>
+<span class="font-heading text-xs text-rose-900 font-bold">2 items need Todd</span>
+</div>
+</div>
+</div>
+<!-- Center Navigation Links -->
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-blue-600 font-heading font-bold border-b-[3px] border-blue-600 pb-1 text-sm flex items-center gap-1.5" href="#">
+<span class="material-symbols-outlined text-[18px]" data-icon="view_kanban">view_kanban</span>
+        Pipeline
+      </a>
+<a class="text-slate-600 hover:text-slate-900 font-heading font-semibold transition-colors pb-1 text-sm" href="#">
+        Telemetry
+      </a>
+<a class="text-slate-600 hover:text-slate-900 font-heading font-semibold transition-colors pb-1 text-sm flex items-center gap-1.5 group" href="#">
+<span class="material-symbols-outlined text-blue-600 text-[18px]" data-icon="psychology">psychology</span>
+        Decision Support
+        <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold font-heading border border-blue-200 group-hover:bg-blue-600 group-hover:text-white transition-colors">AI Co-pilot</span>
+</a>
+<a class="text-slate-600 hover:text-slate-900 font-heading font-semibold transition-colors pb-1 text-sm" href="#">
+        Artifacts
+      </a>
+</nav>
+<!-- Trailing Actions & Todd Avatar -->
+<div class="flex items-center gap-3.5">
+<div class="flex items-center gap-1 bg-slate-100/90 p-0.5 rounded-xl border border-slate-200">
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white transition-colors" title="Notifications">
+<span class="material-symbols-outlined text-[19px]" data-icon="notifications">notifications</span>
+</button>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white transition-colors" title="Tune Controls">
+<span class="material-symbols-outlined text-[19px]" data-icon="tune">tune</span>
+</button>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white transition-colors" title="Help">
+<span class="material-symbols-outlined text-[19px]" data-icon="help_outline">help_outline</span>
+</button>
+</div>
+<div class="h-6 w-px bg-slate-200"></div>
+<button class="px-3.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 font-heading text-xs font-bold transition-all active:scale-[0.98] flex items-center gap-1.5 border-2 border-slate-200 hover:border-slate-300 shadow-xs">
+<span class="material-symbols-outlined text-[16px] text-amber-600" data-icon="pending_actions">pending_actions</span>
+<span>Review Queue (2)</span>
+</button>
+<button class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-heading text-xs font-bold shadow-sm transition-all active:scale-[0.98] flex items-center gap-1.5 border border-blue-700">
+<span class="material-symbols-outlined text-[16px]" data-icon="rocket_launch">rocket_launch</span>
+<span>Dispatch Agent</span>
+</button>
+<!-- Todd Profile with Active dot -->
+<div class="relative ml-1 cursor-pointer">
+<div class="w-9 h-9 rounded-xl ring-2 ring-blue-600/30 overflow-hidden bg-gradient-to-tr from-blue-100 to-indigo-100 border border-blue-300 flex items-center justify-center text-blue-800 font-heading font-bold text-xs shadow-xs">
+<span>TD</span>
+</div>
+<span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+</div>
+</div>
+</header>
+<!-- Top Alert Ribbon: "Needs you (2)" -->
+<section class="w-full px-6 pt-3.5 pb-1 bg-gradient-to-r from-blue-50/60 via-purple-50/40 to-amber-50/50 border-b border-slate-200/80">
+<div class="max-w-[1920px] mx-auto py-1">
+<div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-white p-3.5 rounded-2xl border-2 border-slate-900/10 shadow-pop-card relative overflow-hidden">
+<!-- Left Banner Head -->
+<div class="flex items-center gap-3.5 min-w-[220px]">
+<div class="w-11 h-11 rounded-2xl bg-amber-100 border-2 border-amber-300 flex items-center justify-center text-amber-700 shadow-xs">
+<span class="material-symbols-outlined text-[24px]" data-icon="waving_hand">waving_hand</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="font-heading text-base text-slate-900 font-bold tracking-tight">Needs you</h2>
+<span class="px-2 py-0.5 rounded-full bg-rose-500 text-white font-heading text-[11px] font-extrabold tracking-wide uppercase shadow-xs">2 actions</span>
+</div>
+<p class="text-xs text-slate-500 font-medium">Unblock your agents in 30 seconds</p>
+</div>
+</div>
+<!-- Cards Container -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1">
+<!-- Ribbon Card 1: UAT Recipe Screens -->
+<div class="flex items-center justify-between p-3 bg-amber-50/80 rounded-xl border-2 border-amber-200/90 hover:border-amber-300 transition-all shadow-xs">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-xl bg-amber-200/80 border border-amber-300 flex items-center justify-center text-amber-800">
+<span class="material-symbols-outlined text-[20px]" data-icon="palette">palette</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-heading text-[10px] text-amber-800 uppercase tracking-wider font-extrabold bg-amber-200/50 px-1.5 py-0.5 rounded">UAT Stage</span>
+<span class="text-slate-300 text-xs">•</span>
+<a class="font-mono text-xs text-slate-600 hover:text-blue-600 font-bold inline-flex items-center gap-0.5" href="#LIN-124">
+                    LIN-124 <span class="material-symbols-outlined text-[13px]" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+<p class="text-xs font-bold text-slate-900 mt-0.5">Try the recipe screens (UAT)</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-heading text-xs font-bold shadow-xs active:scale-[0.98] transition-all flex items-center gap-1.5 border border-amber-600">
+<span class="material-symbols-outlined text-[16px]" data-icon="visibility">visibility</span>
+<span>Open Preview</span>
+</button>
+</div>
+</div>
+<!-- Ribbon Card 2: Approve retro fixes -->
+<div class="flex items-center justify-between p-3 bg-blue-50/80 rounded-xl border-2 border-blue-200/90 hover:border-blue-300 transition-all shadow-xs">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-xl bg-blue-100 border border-blue-300 flex items-center justify-center text-blue-700">
+<span class="material-symbols-outlined text-[20px]" data-icon="rate_review">rate_review</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-heading text-[10px] text-blue-800 uppercase tracking-wider font-extrabold bg-blue-200/50 px-1.5 py-0.5 rounded">Remediation</span>
+<span class="text-slate-300 text-xs">•</span>
+<a class="font-mono text-xs text-slate-600 hover:text-blue-600 font-bold inline-flex items-center gap-0.5" href="#LIN-119">
+                    LIN-119 <span class="material-symbols-outlined text-[13px]" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+<p class="text-xs font-bold text-slate-900 mt-0.5">Approve 3 retro fixes</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 rounded-xl bg-white border-2 border-slate-200 text-slate-700 hover:bg-slate-50 font-heading text-xs font-bold transition-all active:scale-[0.98]">
+                Inspect
+              </button>
+<button class="px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 font-heading text-xs font-bold shadow-xs active:scale-[0.98] transition-all flex items-center gap-1.5 border border-emerald-700">
+<span class="material-symbols-outlined text-[16px]" data-icon="check_circle">check_circle</span>
+<span>Quick Approve</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Panoramic Board Canvas (All 8 Columns visible) -->
+<main class="flex-1 w-full px-6 py-4 overflow-x-auto custom-scrollbar">
+<div class="min-w-[1720px] max-w-[2160px] mx-auto">
+<!-- Board Sub-header / Lane metrics -->
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-3">
+<h1 class="font-heading text-xl text-slate-900 tracking-tight font-extrabold">Factory Pipeline</h1>
+<span class="px-3 py-1 rounded-full bg-white border border-slate-300 text-slate-700 font-heading text-xs font-bold shadow-xs">Panoramic Continuous Mode</span>
+</div>
+<div class="flex items-center gap-3 text-xs text-slate-600 font-medium">
+<span class="inline-flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+<span class="material-symbols-outlined text-[15px]" data-icon="sync">sync</span>
+            Linear Realtime Sync active
+          </span>
+<span class="text-slate-300">•</span>
+<span class="font-mono text-slate-500">Last pulse 12s ago</span>
+</div>
+</div>
+<!-- 8-Column Panoramic Grid: Neo-Brutalist & Pop Playful -->
+<div class="grid grid-cols-8 gap-3.5 items-start">
+<!-- ========================================== -->
+<!-- 1. BACKLOG (Lilac / Lavender Pop Wash) -->
+<!-- ========================================== -->
+<div class="flex flex-col rounded-2xl bg-[#F2EDFD] border-2 border-purple-200/80 p-3 shadow-xs">
+<!-- Column Header -->
+<div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-purple-200">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-purple-600 ring-2 ring-purple-300"></span>
+<h3 class="font-heading text-sm font-bold text-purple-950">Backlog</h3>
+</div>
+<span class="w-5 h-5 rounded-full bg-purple-200 text-purple-900 font-mono text-[11px] font-bold flex items-center justify-center">1</span>
+</div>
+<!-- Card -->
+<div class="rounded-xl bg-white border-2 border-purple-200/80 hover:border-purple-400 p-3.5 shadow-pop-card hover:shadow-pop transition-all group">
+<div class="flex items-center justify-between mb-2">
+<a class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 font-mono text-[11px] font-bold flex items-center gap-1 group-hover:bg-purple-200 transition-colors border border-purple-200" href="#">
+                #LIN-104
+                <span class="material-symbols-outlined text-[12px]" data-icon="launch">launch</span>
+</a>
+<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-heading font-semibold flex items-center gap-1 border border-slate-200">
+<span class="material-symbols-outlined text-[13px] text-purple-600" data-icon="bolt">bolt</span>
+                Priority 2
+              </span>
+</div>
+<h4 class="font-heading font-bold text-slate-900 text-[13px] leading-snug mb-1.5">
+              Bring my Samsung Food recipes into Julia
+            </h4>
+<p class="text-xs text-slate-600 leading-relaxed mb-3">
+              Parse API schema payload and convert notes into rich Markdown format.
+            </p>
+<div class="flex items-center justify-between pt-2.5 border-t border-slate-100">
+<div class="flex items-center gap-1.5 text-slate-500 text-[11px] font-medium">
+<span class="material-symbols-outlined text-[14px]" data-icon="tag">tag</span>
+<span>Data Ingestion</span>
+</div>
+<span class="font-mono text-[11px] text-slate-400">Queue #1</span>
+</div>
+</div>
+</div>
+<!-- ========================================== -->
+<!-- 2. READY (Sunny Sunshine Gold Theme) -->
+<!-- ========================================== -->
+<div class="flex flex-col rounded-2xl bg-[#FEF9E7] border-2 border-amber-200/80 p-3 shadow-xs">
+<!-- Column Header -->
+<div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-amber-200">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-amber-300"></span>
+<h3 class="font-heading text-sm font-bold text-amber-950">Ready</h3>
+</div>
+<span class="w-5 h-5 rounded-full bg-amber-200 text-amber-950 font-mono text-[11px] font-bold flex items-center justify-center">1</span>
+</div>
+<!-- Card -->
+<div class="rounded-xl bg-white border-2 border-amber-200/80 hover:border-amber-400 p-3.5 shadow-pop-card hover:shadow-pop transition-all group">
+<div class="flex items-center justify-between mb-2">
+<a class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 font-mono text-[11px] font-bold flex items-center gap-1 group-hover:bg-amber-200 transition-colors border border-amber-200" href="#">
+                #LIN-108
+                <span class="material-symbols-outlined text-[12px]" data-icon="launch">launch</span>
+</a>
+<span class="px-2 py-0.5 rounded-full bg-amber-100/90 text-amber-900 font-heading text-[11px] font-bold border border-amber-200">
+                Clean Specs
+              </span>
+</div>
+<h4 class="font-heading font-bold text-slate-900 text-[13px] leading-snug mb-1.5">
+              Scorecard for every run, plus a ping
+            </h4>
+<p class="text-xs text-slate-600 leading-relaxed mb-3">
+              Aggregate run metrics into telegram webhooks with instantaneous latency benchmarks.
+            </p>
+<div class="pt-2.5 border-t border-slate-100 flex items-center justify-between">
+<span class="font-mono text-[11px] text-slate-500 font-medium">Estimated: 6m</span>
+<button class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-heading text-xs font-bold shadow-xs transition-all active:scale-[0.98] flex items-center gap-1 border border-emerald-700">
+<span class="material-symbols-outlined text-[14px]" data-icon="play_arrow">play_arrow</span>
+<span>Start</span>
+</button>
+</div>
+</div>
+</div>
+<!-- ========================================== -->
+<!-- 3. IMPLEMENTATION (Electric Azure Pop Hero) -->
+<!-- ========================================== -->
+<div class="flex flex-col rounded-2xl bg-[#EBF2FE] border-2 border-blue-400 p-3 shadow-sm ring-2 ring-blue-200">
+<!-- Column Header with LIVE pulse -->
+<div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-blue-200">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping"></span>
+<h3 class="font-heading text-sm font-extrabold text-blue-900">Implementation</h3>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-blue-600 text-white font-heading text-[10px] font-black tracking-wider">1 LIVE</span>
+</div>
+<!-- Card (Active Running Workhorse) -->
+<div class="rounded-xl bg-white border-2 border-blue-300 p-3.5 shadow-md">
+<!-- Linear Link + Step Counter -->
+<div class="flex items-center justify-between mb-2">
+<a class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-mono text-[11px] font-bold flex items-center gap-1 border border-blue-200" href="#">
+                #LIN-112
+                <span class="material-symbols-outlined text-[12px]" data-icon="launch">launch</span>
+</a>
+<span class="px-2.5 py-0.5 rounded-full bg-blue-600 text-white font-heading font-extrabold text-[10px]">
+                Step 4 of 8
+              </span>
+</div>
+<!-- Title -->
+<h4 class="font-heading font-bold text-slate-900 text-[13px] leading-snug mb-2">
+              New machine: retry and pause
+            </h4>
+<!-- Multi-segment visual step bar -->
+<div class="mb-3">
+<div class="flex gap-1 h-2 w-full mb-1.5">
+<div class="flex-1 bg-blue-600 rounded-full"></div>
+<div class="flex-1 bg-blue-600 rounded-full"></div>
+<div class="flex-1 bg-blue-600 rounded-full"></div>
+<div class="flex-1 bg-blue-500 animate-pulse rounded-full"></div>
+<div class="flex-1 bg-slate-200 rounded-full"></div>
+<div class="flex-1 bg-slate-200 rounded-full"></div>
+<div class="flex-1 bg-slate-200 rounded-full"></div>
+<div class="flex-1 bg-slate-200 rounded-full"></div>
+</div>
+<div class="flex items-center justify-between text-[11px]">
+<span class="text-blue-700 font-heading font-bold inline-flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping"></span>
+                  Doing now: running tests
+                </span>
+<span class="font-mono font-bold text-blue-900">50%</span>
+</div>
+</div>
+<!-- Telemetry Matrix Pills -->
+<div class="grid grid-cols-2 gap-1.5 mb-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
+<div class="flex items-center gap-1 text-[11px] text-slate-600 font-medium">
+<span class="material-symbols-outlined text-[13px] text-emerald-600" data-icon="history">history</span>
+<span class="font-mono">Active 40s ago</span>
+</div>
+<div class="flex items-center gap-1 text-[11px] text-slate-600 font-medium">
+<span class="material-symbols-outlined text-[13px] text-blue-600" data-icon="timer">timer</span>
+<span class="font-mono">12 min elapsed</span>
+</div>
+<div class="flex items-center gap-1 text-[11px] text-slate-700 font-medium">
+<span class="material-symbols-outlined text-[13px] text-amber-600" data-icon="paid">paid</span>
+<span class="font-mono font-bold text-slate-900">$0.84 spent</span>
+</div>
+<!-- Mini Context Circular Gauge -->
+<div class="flex items-center gap-1 text-[11px] text-slate-600 font-medium">
+<div class="relative w-3.5 h-3.5 flex items-center justify-center">
+<svg class="w-3.5 h-3.5 -rotate-90" viewbox="0 0 36 36">
+<circle cx="18" cy="18" fill="none" r="14" stroke="#cbd5e1" stroke-width="4"></circle>
+<circle cx="18" cy="18" fill="none" r="14" stroke="#1d58f5" stroke-dasharray="88" stroke-dashoffset="52" stroke-width="4"></circle>
+</svg>
+</div>
+<span class="font-mono">Ctx: 41% full</span>
+</div>
+</div>
+<!-- Agent Chips -->
+<div class="flex items-center justify-between mb-3 pt-0.5">
+<div class="flex items-center gap-1.5">
+<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-heading font-bold flex items-center gap-1 border border-slate-200">
+<span class="material-symbols-outlined text-[12px] text-blue-600" data-icon="smart_toy">smart_toy</span>
+                  Main session
+                </span>
+<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-heading font-bold flex items-center gap-1 border border-slate-200">
+<span class="material-symbols-outlined text-[12px] text-emerald-600" data-icon="terminal">terminal</span>
+                  Coder
+                </span>
+</div>
+</div>
+<!-- Action Button: Coral Stop -->
+<button class="w-full py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-heading text-xs font-bold transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 border border-rose-300">
+<span class="material-symbols-outlined text-[16px] text-rose-600" data-icon="stop_circle">stop_circle</span>
+<span>Stop</span>
+</button>
+</div>
+</div>
+<!-- ========================================== -->
+<!-- 4. EVIDENCE REVIEW (Indigo / Periwinkle Pop) -->
+<!-- ========================================== -->
+<div class="flex flex-col rounded-2xl bg-[#EEF2FF] border-2 border-indigo-200/80 p-3 shadow-xs">
+<!-- Column Header -->
+<div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-indigo-200">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-indigo-600 ring-2 ring-indigo-300"></span>
+<h3 class="font-heading text-sm font-bold text-indigo-950">Evidence review</h3>
+</div>
+<span class="w-5 h-5 rounded-full bg-indigo-200 text-indigo-950 font-mono text-[11px] font-bold flex items-center justify-center">1</span>
+</div>
+<!-- Card -->
+<div class="rounded-xl bg-white border-2 border-indigo-200/80 hover:border-indigo-400 p-3.5 shadow-pop-card hover:shadow-pop transition-all group">
+<div class="flex items-center justify-between mb-2">
+<a class="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-900 font-mono text-[11px] font-bold flex items-center gap-1 group-hover:bg-indigo-200 transition-colors border border-indigo-200" href="#">
+                #LIN-115
+                <span class="material-symbols-outlined text-[12px]" data-icon="launch">launch</span>
+</a>
+<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-mono text-[11px] font-bold flex items-center gap-1 border border-emerald-200">
+<span class="material-symbols-outlined text-[12px] text-emerald-600" data-icon="check_circle">check_circle</span>
+                94% pass
+              </span>
+</div>
+<h4 class="font-heading font-bold text-slate-900 text-[13px] leading-snug mb-2">
+              Clean telemetry snapshot &amp; trace bundle
+            </h4>
+<!-- Illustrative Artifact preview placeholder -->
+<div class="p-2.5 rounded-xl bg-slate-50 border border-indigo-100 mb-3 space-y-2">
+<div class="flex items-center justify-between text-[11px]">
+<span class="text-slate-600 font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-indigo-600" data-icon="folder_zip">folder_zip</span>
+                  Artifacts generated (4)
+                </span>
+<span class="font-mono text-indigo-700 font-bold">2.4 MB</span>
+</div>
+<!-- Test Coverage Heat Mini-bar -->
+<div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden flex">
+<div class="bg-emerald-500 w-[82%]" title="Unit coverage"></div>
+<div class="bg-emerald-300 w-[12%]" title="Integration"></div>
+<div class="bg-rose-500 w-[6%]" title="Misses"></div>
+</div>
+<div class="flex items-center justify-between text-[10px] text-slate-500">
+<span class="font-heading font-bold">Coverage heat: High</span>
+<span class="font-mono">82% core</span>
+</div>
+</div>
+<button class="w-full py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-heading text-xs font-bold transition-all flex items-center justify-center gap-1 border border-slate-200">
+<span class="material-symbols-outlined text-[14px]" data-icon="download">download</span>
+<span>Inspect Artifacts</span>
+</button>
+</div>
+</div>
+<!-- ========================================== -->
+<!-- 5. REMEDIATION (Pop Rose Punch - STUCK) -->
+<!-- ========================================== -->
+<div class="flex flex-col rounded-2xl bg-[#FFF1F2] border-2 border-rose-300 p-3 shadow-sm ring-2 ring-rose-200">
+<!-- Column Header with Warning Tone -->
+<div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-rose-200">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-300"></span>
+<h3 class="font-heading text-sm font-extrabold text-rose-950">Remediation</h3>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white font-heading text-[10px] font-black tracking-wider animate-bounce">STUCK</span>
+</div>
+<!-- Card (Marked Stuck styling) -->
+<div class="rounded-xl bg-white border-2 border-rose-300 p-3.5 shadow-md relative overflow-hidden" id="LIN-119">
+<!-- Warning Stripe Accents -->
+<div class="flex items-center justify-between mb-2">
+<a class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-900 font-mono text-[11px] font-bold flex items-center gap-1 border border-rose-200" href="#">
+                #LIN-119
+                <span class="material-symbols-outlined text-[12px]" data-icon="launch">launch</span>
+</a>
+<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-900 font-heading text-[10px] font-black tracking-wide flex items-center gap-1 border border-rose-200">
+<span class="material-symbols-outlined text-[13px] text-rose-600" data-icon="warning">warning</span>
+                Marked Stuck
+              </span>
+</div>
+<h4 class="font-heading font-bold text-slate-900 text-[13px] leading-snug mb-2">
+              Practice: real failure path
+            </h4>
+<!-- Stuck Alert Callout -->
+<div class="p-2.5 rounded-xl bg-rose-50 border-2 border-rose-200 mb-3">
+<div class="flex items-start gap-1.5 text-rose-700">
+<span class="material-symbols-outlined text-[16px] shrink-0 mt-0.5" data-icon="hourglass_disabled">hourglass_disabled</span>
+<div>
+<p class="font-heading text-xs font-bold text-rose-900">No activity for 7 min</p>
+<p class="text-[11px] text-slate-600 leading-tight">Agent waiting on DB lock release</p>
+</div>
+</div>
+</div>
+<!-- Action buttons -->
+<div class="grid grid-cols-2 gap-1.5">
+<button class="py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-heading text-xs font-bold transition-all flex items-center justify-center gap-1 border border-slate-200">
+<span class="material-symbols-outlined text-[14px]" data-icon="analytics">analytics</span>
+<span>View Trace</span>
+</button>
+<button class="py-1.5 rounded-xl bg-rose-600 text-white hover:bg-rose-700 font-heading text-xs font-bold shadow-xs transition-all active:scale-[0.98] flex items-center justify-center gap-1 border border-rose-700">
+<span class="material-symbols-outlined text-[14px]" data-icon="touch_app">touch_app</span>
+<span>Nudge Agent</span>
+</button>
+</div>
+</div>
+</div>
+<!-- ========================================== -->
+<!-- 6. STAGING / SMOKE TEST (Clean Mint / Cyan Pop) -->
+<!-- ========================================== -->
+<div class="flex flex-col rounded-2xl bg-[#ECFDF5] border-2 border-emerald-200/80 p-3 shadow-xs">
+<!-- Column Header -->
+<div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-emerald-200">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-300"></span>
+<h3 class="font-heading text-sm font-bold text-emerald-950">Staging / smoke</h3>
+</div>
+<span class="w-5 h-5 rounded-full bg-emerald-200 text-emerald-950 font-mono text-[11px] font-bold flex items-center justify-center">1</span>
+</div>
+<!-- Card -->
+<div class="rounded-xl bg-white border-2 border-emerald-200/80 hover:border-emerald-400 p-3.5 shadow-pop-card hover:shadow-pop transition-all group">
+<div class="flex items-center justify-between mb-2">
+<a class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-mono text-[11px] font-bold flex items-center gap-1 group-hover:bg-emerald-200 transition-colors border border-emerald-200" href="#">
+                #LIN-121
+                <span class="material-symbols-outlined text-[12px]" data-icon="launch">launch</span>
+</a>
+<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-heading text-[11px] font-bold border border-emerald-200">
+                Smoke Suite
+              </span>
+</div>
+<h4 class="font-heading font-bold text-slate-900 text-[13px] leading-snug mb-2">
+              Automated smoke check: Auth &amp; Session recovery
+            </h4>
+<!-- Green checkmarks micro-graphic -->
+<div class="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 mb-3">
+<div class="flex items-center justify-between mb-1.5">
+<span class="text-emerald-950 font-heading font-bold text-[12px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px] text-emerald-600" data-icon="verified">verified</span>
+                  Passing (9/9 checks)
+                </span>
+<span class="font-mono text-[10px] text-emerald-700 font-bold">0 failures</span>
+</div>
+<div class="flex gap-1.5">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-1 ring-emerald-300" title="Check 1"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-1 ring-emerald-300" title="Check 2"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-1 ring-emerald-300" title="Check 3"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-1 ring-emerald-300" title="Check 4"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-1 ring-emerald-300" title="Check 5"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-1 ring-emerald-300" title="Check 6"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-1 ring-emerald-300" title="Check 7"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-1 ring-emerald-300" title="Check 8"></span>
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-1 ring-emerald-300" title="Check 9"></span>
+</div>
+</div>
+<div class="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100 font-mono">
+<span>Environment: Stage-04</span>
+<span class="text-emerald-700 font-bold">100% stable</span>
+</div>
+</div>
+</div>
+<!-- ========================================== -->
+<!-- 7. UAT (Bright Tangerine / Orange - WAITING ON TODD) -->
+<!-- ========================================== -->
+<div class="flex flex-col rounded-2xl bg-[#FFF7ED] border-2 border-amber-400 p-3 shadow-md ring-2 ring-amber-200">
+<!-- Column Header with Waiting Callout -->
+<div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-amber-300">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-amber-600 ring-2 ring-amber-300"></span>
+<h3 class="font-heading text-sm font-extrabold text-amber-950">UAT</h3>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-heading text-[10px] font-black tracking-wider flex items-center gap-1 border border-amber-600">
+<span class="material-symbols-outlined text-[12px]" data-icon="person">person</span>
+              WAITING
+            </span>
+</div>
+<!-- Card (Waiting on Todd styling) -->
+<div class="rounded-xl bg-white border-2 border-amber-300 p-3.5 shadow-md" id="LIN-124">
+<!-- Todd Badge & Linear Link -->
+<div class="flex items-center justify-between mb-2">
+<a class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-950 font-mono text-[11px] font-bold flex items-center gap-1 border border-amber-200" href="#">
+                #LIN-124
+                <span class="material-symbols-outlined text-[12px]" data-icon="launch">launch</span>
+</a>
+<div class="flex items-center gap-1 bg-amber-200 text-amber-950 px-2 py-0.5 rounded-full font-heading text-[10px] font-black border border-amber-300">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span>Needs Todd</span>
+</div>
+</div>
+<!-- Title -->
+<h4 class="font-heading font-bold text-slate-900 text-[13px] leading-snug mb-2">
+              Recipe screens look like Julia’s vintage design
+            </h4>
+<!-- High contrast banner with Todd Avatar & Waving hand -->
+<div class="p-2.5 rounded-xl bg-gradient-to-r from-amber-100/90 to-amber-50 border-2 border-amber-200 mb-3">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 font-heading font-bold text-[10px] flex items-center justify-center ring-1 ring-blue-300">
+                  TD
+                </div>
+<span class="font-heading text-xs text-amber-950 font-bold">Waiting on you</span>
+<span class="material-symbols-outlined text-[16px] text-amber-600" data-icon="waving_hand">waving_hand</span>
+</div>
+<p class="text-[11px] text-slate-600">Design team delivered mockup sync. Needs your thumbs-up.</p>
+</div>
+<!-- Primary Review Action -->
+<button class="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-heading text-xs font-bold shadow-xs transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 border border-amber-600">
+<span class="material-symbols-outlined text-[16px]" data-icon="preview">preview</span>
+<span>Review Screens</span>
+</button>
+</div>
+</div>
+<!-- ========================================== -->
+<!-- 8. COMPLETE (Fresh Mint / Emerald Pop) -->
+<!-- ========================================== -->
+<div class="flex flex-col rounded-2xl bg-[#F0FDF4] border-2 border-emerald-200/80 p-3 shadow-xs">
+<!-- Column Header -->
+<div class="flex items-center justify-between pb-2.5 mb-2.5 border-b border-emerald-200">
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-600 ring-2 ring-emerald-300"></span>
+<h3 class="font-heading text-sm font-bold text-emerald-950">Complete</h3>
+</div>
+<span class="w-5 h-5 rounded-full bg-emerald-200 text-emerald-950 font-mono text-[11px] font-bold flex items-center justify-center">1</span>
+</div>
+<!-- Card -->
+<div class="rounded-xl bg-white border-2 border-emerald-200/80 hover:border-emerald-400 p-3.5 shadow-pop-card hover:shadow-pop transition-all group">
+<div class="flex items-center justify-between mb-2">
+<a class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-mono text-[11px] font-bold flex items-center gap-1 group-hover:bg-emerald-200 transition-colors border border-emerald-200" href="#">
+                #LIN-98
+                <span class="material-symbols-outlined text-[12px]" data-icon="launch">launch</span>
+</a>
+<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-heading text-[10px] font-black flex items-center gap-1 border border-emerald-200">
+<span class="material-symbols-outlined text-[13px] text-emerald-600" data-icon="celebration">celebration</span>
+                Live
+              </span>
+</div>
+<h4 class="font-heading font-bold text-slate-900 text-[13px] leading-snug mb-1.5">
+              Add a recipe and find it by title
+            </h4>
+<p class="text-xs text-slate-600 leading-relaxed mb-3">
+              Full text search indexing across 4,200 archived recipe titles finished with 0 error rate.
+            </p>
+<!-- Status: Deployed with Confetti Micro-accent -->
+<div class="p-2 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<div class="w-5 h-5 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-[12px]">
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span>
+</div>
+<span class="font-heading text-[11px] font-bold text-emerald-900">Deployed to production</span>
+</div>
+<span class="text-xs">🎉</span>
+</div>
+<div class="flex items-center justify-between text-[11px] text-slate-400 pt-2.5 mt-2 border-t border-slate-100 font-mono">
+<span>Shipped 34m ago</span>
+<span class="font-bold text-emerald-700">v2.14.0</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Sticky Bottom Quick Summary Bar (Neo-brutalist pop bar) -->
+<footer class="w-full bg-white/95 backdrop-blur-md border-t-2 border-slate-900/10 px-6 py-2.5 shadow-sm">
+<div class="max-w-[1920px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+<div class="flex items-center gap-6">
+<span class="flex items-center gap-1.5 font-medium">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          Factory load: <strong class="text-slate-900 font-heading font-bold">32% capacity</strong>
+</span>
+<span class="hidden sm:inline text-slate-300">•</span>
+<span class="flex items-center gap-1 font-medium">
+<span class="material-symbols-outlined text-[16px] text-blue-600" data-icon="memory">memory</span>
+          Worker pool: <span class="font-mono font-semibold text-slate-800">4 nodes active</span>
+</span>
+<span class="hidden sm:inline text-slate-300">•</span>
+<span class="flex items-center gap-1 font-medium">
+<span class="material-symbols-outlined text-[16px] text-amber-600" data-icon="speed">speed</span>
+          Avg run time: <span class="font-mono font-semibold text-slate-800">4.8m</span>
+</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-slate-400">Press <kbd class="px-1.5 py-0.5 bg-slate-100 rounded-md border border-slate-300 font-mono text-[10px] text-slate-700 shadow-xs">?</kbd> for shortcuts</span>
+<button class="px-3 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-heading text-xs font-bold transition-colors flex items-center gap-1 border border-slate-300">
+<span class="material-symbols-outlined text-[14px]" data-icon="fullscreen">fullscreen</span>
+          Panoramic fit
+        </button>
+</div>
+</div>
+</footer>
+</body></html>

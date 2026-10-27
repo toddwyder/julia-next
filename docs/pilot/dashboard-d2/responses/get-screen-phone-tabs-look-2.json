@@ -1,0 +1,29 @@
+{
+  "id": 1793140229319,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/613aa11a86374af98f2f67a9a75e210c\",\"title\":\"Todd's Factory - Editorial Warmth\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/e3cb8bd4e18c41f2b0a30892dd617d1b\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/e3cb8bd4e18c41f2b0a30892dd617d1b:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/37857a6896204a198832ad594168b096\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/37857a6896204a198832ad594168b096:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"3488\",\"deviceType\":\"MOBILE\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "MOBILE",
+      "height": "3488",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/37857a6896204a198832ad594168b096:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/37857a6896204a198832ad594168b096"
+      },
+      "name": "projects/12943705270951129641/screens/613aa11a86374af98f2f67a9a75e210c",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/e3cb8bd4e18c41f2b0a30892dd617d1b:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/e3cb8bd4e18c41f2b0a30892dd617d1b"
+      },
+      "title": "Todd's Factory - Editorial Warmth",
+      "width": "780"
+    }
+  }
+}

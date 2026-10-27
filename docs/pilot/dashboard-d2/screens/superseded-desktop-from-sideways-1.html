@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Todd's Factory - Panoramic Pipeline Board</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<!-- Typography: Editorial Serif (Newsreader + Playfair Display) + Newsroom Tabular Sans (Plus Jakarta Sans / Inter) + JetBrains Mono -->
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "canvas-bg": "#F9F7F2",
+            "paper": "#FFFFFF",
+            "paper-warm": "#F4EFE6",
+            "paper-muted": "#ECE6DA",
+            "ink": "#181715",
+            "ink-secondary": "#57534E",
+            "ink-tertiary": "#8A847C",
+            "ink-border": "#E3DCCF",
+            "ink-border-strong": "#C5BAA8",
+            "crimson": "#B91C1C",
+            "crimson-soft": "#FDF2F0",
+            "cobalt": "#1D4ED8",
+            "cobalt-soft": "#EFF6FF",
+            "ochre": "#B45309",
+            "ochre-soft": "#FEF8EC",
+            "forest": "#15803D",
+            "forest-soft": "#F0FDF4"
+          },
+          "fontFamily": {
+            "editorial": ["Newsreader", "Georgia", "serif"],
+            "body-md": ["Plus Jakarta Sans", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 8px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #ECE6DA;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #C5BAA8;
+      border-radius: 9999px;
+      border: 2px solid #ECE6DA;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #8A847C;
+    }
+  </style>
+</head>
+<body class="bg-[#F9F7F2] text-[#181715] min-h-screen flex flex-col font-body-md antialiased overflow-x-hidden selection:bg-[#EFE8D8] selection:text-[#181715]">
+<!-- Top Navigation Bar (Refined Editorial Masthead Header) -->
+<header class="w-full px-6 flex justify-between items-center h-16 bg-[#FFFFFF] border-b border-[#E3DCCF] docked full-width top-0 z-40 sticky">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-3">
+<div class="w-9 h-9 rounded-lg bg-[#181715] flex items-center justify-center text-[#F9F7F2] shadow-xs">
+<span class="material-symbols-outlined text-[20px]" data-icon="precision_manufacturing">precision_manufacturing</span>
+</div>
+<span class="font-editorial text-[22px] font-bold tracking-tight text-[#181715]">Todd's Factory</span>
+<span class="text-[11px] font-mono tracking-widest uppercase text-[#8A847C] pl-1 border-l border-[#E3DCCF] hidden sm:inline">Despatch Ed.</span>
+</div>
+<!-- Live Factory Health / Overview Chips -->
+<div class="hidden lg:flex items-center gap-2 pl-2 border-l border-[#E3DCCF]">
+<div class="flex items-center gap-1.5 px-2.5 py-1 bg-[#F0FDF4] rounded border border-[#BBF7D0]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#15803D]"></span>
+<span class="text-[11px] font-bold text-[#14532D] tracking-tight uppercase font-mono">8 lanes online</span>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 bg-[#FEF8EC] rounded border border-[#FDE68A]">
+<span class="material-symbols-outlined text-[14px] text-[#B45309]" data-icon="payments">payments</span>
+<span class="text-[11px] text-[#78350F] font-bold font-mono">$3.42 daily spend</span>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 bg-[#FDF2F0] rounded border border-[#FECACA]">
+<span class="material-symbols-outlined text-[14px] text-[#B91C1C]" data-icon="notifications_active">notifications_active</span>
+<span class="text-[11px] text-[#991B1B] font-bold font-mono">2 items need Todd</span>
+</div>
+</div>
+</div>
+<!-- Center Navigation Links -->
+<nav class="hidden md:flex items-center gap-7">
+<a class="text-[#181715] font-editorial font-bold border-b-2 border-[#181715] pb-1 text-[15px] flex items-center gap-1.5" href="#">
+<span class="material-symbols-outlined text-[17px] text-[#181715]" data-icon="view_kanban">view_kanban</span>
+        Pipeline
+      </a>
+<a class="text-[#57534E] hover:text-[#181715] font-editorial text-[15px] transition-colors pb-1" href="#">
+        Telemetry
+      </a>
+<a class="text-[#57534E] hover:text-[#181715] font-editorial text-[15px] transition-colors pb-1 flex items-center gap-1.5 group" href="#">
+<span class="material-symbols-outlined text-[#1D4ED8] text-[17px]" data-icon="psychology">psychology</span>
+        Decision Support
+        <span class="px-1.5 py-0.2 rounded bg-[#EFF6FF] text-[#1D4ED8] text-[10px] font-mono uppercase font-bold border border-[#BFDBFE]">AI Co-pilot</span>
+</a>
+<a class="text-[#57534E] hover:text-[#181715] font-editorial text-[15px] transition-colors pb-1" href="#">
+        Artifacts
+      </a>
+</nav>
+<!-- Trailing Actions & Todd Avatar -->
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-0.5 bg-[#F4EFE6] p-0.5 rounded-md border border-[#E3DCCF]">
+<button class="w-7 h-7 rounded flex items-center justify-center text-[#57534E] hover:text-[#181715] hover:bg-[#FFFFFF] transition-colors" title="Notifications">
+<span class="material-symbols-outlined text-[17px]" data-icon="notifications">notifications</span>
+</button>
+<button class="w-7 h-7 rounded flex items-center justify-center text-[#57534E] hover:text-[#181715] hover:bg-[#FFFFFF] transition-colors" title="Tune Controls">
+<span class="material-symbols-outlined text-[17px]" data-icon="tune">tune</span>
+</button>
+<button class="w-7 h-7 rounded flex items-center justify-center text-[#57534E] hover:text-[#181715] hover:bg-[#FFFFFF] transition-colors" title="Help">
+<span class="material-symbols-outlined text-[17px]" data-icon="help_outline">help_outline</span>
+</button>
+</div>
+<div class="h-5 w-px bg-[#E3DCCF]"></div>
+<button class="px-3 py-1.5 rounded bg-[#FFFFFF] hover:bg-[#F4EFE6] text-[#181715] font-mono text-[11px] font-semibold transition-all flex items-center gap-1.5 border border-[#C5BAA8] shadow-2xs">
+<span class="material-symbols-outlined text-[15px] text-[#B45309]" data-icon="pending_actions">pending_actions</span>
+<span>Review Queue (2)</span>
+</button>
+<button class="px-3.5 py-1.5 rounded bg-[#181715] hover:bg-[#2C2A26] text-[#F9F7F2] font-mono text-[11px] font-semibold transition-all flex items-center gap-1.5 border border-[#181715]">
+<span class="material-symbols-outlined text-[15px] text-[#E3DCCF]" data-icon="rocket_launch">rocket_launch</span>
+<span>Dispatch Agent</span>
+</button>
+<!-- Todd Profile with Active dot -->
+<div class="relative ml-1 cursor-pointer">
+<div class="w-8 h-8 rounded border border-[#C5BAA8] bg-[#F4EFE6] flex items-center justify-center text-[#181715] font-editorial font-bold text-xs">
+<span>TD</span>
+</div>
+<span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#15803D] ring-2 ring-[#FFFFFF]"></span>
+</div>
+</div>
+</header>
+<!-- Top Alert Ribbon: "Needs you (2)" (Editorial Callout Box) -->
+<section class="w-full px-6 pt-3.5 pb-2 bg-[#F4EFE6] border-b border-[#E3DCCF]">
+<div class="max-w-[1280px] mx-auto">
+<div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-[#FFFFFF] p-3.5 rounded border border-[#C5BAA8] shadow-xs relative overflow-hidden">
+<!-- Left Banner Head -->
+<div class="flex items-center gap-3.5 min-w-[220px]">
+<div class="w-10 h-10 rounded bg-[#FEF8EC] border border-[#FDE68A] flex items-center justify-center text-[#B45309]">
+<span class="material-symbols-outlined text-[22px]" data-icon="waving_hand">waving_hand</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="font-editorial text-lg text-[#181715] font-bold tracking-tight">Needs you</h2>
+<span class="px-2 py-0.5 rounded bg-[#B91C1C] text-[#FFFFFF] font-mono text-[10px] font-bold uppercase tracking-wider">2 actions</span>
+</div>
+<p class="text-xs text-[#57534E] font-normal italic">Unblock your agents in 30 seconds</p>
+</div>
+</div>
+<!-- Cards Container -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1">
+<!-- Ribbon Card 1: UAT Recipe Screens -->
+<div class="flex items-center justify-between p-3 bg-[#FEF8EC]/60 rounded border border-[#FDE68A] hover:border-[#F59E0B] transition-all">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-[#FEF3C7] border border-[#FDE68A] flex items-center justify-center text-[#B45309]">
+<span class="material-symbols-outlined text-[18px]" data-icon="palette">palette</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-mono text-[10px] text-[#B45309] uppercase tracking-wider font-bold bg-[#FEF3C7] px-1.5 py-0.5 rounded">UAT Stage</span>
+<span class="text-[#8A847C] text-xs">•</span>
+<a class="font-mono text-xs text-[#181715] hover:text-[#B45309] font-semibold inline-flex items-center gap-0.5 underline decoration-[#C5BAA8]" href="#LIN-124">
+                    LIN-124 <span class="material-symbols-outlined text-[12px]" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+<p class="text-xs font-semibold text-[#181715] font-editorial mt-0.5 text-[14px]">Try the recipe screens (UAT)</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 rounded bg-[#B45309] hover:bg-[#92400E] text-[#FFFFFF] font-mono text-[11px] font-semibold active:scale-[0.98] transition-all flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]" data-icon="visibility">visibility</span>
+<span>Open Preview</span>
+</button>
+</div>
+</div>
+<!-- Ribbon Card 2: Approve retro fixes -->
+<div class="flex items-center justify-between p-3 bg-[#EFF6FF]/60 rounded border border-[#BFDBFE] hover:border-[#60A5FA] transition-all">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-[#DBEAFE] border border-[#BFDBFE] flex items-center justify-center text-[#1D4ED8]">
+<span class="material-symbols-outlined text-[18px]" data-icon="rate_review">rate_review</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-mono text-[10px] text-[#1D4ED8] uppercase tracking-wider font-bold bg-[#DBEAFE] px-1.5 py-0.5 rounded">Remediation</span>
+<span class="text-[#8A847C] text-xs">•</span>
+<a class="font-mono text-xs text-[#181715] hover:text-[#1D4ED8] font-semibold inline-flex items-center gap-0.5 underline decoration-[#C5BAA8]" href="#LIN-119">
+                    LIN-119 <span class="material-symbols-outlined text-[12px]" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+<p class="text-xs font-semibold text-[#181715] font-editorial mt-0.5 text-[14px]">Approve 3 retro fixes</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-2.5 py-1.5 rounded bg-[#FFFFFF] border border-[#C5BAA8] text-[#181715] hover:bg-[#F4EFE6] font-mono text-[11px] font-semibold transition-all">
+                Inspect
+              </button>
+<button class="px-3 py-1.5 rounded bg-[#15803D] text-[#FFFFFF] hover:bg-[#166534] font-mono text-[11px] font-semibold active:scale-[0.98] transition-all flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]" data-icon="check_circle">check_circle</span>
+<span>Quick Approve</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Panoramic Board Canvas (All 8 Columns visible) -->
+<main class="flex-1 w-full px-3 py-3 overflow-x-hidden">
+<div class="w-full max-w-[1280px] mx-auto">
+<!-- Board Sub-header / Lane metrics -->
+<div class="flex items-center justify-between mb-3 border-b border-[#E3DCCF] pb-2">
+<div class="flex items-center gap-3">
+<h1 class="font-editorial text-2xl text-[#181715] tracking-tight font-bold italic">Factory Pipeline</h1>
+<span class="px-2.5 py-0.5 rounded bg-[#FFFFFF] border border-[#C5BAA8] text-[#57534E] font-mono text-[11px] uppercase tracking-wide">Panoramic Continuous</span>
+</div>
+<div class="flex items-center gap-3 text-xs text-[#57534E] font-medium">
+<span class="inline-flex items-center gap-1.5 text-[#15803D] font-mono text-[11px] font-semibold bg-[#F0FDF4] px-2.5 py-0.5 rounded border border-[#BBF7D0]">
+<span class="material-symbols-outlined text-[14px]" data-icon="sync">sync</span>
+            Linear Realtime Sync active
+          </span>
+<span class="text-[#8A847C]">•</span>
+<span class="font-mono text-[11px] text-[#8A847C]">Last pulse 12s ago</span>
+</div>
+</div>
+<!-- 8-Column Panoramic Grid: Editorial Craft & Paper Tinting -->
+<div class="grid grid-cols-8 gap-2 items-start w-full">
+<!-- 1. BACKLOG -->
+<div class="flex flex-col rounded bg-[#FAF7F2] border border-[#E3DCCF] p-2 shadow-2xs min-w-0">
+<div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#E3DCCF]">
+<div class="flex items-center gap-1.5 min-w-0">
+<span class="w-2 h-2 rounded-full bg-[#78716C] shrink-0"></span>
+<h3 class="font-editorial font-bold text-sm text-[#181715] truncate">Backlog</h3>
+</div>
+<span class="w-4 h-4 rounded bg-[#E3DCCF] text-[#57534E] font-mono text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
+</div>
+<div class="rounded bg-[#FFFFFF] border border-[#E3DCCF] hover:border-[#8A847C] p-2 shadow-2xs transition-all">
+<div class="flex items-center justify-between mb-1.5 gap-1">
+<a class="px-1.5 py-0.5 rounded bg-[#F4EFE6] text-[#57534E] font-mono text-[10px] font-semibold inline-flex items-center gap-0.5" href="#">
+#LIN-104
+<span class="material-symbols-outlined text-[10px]" data-icon="launch">launch</span>
+</a>
+<span class="px-1 py-0.5 rounded bg-[#F4EFE6] text-[#78716C] text-[9px] font-mono uppercase shrink-0">P2</span>
+</div>
+<h4 class="font-editorial font-bold text-[#181715] text-[13px] leading-tight mb-1 line-clamp-2">
+Bring my Samsung Food recipes into Julia
+</h4>
+<p class="text-[11px] text-[#57534E] leading-snug mb-2 line-clamp-2">
+Parse API schema payload and convert notes into rich Markdown format.
+</p>
+<div class="flex items-center justify-between pt-1.5 border-t border-[#F4EFE6] text-[10px] text-[#8A847C] font-mono">
+<span class="truncate">Data Ingest</span>
+<span class="text-[#8A847C] shrink-0">#1</span>
+</div>
+</div>
+</div>
+<!-- 2. READY -->
+<div class="flex flex-col rounded bg-[#FEFBF3] border border-[#FDE68A] p-2 shadow-2xs min-w-0">
+<div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#FDE68A]">
+<div class="flex items-center gap-1.5 min-w-0">
+<span class="w-2 h-2 rounded-full bg-[#B45309] shrink-0"></span>
+<h3 class="font-editorial font-bold text-sm text-[#78350F] truncate">Ready</h3>
+</div>
+<span class="w-4 h-4 rounded bg-[#FEF3C7] text-[#92400E] font-mono text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
+</div>
+<div class="rounded bg-[#FFFFFF] border border-[#FDE68A] hover:border-[#D97706] p-2 shadow-2xs transition-all">
+<div class="flex items-center justify-between mb-1.5 gap-1">
+<a class="px-1.5 py-0.5 rounded bg-[#FEF3C7] text-[#92400E] font-mono text-[10px] font-semibold inline-flex items-center gap-0.5" href="#">
+#LIN-108
+<span class="material-symbols-outlined text-[10px]" data-icon="launch">launch</span>
+</a>
+<span class="px-1 py-0.5 rounded bg-[#FEF3C7] text-[#B45309] font-mono text-[9px] font-bold uppercase shrink-0">Specs</span>
+</div>
+<h4 class="font-editorial font-bold text-[#181715] text-[13px] leading-tight mb-1 line-clamp-2">
+Scorecard for every run, plus a ping
+</h4>
+<p class="text-[11px] text-[#57534E] leading-snug mb-2 line-clamp-2">
+Aggregate run metrics into telegram webhooks with benchmarks.
+</p>
+<div class="pt-1.5 border-t border-[#F4EFE6] flex items-center justify-between gap-1">
+<span class="font-mono text-[10px] text-[#8A847C]">~6m</span>
+<button class="px-2 py-0.5 rounded bg-[#15803D] hover:bg-[#166534] text-white font-mono text-[10px] font-semibold transition-all flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[12px]" data-icon="play_arrow">play_arrow</span>
+<span>Start</span>
+</button>
+</div>
+</div>
+</div>
+<!-- 3. IMPLEMENTATION (Cobalt Ink Accent) -->
+<div class="flex flex-col rounded bg-[#F8FAFF] border-2 border-[#1D4ED8] p-2 shadow-xs min-w-0">
+<div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#DBEAFE]">
+<div class="flex items-center gap-1.5 min-w-0">
+<span class="w-2 h-2 rounded-full bg-[#1D4ED8] animate-ping shrink-0"></span>
+<h3 class="font-editorial font-bold text-sm text-[#1E3A8A] truncate">Implementation</h3>
+</div>
+<span class="px-1.5 py-0.2 rounded bg-[#1D4ED8] text-white font-mono text-[9px] font-bold shrink-0">1 LIVE</span>
+</div>
+<div class="rounded bg-[#FFFFFF] border border-[#BFDBFE] p-2 shadow-2xs">
+<div class="flex items-center justify-between mb-1.5 gap-1">
+<a class="px-1.5 py-0.5 rounded bg-[#EFF6FF] text-[#1D4ED8] font-mono text-[10px] font-bold inline-flex items-center gap-0.5" href="#">
+#LIN-112
+<span class="material-symbols-outlined text-[10px]" data-icon="launch">launch</span>
+</a>
+<span class="px-1.5 py-0.2 rounded bg-[#1D4ED8] text-white font-mono font-bold text-[9px] shrink-0">
+4/8
+</span>
+</div>
+<h4 class="font-editorial font-bold text-[#181715] text-[13px] leading-tight mb-1.5 line-clamp-2">
+New machine: retry and pause
+</h4>
+<div class="mb-2">
+<div class="flex gap-0.5 h-1.5 w-full mb-1">
+<div class="flex-1 bg-[#1D4ED8] rounded-xs"></div>
+<div class="flex-1 bg-[#1D4ED8] rounded-xs"></div>
+<div class="flex-1 bg-[#1D4ED8] rounded-xs"></div>
+<div class="flex-1 bg-[#3B82F6] animate-pulse rounded-xs"></div>
+<div class="flex-1 bg-[#E2E8F0] rounded-xs"></div>
+<div class="flex-1 bg-[#E2E8F0] rounded-xs"></div>
+<div class="flex-1 bg-[#E2E8F0] rounded-xs"></div>
+<div class="flex-1 bg-[#E2E8F0] rounded-xs"></div>
+</div>
+<div class="flex items-center justify-between text-[10px]">
+<span class="text-[#1D4ED8] font-mono font-semibold truncate">
+Running tests
+</span>
+<span class="font-mono font-bold text-[#1E3A8A] shrink-0">50%</span>
+</div>
+</div>
+<div class="bg-[#F8FAFC] p-1.5 rounded border border-[#E2E8F0] space-y-1 mb-2 text-[10px] font-mono text-[#475569]">
+<div class="flex justify-between"><span>Active:</span><span class="font-semibold text-[#0F172A]">40s ago</span></div>
+<div class="flex justify-between"><span>Spend:</span><span class="font-semibold text-[#0F172A]">$0.84</span></div>
+<div class="flex justify-between"><span>Context:</span><span class="font-semibold text-[#1D4ED8]">41%</span></div>
+</div>
+<button class="w-full py-1 rounded bg-[#FEE2E2] hover:bg-[#FECACA] text-[#991B1B] font-mono text-[10px] font-semibold transition-all flex items-center justify-center gap-1 border border-[#FCA5A5]">
+<span class="material-symbols-outlined text-[13px] text-[#B91C1C]" data-icon="stop_circle">stop_circle</span>
+<span>Stop</span>
+</button>
+</div>
+</div>
+<!-- 4. EVIDENCE REVIEW -->
+<div class="flex flex-col rounded bg-[#FAF9F6] border border-[#E3DCCF] p-2 shadow-2xs min-w-0">
+<div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#E3DCCF]">
+<div class="flex items-center gap-1.5 min-w-0">
+<span class="w-2 h-2 rounded-full bg-[#4338CA] shrink-0"></span>
+<h3 class="font-editorial font-bold text-sm text-[#181715] truncate">Evidence</h3>
+</div>
+<span class="w-4 h-4 rounded bg-[#E0E7FF] text-[#3730A3] font-mono text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
+</div>
+<div class="rounded bg-[#FFFFFF] border border-[#E3DCCF] hover:border-[#C5BAA8] p-2 shadow-2xs transition-all">
+<div class="flex items-center justify-between mb-1.5 gap-1">
+<a class="px-1.5 py-0.5 rounded bg-[#EEF2FF] text-[#3730A3] font-mono text-[10px] font-bold inline-flex items-center gap-0.5" href="#">
+#LIN-115
+<span class="material-symbols-outlined text-[10px]" data-icon="launch">launch</span>
+</a>
+<span class="px-1 py-0.5 rounded bg-[#DCFCE7] text-[#166534] font-mono text-[9px] font-bold shrink-0">94%</span>
+</div>
+<h4 class="font-editorial font-bold text-[#181715] text-[13px] leading-tight mb-1.5 line-clamp-2">
+Clean telemetry &amp; trace bundle
+</h4>
+<div class="p-1.5 rounded bg-[#FAF9F6] border border-[#E3DCCF] mb-2 space-y-1">
+<div class="flex items-center justify-between text-[10px]">
+<span class="text-[#57534E] truncate">Artifacts (4)</span>
+<span class="font-mono text-[#181715] font-bold shrink-0">2.4M</span>
+</div>
+<div class="w-full bg-[#E2E8F0] h-1.5 rounded overflow-hidden flex">
+<div class="bg-[#15803D] w-[82%]"></div>
+<div class="bg-[#86EFAC] w-[12%]"></div>
+<div class="bg-[#B91C1C] w-[6%]"></div>
+</div>
+<div class="text-[9px] text-[#78716C] font-mono">Coverage: 82% core</div>
+</div>
+<button class="w-full py-1 rounded bg-[#F4EFE6] hover:bg-[#EAE4D7] text-[#181715] font-mono text-[10px] font-semibold transition-all flex items-center justify-center gap-0.5 border border-[#C5BAA8]">
+<span class="material-symbols-outlined text-[12px]" data-icon="download">download</span>
+<span>Inspect</span>
+</button>
+</div>
+</div>
+<!-- 5. REMEDIATION (Vermilion / Crimson Alert Accent) -->
+<div class="flex flex-col rounded bg-[#FFFBFB] border-2 border-[#B91C1C] p-2 shadow-2xs min-w-0">
+<div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#FECACA]">
+<div class="flex items-center gap-1.5 min-w-0">
+<span class="w-2 h-2 rounded-full bg-[#B91C1C] shrink-0"></span>
+<h3 class="font-editorial font-bold text-sm text-[#7F1D1D] truncate">Remediation</h3>
+</div>
+<span class="px-1.5 py-0.2 rounded bg-[#B91C1C] text-white font-mono text-[9px] font-bold shrink-0 animate-bounce">STUCK</span>
+</div>
+<div class="rounded bg-[#FFFFFF] border border-[#FECACA] p-2 shadow-2xs">
+<div class="flex items-center justify-between mb-1.5 gap-1">
+<a class="px-1.5 py-0.5 rounded bg-[#FEE2E2] text-[#991B1B] font-mono text-[10px] font-bold inline-flex items-center gap-0.5" href="#">
+#LIN-119
+<span class="material-symbols-outlined text-[10px]" data-icon="launch">launch</span>
+</a>
+<span class="px-1 py-0.5 rounded bg-[#FEE2E2] text-[#B91C1C] font-mono text-[9px] font-bold uppercase shrink-0">Stuck</span>
+</div>
+<h4 class="font-editorial font-bold text-[#181715] text-[13px] leading-tight mb-1.5 line-clamp-2">
+Practice: real failure path
+</h4>
+<div class="p-1.5 rounded bg-[#FEF2F2] border border-[#FCA5A5] mb-2">
+<p class="font-mono text-[10px] font-bold text-[#991B1B]">No activity: 7m</p>
+<p class="text-[9px] text-[#7F1D1D] font-mono truncate">Waiting on DB lock</p>
+</div>
+<div class="grid grid-cols-2 gap-1">
+<button class="py-1 rounded bg-[#F4EFE6] hover:bg-[#EAE4D7] text-[#181715] font-mono text-[9px] font-semibold transition-all flex items-center justify-center border border-[#C5BAA8]">
+Trace
+</button>
+<button class="py-1 rounded bg-[#B91C1C] text-white hover:bg-[#991B1B] font-mono text-[9px] font-semibold transition-all flex items-center justify-center">
+Nudge
+</button>
+</div>
+</div>
+</div>
+<!-- 6. STAGING / SMOKE TEST -->
+<div class="flex flex-col rounded bg-[#F9FCF9] border border-[#BBF7D0] p-2 shadow-2xs min-w-0">
+<div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#BBF7D0]">
+<div class="flex items-center gap-1.5 min-w-0">
+<span class="w-2 h-2 rounded-full bg-[#15803D] shrink-0"></span>
+<h3 class="font-editorial font-bold text-sm text-[#14532D] truncate">Staging</h3>
+</div>
+<span class="w-4 h-4 rounded bg-[#DCFCE7] text-[#166534] font-mono text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
+</div>
+<div class="rounded bg-[#FFFFFF] border border-[#BBF7D0] hover:border-[#4ADE80] p-2 shadow-2xs transition-all">
+<div class="flex items-center justify-between mb-1.5 gap-1">
+<a class="px-1.5 py-0.5 rounded bg-[#DCFCE7] text-[#14532D] font-mono text-[10px] font-bold inline-flex items-center gap-0.5" href="#">
+#LIN-121
+<span class="material-symbols-outlined text-[10px]" data-icon="launch">launch</span>
+</a>
+<span class="px-1 py-0.5 rounded bg-[#DCFCE7] text-[#15803D] font-mono text-[9px] font-bold uppercase shrink-0">Smoke</span>
+</div>
+<h4 class="font-editorial font-bold text-[#181715] text-[13px] leading-tight mb-1.5 line-clamp-2">
+Automated smoke check: Auth &amp; Session
+</h4>
+<div class="p-1.5 rounded bg-[#F0FDF4] border border-[#BBF7D0] mb-2">
+<div class="flex items-center justify-between mb-1">
+<span class="text-[#14532D] font-mono font-bold text-[10px]">9/9 checks</span>
+<span class="font-mono text-[9px] text-[#15803D] font-bold">0 err</span>
+</div>
+<div class="flex gap-0.5 flex-wrap">
+<span class="w-2 h-2 rounded-full bg-[#15803D]"></span>
+<span class="w-2 h-2 rounded-full bg-[#15803D]"></span>
+<span class="w-2 h-2 rounded-full bg-[#15803D]"></span>
+<span class="w-2 h-2 rounded-full bg-[#15803D]"></span>
+<span class="w-2 h-2 rounded-full bg-[#15803D]"></span>
+<span class="w-2 h-2 rounded-full bg-[#15803D]"></span>
+<span class="w-2 h-2 rounded-full bg-[#15803D]"></span>
+<span class="w-2 h-2 rounded-full bg-[#15803D]"></span>
+<span class="w-2 h-2 rounded-full bg-[#15803D]"></span>
+</div>
+</div>
+<div class="text-[10px] text-[#57534E] pt-1 border-t border-[#F0FDF4] font-mono truncate">
+Stage-04 • 100% stable
+</div>
+</div>
+</div>
+<!-- 7. UAT (Golden Ochre Accent) -->
+<div class="flex flex-col rounded bg-[#FFFDF5] border-2 border-[#D97706] p-2 shadow-2xs min-w-0">
+<div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#FDE68A]">
+<div class="flex items-center gap-1.5 min-w-0">
+<span class="w-2 h-2 rounded-full bg-[#B45309] shrink-0"></span>
+<h3 class="font-editorial font-bold text-sm text-[#78350F] truncate">UAT</h3>
+</div>
+<span class="px-1.5 py-0.2 rounded bg-[#B45309] text-white font-mono text-[9px] font-bold shrink-0">
+WAITING
+</span>
+</div>
+<div class="rounded bg-[#FFFFFF] border border-[#FDE68A] p-2 shadow-2xs">
+<div class="flex items-center justify-between mb-1.5 gap-1">
+<a class="px-1.5 py-0.5 rounded bg-[#FEF3C7] text-[#92400E] font-mono text-[10px] font-bold inline-flex items-center gap-0.5" href="#">
+#LIN-142
+<span class="material-symbols-outlined text-[10px]" data-icon="launch">launch</span>
+</a>
+<span class="px-1.5 py-0.5 rounded bg-[#FEF3C7] text-[#B45309] font-mono text-[9px] font-bold uppercase shrink-0">
+Waiting on you
+</span>
+</div>
+<h4 class="font-editorial font-bold text-[#181715] text-[13px] leading-tight mb-1.5 line-clamp-2">
+Recipe screens look like Julia's vintage design
+</h4>
+<div class="p-1.5 rounded bg-[#FFFBEB] border border-[#FDE68A] mb-2 space-y-0.5 text-[10px]">
+<p class="text-[#78350F] font-mono truncate">Staging preview ready</p>
+<p class="text-[#B45309] font-mono text-[9px]">Figma 99.2% match</p>
+</div>
+<button class="w-full py-1 px-1.5 rounded bg-[#B45309] hover:bg-[#92400E] text-white font-mono text-[10px] font-semibold transition-all active:scale-[0.98] flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[13px]" data-icon="rate_review">rate_review</span>
+<span>Open Feedback</span>
+</button>
+</div>
+</div>
+<!-- 8. COMPLETE (Deep Forest Green Accent) -->
+<div class="flex flex-col rounded bg-[#F8FAF7] border border-[#BBF7D0] p-2 shadow-2xs min-w-0">
+<div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-[#BBF7D0]">
+<div class="flex items-center gap-1.5 min-w-0">
+<span class="w-2 h-2 rounded-full bg-[#15803D] shrink-0"></span>
+<h3 class="font-editorial font-bold text-sm text-[#14532D] truncate">Complete</h3>
+</div>
+<span class="w-4 h-4 rounded bg-[#DCFCE7] text-[#14532D] font-mono text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
+</div>
+<div class="rounded bg-[#FFFFFF] border border-[#BBF7D0] hover:border-[#86EFAC] p-2 shadow-2xs transition-all">
+<div class="flex items-center justify-between mb-1.5 gap-1">
+<a class="px-1.5 py-0.5 rounded bg-[#DCFCE7] text-[#14532D] font-mono text-[10px] font-bold inline-flex items-center gap-0.5" href="#">
+#LIN-95
+<span class="material-symbols-outlined text-[10px]" data-icon="launch">launch</span>
+</a>
+<span class="px-1.5 py-0.5 rounded bg-[#DCFCE7] text-[#15803D] font-mono text-[9px] font-bold flex items-center gap-0.5 shrink-0 border border-[#86EFAC]">
+✓ Shipped
+</span>
+</div>
+<h4 class="font-editorial font-bold text-[#181715] text-[13px] leading-tight mb-1.5 line-clamp-2">
+Add a recipe and find it by title
+</h4>
+<div class="p-1.5 rounded bg-[#F0FDF4] border border-[#BBF7D0] mb-2 flex items-center gap-1 text-[10px]">
+<span class="material-symbols-outlined text-[13px] text-[#15803D] shrink-0" data-icon="task_alt">task_alt</span>
+<span class="text-[#14532D] font-mono truncate">Shipped to main</span>
+</div>
+<div class="text-[10px] text-[#78716C] pt-1 border-t border-[#F0FDF4] font-mono truncate">
+Yesterday • v2.14.0
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Sticky Bottom Quick Summary Bar (Refined Editorial Ticker Bar) -->
+<footer class="w-full bg-[#FFFFFF] border-t border-[#E3DCCF] px-6 py-2.5">
+<div class="max-w-[1280px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-[#57534E]">
+<div class="flex items-center gap-6">
+<span class="flex items-center gap-1.5 font-medium">
+<span class="w-2 h-2 rounded-full bg-[#15803D]"></span>
+          Factory load: <strong class="text-[#181715] font-mono font-bold">32% capacity</strong>
+</span>
+<span class="hidden sm:inline text-[#C5BAA8]">•</span>
+<span class="flex items-center gap-1 font-medium">
+<span class="material-symbols-outlined text-[15px] text-[#1D4ED8]" data-icon="memory">memory</span>
+          Worker pool: <span class="font-mono font-semibold text-[#181715]">4 nodes active</span>
+</span>
+<span class="hidden sm:inline text-[#C5BAA8]">•</span>
+<span class="flex items-center gap-1 font-medium">
+<span class="material-symbols-outlined text-[15px] text-[#B45309]" data-icon="speed">speed</span>
+          Avg run time: <span class="font-mono font-semibold text-[#181715]">4.8m</span>
+</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-[#8A847C]">Press <kbd class="px-1.5 py-0.5 bg-[#F4EFE6] rounded border border-[#C5BAA8] font-mono text-[10px] text-[#181715]">?</kbd> for shortcuts</span>
+<button class="px-3 py-1 rounded bg-[#F4EFE6] hover:bg-[#EAE4D7] text-[#181715] font-mono text-xs font-semibold transition-colors flex items-center gap-1 border border-[#C5BAA8]">
+<span class="material-symbols-outlined text-[14px]" data-icon="fullscreen">fullscreen</span>
+          Panoramic fit
+        </button>
+</div>
+</div>
+</footer>
+</body></html>

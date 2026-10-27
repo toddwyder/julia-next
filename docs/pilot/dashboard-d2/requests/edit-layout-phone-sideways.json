@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793140330327,
+  "method": "tools/call",
+  "params": {
+    "name": "edit_screens",
+    "arguments": {
+      "projectId": "12943705270951129641",
+      "selectedScreenIds": [
+        "5506e9428f2a45cf83cc93f66845415c"
+      ],
+      "prompt": "Fix the \"Needs you (2)\" strip fixed at the top: show BOTH items in full, stacked one above the other, each fully readable with its button: \"Try the recipe screens (UAT)\" and \"Approve 3 retro fixes\". Nothing in the strip may be cut off. Keep the board columns scrolling sideways below it in order Backlog, Ready, Implementation, Evidence review, Remediation, Staging / smoke test, UAT, Complete, with a visible hint that more columns are to the right. Keep colours, fonts and tile content. Use plain words. Do not create or apply design systems.",
+      "deviceType": "MOBILE"
+    }
+  }
+}

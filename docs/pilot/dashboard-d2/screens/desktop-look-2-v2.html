@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Todd's Factory - Panoramic Pipeline Board (Swiss Data Studio)</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<!-- Swiss precision grotesque typography: Inter + JetBrains Mono for metrics -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=JetBrains+Mono:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+          },
+          colors: {
+            brand: {
+              cyan: '#0284c7',      // Primary active sky/cyan
+              blue: '#0284c7',
+              teal: '#0d9488',
+              emerald: '#10b981',   // Done / pass
+              amber: '#d97706',     // Ready / waiting
+              crimson: '#e11d48',   // Remediation / stuck
+              violet: '#7c3aed',    // Review
+              purple: '#9333ea',    // Backlog
+            }
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 7px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .tabular {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Tableau canvas subtle dot-grid precision background */
+    .bg-swiss-grid {
+      background-color: #f8fafc;
+      background-image: radial-gradient(#cbd5e1 0.75px, transparent 0.75px);
+      background-size: 20px 20px;
+    }
+  </style>
+</head>
+<body class="bg-swiss-grid text-slate-900 min-h-screen flex flex-col font-sans text-[13px] antialiased overflow-x-hidden selection:bg-sky-500 selection:text-white">
+<!-- Top Navigation Bar: Precision Figma / Tableau Canvas Bar -->
+<header class="w-full px-6 flex justify-between items-center h-14 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-[0_1px_3px_rgba(15,23,42,0.04)] docked full-width top-0 z-40 sticky">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2.5">
+<div class="w-8 h-8 rounded-lg bg-sky-600 flex items-center justify-center text-white shadow-sm ring-1 ring-sky-500/20">
+<span class="material-symbols-outlined text-[19px]" data-icon="precision_manufacturing">precision_manufacturing</span>
+</div>
+<div class="flex items-baseline gap-1.5">
+<span class="text-[16px] font-black text-slate-900 tracking-tight">Todd's Factory</span>
+<span class="text-[10px] font-mono uppercase tracking-widest text-sky-600 font-bold px-1.5 py-0.2 bg-sky-50 rounded border border-sky-200/60">STUDIO VIZ</span>
+</div>
+</div>
+<!-- Live Factory Health / Overview Infographic Chips -->
+<div class="hidden lg:flex items-center gap-2 pl-2">
+<div class="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50/90 rounded-md border border-emerald-200/70">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="text-[11px] font-mono font-semibold text-emerald-800 tabular">8 lanes online</span>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50/90 rounded-md border border-amber-200/70">
+<span class="material-symbols-outlined text-[14px] text-amber-600" data-icon="payments">payments</span>
+<span class="text-[11px] font-mono font-semibold text-amber-800 tabular">$3.42 daily spend</span>
+</div>
+<div class="flex items-center gap-1.5 px-2.5 py-1 bg-rose-50/90 rounded-md border border-rose-200/70">
+<span class="material-symbols-outlined text-[14px] text-rose-600" data-icon="notifications_active">notifications_active</span>
+<span class="text-[11px] font-mono font-bold text-rose-700">2 items need Todd</span>
+</div>
+</div>
+</div>
+<!-- Center Navigation Links: Clean Swiss Grotesque tabs -->
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-sky-600 font-bold border-b-2 border-sky-600 pb-3 pt-3 text-[12px] uppercase tracking-wider flex items-center gap-1.5" href="#">
+<span class="material-symbols-outlined text-[17px]" data-icon="view_kanban">view_kanban</span>
+    Pipeline
+  </a>
+<a class="text-slate-600 hover:text-slate-900 transition-colors py-3 text-[12px] uppercase tracking-wider font-semibold" href="#">
+    Telemetry
+  </a>
+<a class="text-slate-600 hover:text-slate-900 transition-colors py-3 text-[12px] uppercase tracking-wider font-semibold flex items-center gap-1.5 group" href="#">
+<span class="material-symbols-outlined text-sky-600 text-[17px]" data-icon="psychology">psychology</span>
+    Decision Support
+    <span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-mono text-[9px] font-bold tracking-tight">AI Co-pilot</span>
+</a>
+<a class="text-slate-600 hover:text-slate-900 transition-colors py-3 text-[12px] uppercase tracking-wider font-semibold" href="#">
+    Artifacts
+  </a>
+</nav>
+<!-- Trailing Actions & Todd Avatar -->
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1">
+<button class="w-7 h-7 rounded-md flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors" title="Notifications">
+<span class="material-symbols-outlined text-[18px]" data-icon="notifications">notifications</span>
+</button>
+<button class="w-7 h-7 rounded-md flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors" title="Tune Controls">
+<span class="material-symbols-outlined text-[18px]" data-icon="tune">tune</span>
+</button>
+<button class="w-7 h-7 rounded-md flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors" title="Help">
+<span class="material-symbols-outlined text-[18px]" data-icon="help_outline">help_outline</span>
+</button>
+</div>
+<div class="h-4 w-px bg-slate-200"></div>
+<button class="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-[12px] transition-all flex items-center gap-1.5 border border-slate-300/80">
+<span class="material-symbols-outlined text-[15px] text-amber-600" data-icon="pending_actions">pending_actions</span>
+<span>Review Queue (2)</span>
+</button>
+<button class="px-3.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white font-semibold text-[12px] shadow-sm transition-all flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px]" data-icon="rocket_launch">rocket_launch</span>
+<span>Dispatch Agent</span>
+</button>
+<!-- Todd Profile -->
+<div class="relative ml-0.5 cursor-pointer">
+<div class="w-7 h-7 rounded-md bg-sky-100 border border-sky-300 text-sky-700 font-mono font-bold text-[11px] flex items-center justify-center">
+      TD
+    </div>
+<span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1.5 ring-white"></span>
+</div>
+</div>
+</header>
+<!-- Top Alert Ribbon: "Needs you (2)" -->
+<section class="w-full px-6 py-3 bg-white/70 border-b border-slate-200/80">
+<div class="max-w-[1920px] mx-auto">
+<div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+<!-- Left Banner Head -->
+<div class="flex items-center gap-3.5 min-w-[220px]">
+<div class="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600">
+<span class="material-symbols-outlined text-[22px]" data-icon="waving_hand">waving_hand</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<h2 class="text-[14px] font-bold text-slate-900 tracking-tight">Needs you</h2>
+<span class="px-1.5 py-0.5 rounded bg-rose-500 text-white font-mono text-[10px] font-bold tracking-tight">2 ACTIONS</span>
+</div>
+<p class="text-[11px] text-slate-500 font-medium">Unblock your agents in 30 seconds</p>
+</div>
+</div>
+<!-- Cards Container -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1">
+<!-- Ribbon Card 1: UAT Recipe Screens -->
+<div class="flex items-center justify-between p-2.5 px-3 bg-amber-50/60 rounded-lg border border-amber-200/90 hover:border-amber-300 transition-all">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-md bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+<span class="material-symbols-outlined text-[18px]" data-icon="palette">palette</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-mono text-[10px] text-amber-800 uppercase tracking-wider font-bold">UAT STAGE</span>
+<span class="text-slate-300 text-xs">•</span>
+<a class="font-mono text-[11px] text-slate-600 hover:text-sky-600 font-bold inline-flex items-center gap-0.5" href="#LIN-124">
+                LIN-124 <span class="material-symbols-outlined text-[12px]" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+<p class="text-[12px] font-semibold text-slate-900">Try the recipe screens (UAT)</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-3 py-1.5 rounded-md bg-amber-600 text-white hover:bg-amber-500 font-medium text-[11px] shadow-sm transition-all flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]" data-icon="visibility">visibility</span>
+<span>Open Preview</span>
+</button>
+</div>
+</div>
+<!-- Ribbon Card 2: Approve retro fixes -->
+<div class="flex items-center justify-between p-2.5 px-3 bg-sky-50/60 rounded-lg border border-sky-200/90 hover:border-sky-300 transition-all">
+<div class="flex items-center gap-2.5">
+<div class="w-7 h-7 rounded-md bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+<span class="material-symbols-outlined text-[18px]" data-icon="rate_review">rate_review</span>
+</div>
+<div>
+<div class="flex items-center gap-2">
+<span class="font-mono text-[10px] text-sky-800 uppercase tracking-wider font-bold">REMEDIATION</span>
+<span class="text-slate-300 text-xs">•</span>
+<a class="font-mono text-[11px] text-slate-600 hover:text-sky-600 font-bold inline-flex items-center gap-0.5" href="#LIN-119">
+                LIN-119 <span class="material-symbols-outlined text-[12px]" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+<p class="text-[12px] font-semibold text-slate-900">Approve 3 retro fixes</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-2.5 py-1.5 rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium text-[11px] transition-all">
+            Inspect
+          </button>
+<button class="px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-500 font-medium text-[11px] shadow-sm transition-all flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]" data-icon="check_circle">check_circle</span>
+<span>Quick Approve</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Panoramic Board Canvas (All 8 Columns visible) -->
+<main class="flex-1 w-full px-3 py-3 overflow-x-hidden"><div class="w-full max-w-[1260px] mx-auto"><div class="flex items-center justify-between mb-2.5 px-0.5"><div class="flex items-center gap-2.5"><h1 class="text-[15px] text-slate-900 tracking-tight font-extrabold flex items-center gap-2">Factory Pipeline</h1><span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-mono text-[9.5px] font-semibold tracking-wide uppercase">Panoramic View</span></div><div class="flex items-center gap-2.5 text-[11px] text-slate-500 font-medium"><span class="inline-flex items-center gap-1 text-emerald-600 font-semibold font-mono"><span class="material-symbols-outlined text-[13px]" data-icon="sync">sync</span>Linear Realtime Sync</span><span class="text-slate-300">•</span><span class="font-mono text-[10px]">12s ago</span></div></div><div class="grid grid-cols-8 gap-2 items-start w-full"><div class="flex flex-col rounded-lg bg-white border border-purple-200/90 shadow-[0_1px_3px_rgba(147,51,234,0.04)] p-1.5 min-w-0"><div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-purple-100"><div class="flex items-center gap-1 min-w-0"><span class="w-2 h-2 rounded-xs bg-purple-600 shrink-0"></span><h3 class="text-[10px] font-mono uppercase tracking-wider font-bold text-purple-950 truncate">Backlog</h3></div><span class="w-3.5 h-3.5 rounded bg-purple-100 text-purple-800 font-mono text-[9px] font-bold flex items-center justify-center shrink-0 tabular">1</span></div><div class="rounded-md bg-white border-t-2 border-t-purple-600 border border-slate-200 p-2 shadow-sm hover:border-purple-300 transition-all group"><div class="flex items-center justify-between mb-1.5"><a class="px-1 py-0.5 rounded bg-purple-50 text-purple-700 font-mono text-[9px] font-bold flex items-center gap-0.5 border border-purple-200" href="#">#LIN-104</a><span class="px-1 py-0.2 rounded bg-slate-100 text-slate-700 font-mono text-[9px] font-semibold flex items-center gap-0.5"><span class="material-symbols-outlined text-[10px] text-purple-600" data-icon="bolt">bolt</span>P2</span></div><h4 class="font-bold text-slate-900 text-[11px] leading-tight mb-1 tracking-tight">Bring my Samsung Food recipes into Julia</h4><p class="text-[10px] text-slate-500 leading-tight mb-2">Parse API schema payload and convert notes into Markdown.</p><div class="flex items-center justify-between pt-1.5 border-t border-slate-100 font-mono text-[9px]"><div class="flex items-center gap-0.5 text-slate-500 font-medium truncate"><span class="material-symbols-outlined text-[11px] text-purple-500" data-icon="tag">tag</span><span class="truncate">Ingestion</span></div><span class="text-slate-400 shrink-0">Q#1</span></div></div></div><div class="flex flex-col rounded-lg bg-white border border-amber-200/90 shadow-[0_1px_3px_rgba(217,119,6,0.04)] p-1.5 min-w-0"><div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-amber-100"><div class="flex items-center gap-1 min-w-0"><span class="w-2 h-2 rounded-xs bg-amber-500 shrink-0"></span><h3 class="text-[10px] font-mono uppercase tracking-wider font-bold text-amber-950 truncate">Ready</h3></div><span class="w-3.5 h-3.5 rounded bg-amber-100 text-amber-900 font-mono text-[9px] font-bold flex items-center justify-center shrink-0 tabular">1</span></div><div class="rounded-md bg-white border-t-2 border-t-amber-500 border border-slate-200 p-2 shadow-sm hover:border-amber-300 transition-all group"><div class="flex items-center justify-between mb-1.5"><a class="px-1 py-0.5 rounded bg-amber-50 text-amber-800 font-mono text-[9px] font-bold flex items-center gap-0.5 border border-amber-200" href="#">#LIN-108</a><span class="px-1 py-0.2 rounded bg-amber-50 text-amber-800 font-mono text-[8.5px] font-bold border border-amber-200 truncate">Clean Specs</span></div><h4 class="font-bold text-slate-900 text-[11px] leading-tight mb-1 tracking-tight">Scorecard for every run, plus a ping</h4><p class="text-[10px] text-slate-500 leading-tight mb-2">Aggregate run metrics into telegram webhooks with latency data.</p><div class="pt-1.5 border-t border-slate-100 flex items-center justify-between font-mono text-[9px]"><span class="text-slate-500 font-medium">EST: 6m</span><button class="px-1.5 py-0.5 rounded bg-amber-600 text-white hover:bg-amber-500 font-sans font-bold text-[9.5px] transition-all flex items-center gap-0.5"><span class="material-symbols-outlined text-[11px]" data-icon="play_arrow">play_arrow</span><span>Start</span></button></div></div></div><div class="flex flex-col rounded-lg bg-sky-50/50 border-2 border-sky-400 p-1.5 shadow-[0_2px_8px_rgba(2,132,199,0.08)] min-w-0"><div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-sky-200"><div class="flex items-center gap-1 min-w-0"><span class="w-2 h-2 rounded-full bg-sky-500 animate-ping shrink-0"></span><h3 class="text-[10px] font-mono uppercase tracking-wider font-extrabold text-sky-950 truncate">Implementation</h3></div><span class="px-1 py-0.2 rounded bg-sky-600 text-white font-mono text-[8.5px] font-black shrink-0">1 LIVE</span></div><div class="rounded-md bg-white border border-sky-300 p-1.5 shadow-sm"><div class="flex items-center justify-between mb-1"><a class="px-1 py-0.5 rounded bg-sky-100 text-sky-800 font-mono text-[9px] font-bold border border-sky-200" href="#">#LIN-112</a><span class="px-1 py-0.2 rounded bg-sky-50 text-sky-700 font-mono font-bold text-[8.5px] border border-sky-200">Step 4/8</span></div><h4 class="font-bold text-slate-900 text-[11px] leading-tight mb-1 tracking-tight">New machine: retry and pause</h4><div class="mb-1.5 bg-sky-50/80 p-1 rounded border border-sky-100"><div class="flex gap-0.5 h-1 w-full mb-1"><div class="flex-1 bg-sky-500 rounded-xs"></div><div class="flex-1 bg-sky-500 rounded-xs"></div><div class="flex-1 bg-sky-500 rounded-xs"></div><div class="flex-1 bg-sky-400 animate-pulse rounded-xs"></div><div class="flex-1 bg-slate-200 rounded-xs"></div><div class="flex-1 bg-slate-200 rounded-xs"></div><div class="flex-1 bg-slate-200 rounded-xs"></div><div class="flex-1 bg-slate-200 rounded-xs"></div></div><div class="flex items-center justify-between font-mono text-[8.5px]"><span class="text-sky-700 font-bold inline-flex items-center gap-0.5 truncate"><span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping shrink-0"></span>RUN TESTS</span><span class="font-bold text-sky-900">50%</span></div></div><div class="space-y-0.5 mb-1.5 bg-slate-50 p-1 rounded border border-slate-200 font-mono text-[8.5px]"><div class="flex items-center justify-between text-slate-600"><span>Active 40s ago</span><span class="text-slate-800 font-bold">$0.84</span></div><div class="flex items-center justify-between text-slate-600"><span>12m elapsed</span><span class="text-sky-700 font-bold">Ctx 41%</span></div></div><div class="flex items-center gap-1 mb-1.5 font-mono text-[8.5px]"><span class="px-1 py-0.2 rounded bg-slate-100 text-slate-700 font-medium flex items-center gap-0.5 border border-slate-200 truncate"><span class="material-symbols-outlined text-[9px] text-sky-600" data-icon="smart_toy">smart_toy</span>Main</span><span class="px-1 py-0.2 rounded bg-slate-100 text-slate-700 font-medium flex items-center gap-0.5 border border-slate-200 truncate"><span class="material-symbols-outlined text-[9px] text-emerald-600" data-icon="terminal">terminal</span>Coder</span></div><button class="w-full py-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-[9.5px] transition-all flex items-center justify-center gap-0.5 border border-rose-200"><span class="material-symbols-outlined text-[11px]" data-icon="stop_circle">stop_circle</span><span>Stop</span></button></div></div><div class="flex flex-col rounded-lg bg-white border border-indigo-200/90 shadow-[0_1px_3px_rgba(79,70,229,0.04)] p-1.5 min-w-0"><div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-indigo-100"><div class="flex items-center gap-1 min-w-0"><span class="w-2 h-2 rounded-xs bg-indigo-600 shrink-0"></span><h3 class="text-[10px] font-mono uppercase tracking-wider font-bold text-indigo-950 truncate">Evidence review</h3></div><span class="w-3.5 h-3.5 rounded bg-indigo-100 text-indigo-900 font-mono text-[9px] font-bold flex items-center justify-center shrink-0 tabular">1</span></div><div class="rounded-md bg-white border-t-2 border-t-indigo-600 border border-slate-200 p-2 shadow-sm hover:border-indigo-300 transition-all group"><div class="flex items-center justify-between mb-1.5"><a class="px-1 py-0.5 rounded bg-indigo-50 text-indigo-800 font-mono text-[9px] font-bold flex items-center gap-0.5 border border-indigo-200" href="#">#LIN-115</a><span class="px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-mono text-[8.5px] font-bold flex items-center gap-0.5"><span class="material-symbols-outlined text-[9px]" data-icon="check_circle">check_circle</span>94%</span></div><h4 class="font-bold text-slate-900 text-[11px] leading-tight mb-1 tracking-tight">Clean telemetry snapshot &amp; trace bundle</h4><div class="p-1.5 rounded bg-indigo-50/50 border border-indigo-100 mb-1.5 space-y-1"><div class="flex items-center justify-between font-mono text-[8.5px]"><span class="text-indigo-950 font-medium flex items-center gap-0.5"><span class="material-symbols-outlined text-[10px] text-indigo-600" data-icon="folder_zip">folder_zip</span>Artifacts (4)</span><span class="text-indigo-700 font-bold">2.4 MB</span></div><div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden flex"><div class="bg-emerald-500 w-[82%]"></div><div class="bg-teal-400 w-[12%]"></div><div class="bg-rose-500 w-[6%]"></div></div><div class="flex items-center justify-between font-mono text-[8px] text-slate-500"><span>OPTIMAL</span><span class="font-bold text-slate-700">82% core</span></div></div><button class="w-full py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[9.5px] transition-all flex items-center justify-center gap-0.5 border border-slate-200"><span class="material-symbols-outlined text-[11px]" data-icon="download">download</span><span>Inspect</span></button></div></div><div class="flex flex-col rounded-lg bg-rose-50/70 border-2 border-rose-400 p-1.5 shadow-[0_2px_8px_rgba(244,63,94,0.1)] min-w-0"><div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-rose-200"><div class="flex items-center gap-1 min-w-0"><span class="w-2 h-2 rounded-xs bg-rose-600 shrink-0"></span><h3 class="text-[10px] font-mono uppercase tracking-wider font-extrabold text-rose-950 truncate">Remediation</h3></div><span class="px-1 py-0.2 rounded bg-rose-600 text-white font-mono text-[8.5px] font-black shrink-0 animate-pulse">STUCK</span></div><div class="rounded-md bg-white border border-rose-300 p-1.5 shadow-sm" id="LIN-119"><div class="flex items-center justify-between mb-1"><a class="px-1 py-0.5 rounded bg-rose-100 text-rose-800 font-mono text-[9px] font-bold border border-rose-200" href="#">#LIN-119</a><span class="px-1 py-0.2 rounded bg-rose-100 text-rose-800 font-mono text-[8.5px] font-extrabold flex items-center gap-0.5 border border-rose-200"><span class="material-symbols-outlined text-[10px] text-rose-600" data-icon="warning">warning</span>Stuck</span></div><h4 class="font-bold text-slate-900 text-[11px] leading-tight mb-1 tracking-tight">Practice: real failure path</h4><div class="p-1 rounded bg-rose-50 border border-rose-200 mb-1.5 font-mono text-[8.5px]"><div class="flex items-start gap-1 text-rose-700"><span class="material-symbols-outlined text-[12px] shrink-0" data-icon="hourglass_disabled">hourglass_disabled</span><div><p class="font-bold text-rose-900">No activity 7 min</p><p class="text-[8px] text-slate-600 leading-tight">Waiting on DB lock</p></div></div></div><div class="grid grid-cols-2 gap-1"><button class="py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[9px] transition-all flex items-center justify-center border border-slate-200">Trace</button><button class="py-0.5 rounded bg-rose-600 text-white hover:bg-rose-500 font-bold text-[9px] shadow-sm transition-all flex items-center justify-center">Nudge</button></div></div></div><div class="flex flex-col rounded-lg bg-white border border-teal-200/90 shadow-[0_1px_3px_rgba(13,148,136,0.04)] p-1.5 min-w-0"><div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-teal-100"><div class="flex items-center gap-1 min-w-0"><span class="w-2 h-2 rounded-xs bg-teal-600 shrink-0"></span><h3 class="text-[10px] font-mono uppercase tracking-wider font-bold text-teal-950 truncate">Staging / smoke</h3></div><span class="w-3.5 h-3.5 rounded bg-teal-100 text-teal-900 font-mono text-[9px] font-bold flex items-center justify-center shrink-0 tabular">1</span></div><div class="rounded-md bg-white border-t-2 border-t-teal-600 border border-slate-200 p-2 shadow-sm hover:border-teal-300 transition-all group"><div class="flex items-center justify-between mb-1.5"><a class="px-1 py-0.5 rounded bg-teal-50 text-teal-800 font-mono text-[9px] font-bold border border-teal-200" href="#">#LIN-121</a><span class="px-1 py-0.2 rounded bg-teal-50 text-teal-800 font-mono text-[8.5px] font-semibold border border-teal-200">Suite</span></div><h4 class="font-bold text-slate-900 text-[11px] leading-tight mb-1 tracking-tight">Automated smoke check: Auth &amp; Session recovery</h4><div class="p-1.5 rounded bg-teal-50/60 border border-teal-100 mb-1.5"><div class="flex items-center justify-between mb-1 font-mono text-[8.5px]"><span class="text-teal-950 font-bold flex items-center gap-0.5"><span class="material-symbols-outlined text-[10px] text-teal-600" data-icon="verified">verified</span>9/9 Pass</span><span class="text-[8px] text-teal-700">0 fail</span></div><div class="flex flex-wrap gap-0.5"><span class="w-2 h-2 rounded-xs bg-teal-500"></span><span class="w-2 h-2 rounded-xs bg-teal-500"></span><span class="w-2 h-2 rounded-xs bg-teal-500"></span><span class="w-2 h-2 rounded-xs bg-teal-500"></span><span class="w-2 h-2 rounded-xs bg-teal-500"></span><span class="w-2 h-2 rounded-xs bg-teal-500"></span><span class="w-2 h-2 rounded-xs bg-teal-500"></span><span class="w-2 h-2 rounded-xs bg-teal-500"></span><span class="w-2 h-2 rounded-xs bg-teal-500"></span></div></div><div class="flex items-center justify-between font-mono text-[8.5px] text-slate-500 pt-1 border-t border-slate-100"><span>Stage-04</span><span class="text-teal-700 font-bold">100% ok</span></div></div></div><div class="flex flex-col rounded-lg bg-amber-50/70 border-2 border-amber-400 p-1.5 shadow-[0_2px_8px_rgba(217,119,6,0.1)] min-w-0"><div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-amber-200"><div class="flex items-center gap-1 min-w-0"><span class="w-2 h-2 rounded-xs bg-amber-600 shrink-0"></span><h3 class="text-[10px] font-mono uppercase tracking-wider font-extrabold text-amber-950 truncate">UAT</h3></div><span class="px-1 py-0.2 rounded bg-amber-600 text-white font-mono text-[8px] font-black shrink-0">WAITING</span></div><div class="rounded-md bg-white border border-amber-300 p-1.5 shadow-sm" id="LIN-124"><div class="flex items-center justify-between mb-1"><a class="px-1 py-0.5 rounded bg-amber-100 text-amber-900 font-mono text-[9px] font-bold border border-amber-200" href="#">#LIN-124</a><span class="px-1 py-0.2 rounded bg-amber-100 text-amber-900 font-mono text-[8px] font-bold border border-amber-200 truncate">Needs Todd</span></div><h4 class="font-bold text-slate-900 text-[11px] leading-tight mb-1 tracking-tight">Recipe screens look like Julia’s vintage design</h4><div class="p-1 rounded bg-amber-50 border border-amber-200 mb-1.5"><div class="flex items-center gap-1 mb-0.5"><div class="w-3.5 h-3.5 rounded bg-sky-600 text-white font-mono font-bold text-[7.5px] flex items-center justify-center shrink-0">TD</div><span class="font-mono text-[8.5px] text-amber-950 font-bold uppercase truncate">Waiting on you</span></div><p class="text-[8.5px] text-slate-600 leading-tight">Staging sandbox ready for review</p></div><button class="w-full py-1 rounded bg-amber-600 text-white hover:bg-amber-500 font-bold text-[9.5px] shadow-sm transition-all flex items-center justify-center gap-0.5"><span class="material-symbols-outlined text-[11px]" data-icon="preview">preview</span><span>Review</span></button></div></div><div class="flex flex-col rounded-lg bg-white border border-emerald-200/90 shadow-[0_1px_3px_rgba(16,185,129,0.04)] p-1.5 min-w-0"><div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-emerald-100"><div class="flex items-center gap-1 min-w-0"><span class="w-2 h-2 rounded-xs bg-emerald-600 shrink-0"></span><h3 class="text-[10px] font-mono uppercase tracking-wider font-bold text-emerald-950 truncate">Complete</h3></div><span class="w-3.5 h-3.5 rounded bg-emerald-100 text-emerald-900 font-mono text-[9px] font-bold flex items-center justify-center shrink-0 tabular">1</span></div><div class="rounded-md bg-white border-t-2 border-t-emerald-600 border border-slate-200 p-2 shadow-sm hover:border-emerald-300 transition-all group"><div class="flex items-center justify-between mb-1.5"><a class="px-1 py-0.5 rounded bg-emerald-50 text-emerald-800 font-mono text-[9px] font-bold border border-emerald-200" href="#">#LIN-95</a><span class="px-1 py-0.2 rounded bg-emerald-50 text-emerald-700 font-mono text-[8.5px] font-bold flex items-center gap-0.5 border border-emerald-200"><span class="material-symbols-outlined text-[9px] text-emerald-600" data-icon="check">check</span>Done</span></div><h4 class="font-bold text-slate-900 text-[11px] leading-tight mb-1 tracking-tight">Add a recipe and find it by title</h4><p class="text-[10px] text-slate-500 leading-tight mb-1.5">Full text search indexing across 4,200 archived recipe titles.</p><div class="p-1 rounded bg-emerald-50 border border-emerald-100 flex items-center justify-between mb-1"><div class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span><span class="font-mono text-[8px] font-bold text-emerald-800 uppercase tracking-tight">Shipped to main</span></div><span class="text-[8.5px]">🎉</span></div><div class="flex items-center justify-between font-mono text-[8.5px] text-slate-400 pt-1 border-t border-slate-100"><span>Yesterday</span><span class="text-emerald-700 font-bold">v2.14.0</span></div></div></div></div></div></main>
+<!-- Sticky Bottom Quick Summary Bar: Tableau Style Telemetry Footer -->
+<footer class="w-full bg-white/90 backdrop-blur-sm border-t border-slate-200 px-6 py-2 shadow-sm font-mono text-[11.5px]">
+<div class="max-w-[1920px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3 text-slate-600">
+<div class="flex items-center gap-6">
+<span class="flex items-center gap-1.5 font-medium">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+      Factory load: <strong class="text-slate-900 font-bold tabular">32% capacity</strong>
+</span>
+<span class="hidden sm:inline text-slate-300">•</span>
+<span class="flex items-center gap-1.5 font-medium">
+<span class="material-symbols-outlined text-[15px] text-sky-600" data-icon="memory">memory</span>
+      Worker pool: <strong class="text-slate-900">4 nodes active</strong>
+</span>
+<span class="hidden sm:inline text-slate-300">•</span>
+<span class="flex items-center gap-1.5 font-medium">
+<span class="material-symbols-outlined text-[15px] text-amber-600" data-icon="speed">speed</span>
+      Avg run time: <strong class="text-slate-900 tabular">4.8m</strong>
+</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="text-[11px] text-slate-400">Press <kbd class="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-300 font-mono text-[10px]">?</kbd> for shortcuts</span>
+<button class="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-semibold transition-colors flex items-center gap-1 border border-slate-300/60">
+<span class="material-symbols-outlined text-[14px]" data-icon="fullscreen">fullscreen</span>
+      Panoramic fit
+    </button>
+</div>
+</div>
+</footer>
+</body></html>

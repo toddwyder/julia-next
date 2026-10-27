@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793140330557,
+  "method": "tools/call",
+  "params": {
+    "name": "edit_screens",
+    "arguments": {
+      "projectId": "12943705270951129641",
+      "selectedScreenIds": [
+        "d38eb35e2b52405ea7fa25af24bce7d2"
+      ],
+      "prompt": "Fix the board so ALL EIGHT columns are fully visible side by side inside the 1280px-wide desktop frame with no horizontal overflow: Backlog, Ready, Implementation, Evidence review, Remediation, Staging / smoke test, UAT, Complete. Make each column narrower (about 150px) and tiles more compact so every tile, label and button stays readable. The UAT column must show the tile \"Recipe screens look like Julia's vintage design\" marked \"Waiting on you\". The Complete column must show the tile \"Add a recipe and find it by title\" with a done tick. Keep the current colours, fonts, header, \"Needs you (2)\" strip and all existing tile content. Use plain words. Do not create or apply design systems.",
+      "deviceType": "DESKTOP"
+    }
+  }
+}

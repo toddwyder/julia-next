@@ -1,0 +1,29 @@
+{
+  "id": 1793140215024,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/e8820841437c465cab3e35fc990f80e7\",\"title\":\"Todd's Factory Board - Data Infographic\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/63c935368ed04c0c9db1dd667ff360ec\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/63c935368ed04c0c9db1dd667ff360ec:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/6ffe8c7e227e4e4685ca90f0c852705c\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/6ffe8c7e227e4e4685ca90f0c852705c:download\",\"mimeType\":\"text/html\"},\"width\":\"2560\",\"height\":\"2048\",\"deviceType\":\"DESKTOP\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "DESKTOP",
+      "height": "2048",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/6ffe8c7e227e4e4685ca90f0c852705c:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/6ffe8c7e227e4e4685ca90f0c852705c"
+      },
+      "name": "projects/12943705270951129641/screens/e8820841437c465cab3e35fc990f80e7",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/63c935368ed04c0c9db1dd667ff360ec:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/63c935368ed04c0c9db1dd667ff360ec"
+      },
+      "title": "Todd's Factory Board - Data Infographic",
+      "width": "2560"
+    }
+  }
+}
