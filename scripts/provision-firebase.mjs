@@ -37,7 +37,7 @@ export const HOUSEHOLD_EMAILS = ['toddwyder@gmail.com', 'katinawyder@gmail.com']
 export const PROOF_EMAILS = ['todd@household.test', 'katina@household.test'];
 export const PROOF_USERS = [...PROOF_EMAILS, 'stranger@elsewhere.test'];
 export const LOCATION = 'eur3';
-export const AUTHORISED_DOMAIN = 'julia-next.vercel.app';
+export const AUTHORISED_DOMAIN = 'julia-next-hazel.vercel.app';
 export const BOOTSTRAP_ACCOUNT = 'proof-agent';
 export const BOOTSTRAP_ROLE = 'roles/owner';
 
