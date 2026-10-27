@@ -288,6 +288,21 @@ export async function ensureAuthorisedDomain(project, token, domain = AUTHORISED
   return 'authorised';
 }
 
+export async function removeAuthorisedDomain(project, token, domain) {
+  if (domain === AUTHORISED_DOMAIN) throw new Error(`${domain} is Julia's own address; it stays authorised`);
+  const config = await google(`${IDENTITY_API}/projects/${project.id}/config`, { token });
+  if (!config.ok) throw authNotStarted(project, config.answer);
+  const domains = config.answer.authorizedDomains ?? [];
+  if (!domains.includes(domain)) return 'already gone';
+  const patched = await google(`${IDENTITY_API}/projects/${project.id}/config?updateMask=authorizedDomains`, {
+    token,
+    method: 'PATCH',
+    body: { authorizedDomains: domains.filter(entry => entry !== domain) },
+  });
+  if (!patched.ok) throw new Error(`could not remove ${domain}: ${JSON.stringify(patched.answer)}`);
+  return 'removed';
+}
+
 export async function ensurePasswordSignIn(project, token) {
   const config = await google(`${IDENTITY_API}/projects/${project.id}/config`, { token });
   if (!config.ok) throw authNotStarted(project, config.answer);
