@@ -38,7 +38,20 @@ export function password() {
   return randomBytes(18).toString('base64url');
 }
 
-export async function idToken(apiKey, email, pass) {
+// A project with no Firebase Authentication config refuses every identity call
+// until someone presses "Get started" in the console once. Say that, rather than
+// passing Google's body through.
+export function identityFailure(projectId, email, body) {
+  if (/CONFIGURATION_NOT_FOUND/.test(body)) {
+    return (
+      `${projectId} has no Firebase Authentication config yet, so ${email} cannot sign in and no API creates one. ` +
+      `Press "Get started" once at https://console.firebase.google.com/project/${projectId}/authentication, then run this again.`
+    );
+  }
+  return `could not get a token for ${email}: ${body}`;
+}
+
+export async function idToken(apiKey, email, pass, projectId = 'the proof project') {
   const create = await fetch(`${IDENTITY}signUp?key=${apiKey}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -50,7 +63,7 @@ export async function idToken(apiKey, email, pass) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password: pass, returnSecureToken: true }),
   });
-  if (!signIn.ok) throw new Error(`could not get a token for ${email}: ${await signIn.text()}`);
+  if (!signIn.ok) throw new Error(identityFailure(projectId, email, await signIn.text()));
   return (await signIn.json()).idToken;
 }
 
@@ -143,7 +156,7 @@ export async function main() {
 
   const pass = password();
   const tokens = {};
-  for (const [who, email] of Object.entries(EMAILS)) tokens[who] = await idToken(web.apiKey, email, pass);
+  for (const [who, email] of Object.entries(EMAILS)) tokens[who] = await idToken(web.apiKey, email, pass, web.projectId);
 
   const app = await startApp(web);
   const browser = await chromium.launch();
