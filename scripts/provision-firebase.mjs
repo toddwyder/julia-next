@@ -31,7 +31,11 @@ import { accessToken } from './firebase-session.mjs';
 export const HOUSEHOLD = { id: 'julia-household-512904', displayName: 'Julia household' };
 export const PROOF = { id: 'julia-household-proof', displayName: 'Julia household proof' };
 export const HOUSEHOLD_EMAILS = ['toddwyder@gmail.com', 'katinawyder@gmail.com'];
-export const PROOF_EMAILS = ['todd@household.test', 'katina@household.test', 'stranger@elsewhere.test'];
+// The two identities on the proof project's household list, and the third user
+// who exists but is deliberately not on it: that is the identity the proof films
+// being turned away.
+export const PROOF_EMAILS = ['todd@household.test', 'katina@household.test'];
+export const PROOF_USERS = [...PROOF_EMAILS, 'stranger@elsewhere.test'];
 export const LOCATION = 'eur3';
 export const AUTHORISED_DOMAIN = 'julia-next.vercel.app';
 export const BOOTSTRAP_ACCOUNT = 'proof-agent';

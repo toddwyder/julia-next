@@ -7,16 +7,20 @@
 
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
 import { chromium, expect } from '@playwright/test';
+import { serviceAccountToken } from './provision-firebase.mjs';
+import { cert, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PROOF_CONFIG = fileURLToPath(new URL('../.firebase-proof.json', import.meta.url));
 const OUT = fileURLToPath(new URL('../.proof/', import.meta.url));
 const IDENTITY = 'https://identitytoolkit.googleapis.com/v1/accounts:';
+const PROOF_KEYS = fileURLToPath(new URL('../.firebase-proof-keys/', import.meta.url));
 const LIBRARY_KEY = 'julia.recipes.v1';
 
 export const EMAILS = { todd: 'todd@household.test', katina: 'katina@household.test', stranger: 'stranger@elsewhere.test' };
@@ -49,6 +53,42 @@ export function identityFailure(projectId, email, body) {
     );
   }
   return `could not get a token for ${email}: ${body}`;
+}
+
+export function proofKeyFile(projectId, read = existsSync) {
+  const path = `${PROOF_KEYS}${projectId}.json`;
+  if (!read(path)) throw new Error(`no service account key at ${path}; run node scripts/provision-firebase.mjs first`);
+  return path;
+}
+
+// The household rules ask for a verified email, and a sign-up makes an unverified
+// one, so the recorder would film its own users being turned away. It also has to
+// cope with users left behind by an earlier run, whose password nobody kept. So
+// each run starts from fresh, verified users made with the service account.
+export async function freshIdentities(keyJson, emails, pass) {
+  const projectId = keyJson.project_id;
+  const app = initializeApp({ credential: cert(keyJson), projectId }, `record-proof-${projectId}`);
+  const auth = getAuth(app);
+  for (const email of Object.values(emails)) {
+    const existing = await auth.getUserByEmail(email).catch(() => null);
+    if (existing) await auth.deleteUser(existing.uid);
+    await auth.createUser({ email, password: pass, emailVerified: true });
+  }
+  return projectId;
+}
+
+// A rerun must not film last run's recipes, so the proof project's library is
+// emptied first. The household project is never touched.
+export async function clearLibrary(projectId, token) {
+  const base = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/recipes`;
+  const listed = await fetch(`${base}?pageSize=300`, { headers: { authorization: `Bearer ${token}` } });
+  if (!listed.ok) throw new Error(`could not list the proof library: ${listed.status}`);
+  const { documents = [] } = await listed.json();
+  for (const document of documents) {
+    const removed = await fetch(`https://firestore.googleapis.com/v1/${document.name}`, { method: 'DELETE', headers: { authorization: `Bearer ${token}` } });
+    if (!removed.ok) throw new Error(`could not clear ${document.name}: ${removed.status}`);
+  }
+  return documents.length;
 }
 
 export async function idToken(apiKey, email, pass, projectId = 'the proof project') {
@@ -105,7 +145,7 @@ function freePort() {
   });
 }
 
-async function startApp(web) {
+export async function startApp(web) {
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
   const child = spawn('npx', ['--no-install', 'next', 'dev', '--hostname', '127.0.0.1', '--port', String(port)], {
@@ -152,9 +192,13 @@ export async function main() {
   const web = proofConfig(JSON.parse(readFileSync(PROOF_CONFIG, 'utf8')));
   mkdirSync(OUT, { recursive: true });
   const videos = `${OUT}videos/`;
+  rmSync(videos, { recursive: true, force: true });
   mkdirSync(videos, { recursive: true });
 
   const pass = password();
+  const keyJson = JSON.parse(readFileSync(proofKeyFile(web.projectId), 'utf8'));
+  await freshIdentities(keyJson, EMAILS, pass);
+  await clearLibrary(web.projectId, await serviceAccountToken(keyJson));
   const tokens = {};
   for (const [who, email] of Object.entries(EMAILS)) tokens[who] = await idToken(web.apiKey, email, pass, web.projectId);
 
@@ -205,8 +249,8 @@ export async function main() {
       await page.goto(`${app.url}/recipes`);
       await signInAsProofUser(page, EMAILS.katina, pass);
       await expect(page.getByText(`Signed in as ${EMAILS.katina}`)).toBeVisible({ timeout: 60_000 });
-      await expect(page.getByText(SAVED.title)).toBeVisible();
-      await page.getByText(SAVED.title).click();
+      await page.locator(`a[href$="${savedId}"]`).click();
+      await page.locator('[data-testid="recipe-title"]').waitFor({ timeout: 60_000 });
       const shown = await page.evaluate(() => ({
         title: document.querySelector('[data-testid="recipe-title"]')?.textContent ?? null,
         lines: [...document.querySelectorAll('[data-testid="recipe-ingredients"] > *, [data-testid="recipe-steps"] > *')].map(row => row.textContent.trim()).filter(Boolean),
@@ -220,7 +264,7 @@ export async function main() {
       await page.goto(`${app.url}/recipes`);
       await signInAsProofUser(page, EMAILS.stranger, pass);
       await expect(page.getByText(`${EMAILS.stranger} is not part of this household`)).toBeVisible({ timeout: 60_000 });
-      await expect(page.getByRole('button', { name: 'Use another Google account' })).toBeVisible();
+      await expect(page.getByLabel('Test user email')).toBeVisible();
       const read = await storageRead(web.projectId, tokens.stranger, savedId);
       const write = await storageWrite(web.projectId, tokens.stranger, 'intruder-pie');
       await showOnPage(page, `direct storage request as ${EMAILS.stranger}: read ${read}, write ${write}`);

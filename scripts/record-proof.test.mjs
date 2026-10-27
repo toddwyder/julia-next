@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { PROOF_EMAILS } from './provision-firebase.mjs';
+import { PROOF_EMAILS, PROOF_USERS } from './provision-firebase.mjs';
 import { EMAILS, identityFailure, password, proofConfig, recipeUrl } from './record-proof.mjs';
 
 test('without the proof project config the recorder says what to run', () => {
@@ -14,8 +14,10 @@ test('the proof web config is read as it was written', () => {
   assert.deepEqual(proofConfig({ web }), web);
 });
 
-test('every identity the recorder signs in is on the proof membership list', () => {
-  for (const email of Object.values(EMAILS)) assert.ok(PROOF_EMAILS.includes(email), `${email} is not in PROOF_EMAILS`);
+test('the recorder signs in two household identities and one outsider', () => {
+  for (const email of Object.values(EMAILS)) assert.ok(PROOF_USERS.includes(email), `${email} is not a proof user`);
+  assert.deepEqual(Object.keys(EMAILS).filter(who => PROOF_EMAILS.includes(EMAILS[who])), ['todd', 'katina']);
+  assert.ok(!PROOF_EMAILS.includes(EMAILS.stranger), 'the identity the proof turns away must not be a member');
 });
 
 test('each run makes a fresh password nobody wrote down', () => {
