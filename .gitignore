@@ -22,3 +22,6 @@ playwright-report/
 firestore-debug.log
 firebase-debug.log
 ui-debug.log
+
+# TLA+ model checker downloaded by scripts/check-recipes-model.mjs
+formal/.tools/
