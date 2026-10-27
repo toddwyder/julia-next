@@ -1,0 +1,39 @@
+rules_version = '2';
+
+// The household is the list of Google emails in household/members. Only the
+// Firebase Admin SDK edits that list; no browser can write it.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isHousehold() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in get(/databases/$(database)/documents/household/members).data.emails;
+    }
+
+    function isText(value, max) {
+      return value is string && value.size() <= max;
+    }
+
+    // A recipe is written once, whole. There is no update or delete yet, so a
+    // retried save can never change or split a stored recipe.
+    function isCompleteRecipe(id) {
+      let recipe = request.resource.data;
+      return recipe.keys().hasOnly(['id', 'title', 'ingredients', 'steps', 'createdAt'])
+        && recipe.keys().hasAll(['id', 'title', 'ingredients', 'steps', 'createdAt'])
+        && recipe.id == id
+        && isText(recipe.title, 500) && recipe.title.trim().size() > 0
+        && isText(recipe.ingredients, 100000)
+        && isText(recipe.steps, 100000)
+        && isText(recipe.createdAt, 40);
+    }
+
+    match /household/members {
+      allow get: if isHousehold();
+    }
+
+    match /recipes/{id} {
+      allow read: if isHousehold();
+      allow create: if isHousehold() && isCompleteRecipe(id);
+    }
+  }
+}

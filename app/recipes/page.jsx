@@ -3,23 +3,24 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-import { openRecipeLibrary } from '../../lib/recipes';
+import { listRecipes } from '../../lib/recipes';
+import { useHousehold } from './household-gate';
 import styles from './recipes.module.css';
 
 export default function LibraryPage() {
   const [query, setQuery] = useState('');
   const [recipes, setRecipes] = useState(null);
   const [error, setError] = useState('');
+  const { db } = useHousehold();
 
   useEffect(() => {
-    try {
-      setRecipes(openRecipeLibrary(window.localStorage).list(query));
-      setError('');
-    } catch (thrown) {
-      setRecipes([]);
-      setError(thrown.message);
-    }
-  }, [query]);
+    let current = true;
+    listRecipes(db, query).then(
+      found => { if (current) { setRecipes(found); setError(''); } },
+      () => { if (current) { setRecipes([]); setError('Julia could not reach the recipe library. Check the connection and try again.'); } },
+    );
+    return () => { current = false; };
+  }, [db, query]);
 
   const searching = query.trim() !== '';
 
@@ -73,7 +74,6 @@ export default function LibraryPage() {
           </ul>
         </section>
 
-        <p className={styles.notice}>❧ Recipes are saved only in this browser on this device.</p>
       </div>
     </main>
   );

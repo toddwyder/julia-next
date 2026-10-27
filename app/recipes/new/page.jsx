@@ -4,25 +4,36 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { newRecipeId, openRecipeLibrary } from '../../../lib/recipes';
+import { newRecipeId, saveRecipe } from '../../../lib/recipes';
+import { errorCode, reportRecipeEvent } from '../../../lib/report-recipe-event';
+import { useHousehold } from '../household-gate';
 import styles from '../recipes.module.css';
 
 export default function NewRecipePage() {
   const router = useRouter();
   const [id] = useState(() => newRecipeId());
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const { db, user } = useHousehold();
 
-  function handleSubmit(event) {
+  // The id is fixed when the page opens, so pressing Save again after a failed
+  // or unanswered save finds the recipe already stored instead of adding one.
+  async function handleSubmit(event) {
     event.preventDefault();
     const written = new FormData(event.currentTarget);
+    const fields = { title: written.get('title'), ingredients: written.get('ingredients'), steps: written.get('steps') };
+    if (String(fields.title).trim() === '') {
+      setError('A recipe needs a title.');
+      return;
+    }
+    setSaving(true);
+    setError('');
     try {
-      openRecipeLibrary(window.localStorage).save(id, {
-        title: written.get('title'),
-        ingredients: written.get('ingredients'),
-        steps: written.get('steps'),
-      });
+      await saveRecipe(db, id, fields);
     } catch (thrown) {
-      setError(thrown.message);
+      await reportRecipeEvent(user, { action: 'save', outcome: 'failed', code: errorCode(thrown) });
+      setError('Julia could not save this recipe. Nothing is lost: check the connection and press Save Recipe again.');
+      setSaving(false);
       return;
     }
     router.replace(`/recipes/${id}`);
@@ -58,10 +69,9 @@ export default function NewRecipePage() {
 
         <div className={styles.formActions}>
           <Link href="/recipes" className={styles.outline}>Cancel</Link>
-          <button type="submit" className={styles.solid}>Save Recipe</button>
+          <button type="submit" className={styles.solid} disabled={saving}>{saving ? 'Saving...' : 'Save Recipe'}</button>
         </div>
 
-        <p className={styles.notice}>❧ Recipes are saved only in this browser on this device.</p>
       </form>
     </main>
   );
