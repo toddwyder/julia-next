@@ -83,3 +83,20 @@ jobs:
           [[ "$REPOSITORY_HYGIENE" == success ]]
           [[ "$PACKAGE_TESTS" == success ]]
           [[ "$WEB" == success ]]
+
+  # Temporary: proves the production smoke against the real past mistake. Removed before merge.
+  production-smoke-proof:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - run: npm ci
+      - run: npx --no-install playwright install --with-deps chromium
+      - name: The restaurant address the code held on 27 Oct must fail
+        run: |
+          if node scripts/production-smoke.mjs e8d22b2fca3a523340d112d18cb3c6dbaff0db8c julia-next.vercel.app; then echo "UNEXPECTED PASS"; exit 1; fi
+          echo "Failed as it should."
+      - name: Julia's real address at the current production commit must pass
+        run: node scripts/production-smoke.mjs 5061e94ec3ac321bb74399b3004b1b25e7dce71f
