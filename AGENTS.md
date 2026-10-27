@@ -29,7 +29,8 @@ A card is finished when its PR is merged to main (after Todd's UAT yes when the 
 | --- | --- |
 | Skill names are unique across the installed catalogs. | `node scripts/check-skill-names.mjs` rejects duplicate frontmatter names. |
 | Current agent-read files point only at paths that exist. | `node scripts/check-agent-links.mjs` checks the entry points, pstack skills, and `ask-matt`. |
-| Every branch except `main` has an open pull request to `main`. | `node scripts/check-branch-pr.mjs` audits GitHub branches and open pull requests in CI. |
+| Every branch except `main` has an open pull request to `main`. | `node scripts/check-branch-pr.mjs` audits GitHub branches and open pull requests in CI; a push run leaves the pushed branch to its own pull-request run. |
+| A scorecard never reports unpriced spend as $0. | `scripts/scorecard.mjs` prints "unknown" or "at least" when a row is unpriced; `scripts/scorecard.test.mjs` replays JUL-208's $0.00 headline. |
 
 <!-- BEGIN:nextjs-agent-rules -->
 
