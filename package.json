@@ -10,7 +10,9 @@
     "lint:framework": "node scripts/lint-framework.mjs",
     "check:recipes-model": "node scripts/check-recipes-model.mjs",
     "prove:recipe-events": "node scripts/prove-recipe-events.mjs",
-    "prove:household-rules": "node scripts/prove-household-rules.mjs"
+    "prove:household-rules": "node scripts/prove-household-rules.mjs",
+    "provision:firebase": "node scripts/provision-firebase.mjs",
+    "proof:record": "node scripts/record-proof.mjs"
   },
   "dependencies": {
     "@sentry/node": "^10.75.0",

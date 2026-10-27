@@ -20,11 +20,14 @@ The card also asks for stock Firebase first, with custom code only where none ex
 
 **Rules are tested on the emulator.** `@firebase/rules-unit-testing` works only against the Firestore emulator, and rules cannot be exercised at all against a real project because a real project always enforces them. So `lib/firestore-rules.test.mjs` and the recipe store tests start the Auth and Firestore emulators on `127.0.0.1:9099` and `127.0.0.1:8080`, and the browser specs in `verify-julia` sign in to the emulators' fake Google page as fake household accounts. That reverses 0010's "we don't use the Firestore emulator", whose reason was Java overloading the runner; one emulator pair now starts in about 20 seconds and takes Java 21, which `scripts/firebase-emulators.mjs` picks for itself. Testing the app's own paths against a second real Firebase project stays the plan for anything the emulator cannot mimic, and real accounts on real devices stay Todd's UAT.
 
+**A second, throwaway project for the proof.** The recorded proof runs against its own project, `julia-household-proof`, so no test user ever exists in the household project and its sign-in stays Google-only. The app shows a test-user form only when the build is pointed at that project (`lib/firebase-project.js`), and a unit test proves the form is absent otherwise. `scripts/record-proof.mjs` creates those users with passwords thrown away at the end of the run, records the three sessions as video, and checks that storage itself refuses the third identity while serving the same document to a household one.
+
 **What records the household's use.** Sign-in, save and move send one event each to Axiom, and a failed save is also captured in Sentry, through `/api/recipe-events`. The event carries an action, an outcome and Firebase's error code; it never carries recipe text or an email address, and neither Sentry nor Axiom receives either.
 
 ## Consequences
 
 - The Firebase project, its Google sign-in, the `household/members` list and the service account are Todd's to create; until they exist the app cannot reach a real library.
 - Only two local verifications can run at once on this server, because the emulator ports are fixed. A run that finds both emulators already answering reuses them and leaves them running.
-- Vercel needs the Firebase web config in its environment; the browser holds no key that grants anything on its own, because the rules and not the key decide access.
+- The household web config is committed to `lib/firebase-household-config.js` by `scripts/provision-firebase.mjs`, so Vercel needs no extra environment for it; the browser holds no key that grants anything on its own, because the rules and not the key decide access.
+- Provisioning both projects takes one approved Google login, because only a signed-in person can create a project and grant a service account a role. After that the rest of the setup runs unattended.
 - Adding a third person to the household is a console edit of one document, not a deploy.

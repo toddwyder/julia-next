@@ -1,12 +1,14 @@
 'use client';
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 import { household } from '../../lib/firebase';
+import { FIREBASE_WEB_CONFIG, ON_PROOF_PROJECT } from '../../lib/firebase-project';
 import { moveBrowserRecipes } from '../../lib/recipes';
 import { errorCode, reportRecipeEvent } from '../../lib/report-recipe-event';
+import ProofSignIn from './proof-sign-in';
 import styles from './recipes.module.css';
 
 const Household = createContext(null);
@@ -24,6 +26,7 @@ export default function HouseholdGate({ children }) {
   const signingIn = useRef(false);
 
   useEffect(() => {
+    if (!FIREBASE_WEB_CONFIG) return;
     const { auth, db } = household();
     return onAuthStateChanged(auth, async user => {
       if (!user) {
@@ -71,6 +74,17 @@ export default function HouseholdGate({ children }) {
     }
   }
 
+  async function signInAsTestUser(email, password) {
+    signingIn.current = true;
+    setState({ status: 'checking' });
+    try {
+      await signInWithEmailAndPassword(household().auth, email, password);
+    } catch {
+      signingIn.current = false;
+      setState({ status: 'signed-out', error: 'Sign-in did not finish. Try again.' });
+    }
+  }
+
   if (state.status === 'member') {
     return (
       <Household.Provider value={{ db: state.db, user: state.user }}>
@@ -81,6 +95,20 @@ export default function HouseholdGate({ children }) {
           <button type="button" className={styles.typewriter} onClick={() => signOut(household().auth)}>Sign out</button>
         </p>
       </Household.Provider>
+    );
+  }
+
+  if (!FIREBASE_WEB_CONFIG) {
+    return (
+      <main className={`vintage-column ${styles.page}`}>
+        <div className={styles.stack}>
+          <h1 className={styles.title}>The Household Library</h1>
+          <div className={styles.emptyBox}>
+            <p className={styles.emptyHeading}>The household library is not set up yet.</p>
+            <p className={styles.emptyLine}>The project that holds the recipes has not been created, so there is nothing to sign in to.</p>
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -107,11 +135,15 @@ export default function HouseholdGate({ children }) {
             : <p className={styles.emptyHeading}>The recipe library is private to the household.</p>}
         </div>
         {state.error ? <p className={styles.error} role="alert">{state.error}</p> : null}
-        <div>
-          <button type="button" className={styles.solid} onClick={signIn}>
-            {state.status === 'turned-away' ? 'Use another Google account' : 'Sign in with Google'}
-          </button>
-        </div>
+        {ON_PROOF_PROJECT
+          ? <ProofSignIn onSignIn={signInAsTestUser} />
+          : (
+            <div>
+              <button type="button" className={styles.solid} onClick={signIn}>
+                {state.status === 'turned-away' ? 'Use another Google account' : 'Sign in with Google'}
+              </button>
+            </div>
+          )}
       </div>
     </main>
   );

@@ -25,3 +25,8 @@ ui-debug.log
 
 # TLA+ model checker downloaded by scripts/check-recipes-model.mjs
 formal/.tools/
+
+# proof project credentials and the vault template written while provisioning
+.firebase-proof.json
+.firebase-vault-*.json
+.proof/

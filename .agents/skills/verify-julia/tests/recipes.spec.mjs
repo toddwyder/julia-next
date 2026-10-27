@@ -47,6 +47,7 @@ test('a signed-out browser sees only the sign-in, on every recipe page', async (
     await expect(page.getByText('The recipe library is private to the household')).toBeVisible();
     await expect(page.getByLabel('Recipe Title')).toHaveCount(0);
     await expect(page.getByLabel('Search your collection')).toHaveCount(0);
+    await expect(page.getByLabel('Test user email')).toHaveCount(0);
   }
 });
 
