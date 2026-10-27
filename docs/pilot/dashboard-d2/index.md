@@ -1,6 +1,37 @@
 # Dashboard pilot design screens (D2)
 
-Todd picks one row from the first table. That screen becomes the dashboard design. Nothing here is app code.
+Todd chose **Mint & Iris** from the earlier desktop drawings. The new phone layout is his vertical accordion. Nothing here is app code.
+
+## Mint & Iris: phone accordion
+
+**[Compare the chosen desktop and both phone states side by side](screens/mint-iris-comparison.png).** The original nine options remain below for reference.
+
+| State | Picture and HTML | Stitch screen ID | Requests |
+| --- | --- | --- | --- |
+| Chosen desktop: Mint & Iris | [PNG](screens/mint-iris-desktop-source.png), [HTML](screens/mint-iris-desktop-source.html) | `bab9a7fc3eea45e288ab3a81f19f33d2` | [Confirm source](requests/get-screen-mint-iris-desktop-source.json) |
+| Phone: as loaded | [PNG](screens/mint-iris-accordion-loaded-applied.png), [HTML](screens/mint-iris-accordion-loaded-applied.html) | `1bf5cf3ba518483691ae0afd71855b85` | [Generate](requests/mint-iris-accordion-loaded.json), [phone correction](requests/mint-iris-accordion-loaded-phone.json), [apply system](requests/mint-iris-apply-system.json) |
+| Phone: running card open | [PNG](screens/mint-iris-accordion-card-open-final.png), [HTML](screens/mint-iris-accordion-card-open-final.html) | `c4c69ed3a37d42afb18d4bf2d15d5d68` | [Draw](requests/mint-iris-accordion-card-open-retry.json), [collapse other cards](requests/mint-iris-accordion-card-open-corrected.json), [real Linear link](requests/mint-iris-accordion-card-open-final.json) |
+
+All are in project `12943705270951129641`. The named **Mint & Iris** design system is `assets/17575707340211662328`: [create request](requests/mint-iris-create-system.json), [response](responses/mint-iris-create-system.json), [saved-system listing](responses/mint-iris-list-systems.json). Generation explicitly used that asset; `apply_design_system` was also called with its unprefixed asset ID and the phone screen instance/source pair. It produced the final as-loaded screen above.
+
+### Appearance and checks
+
+The side-by-side picture uses the original Stitch PNGs, resized only for comparison. Both phone originals were validated by their PNG signature and `file`, then viewed individually at full width. As loaded is **780 × 1768**; card open is **780 × 2356**. The latter is taller to retain all lower stages, not a sideways-scrolling layout.
+
+- Same Public Sans headings/body, JetBrains Mono metrics, cool `#F3F6F8` background, white rounded cards, mint `#10B981` / `#059669`, iris `#6366F1` / `#EEF2FF` as the selected desktop HTML. Running is iris, stuck rose, waiting amber.
+- Stage order/counts: Backlog 30; Ready 1; Implementation 1; Evidence review 0; Remediation 1; Staging/smoke test 0; UAT 1; Complete 12. Only Implementation, Remediation and UAT stages start open. All cards start collapsed; the second drawing expands only the running card.
+- Both Needs-you items, Decision support, full card titles and all eight stage headings are readable in the pictures. The running card shows step 4 of 8, running tests, active 40 s ago, 12 min elapsed, $0.84 spent, context 41% with a bar, Main session, Coder, Stop and Linear issue. Its link targets the recorded JUL-271 issue, not an invented identifier.
+- Ready's title and Start button, and Remediation's “No activity for 7 min”, remain in their folded HTML. They are intentionally not visible in these two pictured states. This is a design export, not a live dashboard: other navigation/actions remain mock anchors/buttons.
+- [Machine-readable checks](mint-iris-checks.json) record PNG signatures, palette/font tokens, eight stage counts and default states, required hidden content, and native card toggling in Chromium. External assets were blocked for that DOM check; layout/readability was checked on the actual Stitch PNGs, not claimed from the unstyled browser page.
+
+### What failed and how it was corrected
+
+1. The first generation `656e105b950344f4aa190bba57155316` returned a **DESKTOP** 2560 × 2048 canvas despite `deviceType: MOBILE`, plus extra subtitle/review copy. `edit_screens` explicitly requested native 390 CSS px / 780 physical px, no desktop gutters, and removal of those strings. Result: phone screen `c6ab3d9a95b640ddad94cb0e37e0a6bb`; applying the named system produced the final as-loaded screen.
+2. The first card-open edit returned **“The service is currently unavailable.”** The [failure response](responses/mint-iris-accordion-card-open.json) is retained. `list_screens` was checked before one retry; the retry returned a completed screen.
+3. That screen `9a596fe0a178450db29f8d8767caebf1` expanded all three cards and copied running metrics into Remediation and UAT. A targeted edit collapsed those two cards, retaining their open stages and restoring the stuck card's own hidden message. Corrected screen: `eb25afcef8e04cd19b2c192ce0979fff`.
+4. The running card's issue link was a mock anchor. A final HTML-only Stitch edit wired the actual JUL-271 URL. Its PNG is byte-for-byte identical to the corrected picture; the final HTML contains the real URL.
+
+Earlier attempts, exports, requests and replies are retained. Nothing was deleted in Stitch. API keys are read only through the agents' key route, never included in saved artifacts. No app files changed and this PR stays draft and unmerged.
 
 - Stitch project: **Julia dashboard pilot**, ID `12943705270951129641`, made with Todd's Stitch key. No screen was deleted.
 - Board prompt and taste profile: [prompt.md](prompt.md). Every request is in [requests/](requests/) with the key replaced by `[REDACTED]`; every reply is in [responses/](responses/). The `tools/list` reply is [tools-list.json](tools-list.json).

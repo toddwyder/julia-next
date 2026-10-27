@@ -1,0 +1,29 @@
+{
+  "id": 1793143201898,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/bab9a7fc3eea45e288ab3a81f19f33d2\",\"title\":\"Todd's Factory Board - Mint & Iris\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/d290119f920f463d9ac16f13347b7e1e\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d290119f920f463d9ac16f13347b7e1e:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/3d906a2a397d45e5b4a86ccde8fc0823\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/3d906a2a397d45e5b4a86ccde8fc0823:download\",\"mimeType\":\"text/html\"},\"width\":\"2560\",\"height\":\"2048\",\"deviceType\":\"DESKTOP\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "DESKTOP",
+      "height": "2048",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/3d906a2a397d45e5b4a86ccde8fc0823:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/3d906a2a397d45e5b4a86ccde8fc0823"
+      },
+      "name": "projects/12943705270951129641/screens/bab9a7fc3eea45e288ab3a81f19f33d2",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d290119f920f463d9ac16f13347b7e1e:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/d290119f920f463d9ac16f13347b7e1e"
+      },
+      "title": "Todd's Factory Board - Mint & Iris",
+      "width": "2560"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "id": 1793143249383,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"assets/17575707340211662328\",\"designSystem\":{\"displayName\":\"Mint & Iris\",\"theme\":{\"colorMode\":\"LIGHT\",\"roundness\":\"ROUND_TWELVE\",\"customColor\":\"#10B981\",\"headlineFont\":\"PUBLIC_SANS\",\"bodyFont\":\"PUBLIC_SANS\",\"designMd\":\"# Mint & Iris\\nSource: projects/12943705270951129641/screens/bab9a7fc3eea45e288ab3a81f19f33d2, titled Todd's Factory Board - Mint & Iris. Reproduce its actual HTML tokens: Public Sans headings and body, Plus Jakarta Sans heading fallback, JetBrains Mono metrics only. Pale cool page #F3F6F8, white cards, slate-800 text, slate-200 borders. Mint palette #ECFDF5 #D1FAE5 #A7F3D0 #10B981 #059669 #047857. Iris palette #EEF2FF #E0E7FF #C7D2FE #818CF8 #6366F1 #4F46E5 #4338CA. Rounded 12px cards and pill badges, fine tinted borders, soft shadows. Running is iris, stuck is rose, waiting on you is amber, complete is mint. Never copy invented content or desktop navigation from the source. This is a light colourful household dashboard, not a terminal.\",\"colorVariant\":\"FIDELITY\",\"overridePrimaryColor\":\"#059669\",\"overrideSecondaryColor\":\"#6366F1\",\"overrideTertiaryColor\":\"#F59E0B\",\"overrideNeutralColor\":\"#64748B\"}},\"version\":\"1\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "designSystem": {
+        "displayName": "Mint & Iris",
+        "theme": {
+          "bodyFont": "PUBLIC_SANS",
+          "colorMode": "LIGHT",
+          "colorVariant": "FIDELITY",
+          "customColor": "#10B981",
+          "designMd": "# Mint & Iris\nSource: projects/12943705270951129641/screens/bab9a7fc3eea45e288ab3a81f19f33d2, titled Todd's Factory Board - Mint & Iris. Reproduce its actual HTML tokens: Public Sans headings and body, Plus Jakarta Sans heading fallback, JetBrains Mono metrics only. Pale cool page #F3F6F8, white cards, slate-800 text, slate-200 borders. Mint palette #ECFDF5 #D1FAE5 #A7F3D0 #10B981 #059669 #047857. Iris palette #EEF2FF #E0E7FF #C7D2FE #818CF8 #6366F1 #4F46E5 #4338CA. Rounded 12px cards and pill badges, fine tinted borders, soft shadows. Running is iris, stuck is rose, waiting on you is amber, complete is mint. Never copy invented content or desktop navigation from the source. This is a light colourful household dashboard, not a terminal.",
+          "headlineFont": "PUBLIC_SANS",
+          "overrideNeutralColor": "#64748B",
+          "overridePrimaryColor": "#059669",
+          "overrideSecondaryColor": "#6366F1",
+          "overrideTertiaryColor": "#F59E0B",
+          "roundness": "ROUND_TWELVE"
+        }
+      },
+      "name": "assets/17575707340211662328",
+      "version": "1"
+    }
+  }
+}

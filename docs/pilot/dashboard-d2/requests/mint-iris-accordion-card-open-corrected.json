@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793144043877,
+  "method": "tools/call",
+  "params": {
+    "name": "edit_screens",
+    "arguments": {
+      "projectId": "12943705270951129641",
+      "selectedScreenIds": [
+        "9a596fe0a178450db29f8d8767caebf1"
+      ],
+      "deviceType": "MOBILE",
+      "prompt": "Correct this phone screenshot with the smallest possible edit. Keep all colours, fonts, header, Needs you strip, stage counts and stage order EXACTLY. Only ONE card is expanded: Implementation > New machine: retry and pause. Keep its existing expanded content exactly (Step 4 of 8, running tests, Active 40 s ago, 12 min elapsed, $0.84 spent, Context 41% full bar, Main session, Coder, Stop, Linear issue). BUG: Remediation and UAT also have copied running metrics expanded. COLLAPSE BOTH of those cards: their inner details elements must NOT have the open attribute. Remediation remains an OPEN STAGE containing only the card top row Practice: real failure path + rose Stuck badge + downward chevron; hidden content must say No activity for 7 min, never running metrics. UAT remains an OPEN STAGE containing only the card top row Recipe screens look like Julia's vintage design + amber Waiting on you badge + downward chevron; no running metrics in UAT. Do not expand any other cards. Backlog 30, Ready 1, Evidence review 0, Staging/smoke test 0, Complete 12 remain folded. Ready retains hidden Scorecard for every run, plus a ping with Start. Phone 390 CSS px / 780 physical px width, no desktop gutters or sideways scroll. Show every stage down to Complete. Title Mint & Iris - Accordion - Card open - Corrected."
+    }
+  }
+}

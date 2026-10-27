@@ -1,0 +1,29 @@
+{
+  "id": 1793144108677,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/1bf5cf3ba518483691ae0afd71855b85\",\"title\":\"Mint & Iris - Accordion - As loaded - Phone\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/4cf04c1fd6e9412e96a7a3b5aadc0f10\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/4cf04c1fd6e9412e96a7a3b5aadc0f10:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/e5b32e2d334a4f4b97a2c6593b38d479\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/e5b32e2d334a4f4b97a2c6593b38d479:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"1768\",\"deviceType\":\"MOBILE\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "MOBILE",
+      "height": "1768",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/e5b32e2d334a4f4b97a2c6593b38d479:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/e5b32e2d334a4f4b97a2c6593b38d479"
+      },
+      "name": "projects/12943705270951129641/screens/1bf5cf3ba518483691ae0afd71855b85",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/4cf04c1fd6e9412e96a7a3b5aadc0f10:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/4cf04c1fd6e9412e96a7a3b5aadc0f10"
+      },
+      "title": "Mint & Iris - Accordion - As loaded - Phone",
+      "width": "780"
+    }
+  }
+}

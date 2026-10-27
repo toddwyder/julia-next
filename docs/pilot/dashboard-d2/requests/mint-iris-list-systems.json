@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793144263883,
+  "method": "tools/call",
+  "params": {
+    "name": "list_design_systems",
+    "arguments": {
+      "projectId": "12943705270951129641"
+    }
+  }
+}

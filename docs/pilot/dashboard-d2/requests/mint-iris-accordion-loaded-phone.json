@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793143459037,
+  "method": "tools/call",
+  "params": {
+    "name": "edit_screens",
+    "arguments": {
+      "projectId": "12943705270951129641",
+      "selectedScreenIds": [
+        "656e105b950344f4aa190bba57155316"
+      ],
+      "deviceType": "MOBILE",
+      "prompt": "Correct this screen as a PHONE screen titled Mint & Iris - Accordion - As loaded - Phone. IMPORTANT set the actual screen/device metadata and rendered screenshot to PHONE 390 CSS px wide (780 physical px), NOT a desktop 1280px canvas with a phone centered inside. No desktop gutters. All 8 stages fit within about 844 CSS px high. Preserve Mint & Iris Public Sans, mint #059669 #D1FAE5, iris #6366F1 #EEF2FF, page #F3F6F8, white cards and 12px corners. Compact but readable text minimum 13px. Header Todd's Factory with SMALL Decision support link. Remove invented text 8 stages active, Action required, Ready for review, Passed validation suite. Top strip exactly Needs you (2) and two compact links Try the recipe screens (UAT), Approve 3 retro fixes. No subtitle or extra copy. Eight stage headers with counts in order: Backlog · 30; Ready · 1; Implementation · 1; Evidence review · 0; Remediation · 1; Staging/smoke test · 0; UAT · 1; Complete · 12. Only Implementation, Remediation, UAT stages open. Other stages folded headers only. Open stages each show just one tappable compact collapsed card row with COMPLETE title wrapping when needed: New machine: retry and pause — Running (iris); Practice: real failure path — Stuck (rose); Recipe screens look like Julia's vintage design — Waiting on you (amber, different to stuck). No card metrics visible on load. No ellipsis or hidden labels. Folded Ready retains hidden Scorecard for every run, plus a ping and Start button. Hidden running detail: Step 4 of 8; Doing now: running tests; Active 40 s ago; 12 min elapsed; $0.84 spent; Context 41% full; 2 agents inside: Main session, Coder; Stop button; Linear issue link. Hidden stuck detail: No activity for 7 min. No invented statistics or ids. Make this a NATIVE MOBILE screenshot, not a phone floating on a desktop canvas."
+    }
+  }
+}

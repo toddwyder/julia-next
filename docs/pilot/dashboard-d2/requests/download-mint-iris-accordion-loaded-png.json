@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793143386012,
+  "method": "tools/call",
+  "params": {
+    "name": "download_file",
+    "arguments": {
+      "name": "projects/12943705270951129641/files/4da9cae154a5467e9bc6c3b625ff2fe5"
+    }
+  }
+}

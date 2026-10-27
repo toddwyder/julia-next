@@ -1,0 +1,237 @@
+{
+  "id": 1793143906921,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"screens\":[{\"name\":\"projects/12943705270951129641/screens/bab9a7fc3eea45e288ab3a81f19f33d2\",\"title\":\"Todd's Factory Board - Mint & Iris\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/d290119f920f463d9ac16f13347b7e1e\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d290119f920f463d9ac16f13347b7e1e:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/3d906a2a397d45e5b4a86ccde8fc0823\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/3d906a2a397d45e5b4a86ccde8fc0823:download\",\"mimeType\":\"text/html\"},\"width\":\"2560\",\"height\":\"2048\",\"deviceType\":\"DESKTOP\"},{\"name\":\"projects/12943705270951129641/screens/ccffaeccd94349538104d64200d83290\",\"title\":\"Todd's Factory - Warm Editorial Infographic\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/011a1b1ae13841d18cf912d0c2d741c3\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/011a1b1ae13841d18cf912d0c2d741c3:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/d2960adb27fc47619d65cdf4e369ba00\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d2960adb27fc47619d65cdf4e369ba00:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"1768\",\"deviceType\":\"MOBILE\"},{\"name\":\"projects/12943705270951129641/screens/ab1c9032cf2e4339adbdf718d42c3a4b\",\"title\":\"Todd's Factory - Grit Mint & Tangerine\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/8a923bb9cb4a4878827a9a5a855a7bc9\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/8a923bb9cb4a4878827a9a5a855a7bc9:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/d8774488be3b4c36ac0f5bb3c9a66ccc\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d8774488be3b4c36ac0f5bb3c9a66ccc:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"1768\",\"deviceType\":\"MOBILE\"},{\"name\":\"projects/12943705270951129641/screens/c56d6d9a94c442e4bbb134e3a29796a5\",\"title\":\"Todd's Factory - Solar Pop Blueprint\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/6037ed56104548b8ad046d890d0c28fc\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/6037ed56104548b8ad046d890d0c28fc:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/d68bd2a6c8a24323a213b683bca59d57\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d68bd2a6c8a24323a213b683bca59d57:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"1768\",\"deviceType\":\"MOBILE\"},{\"name\":\"projects/12943705270951129641/screens/f8bb36ec95b44a75adf458e2bd4e7733\",\"title\":\"Todd's Factory Board - 8 Columns Full View\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/2682f5e3b658429a95d947efc572cab7\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/2682f5e3b658429a95d947efc572cab7:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/a59bc212bbc6446486d078652b88921d\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a59bc212bbc6446486d078652b88921d:download\",\"mimeType\":\"text/html\"},\"width\":\"2560\",\"height\":\"2048\",\"deviceType\":\"DESKTOP\"},{\"name\":\"projects/12943705270951129641/screens/081f9edabe624bab8ff9777d05e2a659\",\"title\":\"Todd's Factory Board - Editorial Broadside\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/a35a9864c2434d298274d756fd0d3774\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a35a9864c2434d298274d756fd0d3774:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/33522b80e9034001ae0b3223692dad32\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/33522b80e9034001ae0b3223692dad32:download\",\"mimeType\":\"text/html\"},\"width\":\"2560\",\"height\":\"2048\",\"deviceType\":\"DESKTOP\"},{\"name\":\"projects/12943705270951129641/screens/43fc5d81e9ec45428ac8659793f81de2\",\"title\":\"Todd's Software Factory Board\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/788f0120dc38499f9a83c425613c551d\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/788f0120dc38499f9a83c425613c551d:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/d994bc51960447948a6ed83c862e43e2\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d994bc51960447948a6ed83c862e43e2:download\",\"mimeType\":\"text/html\"},\"width\":\"2560\",\"height\":\"2048\",\"deviceType\":\"DESKTOP\"},{\"name\":\"projects/12943705270951129641/screens/0b4f43410a724de6a0414c169f6db308\",\"title\":\"Todd's Factory - Board\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/85100ba0e22348a4812373d65dc5bfe1\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/85100ba0e22348a4812373d65dc5bfe1:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/38a80bb4cfa94259a8bccdac27669374\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/38a80bb4cfa94259a8bccdac27669374:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"3180\",\"deviceType\":\"MOBILE\"},{\"name\":\"projects/12943705270951129641/screens/48645f50f0bf41b08b6543b103280433\",\"title\":\"Todd's Factory Board - Solar Viz\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/82aab0e52e6944d78c13762cc455b367\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/82aab0e52e6944d78c13762cc455b367:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/bdf71f6931394eae8674ae315a59941b\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/bdf71f6931394eae8674ae315a59941b:download\",\"mimeType\":\"text/html\"},\"width\":\"2560\",\"height\":\"2048\",\"deviceType\":\"DESKTOP\"},{\"name\":\"projects/12943705270951129641/screens/dbb1b0e5bb2a411baac2686555e226cb\",\"title\":\"Todd's Factory - Neo-Vibrant Grit\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/2ade4fc0fc6a4dacb4789153ecdc937c\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/2ade4fc0fc6a4dacb4789153ecdc937c:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/a256b71b7e6c4e598d114f28c469fe5a\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a256b71b7e6c4e598d114f28c469fe5a:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"3738\",\"deviceType\":\"MOBILE\"},{\"name\":\"projects/12943705270951129641/screens/1118044880194fd28a23505d95accbcb\",\"title\":\"Todd's Factory - Blueprint Data\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/be96093075f14df980de8bc95e839912\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/be96093075f14df980de8bc95e839912:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/af003fe260eb4a84a76db4a6b85150e0\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/af003fe260eb4a84a76db4a6b85150e0:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"3428\",\"deviceType\":\"MOBILE\"},{\"name\":\"projects/12943705270951129641/screens/5506e9428f2a45cf83cc93f66845415c\",\"title\":\"Todd's Factory Board - Landscape\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/a1e3e983d54948a0ba13b5a788d44e3d\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a1e3e983d54948a0ba13b5a788d44e3d:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/61a6105876f4456bad34db8350495853\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/61a6105876f4456bad34db8350495853:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"1768\",\"deviceType\":\"MOBILE\"},{\"name\":\"projects/12943705270951129641/screens/613aa11a86374af98f2f67a9a75e210c\",\"title\":\"Todd's Factory - Editorial Warmth\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/e3cb8bd4e18c41f2b0a30892dd617d1b\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/e3cb8bd4e18c41f2b0a30892dd617d1b:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/37857a6896204a198832ad594168b096\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/37857a6896204a198832ad594168b096:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"3488\",\"deviceType\":\"MOBILE\"}]}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "screens": [
+        {
+          "deviceType": "DESKTOP",
+          "height": "2048",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/3d906a2a397d45e5b4a86ccde8fc0823:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/3d906a2a397d45e5b4a86ccde8fc0823"
+          },
+          "name": "projects/12943705270951129641/screens/bab9a7fc3eea45e288ab3a81f19f33d2",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d290119f920f463d9ac16f13347b7e1e:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/d290119f920f463d9ac16f13347b7e1e"
+          },
+          "title": "Todd's Factory Board - Mint & Iris",
+          "width": "2560"
+        },
+        {
+          "deviceType": "MOBILE",
+          "height": "1768",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d2960adb27fc47619d65cdf4e369ba00:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/d2960adb27fc47619d65cdf4e369ba00"
+          },
+          "name": "projects/12943705270951129641/screens/ccffaeccd94349538104d64200d83290",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/011a1b1ae13841d18cf912d0c2d741c3:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/011a1b1ae13841d18cf912d0c2d741c3"
+          },
+          "title": "Todd's Factory - Warm Editorial Infographic",
+          "width": "780"
+        },
+        {
+          "deviceType": "MOBILE",
+          "height": "1768",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d8774488be3b4c36ac0f5bb3c9a66ccc:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/d8774488be3b4c36ac0f5bb3c9a66ccc"
+          },
+          "name": "projects/12943705270951129641/screens/ab1c9032cf2e4339adbdf718d42c3a4b",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/8a923bb9cb4a4878827a9a5a855a7bc9:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/8a923bb9cb4a4878827a9a5a855a7bc9"
+          },
+          "title": "Todd's Factory - Grit Mint & Tangerine",
+          "width": "780"
+        },
+        {
+          "deviceType": "MOBILE",
+          "height": "1768",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d68bd2a6c8a24323a213b683bca59d57:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/d68bd2a6c8a24323a213b683bca59d57"
+          },
+          "name": "projects/12943705270951129641/screens/c56d6d9a94c442e4bbb134e3a29796a5",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/6037ed56104548b8ad046d890d0c28fc:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/6037ed56104548b8ad046d890d0c28fc"
+          },
+          "title": "Todd's Factory - Solar Pop Blueprint",
+          "width": "780"
+        },
+        {
+          "deviceType": "DESKTOP",
+          "height": "2048",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a59bc212bbc6446486d078652b88921d:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/a59bc212bbc6446486d078652b88921d"
+          },
+          "name": "projects/12943705270951129641/screens/f8bb36ec95b44a75adf458e2bd4e7733",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/2682f5e3b658429a95d947efc572cab7:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/2682f5e3b658429a95d947efc572cab7"
+          },
+          "title": "Todd's Factory Board - 8 Columns Full View",
+          "width": "2560"
+        },
+        {
+          "deviceType": "DESKTOP",
+          "height": "2048",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/33522b80e9034001ae0b3223692dad32:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/33522b80e9034001ae0b3223692dad32"
+          },
+          "name": "projects/12943705270951129641/screens/081f9edabe624bab8ff9777d05e2a659",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a35a9864c2434d298274d756fd0d3774:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/a35a9864c2434d298274d756fd0d3774"
+          },
+          "title": "Todd's Factory Board - Editorial Broadside",
+          "width": "2560"
+        },
+        {
+          "deviceType": "DESKTOP",
+          "height": "2048",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d994bc51960447948a6ed83c862e43e2:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/d994bc51960447948a6ed83c862e43e2"
+          },
+          "name": "projects/12943705270951129641/screens/43fc5d81e9ec45428ac8659793f81de2",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/788f0120dc38499f9a83c425613c551d:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/788f0120dc38499f9a83c425613c551d"
+          },
+          "title": "Todd's Software Factory Board",
+          "width": "2560"
+        },
+        {
+          "deviceType": "MOBILE",
+          "height": "3180",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/38a80bb4cfa94259a8bccdac27669374:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/38a80bb4cfa94259a8bccdac27669374"
+          },
+          "name": "projects/12943705270951129641/screens/0b4f43410a724de6a0414c169f6db308",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/85100ba0e22348a4812373d65dc5bfe1:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/85100ba0e22348a4812373d65dc5bfe1"
+          },
+          "title": "Todd's Factory - Board",
+          "width": "780"
+        },
+        {
+          "deviceType": "DESKTOP",
+          "height": "2048",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/bdf71f6931394eae8674ae315a59941b:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/bdf71f6931394eae8674ae315a59941b"
+          },
+          "name": "projects/12943705270951129641/screens/48645f50f0bf41b08b6543b103280433",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/82aab0e52e6944d78c13762cc455b367:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/82aab0e52e6944d78c13762cc455b367"
+          },
+          "title": "Todd's Factory Board - Solar Viz",
+          "width": "2560"
+        },
+        {
+          "deviceType": "MOBILE",
+          "height": "3738",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a256b71b7e6c4e598d114f28c469fe5a:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/a256b71b7e6c4e598d114f28c469fe5a"
+          },
+          "name": "projects/12943705270951129641/screens/dbb1b0e5bb2a411baac2686555e226cb",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/2ade4fc0fc6a4dacb4789153ecdc937c:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/2ade4fc0fc6a4dacb4789153ecdc937c"
+          },
+          "title": "Todd's Factory - Neo-Vibrant Grit",
+          "width": "780"
+        },
+        {
+          "deviceType": "MOBILE",
+          "height": "3428",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/af003fe260eb4a84a76db4a6b85150e0:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/af003fe260eb4a84a76db4a6b85150e0"
+          },
+          "name": "projects/12943705270951129641/screens/1118044880194fd28a23505d95accbcb",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/be96093075f14df980de8bc95e839912:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/be96093075f14df980de8bc95e839912"
+          },
+          "title": "Todd's Factory - Blueprint Data",
+          "width": "780"
+        },
+        {
+          "deviceType": "MOBILE",
+          "height": "1768",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/61a6105876f4456bad34db8350495853:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/61a6105876f4456bad34db8350495853"
+          },
+          "name": "projects/12943705270951129641/screens/5506e9428f2a45cf83cc93f66845415c",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a1e3e983d54948a0ba13b5a788d44e3d:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/a1e3e983d54948a0ba13b5a788d44e3d"
+          },
+          "title": "Todd's Factory Board - Landscape",
+          "width": "780"
+        },
+        {
+          "deviceType": "MOBILE",
+          "height": "3488",
+          "htmlCode": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/37857a6896204a198832ad594168b096:download",
+            "mimeType": "text/html",
+            "name": "projects/12943705270951129641/files/37857a6896204a198832ad594168b096"
+          },
+          "name": "projects/12943705270951129641/screens/613aa11a86374af98f2f67a9a75e210c",
+          "screenshot": {
+            "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/e3cb8bd4e18c41f2b0a30892dd617d1b:download",
+            "mimeType": "png",
+            "name": "projects/12943705270951129641/files/e3cb8bd4e18c41f2b0a30892dd617d1b"
+          },
+          "title": "Todd's Factory - Editorial Warmth",
+          "width": "780"
+        }
+      ]
+    }
+  }
+}
