@@ -1,0 +1,363 @@
+{
+ "controls": [
+  {
+   "n": 1,
+   "x": -1,
+   "y": 42,
+   "name": "Header: logo and \"Todd's Factory\"",
+   "what": "A name bar across the top of the screen.",
+   "from": "Drawn by Stitch as part of its frame. Not built (decision 0008).",
+   "status": "frame",
+   "stories": [],
+   "notes": [
+    "The board has no header of its own; the first thing on it is Needs you and the Decision support link."
+   ]
+  },
+  {
+   "n": 2,
+   "x": -1,
+   "y": 90,
+   "name": "Decision support link",
+   "what": "A link to the Decision support view, with its arrow. One tap from the board, always visible.",
+   "from": "Fixed text. Opens the Map view (picture 09).",
+   "status": "ok",
+   "stories": [
+    "S-01",
+    "S-50"
+   ],
+   "notes": [
+    "It sits where the header was; if the header is not built the link still needs a place at the top (G1)."
+   ]
+  },
+  {
+   "n": 3,
+   "x": -1,
+   "y": 195,
+   "name": "Needs you (2): title and count",
+   "what": "The title of the strip of things waiting on Todd, with how many there are.",
+   "from": "The count of action items (the six kinds in picture 06). The machine and Linear supply them.",
+   "status": "build",
+   "stories": [
+    "S-32",
+    "S-41"
+   ],
+   "notes": [
+    "Amber, because it is waiting on Todd. With nothing waiting, the strip shows an empty state (rule R-08)."
+   ]
+  },
+  {
+   "n": 4,
+   "x": -1,
+   "y": 285,
+   "name": "First action row: \"Try the recipe screens (UAT)\"",
+   "what": "One thing waiting on Todd, in plain words, with an arrow. This one is a card in UAT.",
+   "from": "Linear: the card's status is UAT. The wording is built from the card title.",
+   "status": "ok",
+   "stories": [
+    "S-32",
+    "S-34"
+   ],
+   "notes": [
+    "Where tapping goes is open (G2)."
+   ]
+  },
+  {
+   "n": 5,
+   "x": -1,
+   "y": 367,
+   "name": "Second action row: \"Approve 3 retro fixes\"",
+   "what": "Another thing waiting on Todd: retro lessons awaiting his approval.",
+   "from": "The machine's retro output. No data exists for this yet.",
+   "status": "build",
+   "stories": [
+    "S-32",
+    "S-37"
+   ],
+   "notes": [
+    "No screen is drawn for approving retro fixes (S-45). The row is green here and amber above; colour carries no meaning (rule R-07), so all rows look the same (G3)."
+   ]
+  },
+  {
+   "n": 6,
+   "x": -1,
+   "y": 500,
+   "name": "Backlog stage line (folded)",
+   "what": "The stage's name and how many cards are in it, on one line, with a down arrow. Folded when the screen opens. Tapping opens or folds it.",
+   "from": "Linear: cards whose status is Backlog, counted.",
+   "status": "ok",
+   "stories": [
+    "S-04",
+    "S-05"
+   ],
+   "notes": [
+    "What opens when Todd taps it is open (G4)."
+   ]
+  },
+  {
+   "n": 7,
+   "x": -1,
+   "y": 602,
+   "name": "Ready stage line (folded)",
+   "what": "Same as Backlog, for Ready cards. A Ready card is where Start lives.",
+   "from": "Linear: status Ready.",
+   "status": "ok",
+   "stories": [
+    "S-04",
+    "S-05",
+    "S-20"
+   ],
+   "notes": [
+    "The Start button is not drawn on the board (G5)."
+   ]
+  },
+  {
+   "n": 8,
+   "x": -1,
+   "y": 704,
+   "name": "Implementation stage line (open)",
+   "what": "Stage name and count, with an up arrow. Open on load because a running card is inside it. Its count is shown in the stage's colour.",
+   "from": "Linear: status Implementation. Open or folded on load comes from whether a card in it is running, stuck or waiting.",
+   "status": "ok",
+   "stories": [
+    "S-04",
+    "S-05"
+   ],
+   "notes": []
+  },
+  {
+   "n": 9,
+   "x": -1,
+   "y": 795,
+   "name": "Running card row: title and down arrow",
+   "what": "One card inside its stage: its title, and an arrow that expands the card in place (picture 03).",
+   "from": "Linear: the card's title. Which card is running comes from the build machine (B-01).",
+   "status": "build",
+   "stories": [
+    "S-02",
+    "S-03",
+    "S-06"
+   ],
+   "notes": []
+  },
+  {
+   "n": 10,
+   "x": -1,
+   "y": 838,
+   "name": "\"Running\" pill",
+   "what": "A word-and-colour label on the card: Running.",
+   "from": "Whether the build is active, from the build machine.",
+   "status": "build",
+   "stories": [
+    "S-06",
+    "S-10"
+   ],
+   "notes": [
+    "The pills drawn are Running, Stuck and Waiting on you; a stopped card has \"Stopped\" (picture 05). What a card not running shows is open (G6)."
+   ]
+  },
+  {
+   "n": 11,
+   "x": -1,
+   "y": 938,
+   "name": "Evidence review stage line (folded, 0)",
+   "what": "A stage with no cards: its name, 0, and a down arrow.",
+   "from": "Linear: status Evidence review.",
+   "status": "ok",
+   "stories": [
+    "S-04",
+    "S-05"
+   ],
+   "notes": [
+    "Folded because nothing running, stuck or waiting is in it."
+   ]
+  },
+  {
+   "n": 12,
+   "x": -1,
+   "y": 1040,
+   "name": "Remediation stage line (open)",
+   "what": "Stage name and count, open because a stuck card is inside it. Rose because of the stuck card.",
+   "from": "Linear: status Remediation. Open and the colour come from the card inside being stuck.",
+   "status": "ok",
+   "stories": [
+    "S-04",
+    "S-05",
+    "S-08"
+   ],
+   "notes": [
+    "If Todd folds a stage that holds a stuck card, nothing shows it is stuck (G7)."
+   ]
+  },
+  {
+   "n": 13,
+   "x": -1,
+   "y": 1127,
+   "name": "Stuck card row: title and down arrow",
+   "what": "A card in its stage with a rose border, so it stands out.",
+   "from": "Linear title; stuck comes from the build machine (no activity for 5 minutes).",
+   "status": "build",
+   "stories": [
+    "S-06",
+    "S-08"
+   ],
+   "notes": []
+  },
+  {
+   "n": 14,
+   "x": -1,
+   "y": 1172,
+   "name": "\"Stuck\" pill",
+   "what": "Rose pill with the word Stuck.",
+   "from": "The build machine: 5 minutes with no activity (glossary \"Stuck\").",
+   "status": "build",
+   "stories": [
+    "S-08"
+   ],
+   "notes": [
+    "The picture has no icon; the story needs one with the word (status is never colour alone, rule R-05)."
+   ]
+  },
+  {
+   "n": 15,
+   "x": -1,
+   "y": 1273,
+   "name": "Staging/smoke test stage line (folded, 0)",
+   "what": "A stage with no cards.",
+   "from": "Linear: status Staging/smoke test.",
+   "status": "ok",
+   "stories": [
+    "S-04",
+    "S-05"
+   ],
+   "notes": []
+  },
+  {
+   "n": 16,
+   "x": -1,
+   "y": 1374,
+   "name": "UAT stage line (open)",
+   "what": "Stage name and count, amber, open because a card is waiting on Todd.",
+   "from": "Linear: status UAT.",
+   "status": "ok",
+   "stories": [
+    "S-04",
+    "S-05",
+    "S-09"
+   ],
+   "notes": []
+  },
+  {
+   "n": 17,
+   "x": -1,
+   "y": 1470,
+   "name": "UAT card row: title and down arrow",
+   "what": "A card waiting for Todd to try it. The title wraps to two lines rather than being cut off.",
+   "from": "Linear: card title and its status UAT.",
+   "status": "ok",
+   "stories": [
+    "S-06",
+    "S-34"
+   ],
+   "notes": [
+    "What it shows when tapped is open (G8). Labels are never cut off (rule R-06)."
+   ]
+  },
+  {
+   "n": 18,
+   "x": -1,
+   "y": 1517,
+   "name": "\"Waiting on you\" pill",
+   "what": "Amber pill with the words Waiting on you.",
+   "from": "The card is in UAT, or a build is waiting on his answer (B-08).",
+   "status": "build",
+   "stories": [
+    "S-09"
+   ],
+   "notes": []
+  },
+  {
+   "n": 19,
+   "x": -1,
+   "y": 1640,
+   "name": "Complete stage line (folded, 12)",
+   "what": "Finished cards, counted, folded.",
+   "from": "Linear: status Complete. The cards stay until their project is Completed (S-07).",
+   "status": "ok",
+   "stories": [
+    "S-04",
+    "S-05",
+    "S-07"
+   ],
+   "notes": []
+  }
+ ],
+ "gaps": [
+  {
+   "id": "G1",
+   "stories": [
+    "S-01"
+   ],
+   "text": "The header is not built, but the Decision support link has to sit somewhere.",
+   "res": "Closed (Todd, 27 Oct): the link stays top right on its own line, with the plain-text title \"Factory\" beside it."
+  },
+  {
+   "id": "G2",
+   "stories": [
+    "S-32",
+    "S-34"
+   ],
+   "text": "Tapping an action row: does it open that item's action directly, or the Needs you list (picture 06)?",
+   "res": "Closed: a row opens that item's action; the \"Needs you\" title opens the full list."
+  },
+  {
+   "id": "G3",
+   "stories": [
+    "S-32"
+   ],
+   "text": "How many rows the strip shows when more than two things are waiting. Picture 02 shows one amber and one green row.",
+   "res": "Closed: up to three rows, all the same colour, then \"See all (n)\" opens the list."
+  },
+  {
+   "id": "G4",
+   "stories": [
+    "S-05"
+   ],
+   "text": "What opens when Todd taps Backlog (30) or Complete (12): how many cards are listed and in what order.",
+   "res": "Closed: most recently moved first, five at a time with \"Show more\". Start with this and change it if it doesn't work."
+  },
+  {
+   "id": "G5",
+   "stories": [
+    "S-20",
+    "S-21"
+   ],
+   "text": "The Start button on a Ready card is not drawn on the board.",
+   "res": "Closed: an open Ready card shows Start, which opens the Start screen."
+  },
+  {
+   "id": "G6",
+   "stories": [
+    "S-06"
+   ],
+   "text": "The pill on cards that aren't running (Backlog, Ready, Staging, Complete).",
+   "res": "Closed: no pill on cards that aren't running. Pills only for Running, Stuck, Waiting on you and Stopped."
+  },
+  {
+   "id": "G7",
+   "stories": [
+    "S-08",
+    "S-09"
+   ],
+   "text": "A folded stage hides a stuck or waiting card inside it.",
+   "res": "Closed: Stuck pulses (pill and icon, and the stage line holding it, folded or open). Waiting on you is a steady amber mark with its icon. With reduced motion set, the pulse becomes a static, bolder rose header and icon."
+  },
+  {
+   "id": "G8",
+   "stories": [
+    "S-06"
+   ],
+   "text": "What a tapped card shows when it is not running: Backlog, Ready, UAT, Staging, Complete.",
+   "res": "Closed: every card shows title, status and a Linear link. Ready adds Start, UAT adds a link to try it, Complete adds a link to its card page."
+  }
+ ]
+}

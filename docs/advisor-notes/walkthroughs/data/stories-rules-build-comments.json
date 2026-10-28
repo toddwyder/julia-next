@@ -1,0 +1,972 @@
+{
+ "goal": "Todd runs his software factory from one dashboard with two jobs: running the factory (inner loop) and improving it between builds (outer loop). Traces: R1a; PL (25 Oct, \"Two jobs\"); I 39-40.",
+ "stories": [
+  {
+   "title": "Getting around",
+   "items": [
+    {
+     "id": "S-01",
+     "want": "I want the board to open first, with Decision support one tap away",
+     "so": "what needs me now is what I see first, and history is close when I want it",
+     "ac": [
+      "Opening the dashboard shows the board.",
+      "A \"Decision support\" link on the board opens Decision support in one tap.",
+      "Every other screen has a way back to the board."
+     ],
+     "notes": [],
+     "trace": "I 39-40; Gl \"Decision support\"; pictures 02, 08"
+    }
+   ]
+  },
+  {
+   "title": "Board",
+   "items": [
+    {
+     "id": "S-02",
+     "want": "I want the board to show only the cards the machine is building or has built",
+     "so": "all card work goes through one place I can watch",
+     "ac": [
+      "Every card on the board is one the machine worked on, whatever models and providers it used.",
+      "Cards worked by hand appear only in Linear."
+     ],
+     "notes": [
+      "Agents opened by hand were used only because Start didn't exist yet."
+     ],
+     "trace": "R1a (\"across tools\"); I 3-4; 0001"
+    },
+    {
+     "id": "S-03",
+     "want": "I want one tile per card, with the agents working on it inside",
+     "so": "one card never shows up as several",
+     "ac": [
+      "A running card with three agents shows as one tile listing three agents."
+     ],
+     "notes": [],
+     "trace": "I 1-2; Gl \"Board\""
+    },
+    {
+     "id": "S-04",
+     "want": "I want the board's stages to be Linear's statuses",
+     "so": "the board and Linear always agree",
+     "ac": [
+      "The stages are Backlog, Ready, Implementation, Evidence review, Remediation, Staging/smoke test, UAT, Complete, in that order.",
+      "Moving a card in Linear moves it on the board."
+     ],
+     "notes": [
+      "Code review, Triage, Canceled and Duplicate are left off."
+     ],
+     "trace": "I 5-15"
+    },
+    {
+     "id": "S-05",
+     "want": "on my phone, I want stages that fold to one line",
+     "so": "30 Backlog cards never bury the live work",
+     "ac": [
+      "A folded stage shows its name and card count on one line.",
+      "On load, only stages holding a running, stuck or waiting card are open.",
+      "Tapping a stage opens or folds it."
+     ],
+     "notes": [
+      "Todd's own layout. Rejected: columns scrolling sideways; one column at a time by tabs."
+     ],
+     "trace": "D 28-32; 0005; picture 02"
+    },
+    {
+     "id": "S-06",
+     "want": "I want each card to show only its title and status until I tap it",
+     "so": "I can scan a stage quickly and open only what I care about",
+     "ac": [
+      "Each card in an open stage shows its title and a status pill.",
+      "Tapping a card expands it in place; tapping again collapses it."
+     ],
+     "notes": [],
+     "trace": "D 28-32; 0005; pictures 02, 03"
+    },
+    {
+     "id": "S-07",
+     "want": "I want finished cards to stay on the board until their project is done",
+     "so": "finished work clears in batches, not one by one",
+     "ac": [
+      "A Complete card stays while its Linear project is open.",
+      "When the project is marked Completed, its cards leave the board."
+     ],
+     "notes": [
+      "Every piece of work gets its own Linear project, the dashboard included."
+     ],
+     "trace": "I 31-38; 0002; Gl \"Project\""
+    },
+    {
+     "id": "S-08",
+     "want": "I want to see at a glance when a running card is stuck",
+     "so": "I can step in before time is wasted",
+     "ac": [
+      "A running card with no activity for 5 minutes shows a rose \"Stuck\" pill with an icon.",
+      "The pill clears when activity resumes."
+     ],
+     "notes": [],
+     "trace": "I 21-24, 59-61; Gl \"Stuck\""
+    },
+    {
+     "id": "S-09",
+     "want": "I want a card that is waiting for my answer to look different from a stuck one",
+     "so": "I know which cards need me rather than the machine",
+     "ac": [
+      "A card waiting on me shows an amber \"Waiting on you\" pill with its own icon.",
+      "Stuck and waiting never share a colour or icon."
+     ],
+     "notes": [],
+     "trace": "I 81-82; D 35"
+    },
+    {
+     "id": "S-10",
+     "want": "I want a running card to say what it is doing now and when it last did something",
+     "so": "I can tell working from stalled",
+     "ac": [
+      "An open running card shows one line \"Doing now: \u2026\".",
+      "It shows how long ago its last activity was, updating live."
+     ],
+     "notes": [
+      "The \"PULSE\" label on picture 03 is jargon; use plain words (C-04)."
+     ],
+     "trace": "I 21-23; picture 03; handoff 25 Oct (old bug: no sign of life on a running build)"
+    },
+    {
+     "id": "S-11",
+     "want": "I want a running card to show its playbook checklist",
+     "so": "I see how far along the build is",
+     "ac": [
+      "Each playbook step is listed with an icon for done, working, to go or skipped.",
+      "A skipped step has \"why?\", which shows the reason."
+     ],
+     "notes": [
+      "The \"Step 4 of 8\" bar on picture 03 is replaced by this checklist (C-05)."
+     ],
+     "trace": "R1a (\"Steps\"); I 77-78; E 20-23; picture 04; handoff 24 Oct (skipped must not read as not done); handoff 25 Oct (old bug: 'not done' counted as finished)"
+    },
+    {
+     "id": "S-12",
+     "want": "I want each checklist step to show its time",
+     "so": "I can see where a build spends its time",
+     "ac": [
+      "Each step shows how long it took.",
+      "The working step counts up live."
+     ],
+     "notes": [],
+     "trace": "I 78; picture 04"
+    },
+    {
+     "id": "S-13",
+     "want": "I want a running card to show how long it has been running",
+     "so": "I know how long the build has taken so far",
+     "ac": [
+      "An open running card shows the time since Start."
+     ],
+     "notes": [],
+     "trace": "R1a; R1b (\"Wall clock time\")"
+    },
+    {
+     "id": "S-14",
+     "want": "I want a running card to show what it has cost so far",
+     "so": "a costly build shows up early",
+     "ac": [
+      "An open running card shows cost so far, updating live.",
+      "Once a per-card limit is set, the cost shows against it (\"$0.84 of $3.00\")."
+     ],
+     "notes": [
+      "Money never stops a card; going past the limit asks Todd (S-59)."
+     ],
+     "trace": "R1b (\"Cost so far\"); I 93-97; P 22:58-22:59"
+    },
+    {
+     "id": "S-15",
+     "want": "I want to see each agent's context on a running card",
+     "so": "I notice an agent running out of room",
+     "ac": [
+      "An open running card lists each agent on its own line with its context fill and compactions, and shows the card's handoffs."
+     ],
+     "notes": [
+      "Written into the spec, not drawn (0008)."
+     ],
+     "trace": "I 56-58; E 19-20, 25; 0008; Gl \"Compaction\", \"Handoff\"; Gl \"Handoff\" (counted per card)"
+    },
+    {
+     "id": "S-16",
+     "want": "I want each card to link to its Linear issue and its run record",
+     "so": "I can dig into a card when I need to",
+     "ac": [
+      "An open card has a link to its Linear issue and one to its run record.",
+      "After the card's retro is complete, the run-record link is gone (its trace is deleted)."
+     ],
+     "notes": [],
+     "trace": "R1a; R1b; I 85; 0004; picture 04"
+    },
+    {
+     "id": "S-17",
+     "want": "I want to stop a running card",
+     "so": "a build going wrong doesn't keep running",
+     "ac": [
+      "A running card has a Stop button.",
+      "Stop ends the build, keeps its work on its branch, and leaves the card in its column.",
+      "Pressing Start on that card later starts fresh."
+     ],
+     "notes": [],
+     "trace": "I 19-20; PL (\"Start/stop\"); pictures 03, 04"
+    },
+    {
+     "id": "S-18",
+     "want": "I want a stopped card to tell me why it stopped",
+     "so": "I can decide what to do next",
+     "ac": [
+      "A stopped card shows a rose \"Stopped\" pill.",
+      "It shows one line saying why, and the stage that caused it (requirements, design or build).",
+      "It shows its cost and rounds."
+     ],
+     "notes": [],
+     "trace": "I 25, 45; E 9-11; picture 05; handoff 25 Oct (old bug: every failure said 'session not completed')"
+    },
+    {
+     "id": "S-19",
+     "want": "I want a stopped card to show its restart plan",
+     "so": "I can approve a restart from the board",
+     "ac": [
+      "A stopped card shows its restart plan, with \"Read full plan\" and \"Open in Linear\"."
+     ],
+     "notes": [],
+     "trace": "I 25; E 9-11; picture 05"
+    }
+   ]
+  },
+  {
+   "title": "Start",
+   "items": [
+    {
+     "id": "S-20",
+     "want": "I want Start only on cards that are Ready",
+     "so": "I can't start a card that isn't settled",
+     "ac": [
+      "A Start button appears on Ready cards and on no others."
+     ],
+     "notes": [],
+     "trace": "I 7, 15-16; I 93"
+    },
+    {
+     "id": "S-21",
+     "want": "I want to start a build with one tap using last time's settings",
+     "so": "a routine build takes one tap",
+     "ac": [
+      "\"Start with last settings\" sits at the top of the Start screen.",
+      "It starts the build with the last build's models and effort, unchanged."
+     ],
+     "notes": [],
+     "trace": "I 7; D 70; 0007; picture 08"
+    },
+    {
+     "id": "S-22",
+     "want": "I want to see the main choices before I start",
+     "so": "I know what the build will use",
+     "ac": [
+      "A summary shows the main session's model, the Shipping model and the effort, each model with its price."
+     ],
+     "notes": [
+      "\"Evidence reviewer\" is renamed \"Shipping\" (0016).",
+      "Old bug to avoid: the Start form was buried under dead runs (handoff 25 Oct)."
+     ],
+     "trace": "D 70; 0007; 0016; picture 08"
+    },
+    {
+     "id": "S-23",
+     "want": "I want to choose how hard the models think",
+     "so": "I can trade speed and cost against care",
+     "ac": [
+      "An \"Effort\" picker offers Small, Medium, Large and Unlimited as one to four brains.",
+      "Its \u24d8 says \"How hard the models think. More brains is slower and costs more.\"",
+      "Last time's choice is selected when the screen opens."
+     ],
+     "notes": [
+      "The word is effort, not budget or thinking."
+     ],
+     "trace": "I 17-18; D 72-77; 0007; picture 08"
+    },
+    {
+     "id": "S-24",
+     "want": "I want to change any model by tapping its name",
+     "so": "there is one way to change a model, wherever it appears",
+     "ac": [
+      "Tapping any model name opens the model list.",
+      "Picking a model from the list replaces it."
+     ],
+     "notes": [],
+     "trace": "I 16-17; 0011"
+    },
+    {
+     "id": "S-25",
+     "want": "I want to set a whole group's model in one choice",
+     "so": "I don't set 17 roles one by one",
+     "ac": [
+      "Each group row (Building, Judgment, Investigating, Learning, Panels, Workers) shows the group's model.",
+      "Changing it changes every role in the group.",
+      "The down-arrow opens the group's roles; a role set differently shows its own model."
+     ],
+     "notes": [
+      "Group names are the advisor's; Todd accepted them. Roles inside are pstack's real names. Main session appears only at the top (C-08)."
+     ],
+     "trace": "D 63, 70; 0007; 0011; picture 08"
+    },
+    {
+     "id": "S-26",
+     "want": "I want each role explained in plain words",
+     "so": "I can pick sensibly for roles like hillclimb",
+     "ac": [
+      "Each role has an \u24d8.",
+      "Tapping it shows a short plain explanation in a popup."
+     ],
+     "notes": [
+      "Explanations show only when tapped (C-09); text from pstack's own skill files."
+     ],
+     "trace": "D 70-71; 0007; picture 08"
+    },
+    {
+     "id": "S-27",
+     "want": "I want to choose how many models run in each panel",
+     "so": "I control how many helpers a panel uses",
+     "ac": [
+      "With Panels open, each panel shows its models as chips with an \u00d7.",
+      "A \"+ Add\" chip opens the model list.",
+      "A panel keeps at least one model."
+     ],
+     "notes": [],
+     "trace": "I 17; 0012; handoff 27 Oct afternoon (panel length = fan-out)"
+    },
+    {
+     "id": "S-28",
+     "want": "I want to see each model's real price",
+     "so": "I pick knowing what it costs",
+     "ac": [
+      "Every model name shows its price per million tokens as \u2193$in/$out\u2191.",
+      "A model that costs nothing right now shows Free; when it starts costing money, it shows its price.",
+      "An \u24d8 in the model list explains the arrows."
+     ],
+     "notes": [
+      "No model is named as free: Beam is free only for a limited-time promotion (Todd, 27 Oct).",
+      "Replaces $ to $$$$. Judgment's \"$$$$\" on picture 08 is a drawing error (C-11)."
+     ],
+     "trace": "I 75-77; D 119-121; 0013"
+    },
+    {
+     "id": "S-29",
+     "want": "I want to be told when a build finishes",
+     "so": "I don't have to keep watching",
+     "ac": [
+      "The Start screen says \"Ping when it finishes: Linear notification to Todd\".",
+      "When the build finishes, a Linear notification reaches Todd's phone."
+     ],
+     "notes": [
+      "No Slack (C-10)."
+     ],
+     "trace": "D 70, 79-81; 0007; picture 08"
+    },
+    {
+     "id": "S-30",
+     "want": "I want a Start button always in reach after I change settings",
+     "so": "I can start without scrolling back up",
+     "ac": [
+      "Start is fixed at the bottom of the Start screen.",
+      "It starts the build with the settings as shown."
+     ],
+     "notes": [],
+     "trace": "D 70; 0007; picture 08"
+    },
+    {
+     "id": "S-31",
+     "want": "I want to see that my build actually started",
+     "so": "I know Start worked, or why it didn't",
+     "ac": [
+      "After Start, the board shows the card in Implementation, open, saying \"Starting\u2026\".",
+      "If it fails to start, the card stays in Ready with a rose \"Didn't start\" pill, one line saying why, and \"Try again\"."
+     ],
+     "notes": [],
+     "trace": "0014"
+    }
+   ]
+  },
+  {
+   "title": "Needs you",
+   "items": [
+    {
+     "id": "S-32",
+     "want": "I want one list of everything waiting on me",
+     "so": "nothing waits unnoticed for hours",
+     "ac": [
+      "A \"Needs you (N)\" strip with the count sits on top of the board.",
+      "Tapping it opens the list, oldest first."
+     ],
+     "notes": [
+      "Title reads \"Needs you (6)\" with the count (C-07)."
+     ],
+     "trace": "R1a; R1b (\"Action Items\"); I 25-26; picture 06"
+    },
+    {
+     "id": "S-33",
+     "want": "I want each item to show what it is, how long it has waited, and one button to act",
+     "so": "I can act straight away",
+     "ac": [
+      "Each row shows its kind, its title, how long it has waited, and one button that opens where Todd acts."
+     ],
+     "notes": [
+      "Button colours mean nothing (R-07)."
+     ],
+     "trace": "I 25; E 7-9; picture 06"
+    },
+    {
+     "id": "S-34",
+     "want": "I want a card waiting for my try-out (UAT) in the list",
+     "so": "I try it while it's fresh",
+     "ac": [
+      "A card in UAT appears as \"Try it (UAT)\" with \"Open preview\"."
+     ],
+     "notes": [],
+     "trace": "I 25; picture 06"
+    },
+    {
+     "id": "S-35",
+     "want": "I want a stopped card's restart plan in the list",
+     "so": "a stopped card never sits waiting for me unseen",
+     "ac": [
+      "A stopped card appears with \"Read plan\"."
+     ],
+     "notes": [],
+     "trace": "I 25; picture 06"
+    },
+    {
+     "id": "S-36",
+     "want": "I want a shape waiting for my \"settled\" in the list",
+     "so": "new work isn't held up by me",
+     "ac": [
+      "A shape in Backlog awaiting \"settled\" appears with \"Read shape\"."
+     ],
+     "notes": [],
+     "trace": "I 25; picture 06"
+    },
+    {
+     "id": "S-37",
+     "want": "I want retro fixes waiting for my approval in the list",
+     "so": "lessons get applied",
+     "ac": [
+      "Retro fixes awaiting approval appear with \"Review fixes\"."
+     ],
+     "notes": [],
+     "trace": "I 25; picture 06"
+    },
+    {
+     "id": "S-38",
+     "want": "I want a one-click account approval in the list",
+     "so": "a step only I can do doesn't block a build",
+     "ac": [
+      "An account approval appears with \"Approve\"."
+     ],
+     "notes": [],
+     "trace": "I 25; picture 06"
+    },
+    {
+     "id": "S-39",
+     "want": "I want a build's question to me in the list, and my answer to reach the build",
+     "so": "a build never waits hours for me",
+     "ac": [
+      "A build waiting for an answer appears with its question and \"Answer\".",
+      "Todd's answer reaches the running build and it carries on."
+     ],
+     "notes": [
+      "Two such waits went unnoticed for about 2 hours and 20 minutes on 26 Oct."
+     ],
+     "trace": "I 81-83; E 25; picture 06"
+    },
+    {
+     "id": "S-40",
+     "want": "I want a card that didn't start in the list",
+     "so": "a failed start reaches me",
+     "ac": [
+      "A card that didn't start appears with \"Try again\"."
+     ],
+     "notes": [],
+     "trace": "0014"
+    },
+    {
+     "id": "S-41",
+     "want": "I want every new item to reach my phone",
+     "so": "I don't have to keep the dashboard open",
+     "ac": [
+      "Each new item sends Todd a Linear notification.",
+      "The rows don't repeat \"notification sent\"."
+     ],
+     "notes": [
+      "C-06."
+     ],
+     "trace": "I 27-28; 0008"
+    },
+    {
+     "id": "S-59",
+     "want": "I want to be asked when a card has cost more than its limit",
+     "so": "a costly build doesn't run on unnoticed, and I decide whether it should go on",
+     "ac": [
+      "When a running card's cost passes the per-card limit, Todd gets a notification and a Needs you item: keep going or stop.",
+      "The build keeps running until Todd answers; the limit never stops it by itself.",
+      "The card shows \"$x of $limit\" and an amber mark once it is past the limit."
+     ],
+     "notes": [
+      "Todd, 27 Oct: a limit that does nothing is pointless, so it asks. This is a seventh kind of Needs you item, next to the six in picture 06 (G2 on the running card).",
+      "The limit's value is set later from real cards (about the 75th percentile, plus a check for repeating without progress); until then there is no limit."
+     ],
+     "trace": "I 94-97; P 22:58-22:59; PL"
+    }
+   ]
+  },
+  {
+   "title": "Decision support",
+   "items": [
+    {
+     "id": "S-42",
+     "want": "I want to pick a role and compare the models that filled it",
+     "so": "I find the best model for each job",
+     "ac": [
+      "Role chips include the main session, every pstack role and Shipping.",
+      "A card counts only for roles that actually ran on it."
+     ],
+     "notes": [],
+     "trace": "R1a (\"Model\"); I 47-54; 0003"
+    },
+    {
+     "id": "S-43",
+     "want": "I want each model's success rate in a role",
+     "so": "I see which models finish cards without me stepping in",
+     "ac": [
+      "Each model shows its success rate.",
+      "Success means Complete with no intervention caused by the build.",
+      "Automatic rounds within the two-round limit still count as success.",
+      "A UAT send-back or a stop counts against the build, unless its cause was in requirements or design, which counts against that stage instead."
+     ],
+     "notes": [],
+     "trace": "R1a; I 41-44; Gl \"Success\"; I 43 (Todd's definition)"
+    },
+    {
+     "id": "S-44",
+     "want": "I want to see how often I had to step in, and where the trouble came from",
+     "so": "I can fix the stage that causes it",
+     "ac": [
+      "A tapped model shows times stepped in.",
+      "It shows where trouble came from, split into requirements, design and build."
+     ],
+     "notes": [],
+     "trace": "R1a; R1b; I 45-46; Gl \"Human intervention\", \"Root-cause stage\"; picture 09"
+    },
+    {
+     "id": "S-45",
+     "want": "I want to correct a root-cause stage when I approve retro lessons",
+     "so": "the record stays right",
+     "ac": [
+      "Approving a card's retro lessons lets Todd change its root-cause stage."
+     ],
+     "notes": [
+      "No screen is drawn for retro approval; open."
+     ],
+     "trace": "I 45-46; Gl \"Root-cause stage\""
+    },
+    {
+     "id": "S-46",
+     "want": "I want cost and tokens by role and model",
+     "so": "I see where the money goes",
+     "ac": [
+      "Decision support shows cost per card by role and model.",
+      "Tokens are split into cached, input and output."
+     ],
+     "notes": [
+      "Tokens are written into the spec, not drawn (0008)."
+     ],
+     "trace": "R1a; I 47, 53; 0008"
+    },
+    {
+     "id": "S-47",
+     "want": "I want compactions per round by role and model",
+     "so": "I see which models run out of room",
+     "ac": [
+      "Decision support shows compactions per round for each model in the selected role."
+     ],
+     "notes": [
+      "Written into the spec, not drawn (0008)."
+     ],
+     "trace": "I 56-58; 0008"
+    },
+    {
+     "id": "S-48",
+     "want": "I want each model's second-round rate",
+     "so": "I see how often work needs a second automatic round",
+     "ac": [
+      "Each model shows its second-round rate."
+     ],
+     "notes": [],
+     "trace": "R1b; I 63-64; pictures 09, 10"
+    },
+    {
+     "id": "S-49",
+     "want": "I want typical time per playbook step",
+     "so": "I see which steps are slow every time",
+     "ac": [
+      "Decision support shows typical time per step across cards, by role and model."
+     ],
+     "notes": [
+      "Written into the spec, not drawn (0008)."
+     ],
+     "trace": "I 79-80; 0008"
+    },
+    {
+     "id": "S-50",
+     "want": "I want the map view first",
+     "so": "I see cost against success at a glance",
+     "ac": [
+      "A Map / Ranked / Cards switch opens on Map.",
+      "Each model is a bubble: across is cost per card, up is success rate, size is cards run.",
+      "A \"cheap and reliable\" zone is marked."
+     ],
+     "notes": [
+      "Stray \"RK\" and overlapping bubbles are drawing flaws (C-13)."
+     ],
+     "trace": "D 55-57; 0006; picture 09"
+    },
+    {
+     "id": "S-51",
+     "want": "I want a ranked list of models",
+     "so": "I can read the order quickly",
+     "ac": [
+      "Ranked lists the role's models best first, with success rate, cost per card, cards run, times stepped in and second-round rate as small bars.",
+      "Tapping a model shows its cards."
+     ],
+     "notes": [
+      "Sits behind the switch; its top banner goes (C-14)."
+     ],
+     "trace": "D 55-57; 0006; picture 10"
+    },
+    {
+     "id": "S-52",
+     "want": "I want a list of finished cards I can sort and filter",
+     "so": "I can find the expensive or troubled ones",
+     "ac": [
+      "Cards lists finished cards, sortable by cost, time, rounds and times stepped in.",
+      "It filters by role and model.",
+      "Tapping a card opens its page."
+     ],
+     "notes": [
+      "Sits behind the switch (C-14); the one-line notes on picture 11 are inventions (C-15)."
+     ],
+     "trace": "R1b (\"Per card\"); I 65; 0006; picture 11"
+    },
+    {
+     "id": "S-53",
+     "want": "I want models with few cards marked",
+     "so": "I don't trust numbers from too few cards",
+     "ac": [
+      "A model with fewer than 10 cards shows a dashed bubble and \"too few cards to trust yet\"."
+     ],
+     "notes": [],
+     "trace": "D 57-61; 0006; picture 09"
+    },
+    {
+     "id": "S-54",
+     "want": "I want a suggestion from the dashboard",
+     "so": "it may point me at something I didn't think of",
+     "ac": [
+      "A \"Suggestion\" box shows one suggestion based on the numbers."
+     ],
+     "notes": [
+      "Named \"Suggestion\", not \"Todd's Recommendation\" (C-16)."
+     ],
+     "trace": "D 57-59; 0006; picture 09"
+    },
+    {
+     "id": "S-55",
+     "want": "I want to see the spread of cost per card",
+     "so": "the per-card limit can be set from real cards",
+     "ac": [
+      "The Cards view shows the spread of cost per card with the 75th percentile marked."
+     ],
+     "notes": [
+      "Written into the spec, not drawn (0008)."
+     ],
+     "trace": "I 95-97; E 25; 0008"
+    },
+    {
+     "id": "S-56",
+     "want": "I want one finished card's whole story on one page",
+     "so": "I understand what happened on that card",
+     "ac": [
+      "A summary shows cost, Start to merge, rounds and times stepped in.",
+      "Folding sections show: verdict per criterion per round (proven, not proven, wrong thing tested); cost and tokens by role and model; time per stage; times stepped in with cause; compactions.",
+      "Links open the Linear issue and the run record."
+     ],
+     "notes": [
+      "Verdicts per criterion come from the Shipping checker (0016)."
+     ],
+     "trace": "R1b; I 61-66; E 3-7; 0016; picture 07"
+    },
+    {
+     "id": "S-57",
+     "want": "I want to see where cards spend their time, split between the machine working and waiting on me",
+     "so": "I know whether to speed up the machine or my own answers",
+     "ac": [
+      "Decision support shows, across cards, the typical time spent in each stage from Start to merge.",
+      "Time waiting on me (for example UAT) is shown apart from time the machine is working."
+     ],
+     "notes": [
+      "Single-card version is on the card page (S-56). Written into the spec; no picture shows the across-cards view."
+     ],
+     "trace": "I 61-62"
+    },
+    {
+     "id": "S-58",
+     "want": "I want to see which kinds of acceptance criteria keep failing",
+     "so": "I fix how we write them",
+     "ac": [
+      "Decision support shows how often each verdict (proven, not proven, wrong thing tested) occurred across cards.",
+      "A criterion that failed shows which kind of criterion it was."
+     ],
+     "notes": [
+      "Needs verdicts recorded as data (B-05). No picture shows this view; where it sits is open."
+     ],
+     "trace": "I 63-64; Gl; 0016"
+    }
+   ]
+  }
+ ],
+ "rules": [
+  {
+   "id": "R-01",
+   "text": "Every screen works on phone and desktop equally, reached through Tailscale.",
+   "trace": "I 29-30; I 93, 99-100"
+  },
+  {
+   "id": "R-02",
+   "text": "Todd is the only user; there is no sign-in beyond Tailscale.",
+   "trace": "I 93-94, 98-99"
+  },
+  {
+   "id": "R-03",
+   "text": "Screens update live, without refreshing.",
+   "trace": "I 93, 100"
+  },
+  {
+   "id": "R-04",
+   "text": "Glance, don't read: status as pictures and charts, the most important thing where the eye lands first, plain words with no agent jargon, only what Todd needs with detail one tap away, each view fitting a phone screen.",
+   "trace": "I 102-112"
+  },
+  {
+   "id": "R-05",
+   "text": "The Mint & Iris look of picture 12 (light, mint, iris, amber for waiting on you, rose for stuck, Public Sans). Status is never shown by colour alone.",
+   "trace": "0005; D 24, 95-105; C-12"
+  },
+  {
+   "id": "R-06",
+   "text": "Labels and values are never cut off.",
+   "trace": "E 5-7; 0008"
+  },
+  {
+   "id": "R-07",
+   "text": "Button colour carries no meaning.",
+   "trace": "E 9; 0008"
+  },
+  {
+   "id": "R-08",
+   "text": "Every screen has an empty, a loading and a failed state (no cards; the dashboard can't reach the machine).",
+   "trace": "D 123; 0008"
+  },
+  {
+   "id": "R-09",
+   "text": "A picture counts only for what it was drawn to show; the frame Stitch drew around it is not built.",
+   "trace": "E 11, 17; 0008; C-01"
+  },
+  {
+   "id": "R-10",
+   "text": "On desktop, the board follows picture 01's look and column layout; every other screen is the phone layout, widened.",
+   "trace": "E 13, 25-27; 0008; C-02"
+  },
+  {
+   "id": "R-11",
+   "text": "Each screen is proven by Todd seeing it work on that screen.",
+   "trace": "P 19:42-19:43; main's plan (#366)"
+  },
+  {
+   "id": "R-12",
+   "text": "Several cards can run at once; the board shows all of them.",
+   "trace": "I 93-99; handoff 27 Oct afternoon (D1 read-back)"
+  },
+  {
+   "id": "R-13",
+   "text": "Decision support covers all cards, with no date or project filter.",
+   "trace": "I 93-99; handoff 27 Oct afternoon (D1 read-back)"
+  },
+  {
+   "id": "R-14",
+   "text": "Out of scope: editing a card's text (stays in Linear); showing raw traces on screen (only the link); the old dashboard, its mockup and Julia's DESIGN.md as a starting point.",
+   "trace": "I 93-99; handoff 27 Oct afternoon (D1 read-back)"
+  }
+ ],
+ "build": [
+  {
+   "id": "B-01",
+   "text": "The part that starts, watches and stops builds (nothing exists on main since 26 Oct). The runner is a Mastra workflow (Todd, 27 Oct).",
+   "needed": "S-17, S-21, S-30, S-31",
+   "trace": "0009"
+  },
+  {
+   "id": "B-02",
+   "text": "Save the choices made at every Start, so the next Start can reuse them.",
+   "needed": "S-21, S-23",
+   "trace": "I 7; 0007"
+  },
+  {
+   "id": "B-03",
+   "text": "Record each request with its pstack role (today only the stock agent type and model are recorded).",
+   "needed": "S-42 to S-49",
+   "trace": "E 19 (F-01)"
+  },
+  {
+   "id": "B-04",
+   "text": "Record each stop's cause and root-cause stage as data (today only time and question).",
+   "needed": "S-18, S-44",
+   "trace": "E 19 (F-03); ADR 0024"
+  },
+  {
+   "id": "B-05",
+   "text": "Record verdicts and send-backs as data, not only as prose in Linear.",
+   "needed": "S-44, S-48, S-56",
+   "trace": "PL; I 45"
+  },
+  {
+   "id": "B-06",
+   "text": "Record when a card's retro is complete, then delete its trace.",
+   "needed": "S-16",
+   "trace": "I 67-75; 0004 (F-02)"
+  },
+  {
+   "id": "B-07",
+   "text": "The runner (a Mastra workflow) that starts and watches builds also monitors each agent and records its context fill and compactions, where the dashboard can read them (Todd, 27 Oct).",
+   "needed": "S-15, S-47",
+   "trace": "E 19 (F-04)"
+  },
+  {
+   "id": "B-08",
+   "text": "Route Todd's answer to the running build.",
+   "needed": "S-39",
+   "trace": "E 25 (F-05)"
+  },
+  {
+   "id": "B-09",
+   "text": "Prove effort reaches every helper (Mastra Code sets it per session).",
+   "needed": "S-23",
+   "trace": "I 17 (F-06)"
+  },
+  {
+   "id": "B-10",
+   "text": "Keep the model list from Todd's three accounts, priced from the current price (free only while it actually costs nothing), refreshing itself; look up missing prices.",
+   "needed": "S-24, S-28",
+   "trace": "I 75-77; 0015 (F-07)"
+  },
+  {
+   "id": "B-11",
+   "text": "Run pstack's Shipping around UAT: the checker reports each \"done means\" line, then preview and smoke test, then UAT, then Shipping lands it after Todd's yes.",
+   "needed": "S-34, S-56",
+   "trace": "0016"
+  },
+  {
+   "id": "B-12",
+   "text": "The automatic smoke test against the preview (deferred in main's plan; goes through the front door as its own work).",
+   "needed": "B-11",
+   "trace": "I 8-9; 0016"
+  },
+  {
+   "id": "B-13",
+   "text": "Per-card limit: a setting for its value, a check while a card runs, and the notification and Needs you item when the card passes it.",
+   "needed": "S-14, S-59",
+   "trace": "P 22:58-22:59"
+  }
+ ],
+ "comments": [
+  {
+   "id": "C-01",
+   "text": "Each picture counts only for what it was drawn to show; the frame Stitch drew (header, bell, profile icon, bottom menu, \"Live sync\", a second Needs-you bar) is not built.",
+   "trace": "E 11, 17; 0008"
+  },
+  {
+   "id": "C-02",
+   "text": "The desktop board follows picture 01 for its look and column layout only; the other screens are the phone layout widened, judged on content and look.",
+   "trace": "E 13, 25\u201327; 0008"
+  },
+  {
+   "id": "C-03",
+   "text": "Spec lines built without a picture are judged on content and plain words, so a first version may look plainer than the drawn parts.",
+   "trace": "E 27"
+  },
+  {
+   "id": "C-04",
+   "text": "\"PULSE\" on the expanded running card is jargon; use plain words.",
+   "trace": "D 35"
+  },
+  {
+   "id": "C-05",
+   "text": "The \"Step 4 of 8\" bar on picture 03 is replaced by the checklist on picture 04.",
+   "trace": "E 21\u201323"
+  },
+  {
+   "id": "C-06",
+   "text": "\"Linear notification sent\" is not repeated on each Needs-you row; every item sends one.",
+   "trace": "E 9"
+  },
+  {
+   "id": "C-07",
+   "text": "The Needs-you title reads \"Needs you (6)\", with the count.",
+   "trace": "E 9"
+  },
+  {
+   "id": "C-08",
+   "text": "On the Start screen, Main session appears only at the top, not inside a group.",
+   "trace": "D 71"
+  },
+  {
+   "id": "C-09",
+   "text": "Role explanations show only when the \u24d8 is tapped, as a small popup.",
+   "trace": "D 79\u201381"
+  },
+  {
+   "id": "C-10",
+   "text": "No cost estimates, no \"Capped at\", no Slack, and pstack's real role names only (all were Stitch inventions).",
+   "trace": "D 65, 69, 71, 79"
+  },
+  {
+   "id": "C-11",
+   "text": "Judgment's \"$$$$\" for GPT-6 Sol is a drawing error; prices come from the real model list.",
+   "trace": "D 119"
+  },
+  {
+   "id": "C-12",
+   "text": "The design-system card (picture 12) is the colour reference; a later copy in Stitch drifted darker.",
+   "trace": "D 115, 119"
+  },
+  {
+   "id": "C-13",
+   "text": "On the Decision support map, the stray \"RK\" and the overlapping Sol and Opus bubbles are drawing flaws.",
+   "trace": "D 61"
+  },
+  {
+   "id": "C-14",
+   "text": "Ranked and Cards were drawn before the switch existed: both sit behind the Map / Ranked / Cards switch, without their top banners.",
+   "trace": "D 59, 123"
+  },
+  {
+   "id": "C-15",
+   "text": "The one-line notes on each finished card (Cards view) are Stitch's invention.",
+   "trace": "D 53"
+  },
+  {
+   "id": "C-16",
+   "text": "\"Todd's Recommendation\" is renamed \"Suggestion\": it is the dashboard's idea, not Todd's.",
+   "trace": "D 59"
+  }
+ ]
+}

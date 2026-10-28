@@ -1,0 +1,368 @@
+{
+ "controls": [
+  {
+   "n": 1,
+   "x": -1,
+   "y": 50,
+   "name": "Header: logo, \"Factory Board\", bell, profile icon",
+   "what": "A name bar with a logo, a notification bell and a profile icon.",
+   "from": "Drawn by Stitch as part of its frame. Not built (decision 0008).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 2,
+   "x": -1,
+   "y": 157,
+   "name": "Second \"Needs you (6)\" bar with \"4 blocking release\" and Review",
+   "what": "A warning bar across the top of the screen.",
+   "from": "Drawn by Stitch. Not built (decision 0008). The real Needs you strip is on the board.",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 3,
+   "x": -1,
+   "y": 233,
+   "name": "Back arrow: not built",
+   "what": "An arrow back to the board. Not built: the card expands in place on the board (decision 0005), so there is nothing to go back from.",
+   "from": "Drawn by Stitch as part of its frame.",
+   "status": "frame",
+   "stories": [
+    "S-06"
+   ],
+   "notes": [
+    "Closed (Todd, 27 Oct): tapping the card row opens it in place; the same row, with its arrow now pointing up, folds it."
+   ]
+  },
+  {
+   "n": 4,
+   "x": -1,
+   "y": 275,
+   "name": "\"Live sync\" dot",
+   "what": "A blue dot and the words Live sync, showing the screen updates by itself.",
+   "from": "Drawn by Stitch. Not built; updating live is rule R-03.",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 5,
+   "x": -1,
+   "y": 335,
+   "name": "Card title: \"New machine: retry and pause\"",
+   "what": "The title of the running card, wrapping onto two lines rather than being cut off.",
+   "from": "The Linear issue's title.",
+   "status": "ok",
+   "stories": [
+    "S-03",
+    "S-06"
+   ],
+   "notes": [
+    "Labels are never cut off (rule R-06)."
+   ]
+  },
+  {
+   "n": 6,
+   "x": -1,
+   "y": 378,
+   "name": "\"Running\" pill",
+   "what": "A label with a dot and the word Running.",
+   "from": "Whether the build is active, from the build machine.",
+   "status": "build",
+   "stories": [
+    "S-06",
+    "S-10"
+   ],
+   "notes": [
+    "Changes to Stuck or Waiting on you (G5)."
+   ]
+  },
+  {
+   "n": 7,
+   "x": -1,
+   "y": 425,
+   "name": "\"Doing now: writing the code \u00b7 active 40 s ago\"",
+   "what": "One line saying what the build is doing and how long ago it last did anything.",
+   "from": "What it is doing: the checklist step marked working. How long ago: the time of the build's last activity, from the build machine.",
+   "status": "build",
+   "stories": [
+    "S-10",
+    "S-08"
+   ],
+   "notes": [
+    "Where the sentence comes from is settled in G3."
+   ]
+  },
+  {
+   "n": 8,
+   "x": -1,
+   "y": 498,
+   "name": "\"12 min elapsed\"",
+   "what": "How long the build has been running since Start was pressed. Counts up.",
+   "from": "The time Start was pressed, from the build machine (B-01).",
+   "status": "build",
+   "stories": [
+    "S-13"
+   ],
+   "notes": []
+  },
+  {
+   "n": 9,
+   "x": -1,
+   "y": 520,
+   "name": "\"$0.84 spent\"",
+   "what": "What the build has cost so far, updating live.",
+   "from": "Mastra Code's tracing records cost per request and model. The dashboard's builds must make it available.",
+   "status": "build",
+   "stories": [
+    "S-14",
+    "S-59"
+   ],
+   "notes": [
+    "Once a limit is set it reads \"$0.84 of $3.00\" and gains an amber mark past the limit; going past it asks Todd (G2, S-59). Money never stops a card by itself."
+   ]
+  },
+  {
+   "n": 10,
+   "x": -1,
+   "y": 545,
+   "name": "\"Context 41% full\"",
+   "what": "How full the agents' memory is.",
+   "from": "The runner that starts and watches builds monitors each agent and records its context fill (B-07).",
+   "status": "build",
+   "stories": [
+    "S-15"
+   ],
+   "notes": [
+    "Which agent this number is for is settled in G4."
+   ]
+  },
+  {
+   "n": 11,
+   "x": -1,
+   "y": 611,
+   "name": "\"Checklist\" heading",
+   "what": "The title of the list of steps.",
+   "from": "Fixed text.",
+   "status": "ok",
+   "stories": [
+    "S-11"
+   ],
+   "notes": []
+  },
+  {
+   "n": 12,
+   "x": -1,
+   "y": 690,
+   "name": "Done step: tick, name, time, \"Done\"",
+   "what": "A finished step with a green tick, how long it took, and the word Done. Three are drawn.",
+   "from": "The playbook's checklist, which the build writes at the start and ticks off as it goes. The time is the step's start and finish.",
+   "status": "build",
+   "stories": [
+    "S-11",
+    "S-12"
+   ],
+   "notes": [
+    "Step names come from the playbook (G8)."
+   ]
+  },
+  {
+   "n": 13,
+   "x": -1,
+   "y": 889,
+   "name": "Working step: spinner, name, \"6 min so far\"",
+   "what": "The step being done now, highlighted, with a spinner and its time counting up.",
+   "from": "The checklist step currently marked working.",
+   "status": "build",
+   "stories": [
+    "S-11",
+    "S-12",
+    "S-10"
+   ],
+   "notes": []
+  },
+  {
+   "n": 14,
+   "x": -1,
+   "y": 962,
+   "name": "To-go step: empty circle, name, \"To go\"",
+   "what": "A step not started yet. Two are drawn.",
+   "from": "The checklist.",
+   "status": "build",
+   "stories": [
+    "S-11"
+   ],
+   "notes": []
+  },
+  {
+   "n": 15,
+   "x": -1,
+   "y": 1092,
+   "name": "Skipped step: crossed-out name, \"Skipped\"",
+   "what": "A step the build chose to skip, struck through with a no-entry icon and the word Skipped.",
+   "from": "The checklist: the build marks a step skipped and gives a reason.",
+   "status": "build",
+   "stories": [
+    "S-11"
+   ],
+   "notes": [
+    "A finished build that skipped steps must not look unfinished."
+   ]
+  },
+  {
+   "n": 16,
+   "x": -1,
+   "y": 1140,
+   "name": "\"why?\" button",
+   "what": "Shows the reason the step was skipped.",
+   "from": "The reason the build wrote when it skipped the step.",
+   "status": "build",
+   "stories": [
+    "S-11"
+   ],
+   "notes": [
+    "Where the reason appears is settled in G6."
+   ]
+  },
+  {
+   "n": 17,
+   "x": -1,
+   "y": 1258,
+   "name": "\"2 agents inside: Main session \u00b7 Coder\"",
+   "what": "The agents working on this card, with a small icon for each.",
+   "from": "The build machine and Mastra Code: which agents (roles) are active on the card.",
+   "status": "build",
+   "stories": [
+    "S-03",
+    "S-15"
+   ],
+   "notes": [
+    "One line per agent with its context fill and compactions, and the card's handoffs, are not drawn (G4, decision 0008)."
+   ]
+  },
+  {
+   "n": 18,
+   "x": -1,
+   "y": 1330,
+   "name": "\"Linear issue\" link",
+   "what": "Opens the card's issue in Linear.",
+   "from": "The Linear issue's URL.",
+   "status": "ok",
+   "stories": [
+    "S-16"
+   ],
+   "notes": []
+  },
+  {
+   "n": 19,
+   "x": -1,
+   "y": 1373,
+   "name": "\"Run record\" link",
+   "what": "Opens the record of what the build did (its trace).",
+   "from": "Mastra Code's trace for this card. Deleted once the card's retro is complete (decision 0004), so it works while a card runs.",
+   "status": "build",
+   "stories": [
+    "S-16"
+   ],
+   "notes": []
+  },
+  {
+   "n": 20,
+   "x": -1,
+   "y": 1363,
+   "name": "Stop button",
+   "what": "Ends the build. The work stays on its branch and the card stays in its column.",
+   "from": "The part that starts, watches and stops builds, which doesn't exist yet (B-01).",
+   "status": "build",
+   "stories": [
+    "S-17"
+   ],
+   "notes": [
+    "Rose, which is also the colour of Stuck; confirmation and colour are settled in G7."
+   ]
+  },
+  {
+   "n": 21,
+   "x": -1,
+   "y": 1545,
+   "name": "Bottom menu: Board, Inbox, Pipelines, Insights",
+   "what": "A row of four tabs.",
+   "from": "Drawn by Stitch. Not built (decision 0008).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  }
+ ],
+ "gaps": [
+  {
+   "id": "G1",
+   "stories": [
+    "S-06"
+   ],
+   "text": "Is this its own screen or the card expanded on the board? The back arrow and header suggest its own screen; decision 0005 says the card expands in place.",
+   "res": "Closed (Todd, 27 Oct): the card expands in place on the board. The back arrow and header are not built. The title row opens it, and the same row with its arrow pointing up folds it."
+  },
+  {
+   "id": "G2",
+   "stories": [
+    "S-14",
+    "S-59"
+   ],
+   "text": "How cost shows against the per-card limit once one is set. No limit exists now.",
+   "res": "Closed (Todd, 27 Oct): no limit yet, so it shows \"$0.84 spent\". Once a limit is set it reads \"$0.84 of $3.00\". Past the limit the card gets an amber mark, Todd gets a notification and a Needs you item (keep going or stop), and the build keeps running until he answers. Money never stops a card by itself."
+  },
+  {
+   "id": "G3",
+   "stories": [
+    "S-10"
+   ],
+   "text": "Where the \"Doing now\" sentence comes from.",
+   "res": "Proposed: the name of the checklist step marked working, so the line and the checklist never disagree, plus the time since the build's last activity."
+  },
+  {
+   "id": "G4",
+   "stories": [
+    "S-15"
+   ],
+   "text": "The picture shows one context number (41%), but story S-15 says each agent. Agent lines, compactions and handoffs aren't drawn.",
+   "res": "Proposed: the summary shows the fullest agent's fill. Each agent has its own line with its fill and compactions, and the card shows its handoffs. Decision 0008 already puts these in the spec."
+  },
+  {
+   "id": "G5",
+   "stories": [
+    "S-08",
+    "S-09",
+    "S-39"
+   ],
+   "text": "How this card looks when it is stuck or waiting for Todd's answer.",
+   "res": "Proposed: Stuck: rose pulsing pill and icon, and \"Doing now\" says \"No activity for 7 min\". Waiting on you: steady amber pill, the question shown, and an Answer box that sends the answer to the build."
+  },
+  {
+   "id": "G6",
+   "stories": [
+    "S-11"
+   ],
+   "text": "Where the \"why?\" reason appears.",
+   "res": "Proposed: tapping why? opens the reason in a line under the step; tapping again closes it."
+  },
+  {
+   "id": "G7",
+   "stories": [
+    "S-17"
+   ],
+   "text": "Stop is rose, the colour of Stuck, and one tap ends the build.",
+   "res": "Proposed: Stop has a neutral colour with its icon and word (button colour carries no meaning, rule R-07), and asks \"Stop this build? The work is kept.\" before ending it."
+  },
+  {
+   "id": "G8",
+   "stories": [
+    "S-11"
+   ],
+   "text": "The picture's step names are plain words (\"Check it works where Todd uses it\"). The playbook's own step names are not necessarily that.",
+   "res": "Proposed: show the playbook's own step text; where it is jargon, the playbook gets a plain-word label for that step. Todd to confirm."
+  }
+ ]
+}
