@@ -49,9 +49,9 @@ Working document. Each line is a decision Todd agreed in conversation.
 - Structural fix: CI fails if two installed skills share a name. The separate pstack folder is cut (24 Oct).
 
 ## Card shape (Todd, 24 Oct)
-- A card is a short Outcome of one or two sentences plus at most five acceptance criteria describing what Todd sees.
+- A card is a short Outcome of one or two sentences plus the acceptance criteria describing what Todd sees, as many as the card needs; pstack slices a large card when it plans the build (Todd, 28 Oct; the five-criteria limit is lifted).
 - Requirements, Contracts, Proof and Out of scope sections are retired. A constraint that matters to Todd, including how something must be proven, is written as a criterion.
-- Start's admission check accepts that shape and refuses the retired sections. `scripts/check-agent-brief.mjs` refuses more than five criteria. Triage writes that shape.
+- Triage writes that shape. (Start's admission check was removed with the old machine on 26 Oct.)
 
 ## Evidence check (12:09–12:12, revised 24 Oct)
 - **Is the evidence there:** **dropped** (Todd, 24 Oct). No evidence index. The reviewer reads the proof folder for the exact candidate commit; a missing or thin proof folder is a failed criterion, not a separate gate. The "evidence is there" card is dropped.
