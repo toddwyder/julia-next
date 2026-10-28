@@ -1,20 +1,21 @@
 # JUL-276 Start screen plan
 
-Todd opens the dashboard on the server, sees his Ready cards, opens one, picks models and effort, presses Start, watches the build run, and stops it if he wants. Work lands as seven small PRs, each proven on the screen he uses. The program enforces one rule, every PR shows on a screen or Todd approves the exception in writing.
+Todd opens the dashboard on the server, sees his Ready cards, opens one, picks models and effort, presses Start, watches the build run, and stops it if he wants. Work lands as nine small PRs, each proven on the screen he uses. The dashboard is its own app in its own folder, run as a service, never part of Julia's Vercel app (decision 0022).
 
-- PR-1 dashboard page you can open, Ready cards on it
-- PR-2 Start screen read only, matching picture 08
-- PR-3 model, group, panel and effort controls that change things
-- PR-4 start with last settings
-- PR-5 spike, no screen, effort reaches every helper
-- PR-6 start and stop a real build
-- PR-7 did not start, try again, finish ping, several builds at once
+- PR-1 the dashboard app folder, with Ready cards on one page
+- PR-2 run it as a service, updating itself from main between builds
+- PR-3 the weekly model sweep, and the Start screen read only
+- PR-4 model, group, panel and effort controls that change things
+- PR-5 start with last settings
+- PR-6 spike, no screen, effort reaches every helper and cost recording lands
+- PR-7 start and stop a real build
+- PR-8 did not start, try again, finish ping, several builds at once. PR-9 Sentry and Axiom in its own project and dataset.
 
 ## How to read this
 
 One box is one unit of work and every box names the evidence that checks it. A nested box is a sub-step of the box above it. Check a box only when its evidence exists, a file, a log line, a screenshot, a test run or a SHA. The body is a how-to, the appendices explain and record.
 
-The program runs `playbooks/autopilot-full.md` from `.agents/skills/poteto-mode`. Each PR has one owner who carries it from build to merge. Todd's yes is a gate on PR-1, PR-2, PR-3, PR-4, PR-6 and PR-7, because each one changes something he uses. PR-5 has no screen and needs his explicit approval before it starts.
+The program runs `playbooks/autopilot-full.md` from `.agents/skills/poteto-mode`. Each PR has one owner who carries it from build to merge. Todd's yes is a gate on every PR that changes a screen, which is all of them except PR-6. PR-6 has no screen and needs his explicit approval before it starts, which he gave on 28 October 2026.
 
 Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -23,7 +24,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 ### Arm the program
 
 - [ ] State this plan to Todd and stop. Start only on his explicit go.
-- [ ] Read these from trunk at program start and again at every tick.
+- [ ] Read these from trunk at program start and again at every checkpoint.
   - [ ] `git show origin/main:.agents/skills/poteto-mode/playbooks/autopilot-full.md`
   - [ ] `git show origin/main:.agents/skills/poteto-mode/playbooks/multi-phase-plan.md`
   - [ ] `git show origin/main:.agents/skills/swarm/SKILL.md`
@@ -32,32 +33,35 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
   - [ ] `git show origin/main:.agents/skills/poteto-mode/playbooks/shipping.md`
   - [ ] `git show origin/main:docs/plans/path-forward.md`
   - [ ] `git show origin/main:CODING_STANDARDS.md`
-- [ ] On Todd's go, arm the audit tick as `/loop 1h`. Never leave the cadence to memory.
-- [ ] Use this tick prompt, verbatim. "Re-read the execution playbook from trunk. Audit the operation against it and fix drift in this tick. Probe every active lane and judge progress by side effects only. Stand down a stuck lane and dispatch its replacement now. Then post a short status message to Todd in chat only when the audit found a tracked change that no earlier status message reported, such as a PR opened, a code-ready head, a round launched or closed, a verdict, a merge, a stuck agent and the action taken, a blocker added or cleared, or a decision only he can make. Name every such change and nothing else. Do not repeat a table, the merged list, or an unchanged blocker. If the audit found none, end the turn with no reply text. Either way, log this tick's row in the decision trail. The row names the items reported, or none."
+- [ ] Retire the hourly tick. The `/loop 1h` cadence the playbook names does not exist in Mastra Code, which has no timer, so audit at each PR checkpoint instead. The checkpoints are PR opened, verdict given, and merge.
+- [ ] At each checkpoint, audit the operation against the playbook and fix drift on the spot. Probe every active lane and judge progress by side effects only. Stand down a stuck lane and dispatch its replacement at once.
+- [ ] Post a short status message to Todd at a checkpoint only when it found a change that no earlier message reported, such as a PR opened, a code-ready head, a verdict, a merge, a stuck lane and the action taken, a blocker added or cleared, or a decision only he can make. Name every such change and nothing else. If the audit found none, post nothing.
 - [ ] On Todd's hold or stand-down, send every owner a zero-writes order at once.
-- [ ] Ask Todd these three things now, in one message, and keep building nothing that needs the answer.
-  - [ ] Approve PR-5 as an exception, it ships no screen because it proves a machine fact.
-  - [ ] Create two practice cards in Ready, each asking for a docs-only change, so the first real build is harmless.
-  - [ ] Accept that a model with no published price shows "No published price" instead of a number, because CommandCode's DeepSeek V4.1 Flash has no listed price.
+- [ ] Ask Todd for one thing at arm, and keep building while it is pending. Create a Sentry project named `julia-dashboard` and an Axiom dataset named `julia-dashboard`, then add their values to `scripts/julia-agents.env` as `DASHBOARD_SENTRY_DSN`, `DASHBOARD_AXIOM_TOKEN` and `DASHBOARD_AXIOM_DATASET`. The current values cannot do it, proven by probe, Sentry access is `project:releases, event:read, org:read` and Axiom answers `403 token does not have access to resource: datasets with action: create`. Only PR-9 waits on this.
+- [ ] Create the two practice cards yourself, in the Dashboard project, titled `Practice: ...`, each a docs-only change, and cancel them when JUL-276 is complete. Todd approved this on 28 October 2026.
+- [ ] Create the standing issue `Dashboard service` in the Dashboard project, keep it open, and use it as the target for the dashboard-down ping from PR-2.
+- [ ] Create two git worktrees of `main` on the server for the program, one under `/home/ubuntu/julia-dashboard` as the deployed dashboard and one under `/home/ubuntu/verifications/jul-276` as the lane sandbox. Record both paths in the decision trail.
 
 ### Spawn owners
 
 - [ ] Spawn one owner per PR with the lifecycle `autopilot-full` names. Owners branch from `main`, never stacked.
 - [ ] Follow this dependency graph. Start a child only after its parent merges.
-  - [ ] PR-1 and PR-5 are independent and first. PR-1 needs no card and no settings, PR-5 needs no screen.
+  - [ ] PR-1 and PR-6 are independent and first. PR-1 needs no settings, PR-6 needs no screen.
   - [ ] PR-2 after PR-1.
   - [ ] PR-3 after PR-2.
   - [ ] PR-4 after PR-3.
-  - [ ] PR-6 after PR-4.
-  - [ ] PR-7 after PR-6.
-- [ ] Hold the file boundaries. PR-1 and PR-2 touch only `app/dashboard/**`, `lib/dashboard/**`, `docs/design/dashboard/**`, `docs/adr/**`, `scripts/linear-cli.mjs`, `.agents/skills/verify-julia/tests/dashboard*.spec.mjs`. PR-3 and PR-4 add only `lib/dashboard/start-*.js` and the Start screen files. PR-5 touches only `scripts/**` and `docs/research/**`. PR-6 and PR-7 add only `lib/dashboard/run*.js`, `app/api/dashboard/**`, `instrumentation.js` and `dashboard/kickoff.md`.
-- [ ] Hold the review gate. PR-1, PR-2, PR-3, PR-4, PR-6 and PR-7 change an interaction. They wait for Todd's review in chat with screenshots and a video before merge.
+  - [ ] PR-5 after PR-4.
+  - [ ] PR-7 after PR-5 and PR-6.
+  - [ ] PR-8 after PR-7.
+  - [ ] PR-9 after PR-8 and after Todd's telemetry setup lands.
+- [ ] Hold the file boundaries. PR-1 owns `dashboard/app/**`, `dashboard/lib/linear.js`, `dashboard/docs/**`, `dashboard/tests/**`, `dashboard/playwright.config.mjs`, `dashboard/package.json`, `dashboard/package-lock.json` and the reading commands in `scripts/linear-cli.mjs`. PR-2 owns `dashboard/ops/julia-dashboard*.{service,timer}`, `dashboard/scripts/install-service.mjs`, `dashboard/scripts/update.mjs`, `dashboard/scripts/watchdog.mjs`, `dashboard/lib/ping.js`, `dashboard/app/api/health/**` and `docs/agents/server-runbook.md`. PR-3 owns `dashboard/scripts/sweep.mjs`, `dashboard/lib/models.js`, `dashboard/config/**`, `dashboard/ops/julia-dashboard-sweep.*` and `dashboard/app/start/**`. PR-4 and PR-5 own `dashboard/app/start/**` and `dashboard/lib/{roles,last-start}.js` plus `dashboard/config/roles.json`. PR-6 owns `dashboard/worker/**`, `dashboard/scripts/effort-probe.mjs` and `dashboard/scripts/effort-report.mjs`. PR-7 and PR-8 own `dashboard/lib/{runs,supervisor}.js`, `dashboard/app/api/**`, `dashboard/kickoff.md` and the writing commands in `scripts/linear-cli.mjs`. PR-9 owns `dashboard/lib/telemetry.js`, `dashboard/lib/ping.js`, `dashboard/instrumentation.js`, `dashboard/app/telemetry-report/**`, `dashboard/docs/telemetry.md` and `scripts/julia-agents.env`.
+- [ ] Hold the review gate. Every PR except PR-6 changes a screen. Those wait for Todd's review in chat with screenshots and a video before merge.
 
 ### PR mechanics, for every PR
 
 - [ ] Resolve the forge once. Default to `gh`, and use `origin pr` instead if `command -v origin` succeeds and Origin resolves this repository. Record any fallback.
 - [ ] Open the PR ready, never draft, base `main`.
-- [ ] Run `npm run build`, `npm run lint:framework` and `node scripts/test-owners.mjs --run local` once before the PR-facing push. Push with hooks on.
+- [ ] Run `npm ci` in `dashboard/`, then `npm run build`, `npm run lint` and `npm test` in `dashboard/`, then `node scripts/test-owners.mjs --run local` from the repo root, once before the PR-facing push. Push with hooks on.
 - [ ] Run `/deslop` before each commit and `/no-comments` before review.
 - [ ] Triage every Bugbot and security-reviewer comment per `../references/bugbot-triage.md`.
 - [ ] Rebase onto current trunk before the code-ready report and babysit. Rebase again only at merge prep, on a `git merge-tree` conflict, or on a CI failure that comes from trunk.
@@ -67,549 +71,523 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 - [ ] A full swarm runs once at the code-ready head, per `.agents/skills/swarm/SKILL.md`, one gates lane, the ten live lanes below, the perf lane, and two audit lanes that distrust the PR body.
 - [ ] Clean only when every lane is PASS. Send findings back to the owner, including defects a lane filed as a note.
-- [ ] Todd's yes on the screen is required before merge for PR-1, PR-2, PR-3, PR-4, PR-6 and PR-7. PR-5 merges on the gates plus his approval of the exception.
+- [ ] Todd's yes on the screen is required before merge for every PR except PR-6. PR-6 merges on the gates plus his approval of the exception.
 - [ ] The owner merges its own PR, then confirms main CI is green on the merge commit and records that commit on the card.
 
 ### Boot recipe, for every live lane
 
-Each lane runs in its own worktree on this server at the PR head, driven through `.agents/skills/verify-julia/SKILL.md`. There is no cloud VM in this repo and no `control-ui` skill installed, so `verify-julia` is the control skill.
+Each lane runs on this server at the PR head, in a throwaway git worktree under `/home/ubuntu/verifications/jul-276/pr-N`, driven by Playwright against that lane's own app. There is no cloud VM. PR-6 has no screen, so its lanes open the static report file the probe writes into the same worktree.
 
-- [ ] `git worktree add /home/ubuntu/verifications/jul-276-<pr>-<lane> <head SHA>` and `npm ci` in it.
-- [ ] Start with `DASHBOARD_MACHINE=0 npm run build && DASHBOARD_MACHINE=0 npm run start -- --port <3100 + lane>`. Wait for the ready line, then load `http://127.0.0.1:<port>/dashboard`.
-- [ ] Deliver input only through the named Playwright browser session. Name the read-only diagnostics when a lane needs them, `curl -s -o /dev/null -w '%{http_code}'` and `node scripts/julia-agents.mjs -- node scripts/linear-cli.mjs get-issue <ID>`.
-- [ ] Save every screenshot to `docs/scorecards/jul-276/pr-<n>/<slug>.png` and return the paths with the report.
-- [ ] Remove the worktree after the lane reports, per `playbooks/worktree-cleanup.md`.
+- [ ] Create the lane worktree from the PR head, run `npm ci` in `dashboard/`, then `npm run build`.
+- [ ] Start the app on port `3100 + N` bound to `127.0.0.1`, with `DASHBOARD_STATE_DIR` pointed at a fresh per-lane folder under `/tmp/jul-276-lanes/pr-N`.
+- [ ] Seed the lane's state from fixtures, never from production state, and never point a lane at the live state folder.
+- [ ] Open one browser context at 390 by 844 for phone and one at 1280 by 800 for desktop, then follow the lane's steps exactly.
+- [ ] Save the screenshot the lane names. A lane fails when its screenshot is missing, when the predicate is unmet, or when the browser console logs an error.
+- [ ] Stop the app and release the port at the end of the lane.
 
-## Build the dashboard page you can open (PR-1)
+## PR-1 The dashboard app folder, with Ready cards on one page
 
-**Depends on.** None.
-
-**Files.**
-
-- [ ] Create `app/dashboard/layout.jsx`, the Mint and Iris tokens, Public Sans, and the gate that answers 404 unless `DASHBOARD_MACHINE=1`.
-- [ ] Create `app/dashboard/page.jsx`, the Ready card list as a server component.
-- [ ] Create `app/dashboard/dashboard.module.css`.
-- [ ] Create `lib/dashboard/cards.js`, which asks Linear for Ready cards and maps them to `{id, title, url}`.
-- [ ] Create `lib/dashboard/cards.test.mjs`.
-- [ ] Edit `scripts/linear-cli.mjs`, adding `listReady(opts)` and a `list-ready` command that prints JSON.
-- [ ] Create `scripts/linear-cli.test.mjs`, covering `listReady` and `setState` argument building against a stubbed `fetchImpl`.
-- [ ] Create `docs/adr/0026-dashboard-runs-on-the-server.md`, recording that the dashboard is a route in this Next app, served by `next start` on the server, reached over Tailscale, gated by `DASHBOARD_MACHINE`, and that its runner is in-process so one unit serves it.
-- [ ] Copy `08-phone-start-screen.png` and `12-design-system-mint-iris.png` from `origin/pilot/dashboard-d2` into `docs/design/dashboard/`.
-- [ ] Create `.agents/skills/verify-julia/tests/dashboard.spec.mjs` with the Ready list, empty and gate cases.
-
-**Build.**
-
-- [ ] `readReadyCards()` in `lib/dashboard/cards.js` runs `node scripts/julia-agents.mjs -- node scripts/linear-cli.mjs list-ready` with a 10 second timeout and returns cards sorted by identifier.
-- [ ] `listReady()` in `scripts/linear-cli.mjs` queries the Julia-next team for issues in the state whose name is Ready, page size 50, and returns identifier, title, url and state.
-- [ ] `app/dashboard/layout.jsx` exports `dynamic = 'force-dynamic'`, sets `colorScheme` light, loads Public Sans through `next/font/google`, and calls `notFound()` when `process.env.DASHBOARD_MACHINE !== '1'`.
-- [ ] `page.jsx` renders one row per Ready card with its identifier and title, no Start button yet, and the three states below.
-- [ ] Empty state shows one plain line, "Nothing is ready. Cards land here when they are settled."
-- [ ] Loading state comes from `app/dashboard/loading.jsx`, a skeleton of three rows.
-- [ ] Failed state renders when the Linear read throws, with the line "The dashboard cannot reach Linear." and nothing else.
-- [ ] `DASHBOARD_SIMULATE_FAILURE=linear` makes the read throw, so the failed state is provable and demoable.
-- [ ] Tokens live in `dashboard.module.css` as custom properties, mint `#10B981`, iris `#6366F1`, amber `#F59E0B`, slate `#64748B`, rose sampled from picture 12, and every status also carries a word.
-
-**You see.**
-
-- [ ] `http://<tailscale-host>:3000/dashboard` lists only Ready cards, each with its identifier and title.
-- [ ] With `DASHBOARD_MACHINE=0` the route answers 404 and no card data appears.
-- [ ] With `DASHBOARD_SIMULATE_FAILURE=linear` the page shows the reach failure line and no rows.
-
-**Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
-
-- [ ] `lib/dashboard/cards.test.mjs` proves the ready filter keeps only state Ready, that ordering is by identifier, and that a command failure throws a typed error. Run `node --test lib/dashboard/cards.test.mjs`.
-- [ ] `scripts/linear-cli.test.mjs` proves `listReady` sends one query with the Ready state name and `setState` resolves a state id before updating. Run `node --test scripts/linear-cli.test.mjs`.
-- [ ] CI discovers both files, `node scripts/test-owners.mjs --plan` lists them under the root owner.
-
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one worktree each, driven through `verify-julia`.
-
-- [ ] Lane 1. Regression lane against trunk. Open `/dashboard` at trunk and at head. Trunk answers 404, record that. Save `lane-1-trunk-404.png`. Pass when trunk is 404 or has no route and the head lists Ready cards.
-- [ ] Lane 2. A Ready card appears once with its identifier and title and nothing else. Save `lane-2-ready-row.png`. Pass when the row count equals the number of Ready cards and no non-Ready card appears.
-- [ ] Lane 3. A card moved out of Ready in Linear disappears from the page on reload. Save `lane-3-left-ready.png`. Pass when the row count drops by one and the identifier is gone.
-- [ ] Lane 4. Empty state, proven on a worktree pointed at a Linear stub with zero Ready cards. Save `lane-4-empty.png`. Pass when the single empty line shows and no row renders.
-- [ ] Lane 5. Failed state through `DASHBOARD_SIMULATE_FAILURE=linear`. Save `lane-5-failed.png`. Pass when the reach line shows, no row renders, and the page does not crash.
-- [ ] Lane 6. Loading state on a throttled load. Save `lane-6-loading.png`. Pass when three skeleton rows show before content and vanish after it.
-- [ ] Lane 7. Phone width 390 by 844. Save `lane-7-phone.png`. Pass when every identifier and title is fully visible, no ellipse, no horizontal scroll.
-- [ ] Lane 8. Desktop width 1280 by 800. Save `lane-8-desktop.png`. Pass when the same rows show in one column at full width and nothing is cut.
-- [ ] Lane 9. Gate off, run with `DASHBOARD_MACHINE=0`. Save `lane-9-gated.png`. Pass when the response is 404 and no card data is in the HTML.
-- [ ] Lane 10. Browser console and network. Save `lane-10-console.png`. Pass when there are zero console errors and zero failed requests apart from the deliberate ones.
-
-**Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
-
-- [ ] Metric. Server response time for `/dashboard`, ten sequential `curl -w '%{time_total}'` samples, median reported.
-- [ ] Probe. Run the curl loop at trunk and at head, interleaved, against ports 3100 and 3101. Trunk has no route, so the trunk number is the 404 path and only records the floor.
-- [ ] Baseline. Record the trunk median first.
-- [ ] Rule. Head median must stay under 1500 ms with Linear reads included, and under 300 ms when the 10 second card cache is warm. Over either number fails the lane.
-
-**Review gate.** Todd reviews before merge.
-
-- [ ] Copy lane 2, 4, 5, 7 and 8 screenshots into `docs/scorecards/jul-276/pr-1/review/`.
-- [ ] Record a 30 to 60 second video of the page on a lane worktree, phone width, showing rows, empty state and failed state. Save it as `docs/scorecards/jul-276/pr-1/review/pr-1.mp4`.
-- [ ] Post the screenshots and the video in chat. Stop at merge-ready. Wait for the operator's click.
-
-**Merge.**
-
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
-- [ ] Rebased onto current trunk after the verdict, patch-id unchanged.
-- [ ] Owner squash-merges its own PR and confirms main CI green on the merge commit.
-
-## Show the Start screen read only (PR-2)
-
-**Depends on.** PR-1.
+**Depends on.** Nothing. It is the first PR of the program and needs no settings, no models and no runner.
 
 **Files.**
-
-- [ ] Create `app/dashboard/start/[card]/page.jsx`, the server component that loads the card, the catalogue and last settings.
-- [ ] Create `app/dashboard/start/[card]/start-screen.jsx`, the client shell that renders the screen from props and changes nothing yet.
-- [ ] Create `app/dashboard/start/[card]/start-screen.module.css`.
-- [ ] Create `lib/dashboard/catalogue.js`, which loads the live models.dev catalogue, scopes it to Todd's three accounts and joins prices.
-- [ ] Create `lib/dashboard/catalogue.test.mjs`.
-- [ ] Create `lib/dashboard/roles.js`, the five groups and the 17 pstack role lines with one-line plain explanations.
-- [ ] Create `lib/dashboard/roles.test.mjs`.
-- [ ] Create `docs/adr/0027-models-and-prices-from-models-dev.md`, recording the catalogue source, the hourly cache, the bundled fallback and the no-price display.
-- [ ] Create `.agents/skills/verify-julia/tests/dashboard-start.spec.mjs`.
+- [ ] Create `dashboard/package.json` and `dashboard/package-lock.json`, a Next app with its own dependencies and nothing imported from Julia's app.
+- [ ] Create `dashboard/app/layout.jsx`, `dashboard/app/page.jsx`, `dashboard/app/start/[card]/page.jsx` and `dashboard/app/globals.css`.
+- [ ] Create `dashboard/lib/linear.js` and `dashboard/lib/linear.test.mjs`.
+- [ ] Add a read only `list-ready` command to `scripts/linear-cli.mjs`.
+- [ ] Port the decision records and the glossary out of Linear into `dashboard/docs/decisions/`, one file per decision from 0001 to 0022, plus `dashboard/docs/glossary.md`, so the dashboard's records live in the dashboard folder.
+- [ ] Create `dashboard/playwright.config.mjs` and `dashboard/tests/dashboard.spec.mjs`.
 
 **Build.**
-
-- [ ] `loadCatalogue()` fetches `https://models.dev/api.json` with a 20 second timeout, keeps providers `anthropic` and `openai` plus every provider named in the mastracode settings `customProviders`, and maps each model to `{id, provider, name, in, out, free}` from `cost.input` and `cost.output`, both already per million tokens.
-- [ ] The catalogue caches to `~/.local/state/julia/dashboard/catalogue.json` with the fetch time, refreshes when older than one hour, serves the cache when the fetch fails, and falls back to `@mastra/observability` `pricing-data.json` only when no cache exists.
-- [ ] A model with no entry shows `No published price` and never a zero.
-- [ ] `lib/dashboard/roles.js` exports `GROUPS` with the model for each group and `ROLES` with the 17 pstack role lines, the group each belongs to, and a plain explanation of at most 90 characters.
-- [ ] The screen shows the card title, the main session model with its price, the Shipping model with its price, the effort summary, the effort picker with Large preselected from last settings if any, and the group rows with a down arrow.
-- [ ] A group row shows one model for the whole group. The arrow reveals its roles, each with its own model and an info icon.
-- [ ] An info icon opens a small popup with that role's explanation, dismissed by a tap anywhere.
-- [ ] Panels render their model list as chips with a cross and an add chip, and a panel never renders empty.
-- [ ] Start sits fixed at the bottom and is disabled in this PR, with the title attribute `Not wired yet`.
-- [ ] Back returns to `/dashboard`.
+- [ ] Put the Mint and Iris colour tokens and Public Sans into `globals.css`, taken from the approved design system picture, light only.
+- [ ] List every card in state Ready from the Julia-next team, title and Start, newest first, with `list-ready` asking Linear on each request and never caching.
+- [ ] Open `/start/<card>` on Start with that card's title and a Back, and return to the list on Back with the card still Ready.
+- [ ] Show a plain empty state, a loading state, and a failed state with a rose line naming the reason Linear gave.
+- [ ] Bind to the tailnet address from `DASHBOARD_HOST` on port 4313, and deploy nothing to Vercel.
 
 **You see.**
-
-- [ ] `/dashboard/start/<card>` shows the title, both summary models with prices, the effort picker with four options and the info popup, and five group rows.
-- [ ] Opening Building shows four roles each with a model and an info icon, and no main session row anywhere inside a group.
+- [ ] On your phone over Tailscale, one page with your Ready cards, a Start on each, and Back from the card.
+- [ ] A named failure instead of a blank page when Linear is slow or down.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] `dashboard/lib/linear.test.mjs` fails when a Ready card is dropped, when a card in another state is listed, and when a malformed Linear answer renders an empty page.
+- [ ] `node scripts/test-owners.mjs --run local` picks up `dashboard/` as its own owner and runs its tests in CI with no registry change.
 
-- [ ] `catalogue.test.mjs` proves scoping keeps only the three account providers, that price mapping reads per-million input and output, that a missing model yields the no-price marker, and that a failing fetch serves the cache. Run `node --test lib/dashboard/catalogue.test.mjs`.
-- [ ] `roles.test.mjs` proves every role line in `~/.agents/pstack-models.md` that belongs to a group has exactly one entry, that group models match the settings file, and that every explanation is 90 characters or fewer. Run `node --test lib/dashboard/roles.test.mjs`.
-
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one worktree each, driven through `verify-julia`.
-
-- [ ] Lane 1. Regression lane against trunk. Open `/dashboard/start/JUL-276` at trunk and head. Trunk is 404, record that. Save `lane-1-trunk-404.png`. Pass when trunk has no screen and the head renders the full screen.
-- [ ] Lane 2. Top summary shows the master model and the Shipping model, each with a price. Save `lane-2-summary.png`. Pass when both names render and both carry either a price or the no-price marker.
-- [ ] Lane 3. Effort picker shows Small, Medium, Large and Unlimited, each with one to four brains, and Large is preselected. Save `lane-3-effort.png`. Pass when four options render, the brain count matches and Large carries the selected mark.
-- [ ] Lane 4. Effort info icon opens the exact line "How hard the models think. More brains is slower and costs more." Save `lane-4-effort-info.png`. Pass when the popup text matches exactly and closes on a tap outside.
-- [ ] Lane 5. All five group rows render the group model, and Building opens to four roles each with its own model. Save `lane-5-groups.png`. Pass when five groups show, four Building roles show and no main session row exists inside a group.
-- [ ] Lane 6. A role info popup shows its plain explanation and none is longer than 90 characters. Save `lane-6-role-info.png`. Pass when the popup matches the role and every explanation in the DOM is 90 characters or fewer.
-- [ ] Lane 7. Panels open to chips with a cross and an add chip, and removing the last chip is refused. Save `lane-7-panels.png`. Pass when chips render with price on each and the last chip cannot be removed.
-- [ ] Lane 8. Model list from a model name tap shows only the three accounts' models, each with down-arrow price, and the info icon explains the arrows. Save `lane-8-model-list.png`. Pass when every row carries an arrow price or the no-price marker and no other provider appears.
-- [ ] Lane 9. Phone 390 by 844 and desktop 1280 by 800 side by side with picture 08. Save `lane-9-phone-vs-picture.png` and `lane-9-desktop.png`. Pass when the layout order matches the picture, labels are uncut and no Stitch frame is drawn.
-- [ ] Lane 10. Console and network. Save `lane-10-console.png`. Pass when zero console errors appear, the catalogue request happens once per page load and Start is present but disabled.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
+- [ ] Lane 1. Open the list at 390 by 844. Save `docs/scorecards/jul-276/pr-1/lane-1.png`. Pass when three seeded Ready cards show title and Start and no label is cut.
+- [ ] Lane 2. Open the list at 1280 by 800. Save `docs/scorecards/jul-276/pr-1/lane-2.png`. Pass when the same three cards show in one column and every Start is reachable.
+- [ ] Lane 3. Press Start on the first card. Save `docs/scorecards/jul-276/pr-1/lane-3.png`. Pass when the screen shows that card's title, a Back, and the card id in the URL.
+- [ ] Lane 4. Press Back. Save `docs/scorecards/jul-276/pr-1/lane-4.png`. Pass when the list returns and Linear still reports the card as Ready.
+- [ ] Lane 5. Load the empty fixture. Save `docs/scorecards/jul-276/pr-1/lane-5.png`. Pass when a plain empty message shows and no Start is offered.
+- [ ] Lane 6. Load the slow Linear fixture. Save `docs/scorecards/jul-276/pr-1/lane-6.png`. Pass when a loading state shows before any card.
+- [ ] Lane 7. Load the failing Linear fixture. Save `docs/scorecards/jul-276/pr-1/lane-7.png`. Pass when a rose line names the failure and no card is invented.
+- [ ] Lane 8. Repeat lane 1 at 200 percent zoom. Save `docs/scorecards/jul-276/pr-1/lane-8.png`. Pass when every Start stays tappable and nothing overlaps.
+- [ ] Lane 9. Walk the list, Start and Back twice each. Save `docs/scorecards/jul-276/pr-1/lane-9.png`. Pass when the console shows no error.
+- [ ] Lane 10. Repeat lane 9 on desktop. Save `docs/scorecards/jul-276/pr-1/lane-10.png`. Pass when every request succeeds and none answers 500.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Metric. Time to first byte of `GET /` with a seeded list.
+- [ ] Probe. `curl -o /dev/null -s -w '%{time_starttransfer}'` against the lane server, ten times, take the median.
+- [ ] Baseline. 1,500 ms on this server.
+- [ ] Rule. The median must be at or under the baseline in two runs out of three.
 
-- [ ] Metric. Server render time for the Start screen with a cold and a warm catalogue cache, ten samples each, median reported.
-- [ ] Probe. `curl -w '%{time_total}'` on a warm cache, then once after deleting the cache file, at trunk and at head, interleaved.
-- [ ] Baseline. Record the trunk 404 median first.
-- [ ] Rule. Head cold median under 4000 ms including the 5.9 MB catalogue fetch, warm median under 400 ms. Over either number fails.
-
-**Review gate.** Todd reviews before merge.
-
-- [ ] Copy lane 2, 3, 5, 7 and 9 screenshots into `docs/scorecards/jul-276/pr-2/review/`.
-- [ ] Record a 30 to 60 second video walking the screen top to bottom, opening one group and one info popup. Save it as `docs/scorecards/jul-276/pr-2/review/pr-2.mp4`.
-- [ ] Post the screenshots, the side-by-side comparison and the video in chat. Stop at merge-ready. Wait for the operator's click.
+**Review gate.**
+- [ ] Send you the phone and desktop screenshot pair, a 30 to 60 second video of list, Start and Back, and the operator note that the card stayed Ready.
+- [ ] Merge waits for your yes in chat.
 
 **Merge.**
+- [ ] Merge with a merge commit, confirm main CI is green on that commit, and comment the commit on JUL-276.
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
-- [ ] Rebased onto current trunk after the verdict, patch-id unchanged.
-- [ ] Owner squash-merges its own PR and confirms main CI green on the merge commit.
+## PR-2 Run it as a service, updating itself from main between builds
 
-## Change models, groups, panels and effort (PR-3)
-
-**Depends on.** PR-2.
+**Depends on.** PR-1, because a service needs the page it serves.
 
 **Files.**
-
-- [ ] Create `lib/dashboard/start-settings.js`, the defaults and one pure reducer over the Start screen state.
-- [ ] Create `lib/dashboard/start-settings.test.mjs`.
-- [ ] Edit `app/dashboard/start/[card]/start-screen.jsx`, wiring the controls to the reducer.
-- [ ] Create `app/dashboard/start/[card]/model-picker.jsx`.
-- [ ] Create `app/dashboard/start/[card]/group-row.jsx`.
-- [ ] Create `app/dashboard/start/[card]/effort-picker.jsx`.
-- [ ] Create `app/dashboard/start/[card]/panels.jsx`.
+- [ ] Create `dashboard/ops/julia-dashboard.service` and `dashboard/ops/julia-dashboard-update.service` with `dashboard/ops/julia-dashboard-update.timer`.
+- [ ] Create `dashboard/ops/julia-dashboard-watchdog.service` with `dashboard/ops/julia-dashboard-watchdog.timer`.
+- [ ] Create `dashboard/scripts/install-service.mjs`, `dashboard/scripts/update.mjs`, `dashboard/scripts/watchdog.mjs` and `dashboard/lib/ping.js`.
+- [ ] Create `dashboard/app/api/health/route.js` and `dashboard/docs/service.md`.
+- [ ] Add the service section to `docs/agents/server-runbook.md`, written from the runbook's own rules.
 
 **Build.**
-
-- [ ] `start-settings.js` exports `initialSettings(catalogue, last)` and `reduce(start, action)` with actions `pick-main`, `pick-shipping`, `pick-group`, `pick-role`, `add-panel-model`, `remove-panel-model` and `pick-effort`.
-- [ ] `pick-group` writes the chosen model to every role in that group and marks those roles as group-set.
-- [ ] `pick-role` sets one role only and marks it as overridden, so the group row keeps the group model.
-- [ ] `remove-panel-model` refuses when one model is left.
-- [ ] Every model name is a button that opens the model picker, filtered to the three accounts, each row showing name, price and the free marker when the price is zero.
-- [ ] The picker carries an info icon that explains down arrow for input price and up arrow for output price, per million tokens.
-- [ ] The effort picker writes one of `small`, `medium`, `large`, `unlimited` and the summary line follows it.
-- [ ] State survives a group collapse and an info popup open and close.
+- [ ] The unit runs `node dashboard/server.js` from a dedicated checkout at `/home/ubuntu/julia-dashboard`, a worktree of `main`, never the operator checkout, with `Restart=always`, `RestartSec=2`, `WantedBy=multi-user.target` and environment from a root owned env file.
+- [ ] The update timer runs every five minutes, fetches `origin main`, and fast-forwards only when no run is starting or running, then runs `npm ci`, `npm run build` and restarts the unit.
+- [ ] The watchdog timer runs every minute against `/api/health`, and after three failures in a row posts a comment and a reminder on the standing issue `Dashboard service`, then posts a recovery note when health returns.
+- [ ] Health answers `ok` only when Linear answers, the state folder is writable and every run file parses, and names the failing piece otherwise.
+- [ ] Install with `sudo`, which this server allows, and record the unit names in the decision trail.
 
 **You see.**
-
-- [ ] Tapping the Building model and picking another one changes all four Building roles in one move.
-- [ ] Tapping one Building role and picking another model changes that role only, and the group row keeps its own model.
-- [ ] Removing a panel chip leaves the rest, and the last chip has no cross.
+- [ ] The dashboard coming back on its own after a crash and after a reboot.
+- [ ] A merge to main reaching the dashboard between builds, and a Linear notification on your phone when it is down.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] `update.mjs` is tested as a decision function, idle means update, starting or running means skip, and the test fails if a skip still moves the checkout.
+- [ ] `watchdog.mjs` is tested on the third failure, on a recovery, and on a single blip that must send nothing.
 
-- [ ] `start-settings.test.mjs` proves group set overwrites all roles in the group, role override survives a later group change only for roles it did not set, the last panel model cannot be removed, and effort changes the summary. Run `node --test lib/dashboard/start-settings.test.mjs`.
-
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one worktree each, driven through `verify-julia`.
-
-- [ ] Lane 1. Regression lane against trunk. Screenshot the Start screen at the previous head and at this head. Save `lane-1-before-after.png`. Pass when every read-only element from PR-2 still renders.
-- [ ] Lane 2. Change the Building group model. Save `lane-2-group-change.png`. Pass when all four Building roles show the new model.
-- [ ] Lane 3. Change one Building role. Save `lane-3-role-override.png`. Pass when that role shows its own model and the other three keep the group model.
-- [ ] Lane 4. Model list contents and prices. Save `lane-4-picker.png`. Pass when only anthropic, openai and commandcode models appear and every row has a price or the no-price marker.
-- [ ] Lane 5. Panel add and remove with the last chip protected. Save `lane-5-panels-edit.png`. Pass when a removed chip is gone and the last chip shows no cross.
-- [ ] Lane 6. Effort change from Large to Unlimited updates the summary and keeps the selection. Save `lane-6-effort-change.png`. Pass when four brains show and the summary names Unlimited.
-- [ ] Lane 7. Info popups for three different roles each show their own text. Save `lane-7-popups.png`. Pass when three texts differ and none is jargon.
-- [ ] Lane 8. State survives collapse and popup round trips. Save `lane-8-state-kept.png`. Pass when every edit from lanes 2, 3, 5 and 6 is still shown afterwards.
-- [ ] Lane 9. Phone 390 by 844 and desktop 1280 by 800 with the picker open. Save `lane-9-phone-picker.png` and `lane-9-desktop-picker.png`. Pass when the picker fits the phone screen, scrolls inside itself and nothing is cut.
-- [ ] Lane 10. Console and network. Save `lane-10-console.png`. Pass when zero console errors appear and the edits issue no network calls.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
+- [ ] Lane 1. Read `systemctl is-enabled julia-dashboard` and load the page. Save `docs/scorecards/jul-276/pr-2/lane-1.png`. Pass when it reads enabled and the page loads.
+- [ ] Lane 2. Kill the process with `kill -9`, wait 15 seconds and reload. Save `docs/scorecards/jul-276/pr-2/lane-2.png`. Pass when the page returns with no manual start.
+- [ ] Lane 3. Write an active run file, then trigger the updater. Save `docs/scorecards/jul-276/pr-2/lane-3.png`. Pass when the updater log says skipped and the run file is unchanged.
+- [ ] Lane 4. Merge a one line change to main, wait for the timer, reload. Save `docs/scorecards/jul-276/pr-2/lane-4.png`. Pass when the served build id matches the new commit.
+- [ ] Lane 5. Stop the unit, wait 90 seconds, open the Linear issue. Save `docs/scorecards/jul-276/pr-2/lane-5.png`. Pass when the down comment and the reminder exist on `Dashboard service`.
+- [ ] Lane 6. Start the unit again and wait one watchdog pass. Save `docs/scorecards/jul-276/pr-2/lane-6.png`. Pass when a recovery comment appears.
+- [ ] Lane 7. Load `/api/health`. Save `docs/scorecards/jul-276/pr-2/lane-7.png`. Pass when it reads ok and names the three checks.
+- [ ] Lane 8. Corrupt one run file, load `/api/health` and the page. Save `docs/scorecards/jul-276/pr-2/lane-8.png`. Pass when health names that file in rose and the list still serves.
+- [ ] Lane 9. Repeat lane 2 at 390 by 844. Save `docs/scorecards/jul-276/pr-2/lane-9.png`. Pass when the phone page recovers with no reload prompt.
+- [ ] Lane 10. Walk lanes 2, 5 and 6 again. Save `docs/scorecards/jul-276/pr-2/lane-10.png`. Pass when the console shows no error in any step.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Metric. Seconds from `kill -9` to the page answering again.
+- [ ] Probe. The lane 2 script, timed with `date +%s%3N` before the kill and after the first 200.
+- [ ] Baseline. 15 seconds.
+- [ ] Rule. Every one of three kills must recover inside the baseline.
 
-- [ ] Metric. Input latency of one group change in the browser, measured as the time from click to the painted update, ten samples, median reported.
-- [ ] Probe. Run the same Playwright script at the previous head and at this head, interleaved, for a picker open and a pick.
-- [ ] Baseline. Record the previous head median first, since the previous head cannot change a model.
-- [ ] Rule. Head median under 150 ms per interaction, and no interaction over 400 ms. A frozen or delayed update fails.
-
-**Review gate.** Todd reviews before merge.
-
-- [ ] Copy lane 2, 3, 5, 6 and 9 screenshots into `docs/scorecards/jul-276/pr-3/review/`.
-- [ ] Record a 30 to 60 second video showing a group change, a role override and a panel chip removal. Save it as `docs/scorecards/jul-276/pr-3/review/pr-3.mp4`.
-- [ ] Post the screenshots and the video in chat. Stop at merge-ready. Wait for the operator's click.
+**Review gate.**
+- [ ] Send you a screenshot of the page after a kill, a 30 to 60 second video of kill and recovery, and the operator note recording the unit names.
+- [ ] Merge waits for your yes in chat.
 
 **Merge.**
+- [ ] Merge with a merge commit, confirm main CI is green on that commit, and comment the commit on JUL-276.
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
-- [ ] Rebased onto current trunk after the verdict, patch-id unchanged.
-- [ ] Owner squash-merges its own PR and confirms main CI green on the merge commit.
+## PR-3 The weekly model sweep, and the Start screen read only
 
-## Start with last settings (PR-4)
-
-**Depends on.** PR-3.
+**Depends on.** PR-2, because the sweep runs as a timer on the same host as the service.
 
 **Files.**
-
-- [ ] Create `lib/dashboard/store.js`, atomic JSON read and write for the dashboard state directory.
-- [ ] Create `lib/dashboard/store.test.mjs`.
-- [ ] Create `app/api/dashboard/settings/route.js`, GET and PUT of the last Start settings.
-- [ ] Edit `app/dashboard/start/[card]/page.jsx`, loading last settings as the initial state.
-- [ ] Edit `app/dashboard/start/[card]/start-screen.jsx`, adding the Start with last settings button at the top.
+- [ ] Create `dashboard/config/accounts.json` and `dashboard/config/price-sources.json`, the one place the two lists live.
+- [ ] Create `dashboard/scripts/sweep.mjs`, `dashboard/lib/models.js` and `dashboard/lib/models.test.mjs`.
+- [ ] Create `dashboard/ops/julia-dashboard-sweep.service` and `dashboard/ops/julia-dashboard-sweep.timer`.
+- [ ] Rewrite `dashboard/app/start/[card]/page.jsx` as the read only Start screen.
 
 **Build.**
-
-- [ ] `readState(name, fallback)` and `writeState(name, value)` write through a temp file and a rename inside `~/.local/state/julia/dashboard/`, with mode 0600.
-- [ ] Last settings live in `~/.local/state/julia/dashboard/last-start.json` as `{main, shipping, effort, groups, roles, panels}`.
-- [ ] The Start screen loads last settings on open, so the controls show the previous choice, and Large when nothing is saved.
-- [ ] Start with last settings appears only when a saved file exists, and it resets every control to the saved values in one tap.
-- [ ] Settings are saved only by a later Start press, so this PR proves the read path and the button, and PR-6 adds the write.
+- [ ] Accounts live in `dashboard/config/accounts.json`, three today, the Claude subscription, the ChatGPT plan and the CommandCode grant, and adding a fourth is a one line change in that file.
+- [ ] Sweep asks each account what it offers through `listAvailableModels()` on the SDK, which answered 8,243 models with 142 carrying a key on this server, and needs no public catalogue.
+- [ ] Sweep adds new models, retires models that disappeared, and records each price from the provider's own pricing page together with the date it was read.
+- [ ] A model with no saved price is not written, so every model the screen shows has a price, and the sweep logs the exclusion.
+- [ ] The sweep timer runs weekly and writes `models.json` atomically, one line per attempt in `sweep-log.jsonl`.
+- [ ] Start screen shows the card title, the main session model and its price, the Shipping model and its price, an effort summary with prices, and the four effort options with the plain explanation from the controls document.
+- [ ] Free appears only for a model the sweep recorded as free.
+- [ ] Back returns to the list and leaves the card Ready, and nothing on this screen changes a model or an effort.
 
 **You see.**
-
-- [ ] On a fresh machine the screen opens with defaults and no Start with last settings button.
-- [ ] With a seeded last-start file the screen opens showing those choices and the button, and the button restores them after edits.
+- [ ] The Start screen for real, with your models, their prices and the effort picker, and no way to change anything yet.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Price parsing is tested against one saved fixture per provider, and the test fails when a page changes shape and the parse starts returning zero.
+- [ ] The add and retire diff is tested, and the test fails when a retired model stays in `models.json`.
+- [ ] The unpriced rule is tested, and the test fails when a model without a price reaches the screen.
 
-- [ ] `store.test.mjs` proves a write is atomic, survives a crash between temp write and rename, reads a missing file as absent instead of throwing, and keeps mode 0600. Run `node --test lib/dashboard/store.test.mjs`.
-
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one worktree each, driven through `verify-julia`.
-
-- [ ] Lane 1. Regression lane against trunk. Open the Start screen at the previous head and at this head. Save `lane-1-before-after.png`. Pass when every PR-3 interaction still works.
-- [ ] Lane 2. Fresh state, no saved file. Save `lane-2-no-saved.png`. Pass when defaults show and the button is absent.
-- [ ] Lane 3. Seeded file loads its values. Save `lane-3-saved-loaded.png`. Pass when every control shows the seeded model and effort.
-- [ ] Lane 4. Edit then press Start with last settings. Save `lane-4-restored.png`. Pass when every control returns to the seeded values in one tap.
-- [ ] Lane 5. A corrupted file is ignored. Save `lane-5-corrupt.png`. Pass when defaults show, the page does not crash and one plain warning line appears.
-- [ ] Lane 6. File mode is 0600 and the directory is 0700. Save `lane-6-mode.png`. Pass when `stat -c '%a'` shows exactly those modes.
-- [ ] Lane 7. Two browser tabs reload without a partial read. Save `lane-7-two-tabs.png`. Pass when both tabs show identical values.
-- [ ] Lane 8. Unknown model in the saved file is dropped. Save `lane-8-unknown-model.png`. Pass when that role falls back to its group model and the page renders.
-- [ ] Lane 9. Phone 390 by 844 and desktop 1280 by 800 with the button present. Save `lane-9-phone.png` and `lane-9-desktop.png`. Pass when the button sits above the summary and nothing is cut.
-- [ ] Lane 10. Console and network. Save `lane-10-console.png`. Pass when zero console errors appear and the settings GET returns 200 once per load.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
+- [ ] Lane 1. Open the Start screen at 390 by 844 with a seeded `models.json`. Save `docs/scorecards/jul-276/pr-3/lane-1.png`. Pass when the card title, the main model, the Shipping model and the effort summary all show with prices.
+- [ ] Lane 2. Open the same screen at 1280 by 800. Save `docs/scorecards/jul-276/pr-3/lane-2.png`. Pass when the same four pieces show and no price is cut.
+- [ ] Lane 3. Read every price on the screen. Save `docs/scorecards/jul-276/pr-3/lane-3.png`. Pass when each reads input and output per million tokens in the approved form.
+- [ ] Lane 4. Open the effort explanation. Save `docs/scorecards/jul-276/pr-3/lane-4.png`. Pass when it reads `How hard the models think. More brains is slower and costs more.`
+- [ ] Lane 5. Try to change a model. Save `docs/scorecards/jul-276/pr-3/lane-5.png`. Pass when no control accepts a change and the saved settings file is byte identical afterwards.
+- [ ] Lane 6. Open a sweep older than eight days. Save `docs/scorecards/jul-276/pr-3/lane-6.png`. Pass when a plain line gives the sweep date and no price is invented.
+- [ ] Lane 7. Open with an empty `models.json`. Save `docs/scorecards/jul-276/pr-3/lane-7.png`. Pass when the screen names the missing sweep and offers Back, with no model invented.
+- [ ] Lane 8. Press Back. Save `docs/scorecards/jul-276/pr-3/lane-8.png`. Pass when the list returns and Linear still reports the card as Ready.
+- [ ] Lane 9. Repeat lane 1 at 200 percent zoom. Save `docs/scorecards/jul-276/pr-3/lane-9.png`. Pass when every label stays whole and nothing overlaps.
+- [ ] Lane 10. Walk lanes 1, 4 and 8 twice. Save `docs/scorecards/jul-276/pr-3/lane-10.png`. Pass when the console shows no error.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Metric. Time to first byte of the Start screen with a seeded `models.json`.
+- [ ] Probe. `curl -o /dev/null -s -w '%{time_starttransfer}'` against the lane server, ten times, take the median.
+- [ ] Baseline. 1,500 ms on this server.
+- [ ] Rule. The median must be at or under the baseline in two runs out of three.
 
-- [ ] Metric. Extra server time added by reading last settings, ten samples, median reported.
-- [ ] Probe. `curl -w '%{time_total}'` on the Start screen with and without last-start present, at the previous head and at this head, interleaved.
-- [ ] Baseline. Record the previous head median first.
-- [ ] Rule. Head adds under 30 ms median against the previous head for the same scenario. Over 30 ms fails.
-
-**Review gate.** Todd reviews before merge.
-
-- [ ] Copy lane 2, 3 and 4 screenshots into `docs/scorecards/jul-276/pr-4/review/`.
-- [ ] Record a 30 to 60 second video of edit, restore and reload. Save it as `docs/scorecards/jul-276/pr-4/review/pr-4.mp4`.
-- [ ] Post the screenshots and the video in chat. Stop at merge-ready. Wait for the operator's click.
+**Review gate.**
+- [ ] Send you the phone and desktop screenshot pair, a 30 to 60 second video of the screen and its effort explanation, and the operator note that the sweep file was untouched by the screen.
+- [ ] Merge waits for your yes in chat.
 
 **Merge.**
+- [ ] Merge with a merge commit, confirm main CI is green on that commit, and comment the commit on JUL-276.
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
-- [ ] Rebased onto current trunk after the verdict, patch-id unchanged.
-- [ ] Owner squash-merges its own PR and confirms main CI green on the merge commit.
+## PR-4 Model, group, panel and effort controls that change things
 
-## Prove effort reaches every helper (PR-5)
-
-**Depends on.** None. It runs in parallel with PR-1 and touches no screen.
+**Depends on.** PR-3, which ships the saved models and prices these controls choose from.
 
 **Files.**
-
-- [ ] Create `scripts/prove-effort.mjs`, a repeatable probe that runs headless builds and reads the results back.
-- [ ] Create `scripts/prove-effort.test.mjs`, covering the reading and comparison helpers against a fixture database.
-- [ ] Create `docs/research/effort-reaches-helpers.md`, the evidence report.
-- [ ] Create `docs/adr/0028-effort-is-per-session.md`, recording how effort is delivered and what it cannot promise.
+- [ ] Create `dashboard/app/start/[card]/start-screen.jsx`, the client component behind the controls.
+- [ ] Create `dashboard/lib/roles.js`, `dashboard/lib/roles.test.mjs` and `dashboard/config/roles.json`.
 
 **Build.**
-
-- [ ] The probe writes a per-run settings file with a chosen `thinkingLevel`, a per-run role models file, and a kickoff prompt that makes the build spawn one helper per group.
-- [ ] The probe reads each run's thread and its subagent calls from `~/.local/share/mastracode/mastra.db`, using `readThreads` from `scripts/scorecard.mjs`.
-- [ ] The probe runs each effort level three times, with hardcoded role models, and reports reasoning tokens per model, subagent model ids, and step counts.
-- [ ] The report states, for each of the four effort options, whether the level reached the main session and every helper, with the database rows that show it.
+- [ ] Six group rows, Building, Judgment, Investigating, Learning, Panels and Workers, each with one group model.
+- [ ] Tap a model name to open the list, pick one to replace it, and the list shows only models the sweep saved, each with its price.
+- [ ] Change a group model and every role in that group follows, matching what `~/.agents/pstack-models.md` does for a real run.
+- [ ] Open a group with its down arrow and set one role on its own, and show that role differently from the rest of its group.
+- [ ] Panels show chips with a cross and `+ Add`, keep at least one model, and refuse to remove the last one with a plain line.
+- [ ] The effort picker offers Small, Medium, Large and Unlimited, one to four brains, and each choice carries its own ⓘ.
+- [ ] Every role carries an ⓘ with one plain sentence taken from its pstack role file.
+- [ ] Write each change to `draft.json` in the state folder as it happens, so a reload keeps it and a second card can reuse it.
 
 **You see.**
-
-- [ ] There is no screen in this PR, by Todd's explicit approval.
-- [ ] The report shows a table of level, run, helper model id and reasoning tokens, and a verdict per level.
+- [ ] Changing one group model and watching every role under it move, and setting one role against its group.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Group propagation is tested, and the test fails when one role in the group keeps the old model.
+- [ ] The panels rule is tested, and the test fails when the last chip can be removed.
+- [ ] The effort map is tested, and the test fails when Small or Unlimited lands on the wrong budget.
 
-- [ ] `prove-effort.test.mjs` proves the parser finds subagent calls with their model ids and reports a missing level as unknown instead of zero. Run `node --test scripts/prove-effort.test.mjs`.
-
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one worktree each, driven through `verify-julia`.
-
-- [ ] Lane 1. Regression lane against trunk. Run the same probe against trunk, where no probe exists, and record that. Save `lane-1-trunk.txt`. Pass when trunk lacks the probe and the head produces the report.
-- [ ] Lane 2. Small runs three times and each helper reports the same model ids as the role file. Save `lane-2-small.json`. Pass when nine of nine helper calls carry the intended model ids.
-- [ ] Lane 3. Medium runs three times, same check. Save `lane-3-medium.json`. Pass when nine of nine match.
-- [ ] Lane 4. Large runs three times, same check. Save `lane-4-large.json`. Pass when nine of nine match.
-- [ ] Lane 5. Unlimited runs three times, same check. Save `lane-5-unlimited.json`. Pass when nine of nine match.
-- [ ] Lane 6. Reasoning tokens rise with effort across levels. Save `lane-6-tokens.json`. Pass when the median per level is non-decreasing and Small is below Unlimited on at least two of three pairs.
-- [ ] Lane 7. Two probe runs at once do not corrupt the database or the role files. Save `lane-7-parallel.json`. Pass when both runs report their own model ids and the database opens clean afterwards.
-- [ ] Lane 8. A role model with no published price still runs. Save `lane-8-unpriced.json`. Pass when the run completes and the report marks the model as unpriced.
-- [ ] Lane 9. A run that fails to start is reported as unknown, never as a pass. Save `lane-9-failed.txt`. Pass when the report shows unknown and the exit code is non-zero.
-- [ ] Lane 10. Total spend for all runs in this PR is under 5 USD. Save `lane-10-spend.json`. Pass when the summed priced cost is under 5.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
+- [ ] Lane 1. Change the Building group model. Save `docs/scorecards/jul-276/pr-4/lane-1.png`. Pass when all four Building roles show the new model and no other group changed.
+- [ ] Lane 2. Set one Building role against its group. Save `docs/scorecards/jul-276/pr-4/lane-2.png`. Pass when that role reads differently from its group and the other three keep the group model.
+- [ ] Lane 3. Change a group, reload the page. Save `docs/scorecards/jul-276/pr-4/lane-3.png`. Pass when the choice survives the reload from `draft.json`.
+- [ ] Lane 4. Add a second model to Panels. Save `docs/scorecards/jul-276/pr-4/lane-4.png`. Pass when two chips show and each has a cross.
+- [ ] Lane 5. Remove both panel chips in turn. Save `docs/scorecards/jul-276/pr-4/lane-5.png`. Pass when the last cross is refused and one chip remains.
+- [ ] Lane 6. Pick each effort option in turn. Save `docs/scorecards/jul-276/pr-4/lane-6.png`. Pass when the summary updates and the four labels stay in order.
+- [ ] Lane 7. Open the model list. Save `docs/scorecards/jul-276/pr-4/lane-7.png`. Pass when every model shows its price and none is missing one.
+- [ ] Lane 8. Open a role ⓘ at 390 by 844. Save `docs/scorecards/jul-276/pr-4/lane-8.png`. Pass when the popup is readable and closable and no label behind it is cut.
+- [ ] Lane 9. Repeat lanes 1 and 2 at 200 percent zoom. Save `docs/scorecards/jul-276/pr-4/lane-9.png`. Pass when every row and cross stays tappable.
+- [ ] Lane 10. Walk lanes 1 to 6 on desktop. Save `docs/scorecards/jul-276/pr-4/lane-10.png`. Pass when the console shows no error.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Metric. Milliseconds from a group model tap to every role row repainted.
+- [ ] Probe. A Playwright timing around the tap and the last row assertion, ten taps, take the median.
+- [ ] Baseline. 100 ms.
+- [ ] Rule. The median must be at or under the baseline, and no tap may exceed 250 ms.
 
-- [ ] Metric. Probe wall time and total token cost for one level of three runs.
-- [ ] Probe. Time `node scripts/prove-effort.mjs --level large` at the head, one level only, and record cost from the database.
-- [ ] Baseline. The head is the first implementation, so record the single measured value as the budget.
-- [ ] Rule. One level of three runs must finish under 20 minutes and under 2 USD, or the probe is too expensive to repeat and fails.
-
-**Review gate.** None. PR-5 is not review-gated, because it ships no interaction and Todd approved the no-screen exception before it started.
+**Review gate.**
+- [ ] Send you a phone screenshot pair of a group change and a role override, a 30 to 60 second video of both, and the operator note that the saved file held the change.
+- [ ] Merge waits for your yes in chat.
 
 **Merge.**
+- [ ] Merge with a merge commit, confirm main CI is green on that commit, and comment the commit on JUL-276.
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
-- [ ] Report committed under `docs/research/` with every database row it cites.
-- [ ] Owner squash-merges its own PR and confirms main CI green on the merge commit.
+## PR-5 Start with last settings
 
-## Start and stop a real build (PR-6)
-
-**Depends on.** PR-4 and PR-5.
+**Depends on.** PR-4, because the choice this PR saves is the choice those controls make.
 
 **Files.**
-
-- [ ] Edit `instrumentation.js`, starting the supervisor when `DASHBOARD_MACHINE=1` and doing nothing otherwise.
-- [ ] Create `lib/dashboard/runs.js`, the run record store and the reconcile-on-boot logic.
-- [ ] Create `lib/dashboard/runs.test.mjs`.
-- [ ] Create `lib/dashboard/supervisor.js`, which starts, watches and stops headless builds.
-- [ ] Create `lib/dashboard/kickoff.js`, which renders the build prompt from `dashboard/kickoff.md` with the card and the role models file.
-- [ ] Create `dashboard/kickoff.md`.
-- [ ] Create `app/api/dashboard/runs/route.js`, POST to start and GET to list.
-- [ ] Create `app/api/dashboard/runs/[id]/stop/route.js`.
-- [ ] Create `app/api/dashboard/events/route.js`, the live update stream.
-- [ ] Edit `app/dashboard/page.jsx` and `app/dashboard/dashboard.module.css`, adding the starting and running pill, Stop with its confirm, and the live update client.
-- [ ] Edit `app/dashboard/start/[card]/start-screen.jsx`, enabling Start and saving last settings on press.
-- [ ] Edit `scripts/linear-cli.mjs`, adding `setState(identifier, stateName)` and a `set-state` command.
-- [ ] Create `docs/adr/0029-runner-lives-in-the-next-server.md`, recording the supervisor, the worktree per run, headless children, disk-backed state and tracing off.
-- [ ] Create `.agents/skills/verify-julia/tests/dashboard-run.spec.mjs`.
+- [ ] Create `dashboard/lib/last-start.js` and `dashboard/lib/last-start.test.mjs`.
+- [ ] Add the `Start with last settings` control to `dashboard/app/start/[card]/start-screen.jsx`.
 
 **Build.**
-
-- [ ] `POST /api/dashboard/runs` accepts `{card, settings}`, refuses a card that is not Ready, writes the run record, prepares a worktree at `~/builds/<card>-<runId>` on branch `card/<card>`, then moves the card to Implementation.
-- [ ] The run record lives at `~/.local/state/julia/dashboard/runs/<runId>.json` with `{runId, card, startedAt, status, pid, worktree, branch, threadId, settings, reason}` and is written atomically.
-- [ ] The supervisor spawns `mastracode --settings <run>/settings.json --model <main> --thinking-level <effort> --prompt <kickoff> --output jsonl --permission-mode auto`, with stdout to `<run>/events.jsonl`, and records the pid.
-- [ ] The kickoff prompt names the card, the per-run role models file, the Shipping model, and the card's playbook, and tells the build to read its role models from that file.
-- [ ] `POST /api/dashboard/runs/:id/stop` sends SIGTERM, waits up to 10 seconds, then SIGKILL, and leaves the worktree and branch in place.
-- [ ] Stop shows the confirmation "Stop this build? The work is kept." and does nothing until confirmed.
-- [ ] The card stays in Implementation after Stop, and the run status becomes stopped.
-- [ ] A restart of the server reconciles every record against its pid, marks dead runs exited, and never starts a second child for the same run.
-- [ ] `GET /api/dashboard/events` streams run status changes as server-sent events, so the page updates without a reload.
-- [ ] Starting a run shows Starting then Running on both the page and the Start screen, and several runs can run at once.
-- [ ] Tracing is off for dashboard runs, and the settings copy sets `observability.enabled` to false.
-- [ ] `setState` resolves the team state id for the asked name and updates the issue, refusing unknown names.
+- [ ] Save the whole Start choice to `last-start.json`, the main session model, every group and role model, the panels and the effort, written when Start is pressed.
+- [ ] Offer `Start with last settings` at the top of a later Start screen, which restores that choice and marks the rows it restored.
+- [ ] Pre-select the last choice on open, as the card asks, and show the sweep default on a fresh install with no saved file.
+- [ ] Ignore a saved model the sweep has retired, fall back to the sweep default, and say so in one plain line.
+- [ ] Keep a saved choice when a card fails, so a failed start does not wipe what you picked.
 
 **You see.**
-
-- [ ] Press Start on the practice card. The page shows Starting, then Running, and the card is in Implementation in Linear.
-- [ ] The build has a branch and a worktree, and its thread id appears on the page.
-- [ ] Press Stop, confirm, and the pill shows Stopped. The branch and worktree remain and the card stays in Implementation.
-- [ ] Start again and a new run starts fresh on the same branch.
+- [ ] A second card opening on the same models and effort as the first, and one button that puts them back after you change things.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Restore is tested, and the test fails when a panel list comes back with a different number of models.
+- [ ] The retired model rule is tested, and the test fails when a missing model is restored silently.
+- [ ] The fresh install path is tested, and the test fails when a choice is invented with no saved file.
 
-- [ ] `runs.test.mjs` proves a record round-trips atomically, that reconcile marks a dead pid exited once, that reconcile never spawns, and that a non-Ready card is refused. Run `node --test lib/dashboard/runs.test.mjs`.
-- [ ] `scripts/linear-cli.test.mjs` proves `setState` resolves the wanted state and refuses an unknown name. Run `node --test scripts/linear-cli.test.mjs`.
-
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one worktree each, driven through `verify-julia`.
-
-- [ ] Lane 1. Regression lane against trunk. Open the page and the Start screen at the previous head and at this head. Save `lane-1-before-after.png`. Pass when every PR-1 to PR-4 screen still renders and start stays disabled at the previous head.
-- [ ] Lane 2. Start the practice card and watch Starting then Running without a reload. Save `lane-2-starting-running.png`. Pass when both states appear in order and the final state is Running.
-- [ ] Lane 3. Linear shows the card in Implementation after Start. Save `lane-3-linear-state.png`. Pass when `get-issue` reports Implementation.
-- [ ] Lane 4. Stop with confirm and the work is kept. Save `lane-4-stopped.png`. Pass when the pill shows Stopped, the worktree path exists, the branch exists, and the card is still in Implementation.
-- [ ] Lane 5. Stop without confirming changes nothing. Save `lane-5-stop-cancel.png`. Pass when the confirm appears, cancel is pressed, and the build is still Running.
-- [ ] Lane 6. Two builds run at once and both show on the page. Save `lane-6-two-runs.png`. Pass when two rows show Running with different thread ids.
-- [ ] Lane 7. Restart the server mid-run and the page still reports the truth. Save `lane-7-restart.png`. Pass when reconcile marks the killed run exited and never launches a duplicate.
-- [ ] Lane 8. Start is refused for a card that left Ready. Save `lane-8-not-ready.png`. Pass when the call returns a refusal and no worktree is created.
-- [ ] Lane 9. Phone 390 by 844 and desktop 1280 by 800 with two runs. Save `lane-9-phone.png` and `lane-9-desktop.png`. Pass when Stop and the pill are visible and fully labelled with both word and colour.
-- [ ] Lane 10. Console and network. Save `lane-10-console.png`. Pass when zero console errors appear and the event stream reconnects once after a dropped connection.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
+- [ ] Lane 1. Press Start on a first card with a changed group model and Large effort. Save `docs/scorecards/jul-276/pr-5/lane-1.png`. Pass when `last-start.json` holds all three pieces.
+- [ ] Lane 2. Open a second card. Save `docs/scorecards/jul-276/pr-5/lane-2.png`. Pass when it opens on the first card's models and effort with no tap.
+- [ ] Lane 3. Change three things on the second card, then press `Start with last settings`. Save `docs/scorecards/jul-276/pr-5/lane-3.png`. Pass when all three return and the restored rows are marked.
+- [ ] Lane 4. Open with no saved file. Save `docs/scorecards/jul-276/pr-5/lane-4.png`. Pass when the sweep default shows and nothing claims to be restored.
+- [ ] Lane 5. Hand edit the saved file to name a retired model. Save `docs/scorecards/jul-276/pr-5/lane-5.png`. Pass when the screen names the swap and shows the default.
+- [ ] Lane 6. Reload after saving. Save `docs/scorecards/jul-276/pr-5/lane-6.png`. Pass when the same choice returns.
+- [ ] Lane 7. Repeat lanes 1 and 3 at 390 by 844. Save `docs/scorecards/jul-276/pr-5/lane-7.png`. Pass when both work with one thumb and no label is cut.
+- [ ] Lane 8. Repeat lanes 1 and 3 at 1280 by 800. Save `docs/scorecards/jul-276/pr-5/lane-8.png`. Pass when both work and the page does not scroll sideways.
+- [ ] Lane 9. Save, corrupt the file, reload. Save `docs/scorecards/jul-276/pr-5/lane-9.png`. Pass when the screen falls back to the default with a plain line and no crash.
+- [ ] Lane 10. Walk lanes 1 to 4 twice. Save `docs/scorecards/jul-276/pr-5/lane-10.png`. Pass when the console shows no error.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Metric. Milliseconds from opening a card with a saved choice to the screen being ready.
+- [ ] Probe. A Playwright timing from `goto` to the last restored row painted, ten opens, take the median.
+- [ ] Baseline. 800 ms.
+- [ ] Rule. The median must be at or under the baseline, and no open may exceed 1,500 ms.
 
-- [ ] Metric. Time from Start press to the Running state on screen, and time from Stop press to the Stopped state.
-- [ ] Probe. Run each action five times on the practice card, record with `performance.now` marks in the Playwright script, at the previous head and at this head.
-- [ ] Baseline. Record the previous head first, where Start is disabled and only the page load is measured.
-- [ ] Rule. Start to Running under 15 seconds with a warm cache and under 60 seconds cold, Stop to Stopped under 10 seconds. Over either number fails, because the run is local and the child is cheap to spawn.
-
-**Review gate.** Todd reviews before merge.
-
-- [ ] Copy lane 2, 4, 6 and 9 screenshots into `docs/scorecards/jul-276/pr-6/review/`.
-- [ ] Record a 30 to 60 second video of Start, Running, Stop and confirm. Save it as `docs/scorecards/jul-276/pr-6/review/pr-6.mp4`.
-- [ ] Post the screenshots and the video in chat. Stop at merge-ready. Wait for the operator's click.
+**Review gate.**
+- [ ] Send you a phone screenshot pair of the first card's choice and the second card opening on it, a 30 to 60 second video of the restore button, and the operator note that the saved file was read back.
+- [ ] Merge waits for your yes in chat.
 
 **Merge.**
+- [ ] Merge with a merge commit, confirm main CI is green on that commit, and comment the commit on JUL-276.
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
-- [ ] Rebased onto current trunk after the verdict, patch-id unchanged.
-- [ ] Owner squash-merges its own PR and confirms main CI green on the merge commit.
-- [ ] Smoke the live dashboard on the server after the merge and revert if it fails.
+## PR-6 Spike, no screen, the pack rule, the write guard, the reset retry and cost per run
 
-## Did not start, try again, finish ping (PR-7)
-
-**Depends on.** PR-6.
+**Depends on.** Nothing from the screen PRs. It starts beside PR-1 and must finish before PR-7, which uses everything it proves.
 
 **Files.**
-
-- [ ] Create `lib/dashboard/ping.js`, the finish and failure notification.
-- [ ] Create `lib/dashboard/ping.test.mjs`.
-- [ ] Create `app/api/dashboard/runs/[id]/retry/route.js`.
-- [ ] Edit `app/dashboard/page.jsx` and `app/dashboard/dashboard.module.css`, adding the rose Did not start pill, its one-line reason and Try again.
-- [ ] Edit `lib/dashboard/supervisor.js`, writing the reason on a spawn or early-exit failure and firing the ping on finish.
+- [ ] Create `dashboard/worker/run-build.mjs`, the one process that owns a build.
+- [ ] Create `dashboard/worker/guarded-write.mjs` and `dashboard/worker/retry.mjs`, with `dashboard/worker/run-build.test.mjs`.
+- [ ] Create `dashboard/scripts/effort-probe.mjs` and `dashboard/scripts/effort-report.mjs`.
 
 **Build.**
-
-- [ ] A run that cannot spawn, or that exits non-zero before the agent starts working, becomes failed with a one-line reason taken from stderr, never a stack trace.
-- [ ] The page shows a rose pill with the word Did not start, the reason line and a Try again button that starts a fresh run.
-- [ ] A finished run posts a comment on its card and sets a Linear reminder, using `postComment` and the reminder mutation from `scripts/stop-ping.mjs`, so Todd's phone notifies him.
-- [ ] The Start screen states `Ping when it finishes: Linear notification to Todd` as information, not a control.
-- [ ] A ping failure is recorded on the run and shown nowhere as success.
-- [ ] Several runs finishing at once each ping their own card.
+- [ ] The worker boots `@mastra/code-sdk` in process with its own `MASTRA_APP_DATA_DIR` and `MASTRA_OBSERVABILITY_DB_PATH`, copies the settings into that folder, and calls `getMastra().shutdown()` at the end. That call is the only path proven to flush traces, and the headless CLI never makes it.
+- [ ] The worker writes the run's settings with a `customModelPacks` entry named after the run whose `plan` and `build` both resolve to the main session model, and passes that pack to `runMC`.
+- [ ] Prove the pack rule, because a launch model loses to the active pack. `activeModelPackId` is `custom:sol/deepseek` on this machine, and that is why today's session ran DeepSeek in build mode and GPT-6.1 Sol in plan mode.
+- [ ] The write guard refuses any `write_file` whose content passes 24,000 bytes and answers with `write this in parts`, installed as a `PreToolUse` hook in the run's own config home so only dashboard builds carry it. `disableBuiltinTools` cannot do this, it never touches the workspace file tools, and a hooks file in the worktree would dirty the build's own diff.
+- [ ] The retry wraps one turn, and after a connection reset waits 2 seconds, then 4, 8 and 16, capped at 30, for five attempts, and the run fails only when every attempt failed.
+- [ ] The observer guard records an error from `memory: observe` or another background observer as a note on the run and never as a run failure, which is what happened all three times today and work carried on each time.
+- [ ] No output cap anywhere. Your 25 October decision stands and output stays at the model maximum, because a cap truncates the answer, as today's test showed when five of six capped replies stopped at the cap.
+- [ ] The effort probe runs three builds per effort level with one helper spawn in each, and records reasoning tokens, the helper model and cost per model from that run's trace database.
+- [ ] The report writes one static `effort-report.html` with a section per level, the pack table, the helper table, the cost table, the guard log, the reset log and the observer log.
 
 **You see.**
-
-- [ ] A card pointed at a build that cannot start shows the rose pill, the reason and Try again, and Todd's phone gets the Linear notification.
-- [ ] A finished build comments on the card and sets a reminder, and the comment carries the thread id.
+- [ ] Nothing, this PR is a machine proof. You approved that exception on 28 October, and PR-7 is the first PR that puts any of it on your screen.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] The retry sequence is tested on a reset at attempt one, three and five, and the test fails when a reset is treated as a finished run.
+- [ ] The guard is tested at 23,999 and 24,001 bytes, and the test fails when the larger write is allowed.
+- [ ] The observer classification is tested, and the test fails when a `memory: observe` error changes run status.
+- [ ] Status mapping is tested on starting, running, stopped, exited and failed, and the test fails when a stopped run reports failed.
 
-- [ ] `ping.test.mjs` proves the comment body carries the card, the result and the thread id, that a reminder is set 30 seconds ahead, and that a failed comment is reported as not notified. Run `node --test lib/dashboard/ping.test.mjs`.
-
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one worktree each, driven through `verify-julia`.
-
-- [ ] Lane 1. Regression lane against trunk. Run the PR-6 start and stop journey at the previous head and at this head. Save `lane-1-before-after.png`. Pass when Start, Running and Stop behave as before.
-- [ ] Lane 2. A build that cannot start shows the rose pill, one line and Try again. Save `lane-2-did-not-start.png`. Pass when the pill carries the word, the reason is one line and Try again is present.
-- [ ] Lane 3. Try again starts a fresh run and reaches Running. Save `lane-3-try-again.png`. Pass when a new run id appears and the state reaches Running.
-- [ ] Lane 4. The failure comment lands on the card. Save `lane-4-failure-comment.png`. Pass when the comment body carries the reason and no secret appears.
-- [ ] Lane 5. The finish comment lands on the card with the thread id. Save `lane-5-finish-comment.png`. Pass when the comment shows the card, the result and the thread id.
-- [ ] Lane 6. The reminder is set on the card for 30 seconds ahead. Save `lane-6-reminder.json`. Pass when the mutation returns success and the reminder time is within a minute.
-- [ ] Lane 7. The Start screen states the ping line and it is not a control. Save `lane-7-ping-line.png`. Pass when the line renders as text and has no input or button.
-- [ ] Lane 8. Three runs finish at once and each card gets its own comment. Save `lane-8-three-pings.png`. Pass when three comments exist, one per card, with no duplicates.
-- [ ] Lane 9. Phone 390 by 844 with the failed pill, showing word and colour. Save `lane-9-phone.png`. Pass when the pill word and the rose colour both show and the reason is not cut off.
-- [ ] Lane 10. Console and network. Save `lane-10-console.png`. Pass when zero console errors appear and a failed ping shows the run as finished with an unnotified mark.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
+- [ ] Lane 1. Open the report at 1280 wide, Small section. Save `docs/scorecards/jul-276/pr-6/lane-1.png`. Pass when three Small runs list reasoning tokens, helper model and cost and none is marked failed.
+- [ ] Lane 2. Medium section. Save `docs/scorecards/jul-276/pr-6/lane-2.png`. Pass when three Medium runs are listed beside the Small figures.
+- [ ] Lane 3. Large section. Save `docs/scorecards/jul-276/pr-6/lane-3.png`. Pass when three Large runs are listed and the highest level is visible.
+- [ ] Lane 4. Unlimited section. Save `docs/scorecards/jul-276/pr-6/lane-4.png`. Pass when three Unlimited runs are listed and every helper they spawned carries the same level.
+- [ ] Lane 5. Pack table. Save `docs/scorecards/jul-276/pr-6/lane-5.png`. Pass when plan and build both name the chosen model in all twelve runs.
+- [ ] Lane 6. Helper table. Save `docs/scorecards/jul-276/pr-6/lane-6.png`. Pass when every run lists the helper it spawned with a model and a token count.
+- [ ] Lane 7. Cost table. Save `docs/scorecards/jul-276/pr-6/lane-7.png`. Pass when every run has a cost row per model read from that run's own trace database.
+- [ ] Lane 8. Guard log. Save `docs/scorecards/jul-276/pr-6/lane-8.png`. Pass when a 60,000 byte write was refused with `write this in parts` and the same file then landed in three accepted writes.
+- [ ] Lane 9. Reset log. Save `docs/scorecards/jul-276/pr-6/lane-9.png`. Pass when a forced reset was retried after the first wait and the run finished.
+- [ ] Lane 10. Observer log. Save `docs/scorecards/jul-276/pr-6/lane-10.png`. Pass when an injected observer error left the run running and the status word unchanged.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Metric. Share of probe runs whose trace database holds model rows after shutdown.
+- [ ] Probe. Query each run's `metric_events` for model token rows, twelve runs.
+- [ ] Baseline. All twelve runs, and a cost read under five seconds per run.
+- [ ] Rule. Twelve of twelve must hold rows and no read may pass five seconds.
 
-- [ ] Metric. Time from child exit to the card comment existing, five samples, median reported.
-- [ ] Probe. Run one practice build to completion at the previous head, where no ping exists, and five at this head, timing with `date +%s` around the Linear read.
-- [ ] Baseline. Record the previous head first, which has no ping, so the baseline is the absent fact plus the run time.
-- [ ] Rule. Ping under 30 seconds median after exit and under 90 seconds at worst. Over 90 seconds fails, because a phone notification that late is a lie about the build.
-
-**Review gate.** Todd reviews before merge.
-
-- [ ] Copy lane 2, 3, 5 and 9 screenshots into `docs/scorecards/jul-276/pr-7/review/`.
-- [ ] Record a 30 to 60 second video of a failed start, the reason, Try again, and the comment landing. Save it as `docs/scorecards/jul-276/pr-7/review/pr-7.mp4`.
-- [ ] Post the screenshots, the phone notification screenshot and the video in chat. Stop at merge-ready. Wait for the operator's click.
+**Review gate.** None. There is no screen in this PR, and the provisioning note is your approved exception.
 
 **Merge.**
+- [ ] Merge on gates plus your approval of the exception, confirm main CI is green on that commit, and comment the commit on JUL-276.
 
-- [ ] Root's clean verdict at the exact head SHA.
-- [ ] Bugbot triage done.
-- [ ] Rebased onto current trunk after the verdict, patch-id unchanged.
-- [ ] Owner squash-merges its own PR and confirms main CI green on the merge commit.
-- [ ] Card moves to Complete in Linear with the merge commit in a comment after Todd's UAT yes.
+## PR-7 Start and stop a real build from the screen
+
+**Depends on.** PR-5 and PR-6, the saved choice and the proven worker.
+
+**Files.**
+- [ ] Create `dashboard/lib/runs.js`, `dashboard/lib/supervisor.js` and `dashboard/lib/runs.test.mjs`.
+- [ ] Create `dashboard/app/api/runs/route.js`, `dashboard/app/api/runs/[id]/stop/route.js` and `dashboard/app/api/runs/[id]/events/route.js`.
+- [ ] Create `dashboard/kickoff.md`, the versioned instructions a build starts from.
+- [ ] Wire Start on `dashboard/app/start/[card]/page.jsx` and add `set-state` to `scripts/linear-cli.mjs`.
+
+**Build.**
+- [ ] Start writes a run file atomically and only then spawns `dashboard/worker/run-build.mjs` detached in its own session, so a dashboard restart leaves the build running.
+- [ ] Each run gets a worktree at `~/builds/<card>-<runId>` from `origin main` and a branch `card/JUL-<n>`, and the card moves to Implementation before the first model call.
+- [ ] The button reads `Starting…`, then `Running` on the first worker event, and the screen shows the current step and the time since the last event.
+- [ ] Start re-checks the card is still Ready and refuses with a plain rose line when it is not, so a stale page cannot start a card twice.
+- [ ] Stop opens `Stop this build? The work is kept.`, sends SIGTERM on yes, leaves the branch and the worktree, keeps the card in Implementation, and a later Start reuses the branch.
+- [ ] Several cards start, run and stop at once, one worker process and one trace database each.
+- [ ] The supervisor rebinds after a dashboard restart by reading the run files and checking each pid, and records a dead pid as exited with its reason.
+- [ ] `kickoff.md` tells the build to work in the worktree, commit and push as it goes, open the pull request with the scorecard line, and stop at the merge gate.
+
+**You see.**
+- [ ] A real build start, report its current step and stop, from your phone, with the branch and the work left behind.
+
+**Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] The run file is tested for atomic writes under a mid-write crash, and the test fails when a half written file is read as a run.
+- [ ] Admission is tested on a Ready card, a moved card and a card already running, and the test fails when a second worker starts.
+- [ ] Rebind is tested on a live pid, a dead pid and a vanished worktree, and the test fails when a dead run still reads as running.
+
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
+- [ ] Lane 1. Press Start with a fixture worker. Save `docs/scorecards/jul-276/pr-7/lane-1.png`. Pass when the button reads `Starting…` then `Running` and a run file exists.
+- [ ] Lane 2. Watch the current step across two worker events. Save `docs/scorecards/jul-276/pr-7/lane-2.png`. Pass when the step text changes without a reload.
+- [ ] Lane 3. Press Stop. Save `docs/scorecards/jul-276/pr-7/lane-3.png`. Pass when the dialog reads `Stop this build? The work is kept.`
+- [ ] Lane 4. Confirm Stop. Save `docs/scorecards/jul-276/pr-7/lane-4.png`. Pass when the button returns to Start, the branch still exists and the worktree still holds the work.
+- [ ] Lane 5. Confirm the card after stop. Save `docs/scorecards/jul-276/pr-7/lane-5.png`. Pass when Linear still reports the card in Implementation.
+- [ ] Lane 6. Start the same card again. Save `docs/scorecards/jul-276/pr-7/lane-6.png`. Pass when the branch is reused rather than recreated and no old run file is deleted.
+- [ ] Lane 7. Restart the dashboard during a run. Save `docs/scorecards/jul-276/pr-7/lane-7.png`. Pass when the build is still running and the screen reads Running again.
+- [ ] Lane 8. Start two cards at once. Save `docs/scorecards/jul-276/pr-7/lane-8.png`. Pass when both read Running, each with its own run file and its own trace database.
+- [ ] Lane 9. Press Start twice quickly on one card. Save `docs/scorecards/jul-276/pr-7/lane-9.png`. Pass when exactly one worker process exists.
+- [ ] Lane 10. Walk lanes 1, 3 and 7 at 390 by 844. Save `docs/scorecards/jul-276/pr-7/lane-10.png`. Pass when every control is tappable and the console shows no error.
+
+**Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Metric. Seconds from pressing Start to the button reading `Running`.
+- [ ] Probe. A Playwright timing from the tap to the Running assertion, five starts, take the median.
+- [ ] Baseline. 10 seconds.
+- [ ] Rule. The median must be at or under the baseline, and no start may exceed 20 seconds.
+
+**Review gate.**
+- [ ] Send you a phone screenshot pair of Starting and Running, a 30 to 60 second video of start, step change and stop, and the operator note that the branch and work survived the stop.
+- [ ] Merge waits for your yes in chat.
+
+**Merge.**
+- [ ] Merge with a merge commit, confirm main CI is green on that commit, and comment the commit on JUL-276.
+
+## PR-8 Did not start, try again, the finish ping, and several builds at once
+
+**Depends on.** PR-7, the run that can fail.
+
+**Files.**
+- [ ] Extend `dashboard/lib/ping.js` with `finishPing` and add `dashboard/lib/ping.test.mjs`.
+- [ ] Extend `dashboard/lib/supervisor.js` and `dashboard/worker/run-build.mjs` for the failed, retried and finished cases.
+- [ ] Add the failed, stopped and finished states to `dashboard/app/start/[card]/start-screen.jsx`.
+
+**Build.**
+- [ ] A failed start shows a rose `Didn't start` pill, one plain line naming the reason, and `Try again`.
+- [ ] The same failure posts a Linear notification on the card, so it reaches your phone, and never claims the build did anything.
+- [ ] A finished build posts a comment on the card and sets a reminder, reusing the stop ping path that already reaches your phone.
+- [ ] Observer errors never mark a run failed, which PR-6 proved, and the screen says nothing about them.
+- [ ] `Try again` starts a fresh run with a new run id, reuses the branch, and never reuses the failed run's leftover state.
+- [ ] Two builds at once keep their own status, their own log and their own stop button, and one stopping leaves the other running.
+
+**You see.**
+- [ ] A failure that names its reason and offers Try again, and a ping on your phone when a build finishes.
+
+**Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] The reason line is tested on a missing key, a missing model and a dead worker, and the test fails when a raw stack reaches the screen.
+- [ ] `finishPing` is tested, and the test fails when a finished run sends no comment or sends two.
+- [ ] Try again is tested, and the test fails when the new run keeps the old run id.
+
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
+- [ ] Lane 1. Start with a broken key fixture. Save `docs/scorecards/jul-276/pr-8/lane-1.png`. Pass when the rose `Didn't start` pill shows and no build claims to run.
+- [ ] Lane 2. Read the reason line. Save `docs/scorecards/jul-276/pr-8/lane-2.png`. Pass when it is one plain sentence with no stack and no jargon.
+- [ ] Lane 3. Press `Try again` with the key restored. Save `docs/scorecards/jul-276/pr-8/lane-3.png`. Pass when a new run id appears and the button reaches Running.
+- [ ] Lane 4. Open the card in Linear after a finish. Save `docs/scorecards/jul-276/pr-8/lane-4.png`. Pass when one comment names the run and its result.
+- [ ] Lane 5. Read the reminder record. Save `docs/scorecards/jul-276/pr-8/lane-5.png`. Pass when one reminder exists for that card and its target is your profile.
+- [ ] Lane 6. Open the failed card in Linear. Save `docs/scorecards/jul-276/pr-8/lane-6.png`. Pass when the failure notification is on the card and names the reason.
+- [ ] Lane 7. Start two cards, stop one. Save `docs/scorecards/jul-276/pr-8/lane-7.png`. Pass when the other still reads Running with its own log growing.
+- [ ] Lane 8. Repeat lanes 1 and 7 at 390 by 844. Save `docs/scorecards/jul-276/pr-8/lane-8.png`. Pass when the pill is readable and both rows stay tappable.
+- [ ] Lane 9. Press Back from a failed card. Save `docs/scorecards/jul-276/pr-8/lane-9.png`. Pass when the card keeps its stage and the list shows it with a Start again.
+- [ ] Lane 10. Walk lanes 1, 3 and 7 twice. Save `docs/scorecards/jul-276/pr-8/lane-10.png`. Pass when the console shows no error and no duplicate worker exists.
+
+**Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Metric. Seconds from worker exit to the pill and its reason being on screen.
+- [ ] Probe. A Playwright timing from the fixture worker exit to the pill assertion, five failures, take the median.
+- [ ] Baseline. 5 seconds for the pill, 30 seconds for the Linear notification.
+- [ ] Rule. Every pill inside five seconds and every notification inside thirty seconds, in five runs out of five.
+
+**Review gate.**
+- [ ] Send you a phone screenshot pair of the pill and of the Linear comment, a 30 to 60 second video of fail, reason and Try again, and the operator note that the reminder target was your profile.
+- [ ] Merge waits for your yes in chat.
+
+**Merge.**
+- [ ] Merge with a merge commit, confirm main CI is green on that commit, and comment the commit on JUL-276.
+
+## PR-9 Sentry and Axiom in the dashboard's own project and dataset
+
+**Depends on.** PR-8, and your two values, which PR-9 is the only PR that waits for.
+
+**Files.**
+- [ ] Create `dashboard/lib/telemetry.js` and `dashboard/lib/telemetry.test.mjs`.
+- [ ] Create `dashboard/instrumentation.js` and `dashboard/app/telemetry-report/page.jsx`.
+- [ ] Add `DASHBOARD_SENTRY_DSN`, `DASHBOARD_AXIOM_TOKEN` and `DASHBOARD_AXIOM_DATASET` to `scripts/julia-agents.env` as references, never as values.
+- [ ] Create `dashboard/docs/telemetry.md`.
+
+**Build.**
+- [ ] Ask you once, at arm time, for a Sentry project `julia-dashboard` and an Axiom dataset `julia-dashboard`, because today's Sentry token carries only `project:releases`, `event:read` and `org:read`, and today's Axiom token answers 403 on dataset create. PR-9 is the only PR that waits for these.
+- [ ] Send Start, Stop, build state change and price sweep to the dashboard's own Axiom dataset, with fixed fields only and no free text.
+- [ ] Send errors to the dashboard's own Sentry project with a code and a run id, never a message body.
+- [ ] Neither sender throws, and a missing value downgrades to a warning, following the shape `lib/boot-events.js` already proves in Julia's app.
+- [ ] The watchdog down ping stays exactly as PR-2 shipped it, so an outage never depends on Sentry or Axiom to reach you.
+- [ ] `telemetry-report` lists the last twenty events and the last error, and only renders when `DASHBOARD_REPORT=1`.
+
+**You see.**
+- [ ] Your build activity in the dashboard's own Axiom dataset and its errors in its own Sentry project, kept apart from Julia's.
+
+**Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Event shape is tested, and the test fails when a free text field reaches Axiom.
+- [ ] The missing value path is tested, and the test fails when telemetry raises into a request.
+- [ ] The blocked network path is tested, and the test fails when a request waits on telemetry.
+
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
+- [ ] Lane 1. Start a build and open the report. Save `docs/scorecards/jul-276/pr-9/lane-1.png`. Pass when a start event shows with its run id and dataset name.
+- [ ] Lane 2. Stop that build. Save `docs/scorecards/jul-276/pr-9/lane-2.png`. Pass when a stop event shows beside the start event.
+- [ ] Lane 3. Read a state change row. Save `docs/scorecards/jul-276/pr-9/lane-3.png`. Pass when it names starting, running and finished in order.
+- [ ] Lane 4. Run the sweep by hand. Save `docs/scorecards/jul-276/pr-9/lane-4.png`. Pass when one sweep row shows with added and retired counts.
+- [ ] Lane 5. Force a worker error. Save `docs/scorecards/jul-276/pr-9/lane-5.png`. Pass when the report lists it and the Sentry project holds the same code.
+- [ ] Lane 6. Unset the Axiom token and start a build. Save `docs/scorecards/jul-276/pr-9/lane-6.png`. Pass when the build runs and one warning shows.
+- [ ] Lane 7. Block the telemetry hosts. Save `docs/scorecards/jul-276/pr-9/lane-7.png`. Pass when Start and Stop still answer inside the perf gate.
+- [ ] Lane 8. Open the report at 390 by 844. Save `docs/scorecards/jul-276/pr-9/lane-8.png`. Pass when rows are readable and no label is cut.
+- [ ] Lane 9. Open the dashboard with `DASHBOARD_REPORT` unset. Save `docs/scorecards/jul-276/pr-9/lane-9.png`. Pass when the report route answers 404.
+- [ ] Lane 10. Walk lanes 1 to 5 twice. Save `docs/scorecards/jul-276/pr-9/lane-10.png`. Pass when the console shows no error and no duplicate event is sent.
+
+**Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
+- [ ] Metric. Milliseconds added to a Start or Stop request by the telemetry send.
+- [ ] Probe. Compare the same request with telemetry on and off, twenty samples each, take the medians.
+- [ ] Baseline. 50 ms added at the median, and 5 percent on time to first byte.
+- [ ] Rule. The median must be at or under the baseline in two runs out of three.
+
+**Review gate.**
+- [ ] Send you a screenshot of the report page, a 30 to 60 second video of a build whose events land in Axiom and fail into Sentry, and the operator note that Julia's own dataset was untouched.
+- [ ] Merge waits for your yes in chat.
+
+**Merge.**
+- [ ] Merge with a merge commit, confirm main CI is green on that commit, and comment the commit on JUL-276.
 
 ## Close the program
 
-- [ ] Every box above is checked with its evidence.
-- [ ] Todd has opened the dashboard on his phone over Tailscale and started, watched and stopped a real build.
-- [ ] Reply to Todd with the screenshots at phone width and desktop, the seven merged PRs with their commit SHAs, the effort report, and the three answers he gave at the start.
+The program is finished when all nine PRs are merged to main, main CI is green on each merge commit, each commit is commented on JUL-276, and each PR's scorecard is written and committed. The two practice cards you asked for are created by the agent in the Dashboard project with titles starting `Practice:` and cancelled at the end, so nothing of theirs is left in Ready. The dashboard is running as a service from main at the tailnet address, the sweep timer is enrolled, and the standing issue `Dashboard service` is open for the watchdog. The decision records in `dashboard/docs/decisions/` carry every choice this program made, including the six decisions below that were taken while planning, and the card's own record is a comment naming the nine commits. Then JUL-276 goes Complete in Linear, and the retro waits for your approval as usual.
 
-## Appendix A. Prototype evidence
+## Appendix A Prototype evidence
 
-Prototype one, headless builds work. Worktree `/tmp/proto-run`, run `mastracode --prompt "Reply with the single word: ready" --model commandcode/deepseek/deepseek-v4.1-flash --thinking-level low --output jsonl --permission-mode deny`. Exit 0, 34 JSONL events, `result` carried status completed, 16,403 input tokens, thread `c270ed50-3282-4345-9dae-a07db91777fa`. The stream contained one malformed line, so the parser must tolerate bad lines.
+Everything here was run on this server today, and each result is what the plan leans on.
 
-Prototype two, per-role models reach helpers. `/tmp/proto-run/settings.json` plus `/tmp/proto-run/roles.md` written by the runner, prompt told the agent to read the role file and spawn one explore helper with that model. Event stream showed 81 occurrences of `"modelId":"openai/gpt-6.1-sol"`, and `scripts/scorecard.mjs` `readThreads` showed the subagent call with `{agentType: 'explore', modelId: 'openai/gpt-6.1-sol'}`. No new code beyond writing two files and one prompt line.
+- The headless CLI runs, exits 0, and emits 34 JSONL events with a thread id and usage, so a worker can read live status from the stream.
+- The CLI never flushes traces. Two per-run trace databases stayed empty after clean exits, and `run-mc.js` ends without a shutdown call, which is why the worker drives the SDK in process instead.
+- The SDK path with `getMastra().shutdown()` wrote a 3.6 MB trace database with model token rows for the run, so cost recording can stay on for every build.
+- Two concurrent CLI runs collided on one thread lock because both resumed the most recent thread. Two concurrent runs with their own app data dirs both exited 0, so per-run folders are the isolation rule.
+- `listAvailableModels()` answered 8,243 models with 142 carrying a key, split 17 anthropic, 52 openai, 72 commandcode and 1 mastracode, so the sweep has an account-scoped source.
+- The Sentry token cannot create a project and the Axiom token cannot create a dataset, both checked read only, so the two values are one click for you.
+- The pack beats the launch model. `activeModelPackId` is `custom:sol/deepseek` and that is why today's session ran DeepSeek in build mode and GPT-6.1 Sol in plan mode.
+- The connection reset was reproduced on purpose. Eight concurrent long requests reset seven times with `read ECONNRESET` on a 200 stream, the same signature as the failures in this session, and short replies never failed.
+- The cap was tested and rejected. Six concurrent long requests with a 10,000 token cap passed 6 of 6, and five of them stopped at the cap, which is why output stays at the model maximum and the fix is a write guard plus a retry.
+- The observer never decides a run. All three observer resets recovered within a second while the main turn kept issuing tool calls.
 
-Prototype three, effort is a signal only. Same prompt and helper model at xhigh gave 162 reasoning tokens in thread `976fcdf6-8e78-4a96-a5ce-bcf83879758d`, at low 71 in thread `6037f522-2a38-4c24-8870-976ffdd1accd`. One run each, so PR-5 turns this into nine runs per level before anything claims it.
+## Appendix B Decisions taken while planning this program
 
-Prototype four, parallel runs. Two headless runs launched together both exited 0 with the expected text, and the database reached 26 threads without visible corruption. The shell grouping in that probe misfiled one output file, so PR-5 repeats it with absolute paths.
+- Cost recording stays on for every dashboard build, solved with a per-run app data folder and a shutdown call rather than switched off, which is your 28 October instruction.
+- The dashboard is its own app in `dashboard/`, server only, with its own decision records and glossary, and it is never part of Julia's Vercel app.
+- The model list and every price come from the weekly sweep, and the screen shows only what the sweep saved, so no model reaches the screen without a price.
+- No output cap. Output stays at the model maximum per your 25 October decision, and the reset is answered with a size-refusing write guard and a retry with a growing wait.
+- The main session choice is applied as a model pack for plan and build, because a launch model is overwritten by the active pack.
+- An observer error is never a run failure, agreed on 28 October after all three today recovered on their own.
 
-Prototype five, the catalogue. `https://models.dev/api.json` fetch returned 200 and 5.9 MB, with anthropic `claude-opus-5` at 5 in and 25 out, openai `gpt-6.1-sol` at 2 in and 10 out, and no `deepseek-v4.1-flash` anywhere, which is why an unpriced model must show a plain marker.
+## Appendix C Risks and what this plan does about them
 
-Still unproven. That a prompt line is enough for every build to honour the role file in practice rather than by luck, that reasoning tokens per helper can be attributed reliably, and that a server restart can never orphan a child.
+- The sweep could read a pricing page whose shape changed and save a wrong price. Each parse has a fixture and a zero-result failure test, and the sweep log keeps the page it read with the date.
+- A per-run config home could lose the subscription credentials. The worker copies the settings and the auth file into the run folder, and the run fails as `Didn't start` with a plain reason rather than silently using another account.
+- A long build could be cut by a merge to main. The updater skips while any run is starting or running, and it is the only thing allowed to move the deployed checkout.
+- A restarted dashboard could lose track of a running build. Workers run detached in their own session and the supervisor rebinds from run files and pid liveness.
+- The write guard could block a legitimate large file. It answers `write this in parts`, and the proof requires the same file to land in parts, so a blocked build keeps working rather than stalling.
+- Telemetry could slow the screen down. Both senders never throw and are measured against a 50 ms median budget with the network blocked.
 
-## Appendix B. Alternatives rejected
+## Appendix D Links
 
-A separate runner service, rejected because two units to deploy and restart means two failure modes and a second port, and the Next process already has the lifecycle hook it needs.
+- The card is JUL-276 in the Julia-next team, with the Start screen controls and sources document attached to it as a Linear document.
+- The approved design is the picture set from 27 October, picture 08 for this screen and picture 12 for the colours.
+- The decisions this program must obey are 0007, 0009, 0011 to 0016 and 0020 to 0022, ported into `dashboard/docs/decisions/` by PR-1.
+- The runner is a Mastra workflow per your 27 October decision, and the worker in PR-6 is the piece that runs one build.
+- The stop ping path that the finish ping follows is `scripts/stop-ping.mjs` with ADR 0024, already in main.
 
-A Vercel host for the dashboard, rejected because the machine that starts builds is this server and the page must talk to it locally. The route ships but stays 404 unless `DASHBOARD_MACHINE=1`.
-
-Running builds through the `@mastra/core` controller API instead of a headless child, rejected because a crash in one build would take the dashboard with it, and the CLI path is proven.
-
-A per-run isolated HOME holding its own `.agents/pstack-models.md`, rejected as heavier, because it needs symlinked skills and a copy of the auth state.
-
-Bundled `pricing-data.json` alone for the model list, rejected because a new model would never appear and the card requires the list to refresh itself. The bundled table stays as the last-resort fallback.
-
-Piping build events into `mastra.db` instead of a per-run `events.jsonl`, rejected for the first version because the CLI already writes what we need and a file per run is trivial to read back.
-
-## Appendix C. Risks
-
-PR-6 is the largest PR and may split inside its owner, per Todd's 28 October decision that pstack slices big cards at build time. Watch the run record and the supervisor boundary, which is where the split goes.
-
-The prompt line that delivers per-run role models depends on the build obeying it. PR-5 proves it for the probe, and the kickoff file in PR-6 keeps it short and explicit. If a build ignores it, the fallback is the isolated HOME, which costs a day.
-
-1Password must be unlocked for Linear reads and pings. A locked vault shows as the failed state on the page and as an unnotified run, never as a silent success.
-
-CommandCode's DeepSeek V4.1 Flash has no published price. Todd sees the no-price marker on his own main coding model, which is honest but may look like a bug. The ADR records why.
-
-`verify-julia` is the control skill because no `control-ui` skill is installed here. It drives Playwright against a local port, which is enough for every lane but gives no cloud isolation.
-
-Several runs share one LibSQL database at `~/.local/share/mastracode/mastra.db`. Tracing is off for dashboard runs because only one process can hold the trace file. Concurrent writes were proven once and are watched in PR-6 lane 6.
-
-## Appendix D. Links and reading list
-
-Read before editing, `docs/design/` pictures on branch `pilot/dashboard-d2` at commit `19f3a31`, `docs/adr/0024-run-scorecard-and-stop-ping.md`, `docs/agents/server-runbook.md`, `docs/agents/issue-tracker.md`, `docs/plans/path-forward.md`, and the installed Next docs under `node_modules/next/dist/docs/` before writing any route.
-
-PR-2 and PR-6 get a `how` pass on the models catalogue and the supervisor, and a `interrogate` pass before their code-ready report, because both carry behaviour that is hard to see on screen.
-
-The decision trail per `show-me-your-work` lives at `docs/scorecards/jul-276/trail.tsv`, one row per decision with its evidence.
