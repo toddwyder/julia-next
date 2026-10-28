@@ -16,8 +16,11 @@ Next 16.3.5 builds with a dashboard-local Turbopack root. The built server has n
 - Root local owner check exited 0 and discovered dashboard automatically.
 - Live list, Start and Back browser tests exited 0 on both viewports.
 - Real empty-list proof is blocked by unrelated Ready JUL-276. It is not filtered or moved.
-- Slow connection proof and performance checks are pending in this checkpoint.
+- Real delayed-connection proof passed. Loading preceded the real Ready list. See [verification details](verification.md).
+- The production benchmark passed the fixed TTFB ceiling. Every timed response contained the real Ready cards. Streaming TTFB excludes Linear completion, so full-response measurements are retained too.
 - A 35-second phone list, Start and Back video is retained in durable owner evidence. It is not a phone hardware or tailnet UAT claim.
 - Todd's UAT and the coordinator's independent swarm are pending. This is self-proof only. No merge or deployment is authorized.
 
 Durable proof directory is `/home/ubuntu/verifications/jul-276/program/owner-1`. The scorecard in the parent folder is generated from actual records, with UAT undecided and unpriced usage explicitly retained.
+
+The refreshed scorecard is program-wide, not a PR-1-only cost receipt. It selects the earlier PR #371. PR-1 is #372. Unpriced rows and missing stop-ping receipts remain gaps, not zero-cost or success claims.
