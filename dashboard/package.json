@@ -1,0 +1,23 @@
+{
+  "name": "julia-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname ${DASHBOARD_HOST:?Set DASHBOARD_HOST} --port 4313",
+    "build": "next build",
+    "start": "next start --hostname ${DASHBOARD_HOST:?Set DASHBOARD_HOST} --port 4313",
+    "lint": "eslint --no-config-lookup --ext .jsx,.js,.mjs --parser-options '{\"ecmaVersion\":\"latest\",\"sourceType\":\"module\",\"ecmaFeatures\":{\"jsx\":true}}' --rule 'no-unreachable:error' --rule 'no-constant-condition:error' --rule 'eqeqeq:error' app lib tests playwright.config.mjs",
+    "test": "node --test lib/*.test.mjs",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "next": "16.3.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "eslint": "^10.11.0"
+  }
+}
