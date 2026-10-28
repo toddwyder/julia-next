@@ -15,9 +15,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const stop = process.env.DASHBOARD_PROGRAM_STOP;
   if (stop && existsSync(stop)) {
     process.stdout.write(JSON.stringify({ decision: 'block', reason: 'Program STOP is present' }));
+    process.exitCode = 2;
   } else {
     const result = guardWrite(input);
     if (process.env.DASHBOARD_GUARD_LOG) appendFileSync(process.env.DASHBOARD_GUARD_LOG, JSON.stringify({ at: new Date().toISOString(), tool: input.tool_name, path: input.tool_input?.path, ...result }) + '\n', { mode: 0o600 });
     process.stdout.write(JSON.stringify(result));
+    process.exitCode = result.decision === 'block' ? 2 : 0;
   }
 }

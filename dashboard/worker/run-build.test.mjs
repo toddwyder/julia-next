@@ -18,7 +18,7 @@ for (const [bytes, decision] of [[23999, 'allow'], [24000, 'allow'], [24001, 'bl
 test('guard counts UTF-8 bytes rather than characters', () => assert.equal(guardWrite({ tool_name: 'write_file', tool_input: { content: '🙂'.repeat(6001) } }).decision, 'block'));
 test('guard CLI speaks the installed hook protocol', () => {
   const result = spawnSync(process.execPath, ['guarded-write.mjs'], { cwd: import.meta.dirname, input: JSON.stringify({ tool_name: 'write_file', tool_input: { content: 'x'.repeat(60000) } }), encoding: 'utf8' });
-  assert.equal(result.status, 0);
+  assert.equal(result.status, 2);
   assert.equal(JSON.parse(result.stdout).reason, 'write this in parts');
 });
 for (const failures of [1, 3, 5]) test(`retry after ${failures} real-shaped reset results`, async () => {
@@ -92,4 +92,52 @@ test('suspended SDK results never report a completed build', async () => {
   const result = { exitCode: 0, status: 'completed', finishReason: 'suspended' };
   assert.equal(mapStatus({ result }), 'failed');
   await assert.rejects(retryTurn(async () => result));
+});
+
+test('installed SDK HookManager refuses oversized writes from the isolated config home', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'worker-hook-test-'));
+  const oldLog = process.env.DASHBOARD_GUARD_LOG;
+  try {
+    const home = join(root, 'home');
+    mkdirSync(join(home, '.mastracode'), { recursive: true });
+    const guard = join(import.meta.dirname, 'guarded-write.mjs');
+    writeFileSync(join(home, '.mastracode/hooks.json'), JSON.stringify({ PreToolUse: [{ type: 'command', command: `${JSON.stringify(process.execPath)} ${JSON.stringify(guard)}` }] }));
+    process.env.DASHBOARD_GUARD_LOG = join(root, 'guard.jsonl');
+    const sdkRoot = new URL('.', import.meta.resolve('@mastra/code-sdk'));
+    const { HookManager } = await import(new URL('hooks/manager.js', sdkRoot));
+    const manager = new HookManager(root, 'fixture', '.mastracode', home);
+    assert.equal((await manager.runPreToolUse('write_file', { path: 'proof.txt', content: 'x'.repeat(60000) })).allowed, false);
+    assert.equal((await manager.runPreToolUse('write_file', { path: 'proof.txt', content: 'x'.repeat(20000) })).allowed, true);
+    const events = readFileSync(process.env.DASHBOARD_GUARD_LOG, 'utf8').trim().split('\n').map(JSON.parse);
+    assert.deepEqual(events.map(e => e.decision), ['block', 'allow']);
+    assert.equal(events[0].reason, 'write this in parts');
+    const outside = new HookManager(root, 'outside', '.mastracode', join(root, 'other-home'));
+    assert.equal((await outside.runPreToolUse('write_file', { content: 'x'.repeat(60000) })).allowed, true);
+  } finally {
+    if (oldLog === undefined) delete process.env.DASHBOARD_GUARD_LOG;
+    else process.env.DASHBOARD_GUARD_LOG = oldLog;
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('trace reader uses the installed timestamp column and distinguishes missing prices', async () => {
+  const { DuckDBInstance } = await import('@duckdb/node-api');
+  const { readRunTrace } = await import('./trace-cost.mjs');
+  const root = mkdtempSync(join(tmpdir(), 'worker-trace-test-'));
+  const path = join(root, 'trace.duckdb');
+  try {
+    const db = await DuckDBInstance.create(path);
+    const connection = await db.connect();
+    try {
+      await connection.run('CREATE TABLE metric_events(threadId VARCHAR, entityName VARCHAR, provider VARCHAR, model VARCHAR, name VARCHAR, value DOUBLE, estimatedCost DOUBLE)');
+      await connection.run("INSERT INTO metric_events VALUES ('thread', 'Code Agent', 'provider', 'model', 'mastra_model_total_input_tokens', 10, 0.02), ('thread', 'Explore Subagent', 'provider', 'model', 'mastra_model_total_output_tokens', 3, NULL)");
+      await connection.run('CREATE TABLE span_events(spanId VARCHAR, parentSpanId VARCHAR, threadId VARCHAR, name VARCHAR, entityName VARCHAR, attributes VARCHAR, errorPreview VARCHAR, timestamp TIMESTAMP, endedAt TIMESTAMP, spanType VARCHAR)');
+    } finally { connection.closeSync(); db.closeSync(); }
+    const trace = await readRunTrace(path);
+    assert.equal(trace.rowCount, 2);
+    assert.equal(trace.models[0].usd, 0.02);
+    assert.equal(trace.models[0].unpriced, true);
+    assert.equal(trace.models[0].tokens.mastra_model_total_output_tokens, 3);
+    assert.equal(trace.generations.length, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
