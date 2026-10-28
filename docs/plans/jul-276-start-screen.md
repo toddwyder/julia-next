@@ -80,7 +80,10 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 
 - [ ] Create the lane worktree from the PR head, run `npm ci` in `dashboard/`, then `npm run build`.
 - [ ] Start the app on port `3100 + N` bound to `127.0.0.1`, with `DASHBOARD_STATE_DIR` pointed at a fresh per-lane folder under `/tmp/jul-276-lanes/pr-N`.
-- [ ] Seed the lane's state from fixtures, never from production state, and never point a lane at the live state folder.
+- [ ] Keep local run files and trace databases in the lane's isolated state folder, never the deployed dashboard's folder. Read real Linear state and use the two real practice cards for builds. Fixtures remain allowed for unit tests, not as live proof.
+- [ ] Record every live lane's real input, card ids, commands, observed result and cleanup. Reserve the practice cards and any shared Linear mutations so parallel lanes cannot interfere. For the empty-list check, move the practice cards out of Ready and restore them afterward; do not move unrelated cards. If unrelated Ready cards prevent an empty result, report the blocker rather than filtering the real list.
+- [ ] Produce slow reads by delaying the lane server's real outbound Linear connection, not by returning a recorded answer. Produce failed reads by starting that lane's dashboard without its Linear key. Restore the connection and key after each check.
+- [ ] Name any state that cannot be produced for real, show the attempted reproduction and ask Todd before using a stand-in. A missing reproduction remains unverified, never PASS.
 - [ ] Open one browser context at 390 by 844 for phone and one at 1280 by 800 for desktop, then follow the lane's steps exactly.
 - [ ] Save the screenshot the lane names. A lane fails when its screenshot is missing, when the predicate is unmet, or when the browser console logs an error.
 - [ ] Stop the app and release the port at the end of the lane.
@@ -113,19 +116,19 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 - [ ] `node scripts/test-owners.mjs --run local` picks up `dashboard/` as its own owner and runs its tests in CI with no registry change.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
-- [ ] Lane 1. Open the list at 390 by 844. Save `docs/scorecards/jul-276/pr-1/lane-1.png`. Pass when three seeded Ready cards show title and Start and no label is cut.
-- [ ] Lane 2. Open the list at 1280 by 800. Save `docs/scorecards/jul-276/pr-1/lane-2.png`. Pass when the same three cards show in one column and every Start is reachable.
+- [ ] Lane 1. Put the two real practice cards in Ready and open the list at 390 by 844. Save `docs/scorecards/jul-276/pr-1/lane-1.png`. Pass when the list matches a fresh Linear read, both practice cards show title and Start, and no label is cut.
+- [ ] Lane 2. Open the list at 1280 by 800. Save `docs/scorecards/jul-276/pr-1/lane-2.png`. Pass when the same real Ready cards show in one column and every Start is reachable.
 - [ ] Lane 3. Press Start on the first card. Save `docs/scorecards/jul-276/pr-1/lane-3.png`. Pass when the screen shows that card's title, a Back, and the card id in the URL.
 - [ ] Lane 4. Press Back. Save `docs/scorecards/jul-276/pr-1/lane-4.png`. Pass when the list returns and Linear still reports the card as Ready.
-- [ ] Lane 5. Load the empty fixture. Save `docs/scorecards/jul-276/pr-1/lane-5.png`. Pass when a plain empty message shows and no Start is offered.
-- [ ] Lane 6. Load the slow Linear fixture. Save `docs/scorecards/jul-276/pr-1/lane-6.png`. Pass when a loading state shows before any card.
-- [ ] Lane 7. Load the failing Linear fixture. Save `docs/scorecards/jul-276/pr-1/lane-7.png`. Pass when a rose line names the failure and no card is invented.
+- [ ] Lane 5. Move the practice cards out of the real Ready column, confirm Linear returns no Ready cards, and reload. Save `docs/scorecards/jul-276/pr-1/lane-5.png`. Pass when a plain empty message shows and no Start is offered. Restore the cards afterward; if other Ready cards prevent this state, use the blocker rule above.
+- [ ] Lane 6. Delay the lane server's real outbound Linear connection and reload. Save `docs/scorecards/jul-276/pr-1/lane-6.png`. Pass when loading shows before the real cards arrive. Remove the delay afterward.
+- [ ] Lane 7. Run the lane dashboard without its Linear key and reload. Save `docs/scorecards/jul-276/pr-1/lane-7.png`. Pass when a rose line names the real configuration failure and no card is invented. Restore the key afterward.
 - [ ] Lane 8. Repeat lane 1 at 200 percent zoom. Save `docs/scorecards/jul-276/pr-1/lane-8.png`. Pass when every Start stays tappable and nothing overlaps.
 - [ ] Lane 9. Walk the list, Start and Back twice each. Save `docs/scorecards/jul-276/pr-1/lane-9.png`. Pass when the console shows no error.
 - [ ] Lane 10. Repeat lane 9 on desktop. Save `docs/scorecards/jul-276/pr-1/lane-10.png`. Pass when every request succeeds and none answers 500.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
-- [ ] Metric. Time to first byte of `GET /` with a seeded list.
+- [ ] Metric. Time to first byte of `GET /` with real Ready cards read from Linear.
 - [ ] Probe. `curl -o /dev/null -s -w '%{time_starttransfer}'` against the lane server, ten times, take the median.
 - [ ] Baseline. 1,500 ms on this server.
 - [ ] Rule. The median must be at or under the baseline in two runs out of three.
@@ -217,7 +220,7 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 - [ ] The unpriced rule is tested, and the test fails when a model without a price reaches the screen.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
-- [ ] Lane 1. Open the Start screen at 390 by 844 with a seeded `models.json`. Save `docs/scorecards/jul-276/pr-3/lane-1.png`. Pass when the card title, the main model, the Shipping model and the effort summary all show with prices.
+- [ ] Lane 1. Open the Start screen at 390 by 844 with a `models.json` written by a real provider sweep. Save `docs/scorecards/jul-276/pr-3/lane-1.png`. Pass when the card title, the main model, the Shipping model and the effort summary all show with prices.
 - [ ] Lane 2. Open the same screen at 1280 by 800. Save `docs/scorecards/jul-276/pr-3/lane-2.png`. Pass when the same four pieces show and no price is cut.
 - [ ] Lane 3. Read every price on the screen. Save `docs/scorecards/jul-276/pr-3/lane-3.png`. Pass when each reads input and output per million tokens in the approved form.
 - [ ] Lane 4. Open the effort explanation. Save `docs/scorecards/jul-276/pr-3/lane-4.png`. Pass when it reads `How hard the models think. More brains is slower and costs more.`
@@ -229,7 +232,7 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 - [ ] Lane 10. Walk lanes 1, 4 and 8 twice. Save `docs/scorecards/jul-276/pr-3/lane-10.png`. Pass when the console shows no error.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
-- [ ] Metric. Time to first byte of the Start screen with a seeded `models.json`.
+- [ ] Metric. Time to first byte of the Start screen with a `models.json` written by a real provider sweep.
 - [ ] Probe. `curl -o /dev/null -s -w '%{time_starttransfer}'` against the lane server, ten times, take the median.
 - [ ] Baseline. 1,500 ms on this server.
 - [ ] Rule. The median must be at or under the baseline in two runs out of three.
@@ -378,8 +381,8 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 - [ ] Lane 6. Helper table. Save `docs/scorecards/jul-276/pr-6/lane-6.png`. Pass when every run lists the helper it spawned with a model and a token count.
 - [ ] Lane 7. Cost table. Save `docs/scorecards/jul-276/pr-6/lane-7.png`. Pass when every run has a cost row per model read from that run's own trace database.
 - [ ] Lane 8. Guard log. Save `docs/scorecards/jul-276/pr-6/lane-8.png`. Pass when a 60,000 byte write was refused with `write this in parts` and the same file then landed in three accepted writes.
-- [ ] Lane 9. Reset log. Save `docs/scorecards/jul-276/pr-6/lane-9.png`. Pass when a forced reset was retried after the first wait and the run finished.
-- [ ] Lane 10. Observer log. Save `docs/scorecards/jul-276/pr-6/lane-10.png`. Pass when an injected observer error left the run running and the status word unchanged.
+- [ ] Lane 9. Repeat the real long concurrent generations that triggered connection resets in the reproduction. Save `docs/scorecards/jul-276/pr-6/lane-9.png` and the request, reset and retry logs. Pass when a real reset is retried after the first wait and the run finishes. If no reset occurs, report the state as unverified and ask before any stand-in.
+- [ ] Lane 10. Repeat the real long concurrent generations that triggered observer errors in the reproduction. Save `docs/scorecards/jul-276/pr-6/lane-10.png` and the observer and worker logs. Pass when a real observer error leaves the run running with its status unchanged. If no observer error occurs, report the state as unverified and ask before any stand-in.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 - [ ] Metric. Share of probe runs whose trace database holds model rows after shutdown.
@@ -421,7 +424,7 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 - [ ] Rebind is tested on a live pid, a dead pid and a vanished worktree, and the test fails when a dead run still reads as running.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
-- [ ] Lane 1. Press Start with a fixture worker. Save `docs/scorecards/jul-276/pr-7/lane-1.png`. Pass when the button reads `Starting…` then `Running` and a run file exists.
+- [ ] Lane 1. Press Start to build a real practice card with the real worker and selected model. Use real practice-card builds for every Start, Running and Stop check below, including the timing probe. Save `docs/scorecards/jul-276/pr-7/lane-1.png`. Pass when the button reads `Starting…` then `Running` and a run file exists.
 - [ ] Lane 2. Watch the current step across two worker events. Save `docs/scorecards/jul-276/pr-7/lane-2.png`. Pass when the step text changes without a reload.
 - [ ] Lane 3. Press Stop. Save `docs/scorecards/jul-276/pr-7/lane-3.png`. Pass when the dialog reads `Stop this build? The work is kept.`
 - [ ] Lane 4. Confirm Stop. Save `docs/scorecards/jul-276/pr-7/lane-4.png`. Pass when the button returns to Start, the branch still exists and the worktree still holds the work.
@@ -471,9 +474,9 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 - [ ] Try again is tested, and the test fails when the new run keeps the old run id.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
-- [ ] Lane 1. Start with a broken key fixture. Save `docs/scorecards/jul-276/pr-8/lane-1.png`. Pass when the rose `Didn't start` pill shows and no build claims to run.
+- [ ] Lane 1. Start a real practice card with an unavailable model selected and keep the provider's actual failure response. Save `docs/scorecards/jul-276/pr-8/lane-1.png`. Pass when the rose `Didn't start` pill shows and no build claims to run.
 - [ ] Lane 2. Read the reason line. Save `docs/scorecards/jul-276/pr-8/lane-2.png`. Pass when it is one plain sentence with no stack and no jargon.
-- [ ] Lane 3. Press `Try again` with the key restored. Save `docs/scorecards/jul-276/pr-8/lane-3.png`. Pass when a new run id appears and the button reaches Running.
+- [ ] Lane 3. Select an available model and press `Try again` on the real practice card. Save `docs/scorecards/jul-276/pr-8/lane-3.png`. Pass when a new run id appears and the button reaches Running.
 - [ ] Lane 4. Open the card in Linear after a finish. Save `docs/scorecards/jul-276/pr-8/lane-4.png`. Pass when one comment names the run and its result.
 - [ ] Lane 5. Read the reminder record. Save `docs/scorecards/jul-276/pr-8/lane-5.png`. Pass when one reminder exists for that card and its target is your profile.
 - [ ] Lane 6. Open the failed card in Linear. Save `docs/scorecards/jul-276/pr-8/lane-6.png`. Pass when the failure notification is on the card and names the reason.
@@ -484,7 +487,7 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 - [ ] Metric. Seconds from worker exit to the pill and its reason being on screen.
-- [ ] Probe. A Playwright timing from the fixture worker exit to the pill assertion, five failures, take the median.
+- [ ] Probe. A Playwright timing from the real worker exit after an unavailable-model failure to the pill assertion, five real practice-card attempts, take the median.
 - [ ] Baseline. 5 seconds for the pill, 30 seconds for the Linear notification.
 - [ ] Rule. Every pill inside five seconds and every notification inside thirty seconds, in five runs out of five.
 
@@ -526,7 +529,7 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 - [ ] Lane 2. Stop that build. Save `docs/scorecards/jul-276/pr-9/lane-2.png`. Pass when a stop event shows beside the start event.
 - [ ] Lane 3. Read a state change row. Save `docs/scorecards/jul-276/pr-9/lane-3.png`. Pass when it names starting, running and finished in order.
 - [ ] Lane 4. Run the sweep by hand. Save `docs/scorecards/jul-276/pr-9/lane-4.png`. Pass when one sweep row shows with added and retired counts.
-- [ ] Lane 5. Force a worker error. Save `docs/scorecards/jul-276/pr-9/lane-5.png`. Pass when the report lists it and the Sentry project holds the same code.
+- [ ] Lane 5. Start a real practice-card build with an unavailable model to produce a real worker error. Save `docs/scorecards/jul-276/pr-9/lane-5.png`. Pass when the report lists it and the Sentry project holds the same code.
 - [ ] Lane 6. Unset the Axiom token and start a build. Save `docs/scorecards/jul-276/pr-9/lane-6.png`. Pass when the build runs and one warning shows.
 - [ ] Lane 7. Block the telemetry hosts. Save `docs/scorecards/jul-276/pr-9/lane-7.png`. Pass when Start and Stop still answer inside the perf gate.
 - [ ] Lane 8. Open the report at 390 by 844. Save `docs/scorecards/jul-276/pr-9/lane-8.png`. Pass when rows are readable and no label is cut.
