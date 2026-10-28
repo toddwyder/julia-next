@@ -75,7 +75,7 @@ Show counts and a one-line summary per item. Let the maintainer pick.
 
 4. **Grill (if needed).** If the request needs fleshing out, call the Skill tool twice, for "grilling" and "domain-modeling", and grill it into shape a round of questions at a time, sharpening domain terms and updating `GLOSSARY.md`/ADRs inline as decisions land.
 
-5. **Check the brief first.** Before showing Todd a draft brief, run `node scripts/check-agent-brief.mjs <draft-file>` and fix every finding. It refuses text copied from repository docs, criteria written as steps, implementation words in criteria, negations in criteria, and more than five criteria. Show the brief only after the check passes.
+5. **Check the brief first.** Before showing Todd a draft brief, run `node scripts/check-agent-brief.mjs <draft-file>` and fix every finding. It refuses text copied from repository docs, criteria written as steps, implementation words in criteria, and negations in criteria. Show the brief only after the check passes.
 
 6. **Apply the outcome:**
    - `ready-for-agent`: write the card in the brief shape ([AGENT-BRIEF.md](AGENT-BRIEF.md)) and make it the card description.

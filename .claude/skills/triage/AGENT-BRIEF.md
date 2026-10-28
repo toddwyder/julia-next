@@ -1,8 +1,8 @@
 # Writing a card
 
-A card is the contract an agent builds from. It has two parts. A short Outcome, and at most five acceptance criteria that describe what Todd sees. Triage writes this shape, and Start refuses any other.
+A card is the contract an agent builds from. It has two parts. A short Outcome, and the acceptance criteria that describe what Todd sees. There is no limit on how many; pstack slices a large card when it plans the build. Triage writes this shape.
 
-Run `node scripts/check-agent-brief.mjs <draft-file>` before showing Todd a draft. It refuses text copied from repository docs, criteria written as steps, implementation words, negations, and more than five criteria.
+Run `node scripts/check-agent-brief.mjs <draft-file>` before showing Todd a draft. It refuses text copied from repository docs, criteria written as steps, implementation words and negations.
 
 ## Shape
 
@@ -27,7 +27,7 @@ Those two sections are the whole card. Requirements, Contracts, Proof and Out of
 
 ## The criteria
 
-- Five at most. Every criterion earns its place.
+- Every criterion earns its place. A card needs as many as it takes to leave nothing for the builder to guess.
 - Each criterion describes something Todd can observe. If Todd cannot tell when it is true, rewrite it.
 - Write the outcome. "The Linear card shows a verdict per criterion", not "Add a verdict field".
 - Leave implementation words out. Name no files, functions, endpoints, schemas, or frameworks.
