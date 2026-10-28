@@ -39,7 +39,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 - [ ] On Todd's hold or stand-down, send every owner a zero-writes order at once.
 - [ ] Ask Todd once at arm to create the Sentry project `julia-dashboard` and Axiom dataset `julia-dashboard`, then save the Sentry DSN, Axiom token and dataset name in the `Julia agents` 1Password vault. Todd edits no files and pastes no secrets into chat. The agent retrieves the vault item references and adds `DASHBOARD_SENTRY_DSN`, `DASHBOARD_AXIOM_TOKEN` and `DASHBOARD_AXIOM_DATASET` to `scripts/julia-agents.env` as 1Password references, never literal secrets. Keep building while this is pending; only PR-9 waits. Existing credentials cannot create these resources, as the probes showed. Sentry access is `project:releases, event:read, org:read` and Axiom answers `403 token does not have access to resource: datasets with action: create`.
 - [ ] Create the two practice cards yourself, in the Dashboard project, titled `Practice: ...`, each a docs-only change, and cancel them when JUL-276 is complete. Todd approved this on 28 October 2026.
-- [ ] Create the standing issue `Dashboard service` in the Dashboard project, keep it open, and use it as the target for the dashboard-down ping from PR-2.
+- [ ] Send dashboard-down pings to Todd as Linear notifications through the existing comment-and-reminder path on JUL-276. Do not create or keep open a `Dashboard service` issue. Verify that the notification still reaches Todd after JUL-276 is Complete; if that path cannot notify him, report the limitation before choosing another target.
 - [ ] Create two git worktrees of `main` on the server for the program, one under `/home/ubuntu/julia-dashboard` as the deployed dashboard and one under `/home/ubuntu/verifications/jul-276` as the lane sandbox. Record both paths in the decision trail.
 
 ### Spawn owners
@@ -154,7 +154,7 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 **Build.**
 - [ ] The unit runs `node dashboard/server.js` from a dedicated checkout at `/home/ubuntu/julia-dashboard`, a worktree of `main`, never the operator checkout, with `Restart=always`, `RestartSec=2`, `WantedBy=multi-user.target` and environment from a root owned env file.
 - [ ] The update timer runs every five minutes, fetches `origin main`, and fast-forwards only when no run is starting or running, then runs `npm ci`, `npm run build` and restarts the unit.
-- [ ] The watchdog timer runs every minute against `/api/health`, and after three failures in a row posts a comment and a reminder on the standing issue `Dashboard service`, then posts a recovery note when health returns.
+- [ ] The watchdog timer runs every minute against `/api/health`. After three consecutive failures, send Todd a Linear notification using the existing comment-and-reminder path on JUL-276, then send a recovery notification when health returns. No standing service issue is created. Keep the sender outside the dashboard process so it works while the dashboard is down.
 - [ ] Health answers `ok` only when Linear answers, the state folder is writable and every run file parses, and names the failing piece otherwise.
 - [ ] Install with `sudo`, which this server allows, and record the unit names in the decision trail.
 
@@ -171,8 +171,8 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 - [ ] Lane 2. Kill the process with `kill -9`, wait 15 seconds and reload. Save `docs/scorecards/jul-276/pr-2/lane-2.png`. Pass when the page returns with no manual start.
 - [ ] Lane 3. Write an active run file, then trigger the updater. Save `docs/scorecards/jul-276/pr-2/lane-3.png`. Pass when the updater log says skipped and the run file is unchanged.
 - [ ] Lane 4. Merge a one line change to main, wait for the timer, reload. Save `docs/scorecards/jul-276/pr-2/lane-4.png`. Pass when the served build id matches the new commit.
-- [ ] Lane 5. Stop the unit, wait 90 seconds, open the Linear issue. Save `docs/scorecards/jul-276/pr-2/lane-5.png`. Pass when the down comment and the reminder exist on `Dashboard service`.
-- [ ] Lane 6. Start the unit again and wait one watchdog pass. Save `docs/scorecards/jul-276/pr-2/lane-6.png`. Pass when a recovery comment appears.
+- [ ] Lane 5. Stop the unit and wait for three failed minute-spaced watchdog checks, allowing up to four minutes. Open Todd's Linear inbox. Save `docs/scorecards/jul-276/pr-2/lane-5.png`. Pass when the dashboard-down notification reaches Todd through the JUL-276 comment and reminder, and no service issue was created. A comment alone is not proof of delivery.
+- [ ] Lane 6. Start the unit again and wait one watchdog pass. Save `docs/scorecards/jul-276/pr-2/lane-6.png`. Pass when the recovery notification reaches Todd and names the dashboard.
 - [ ] Lane 7. Load `/api/health`. Save `docs/scorecards/jul-276/pr-2/lane-7.png`. Pass when it reads ok and names the three checks.
 - [ ] Lane 8. Corrupt one run file, load `/api/health` and the page. Save `docs/scorecards/jul-276/pr-2/lane-8.png`. Pass when health names that file in rose and the list still serves.
 - [ ] Lane 9. Repeat lane 2 at 390 by 844. Save `docs/scorecards/jul-276/pr-2/lane-9.png`. Pass when the phone page recovers with no reload prompt.
@@ -551,7 +551,7 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 
 ## Close the program
 
-The program is finished when all nine PRs are merged to main, main CI is green on each merge commit, each commit is commented on JUL-276, and each PR's scorecard is written and committed. The two practice cards you asked for are created by the agent in the Dashboard project with titles starting `Practice:` and cancelled at the end, so nothing of theirs is left in Ready. The dashboard is running as a service from main at the tailnet address, the sweep timer is enrolled, and the standing issue `Dashboard service` is open for the watchdog. The decision records in `dashboard/docs/decisions/` carry every choice this program made, including the six decisions below that were taken while planning, and the card's own record is a comment naming the nine commits. Then JUL-276 goes Complete in Linear, and the retro waits for your approval as usual.
+The program is finished when all nine PRs are merged to main, main CI is green on each merge commit, each commit is commented on JUL-276, and each PR's scorecard is written and committed. The two practice cards you asked for are created by the agent in the Dashboard project with titles starting `Practice:` and cancelled at the end, so nothing of theirs is left in Ready. The dashboard is running as a service from main at the tailnet address, the sweep timer is enrolled, and the watchdog sends dashboard-down Linear notifications to Todd without a standing service issue. Verify the notification path still works with JUL-276 Complete. The decision records in `dashboard/docs/decisions/` carry every choice this program made, including the six decisions below that were taken while planning, and the card's own record is a comment naming the nine commits. Then JUL-276 goes Complete in Linear, and the retro waits for your approval as usual.
 
 ## Appendix A Prototype evidence
 
