@@ -37,7 +37,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 - [ ] At each checkpoint, audit the operation against the playbook and fix drift on the spot. Probe every active lane and judge progress by side effects only. Stand down a stuck lane and dispatch its replacement at once.
 - [ ] Post a short status message to Todd at a checkpoint only when it found a change that no earlier message reported, such as a PR opened, a code-ready head, a verdict, a merge, a stuck lane and the action taken, a blocker added or cleared, or a decision only he can make. Name every such change and nothing else. If the audit found none, post nothing.
 - [ ] On Todd's hold or stand-down, send every owner a zero-writes order at once.
-- [ ] Ask Todd for one thing at arm, and keep building while it is pending. Create a Sentry project named `julia-dashboard` and an Axiom dataset named `julia-dashboard`, then add their values to `scripts/julia-agents.env` as `DASHBOARD_SENTRY_DSN`, `DASHBOARD_AXIOM_TOKEN` and `DASHBOARD_AXIOM_DATASET`. The current values cannot do it, proven by probe, Sentry access is `project:releases, event:read, org:read` and Axiom answers `403 token does not have access to resource: datasets with action: create`. Only PR-9 waits on this.
+- [ ] Ask Todd once at arm to create the Sentry project `julia-dashboard` and Axiom dataset `julia-dashboard`, then save the Sentry DSN, Axiom token and dataset name in the `Julia agents` 1Password vault. Todd edits no files and pastes no secrets into chat. The agent retrieves the vault item references and adds `DASHBOARD_SENTRY_DSN`, `DASHBOARD_AXIOM_TOKEN` and `DASHBOARD_AXIOM_DATASET` to `scripts/julia-agents.env` as 1Password references, never literal secrets. Keep building while this is pending; only PR-9 waits. Existing credentials cannot create these resources, as the probes showed. Sentry access is `project:releases, event:read, org:read` and Axiom answers `403 token does not have access to resource: datasets with action: create`.
 - [ ] Create the two practice cards yourself, in the Dashboard project, titled `Practice: ...`, each a docs-only change, and cancel them when JUL-276 is complete. Todd approved this on 28 October 2026.
 - [ ] Create the standing issue `Dashboard service` in the Dashboard project, keep it open, and use it as the target for the dashboard-down ping from PR-2.
 - [ ] Create two git worktrees of `main` on the server for the program, one under `/home/ubuntu/julia-dashboard` as the deployed dashboard and one under `/home/ubuntu/verifications/jul-276` as the lane sandbox. Record both paths in the decision trail.
@@ -500,7 +500,7 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 
 ## PR-9 Sentry and Axiom in the dashboard's own project and dataset
 
-**Depends on.** PR-8, and your two values, which PR-9 is the only PR that waits for.
+**Depends on.** PR-8 and Todd's Sentry and Axiom setup saved in the `Julia agents` 1Password vault. Only PR-9 waits for that setup.
 
 **Files.**
 - [ ] Create `dashboard/lib/telemetry.js` and `dashboard/lib/telemetry.test.mjs`.
@@ -509,7 +509,7 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 - [ ] Create `dashboard/docs/telemetry.md`.
 
 **Build.**
-- [ ] Ask you once, at arm time, for a Sentry project `julia-dashboard` and an Axiom dataset `julia-dashboard`, because today's Sentry token carries only `project:releases`, `event:read` and `org:read`, and today's Axiom token answers 403 on dataset create. PR-9 is the only PR that waits for these.
+- [ ] Use the one setup request made at arm time. Todd creates the Sentry project `julia-dashboard` and Axiom dataset `julia-dashboard` and saves their values in the `Julia agents` 1Password vault. The agent adds their references to `scripts/julia-agents.env` and verifies they resolve without printing secrets. Todd does not edit that file. Existing tokens cannot create the resources, as recorded above; only PR-9 waits.
 - [ ] Send Start, Stop, build state change and price sweep to the dashboard's own Axiom dataset, with fixed fields only and no free text.
 - [ ] Send errors to the dashboard's own Sentry project with a code and a run id, never a message body.
 - [ ] Neither sender throws, and a missing value downgrades to a warning, following the shape `lib/boot-events.js` already proves in Julia's app.
