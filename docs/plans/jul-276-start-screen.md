@@ -9,7 +9,7 @@ Todd opens the dashboard on the server, sees his Ready cards, opens one, picks m
 - PR-5 start with last settings
 - PR-6 spike, no screen, effort reaches every helper and cost recording lands
 - PR-7 start and stop a real build
-- PR-8 did not start, try again, finish ping, several builds at once. PR-9 Sentry and Axiom in its own project and dataset.
+- PR-8 did not start, try again, finish ping, several builds at once. PR-9 Julia's existing Sentry project and Axiom dataset, with every dashboard error and log event labelled `dashboard`.
 
 ## How to read this
 
@@ -37,7 +37,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 - [ ] At each checkpoint, audit the operation against the playbook and fix drift on the spot. Probe every active lane and judge progress by side effects only. Stand down a stuck lane and dispatch its replacement at once.
 - [ ] Post a short status message to Todd at a checkpoint only when it found a change that no earlier message reported, such as a PR opened, a code-ready head, a verdict, a merge, a stuck lane and the action taken, a blocker added or cleared, or a decision only he can make. Name every such change and nothing else. If the audit found none, post nothing.
 - [ ] On Todd's hold or stand-down, send every owner a zero-writes order at once.
-- [ ] Ask Todd once at arm to create the Sentry project `julia-dashboard` and Axiom dataset `julia-dashboard`, then save the Sentry DSN, Axiom token and dataset name in the `Julia agents` 1Password vault. Todd edits no files and pastes no secrets into chat. The agent retrieves the vault item references and adds `DASHBOARD_SENTRY_DSN`, `DASHBOARD_AXIOM_TOKEN` and `DASHBOARD_AXIOM_DATASET` to `scripts/julia-agents.env` as 1Password references, never literal secrets. Keep building while this is pending; only PR-9 waits. Existing credentials cannot create these resources, as the probes showed. Sentry access is `project:releases, event:read, org:read` and Axiom answers `403 token does not have access to resource: datasets with action: create`.
+- [ ] Reuse Julia's existing Sentry project and Axiom dataset, per Todd's revised 28 October decision 0022 and JUL-276's updated done-means criterion. Retrieve their existing key references from the `Julia agents` 1Password vault. The agent adds `DASHBOARD_SENTRY_DSN`, `DASHBOARD_AXIOM_TOKEN` and `DASHBOARD_AXIOM_DATASET` to `scripts/julia-agents.env` as references to those existing resources, never literal secrets. Label every dashboard error and log event `dashboard`. Create no new project or dataset and request no setup from Todd. PR-9 has no Todd setup dependency.
 - [ ] Create the two practice cards yourself, in the Dashboard project, titled `Practice: ...`, each a docs-only change, and cancel them when JUL-276 is complete. Todd approved this on 28 October 2026.
 - [ ] Send dashboard-down pings to Todd as Linear notifications through the existing comment-and-reminder path on JUL-276. Do not create or keep open a `Dashboard service` issue. Verify that the notification still reaches Todd after JUL-276 is Complete; if that path cannot notify him, report the limitation before choosing another target.
 - [ ] Create two git worktrees of `main` on the server for the program, one under `/home/ubuntu/julia-dashboard` as the deployed dashboard and one under `/home/ubuntu/verifications/jul-276` as the lane sandbox. Record both paths in the decision trail.
@@ -53,7 +53,7 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
   - [ ] PR-5 after PR-4.
   - [ ] PR-7 after PR-5 and PR-6.
   - [ ] PR-8 after PR-7.
-  - [ ] PR-9 after PR-8 and after Todd's telemetry setup lands.
+  - [ ] PR-9 after PR-8. Reuse the existing vault keys without waiting on Todd.
 - [ ] Hold the file boundaries. PR-1 owns `dashboard/app/**`, `dashboard/lib/linear.js`, `dashboard/docs/**`, `dashboard/tests/**`, `dashboard/playwright.config.mjs`, `dashboard/package.json`, `dashboard/package-lock.json` and the reading commands in `scripts/linear-cli.mjs`. PR-2 owns `dashboard/ops/julia-dashboard*.{service,timer}`, `dashboard/scripts/install-service.mjs`, `dashboard/scripts/update.mjs`, `dashboard/scripts/watchdog.mjs`, `dashboard/lib/ping.js`, `dashboard/app/api/health/**` and `docs/agents/server-runbook.md`. PR-3 owns `dashboard/scripts/sweep.mjs`, `dashboard/lib/models.js`, `dashboard/config/**`, `dashboard/ops/julia-dashboard-sweep.*` and `dashboard/app/start/**`. PR-4 and PR-5 own `dashboard/app/start/**` and `dashboard/lib/{roles,last-start}.js` plus `dashboard/config/roles.json`. PR-6 owns `dashboard/worker/**`, `dashboard/scripts/effort-probe.mjs` and `dashboard/scripts/effort-report.mjs`. PR-7 and PR-8 own `dashboard/lib/{runs,supervisor}.js`, `dashboard/app/api/**`, `dashboard/kickoff.md` and the writing commands in `scripts/linear-cli.mjs`. PR-9 owns `dashboard/lib/telemetry.js`, `dashboard/lib/ping.js`, `dashboard/instrumentation.js`, `dashboard/app/telemetry-report/**`, `dashboard/docs/telemetry.md` and `scripts/julia-agents.env`.
 - [ ] Hold the review gate. Every PR except PR-6 changes a screen. Those wait for Todd's review in chat with screenshots and a video before merge.
 
@@ -498,9 +498,9 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 **Merge.**
 - [ ] Merge with a merge commit, confirm main CI is green on that commit, and comment the commit on JUL-276.
 
-## PR-9 Sentry and Axiom in the dashboard's own project and dataset
+## PR-9 Share Julia's Sentry project and Axiom dataset
 
-**Depends on.** PR-8 and Todd's Sentry and Axiom setup saved in the `Julia agents` 1Password vault. Only PR-9 waits for that setup.
+**Depends on.** PR-8 only. Use the existing keys in the `Julia agents` 1Password vault. No setup from Todd is needed.
 
 **Files.**
 - [ ] Create `dashboard/lib/telemetry.js` and `dashboard/lib/telemetry.test.mjs`.
@@ -509,27 +509,29 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 - [ ] Create `dashboard/docs/telemetry.md`.
 
 **Build.**
-- [ ] Use the one setup request made at arm time. Todd creates the Sentry project `julia-dashboard` and Axiom dataset `julia-dashboard` and saves their values in the `Julia agents` 1Password vault. The agent adds their references to `scripts/julia-agents.env` and verifies they resolve without printing secrets. Todd does not edit that file. Existing tokens cannot create the resources, as recorded above; only PR-9 waits.
-- [ ] Send Start, Stop, build state change and price sweep to the dashboard's own Axiom dataset, with fixed fields only and no free text.
-- [ ] Send errors to the dashboard's own Sentry project with a code and a run id, never a message body.
+- [ ] Reuse Julia's existing Sentry DSN, Axiom token and dataset references from the `Julia agents` 1Password vault. The agent adds their references to `scripts/julia-agents.env` and verifies they resolve without printing secrets. Create no separate resources and ask Todd for no setup.
+- [ ] Send Start, Stop, build state change and price sweep to Julia's existing Axiom dataset, with fixed fields only and no free text.
+- [ ] Send errors to Julia's existing Sentry project with a code and a run id, never a message body.
+- [ ] Set `app=dashboard` on every dashboard error and log event. Use a Sentry tag and an Axiom field so both services can filter on the same `dashboard` label. Apply the label in the shared telemetry sender so callers cannot omit or override it.
 - [ ] Neither sender throws, and a missing value downgrades to a warning, following the shape `lib/boot-events.js` already proves in Julia's app.
 - [ ] The watchdog down ping stays exactly as PR-2 shipped it, so an outage never depends on Sentry or Axiom to reach you.
 - [ ] `telemetry-report` lists the last twenty events and the last error, and only renders when `DASHBOARD_REPORT=1`.
 
 **You see.**
-- [ ] Your build activity in the dashboard's own Axiom dataset and its errors in its own Sentry project, kept apart from Julia's.
+- [ ] Find a real dashboard error in Julia's Sentry project and a real Start event in Julia's Axiom dataset by filtering each service on `app=dashboard`. Keep the run id and the matching remote records as proof. A local report alone does not pass.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 - [ ] Event shape is tested, and the test fails when a free text field reaches Axiom.
+- [ ] Error and log event labels are tested. The test fails if any emitted record lacks `app=dashboard` or a caller can replace it.
 - [ ] The missing value path is tested, and the test fails when telemetry raises into a request.
 - [ ] The blocked network path is tested, and the test fails when a request waits on telemetry.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, each in its own worktree, port and state folder.
-- [ ] Lane 1. Start a build and open the report. Save `docs/scorecards/jul-276/pr-9/lane-1.png`. Pass when a start event shows with its run id and dataset name.
+- [ ] Lane 1. Start a real practice-card build and open the report. Query Julia's existing Axiom dataset with the filter `app=dashboard`. Save `docs/scorecards/jul-276/pr-9/lane-1.png` and the matching remote record. Pass when the Start event is findable by that label and matches the build's run id and Julia's dataset name.
 - [ ] Lane 2. Stop that build. Save `docs/scorecards/jul-276/pr-9/lane-2.png`. Pass when a stop event shows beside the start event.
 - [ ] Lane 3. Read a state change row. Save `docs/scorecards/jul-276/pr-9/lane-3.png`. Pass when it names starting, running and finished in order.
 - [ ] Lane 4. Run the sweep by hand. Save `docs/scorecards/jul-276/pr-9/lane-4.png`. Pass when one sweep row shows with added and retired counts.
-- [ ] Lane 5. Start a real practice-card build with an unavailable model to produce a real worker error. Save `docs/scorecards/jul-276/pr-9/lane-5.png`. Pass when the report lists it and the Sentry project holds the same code.
+- [ ] Lane 5. Start a real practice-card build with an unavailable model to produce a real worker error. Query Julia's existing Sentry project with the tag filter `app:dashboard`. Save `docs/scorecards/jul-276/pr-9/lane-5.png` and the matching remote record. Pass when the dashboard error is findable by that label and matches the report's code and run id.
 - [ ] Lane 6. Unset the Axiom token and start a build. Save `docs/scorecards/jul-276/pr-9/lane-6.png`. Pass when the build runs and one warning shows.
 - [ ] Lane 7. Block the telemetry hosts. Save `docs/scorecards/jul-276/pr-9/lane-7.png`. Pass when Start and Stop still answer inside the perf gate.
 - [ ] Lane 8. Open the report at 390 by 844. Save `docs/scorecards/jul-276/pr-9/lane-8.png`. Pass when rows are readable and no label is cut.
@@ -543,7 +545,7 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 - [ ] Rule. The median must be at or under the baseline in two runs out of three.
 
 **Review gate.**
-- [ ] Send you a screenshot of the report page, a 30 to 60 second video of a build whose events land in Axiom and fail into Sentry, and the operator note that Julia's own dataset was untouched.
+- [ ] Send you a screenshot of the report page and a 30 to 60 second video of a real build. Include the remote proof of its Start event in Julia's Axiom dataset and its error in Julia's Sentry project, each found by filtering on the `dashboard` label. Include an operator note confirming that both use Julia's existing resources and that no separate project or dataset was created.
 - [ ] Merge waits for your yes in chat.
 
 **Merge.**
@@ -551,7 +553,7 @@ Each lane runs on this server at the PR head, in a throwaway git worktree under 
 
 ## Close the program
 
-The program is finished when all nine PRs are merged to main, main CI is green on each merge commit, each commit is commented on JUL-276, and each PR's scorecard is written and committed. The two practice cards you asked for are created by the agent in the Dashboard project with titles starting `Practice:` and cancelled at the end, so nothing of theirs is left in Ready. The dashboard is running as a service from main at the tailnet address, the sweep timer is enrolled, and the watchdog sends dashboard-down Linear notifications to Todd without a standing service issue. Verify the notification path still works with JUL-276 Complete. The decision records in `dashboard/docs/decisions/` carry every choice this program made, including the six decisions below that were taken while planning, and the card's own record is a comment naming the nine commits. Then JUL-276 goes Complete in Linear, and the retro waits for your approval as usual.
+The program is finished when all nine PRs are merged to main, main CI is green on each merge commit, each commit is commented on JUL-276, and each PR's scorecard is written and committed. The two practice cards you asked for are created by the agent in the Dashboard project with titles starting `Practice:` and cancelled at the end, so nothing of theirs is left in Ready. The dashboard is running as a service from main at the tailnet address, the sweep timer is enrolled, and the watchdog sends dashboard-down Linear notifications to Todd without a standing service issue. Verify the notification path still works with JUL-276 Complete. PR-9's proof includes a real dashboard error found in Julia's existing Sentry project and a real Start event found in Julia's existing Axiom dataset, both filtered by the `dashboard` label. The decision records in `dashboard/docs/decisions/` carry every choice this program made, including the six decisions below that were taken while planning, and the card's own record is a comment naming the nine commits. Then JUL-276 goes Complete in Linear, and the retro waits for your approval as usual.
 
 ## Appendix A Prototype evidence
 
@@ -562,7 +564,7 @@ Everything here was run on this server today, and each result is what the plan l
 - The SDK path with `getMastra().shutdown()` wrote a 3.6 MB trace database with model token rows for the run, so cost recording can stay on for every build.
 - Two concurrent CLI runs collided on one thread lock because both resumed the most recent thread. Two concurrent runs with their own app data dirs both exited 0, so per-run folders are the isolation rule.
 - `listAvailableModels()` answered 8,243 models with 142 carrying a key, split 17 anthropic, 52 openai, 72 commandcode and 1 mastracode, so the sweep has an account-scoped source.
-- The Sentry token cannot create a project and the Axiom token cannot create a dataset, both checked read only, so the two values are one click for you.
+- Read-only probes found that the existing Sentry and Axiom tokens cannot create resources. Todd's revised 28 October decision removes that requirement. Reuse Julia's existing project, dataset and vault keys without waiting for new resources.
 - The pack beats the launch model. `activeModelPackId` is `custom:sol/deepseek` and that is why today's session ran DeepSeek in build mode and GPT-6.1 Sol in plan mode.
 - The connection reset was reproduced on purpose. Eight concurrent long requests reset seven times with `read ECONNRESET` on a 200 stream, the same signature as the failures in this session, and short replies never failed.
 - The cap was tested and rejected. Six concurrent long requests with a 10,000 token cap passed 6 of 6, and five of them stopped at the cap, which is why output stays at the model maximum and the fix is a write guard plus a retry.
@@ -572,6 +574,7 @@ Everything here was run on this server today, and each result is what the plan l
 
 - Cost recording stays on for every dashboard build, solved with a per-run app data folder and a shutdown call rather than switched off, which is your 28 October instruction.
 - The dashboard is its own app in `dashboard/`, server only, with its own decision records and glossary, and it is never part of Julia's Vercel app.
+- Todd revised decision 0022 on 28 October 2026. The dashboard shares Julia's existing Sentry project and Axiom dataset using keys already in the agents vault. Every dashboard error and log event has the label `app=dashboard`. PR-9 requires no setup from Todd and is complete only when a real dashboard error and Start event are findable in those services by that label.
 - The model list and every price come from the weekly sweep, and the screen shows only what the sweep saved, so no model reaches the screen without a price.
 - No output cap. Output stays at the model maximum per your 25 October decision, and the reset is answered with a size-refusing write guard and a retry with a growing wait.
 - The main session choice is applied as a model pack for plan and build, because a launch model is overwritten by the active pack.
