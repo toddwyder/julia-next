@@ -1,0 +1,7 @@
+{
+  "name": "julia-dashboard-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {"test": "node --test *.test.mjs", "build": "node --check run-build.mjs && node --check ../scripts/effort-probe.mjs && node --check ../scripts/effort-report.mjs", "lint": "node --check guarded-write.mjs && node --check retry.mjs"},
+  "dependencies": {"@mastra/code-sdk": "1.14.0", "@duckdb/node-api": "1.5.4-r.1"}
+}
