@@ -2,17 +2,17 @@
 
 Run the dashboard as a service that updates itself from main between builds.
 
-- Candidate: `713f7a3` on `feat/jul-276-service`, PR [#376](https://github.com/toddwyder/julia-next/pull/376).
+- Candidate: `d7b9005` on `feat/jul-276-service`, PR [#376](https://github.com/toddwyder/julia-next/pull/376).
 - Server: `vps-ce27cb55`, systemd 255, Node v24.14.1.
 - Deployed checkout: `/home/ubuntu/julia-dashboard` (worktree of `main`, detached).
 - Service unit: `julia-dashboard.service`, timers `julia-dashboard-update.timer` (5 min) and
   `julia-dashboard-watchdog.timer` (1 min).
 
-## Unit and build gates (candidate `713f7a3`)
+## Unit and build gates (candidate `d7b9005`)
 
 | Gate | Command | Result |
 | --- | --- | --- |
-| Unit tests | `cd dashboard && npm test` | 49 tests, 49 pass, 0 fail |
+| Unit tests | `cd dashboard && npm test` | 50 tests, 50 pass, 0 fail |
 | Lint | `cd dashboard && npm run lint` | clean |
 | Build | `cd dashboard && npm run build` | compiled, `/`, `/start/[card]`, `/api/health` dynamic, `/_not-found` static |
 | Framework lint | `node scripts/lint-framework.mjs` from the repo root | passing (root project only) |
@@ -38,10 +38,29 @@ Installed with `sudo -n node dashboard/scripts/install-service.mjs --host 100.11
 
 Screenshot: `lane-1-ready.png` (1280x800).
 
-Boot itself was not exercised because rebooting this server would end the session that built
-and verified the card. The boot promise rests on `WantedBy=multi-user.target` plus
-`systemctl is-enabled`; a real reboot is left for the install-the-service-once step once this
-PR merges, and it is stated here rather than claimed.
+## Boot (lane 1b)
+
+The service, the update timer and the watchdog timer must all come back on their own after a
+real reboot. `enabled` alone is not proof, so the server is being rebooted.
+
+What is written here before the reboot, so the check cannot be chosen after seeing the result:
+
+| Check | Command | Pass condition |
+| --- | --- | --- |
+| The machine really rebooted | `uptime -s`, `journalctl --list-boots` | boot time is the reboot, and there is a new boot id |
+| The service started by itself | `systemctl show -p ActiveEnterTimestamp julia-dashboard`, compared with `uptime -s` | start falls inside the first minute after boot, and `journalctl -b -u julia-dashboard` names `systemd` starting it, not a person |
+| Nothing was started by hand | `journalctl -b -u julia-dashboard -u julia-dashboard-update -u julia-dashboard-watchdog` | every start line belongs to systemd at boot or to a timer, and no `systemctl start` appears after boot |
+| The page answers on the tailnet address | `curl -sS -o /dev/null -w '%{http_code}' http://100.119.112.9:4313/`, then `/api/health` | `200` for both, and health reports `linear`, `state` and `runs` ok |
+| The updater came back | `systemctl list-timers julia-dashboard-update.timer`, `journalctl -b -u julia-dashboard-update` | timer active with a next elapse, and at least one run after boot |
+| The watchdog came back | `systemctl list-timers julia-dashboard-watchdog.timer`, `journalctl -b -u julia-dashboard-watchdog` | timer active with a next elapse, and at least one probe after boot |
+| It serves the merged build | `cat /var/lib/julia-dashboard/state/build.json` | `commit` matches the merged main commit |
+
+The previous boot's journal is kept in `/var/log/journal`, so the shutdown of the old boot and
+the start of the new one can both be read afterwards.
+
+### Boot results
+
+Filled in after the server is back. Everything above was written before the reboot.
 
 ## Crash recovery (lane 2)
 
@@ -79,7 +98,63 @@ Running the updater by hand without the service env file exposed a real defect: 
 --ff-only` exits 0 when the wanted commit is already an ancestor, so the updater reported and
 recorded a build of a commit the checkout never moved to. Fixed in `713f7a3`; the updater now
 treats an ahead checkout as up to date, re-reads `HEAD` after the merge, and stops before
-building when the checkout is somewhere else. Two unit tests cover both cases.
+building when the checkout is somewhere else. Two unit tests cover both cases, and both were shown red with the fix removed and green with it
+back (see "Red then green" below).
+
+## Red then green: the updater fix tests
+
+The two tests that cover the updater defect were each run against the code before the fix
+(`git show e693d67:dashboard/scripts/update.mjs`) and then against the fixed code.
+
+Without the fix:
+
+```text
+✖ a checkout ahead of the ref stands still instead of reporting a build it never made (294.98ms)
+✖ a merge that leaves the checkout behind is a failure, not a recorded build (218.81ms)
+ℹ tests 2
+ℹ pass 0
+ℹ fail 2
+```
+
+The failures are the defect itself: the ahead case returned `updated` where the test expects
+`up-to-date`, and the behind case returned action `install` where it expects phase
+`fast-forward`.
+
+With the fix back:
+
+```text
+✔ a checkout ahead of the ref stands still instead of reporting a build it never made (146.85ms)
+✔ a merge that leaves the checkout behind is a failure, not a recorded build (183.86ms)
+ℹ tests 2
+ℹ pass 2
+ℹ fail 0
+```
+
+Command for both runs, with the file swapped between them:
+
+```sh
+node --test --test-name-pattern="checkout ahead of the ref|merge that leaves the checkout behind" scripts/update.test.mjs
+```
+
+## The merge step needs no ref reset
+
+Verifying a branch on the real service used to write that branch into
+`/etc/julia-dashboard.env`, which left a manual "point it back at main" step after the merge. That
+step is gone rather than remembered: `envFileContent` always writes
+`DASHBOARD_UPDATE_REF=origin/main`, and the installer passes `--ref` only to the single sync run
+(`installSyncEnv`), so the installed unit follows main from the moment it is enabled.
+
+Evidence, in order:
+
+| Check | Evidence |
+| --- | --- |
+| The env file cannot take a branch | unit test `a branch ref is a one-time sync and never reaches the env file`: `envFileContent({ ref: 'origin/feat/jul-276-service' })` still yields `origin/main`; the test fails with the pin removed and passes with it back |
+| The live env file follows main | `/etc/julia-dashboard.env` reads `DASHBOARD_UPDATE_REF=origin/main` |
+| Main being behind is not a rebuild | updater ran with the installed settings and logged `{"phase":"compare","action":"ahead","commit":"4d11c7c…","target":"4669edc…"}`, then stopped: no `npm ci`, no build, no restart, and the built commit stayed `4d11c7c` |
+| A merge needs no action | once main contains this commit, `target` equals `head` and the same path reports up to date; the five-minute timer is the only thing involved |
+
+So the answer to "where does pointing it back at main happen" is: at install time, in
+`dashboard/scripts/install-service.mjs`, which never stores a branch. Merge time touches nothing.
 
 ## Health (lanes 7, 8, 9)
 
@@ -119,7 +194,6 @@ installations side by side, which the plan never needed.
 ## Open
 
 - Todd's yes in chat, which the plan requires before merge.
-- A real reboot to prove the unit starts on boot; deferred as described above.
 - The dashboard address is reachable on the tailnet only; a real phone over Tailscale was not
   used, the 390x844 viewport stands in for it.
 - The service runs `node dashboard/server.js` through the operator checkout's
