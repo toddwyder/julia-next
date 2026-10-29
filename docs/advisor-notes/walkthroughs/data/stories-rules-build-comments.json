@@ -756,8 +756,8 @@
      "so": "I understand what happened on that card",
      "ac": [
       "Every card that ran and reached Complete or was closed has a page, labelled Complete or Closed, plus Interrupted if the machine waited on Todd before his UAT yes.",
-      "A summary shows cost, Start to merge, rounds and HITL interventions, with every label and value in full.",
-      "Folding sections show: the Shipping check's verdict per criterion per round (Proven or Not proven, the reason one tap away); cost and tokens by role and model; time per stage with waiting on Todd apart; HITL interventions with kind, cause and root-cause stage; Context per agent (model, compactions, handoffs, fullest context), its folded line showing the compaction total when there were any.",
+      "A summary shows cost, Start to Complete, rounds and HITL interventions with their total time, with every label and value in full.",
+      "Folding sections show: the Shipping check's verdict per criterion per round (Proven or Not proven, the reason and the proving slice one tap away); cost and tokens by role, with the model asked for and the model that answered, swaps marked; time per stage with waiting on Todd apart; HITL interventions with kind (Agent stopped, Question, Stop, Send-back), ping, cause and root-cause stage; Context per agent, its folded line showing the compaction total when there were any; Slices, on a card built in slices.",
       "Links open the Linear issue and the run record; after the retro the run-record link reads \"Run record deleted\".",
       "Everything on the page comes from the runner's kept record of the card."
      ],
@@ -765,7 +765,7 @@
       "Verdicts per criterion come from the Shipping checker (0016, 0044).",
       "A value that applies but wasn't captured shows \"Not recorded\" and is left out of totals; one that doesn't apply shows N/A; never 0 (0046)."
      ],
-     "trace": "R1b; I 61-66; E 3-7; 0016; 0041-0051; picture 07"
+     "trace": "R1b; I 61-66; E 3-7; 0016; 0041-0056; picture 07"
     },
     {
      "id": "S-57",

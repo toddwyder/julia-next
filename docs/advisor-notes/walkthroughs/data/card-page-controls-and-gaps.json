@@ -88,8 +88,8 @@
    "n": 7,
    "x": -1,
    "y": 240,
-   "name": "Tile \"Start to merge\" (2 h 34 \u2026)",
-   "what": "Time from Start to the merge, including time spent waiting on Todd.",
+   "name": "Tile \"Start to Complete\"",
+   "what": "Time from Start to the card reaching Complete (its last merge), including time waiting on Todd (0056).",
    "from": "Start time from the runner; merge time from GitHub. Both in the kept record.",
    "status": "build",
    "stories": [
@@ -117,7 +117,7 @@
    "x": -1,
    "y": 240,
    "name": "Tile \"HITL interventions\" (1)",
-   "what": "How many times the machine waited on Todd before his UAT yes, including a build asking him a question (0045).",
+   "what": "Count and total time of the waits on Todd before his UAT yes, for example \"30 \u00b7 5 h 17 min\" (0045, 0054).",
    "from": "The stops in the kept record. Glossary: \"Human intervention\".",
    "status": "build",
    "stories": [
@@ -194,15 +194,15 @@
    "x": -1,
    "y": 720,
    "name": "Fold \"Cost by role and model\" ($4.13 \u00b7 3 models)",
-   "what": "Cost for each role and model, with tokens split into cached, input and output.",
-   "from": "The cost rows in the kept record (B-03).",
+   "what": "Cost for each role, showing the model asked for and the model that answered, with tokens split into cached, input and output. A row where the two differ is amber and its cost counts against the model that answered; the folded line warns, for example \"1 model swapped\" (0052, 0053).",
+   "from": "The runner's kept record; the answering model comes from Mastra's tracing, received live (0041, 0052).",
    "status": "build",
    "stories": [
     "S-56",
     "S-46"
    ],
    "notes": [
-    "A small table: role, model, cost, and tokens split cached / input / output (0045)."
+    "Contents written in words (decision 0008)."
    ]
   },
   {
@@ -226,7 +226,7 @@
    "x": -1,
    "y": 872,
    "name": "Fold \"HITL interventions\" (1 \u00b7 cause: design)",
-   "what": "Each wait on Todd before his UAT yes: when, how long, its kind (question, stop or send-back), the cause and the root-cause stage (requirements, design or build) (0045).",
+   "what": "Each wait on Todd before his UAT yes: when, how long, its kind (Agent stopped, Question, Stop or Send-back), whether he was pinged and when, the cause and the root-cause stage. Opening a row shows what the agent last said and what Todd replied. A wait with no ping is rose, \"Not pinged\", and the folded line counts them (0045, 0054, 0055).",
    "from": "The stops with their cause and root-cause stage (B-04).",
    "status": "build",
    "stories": [
@@ -290,7 +290,9 @@
    "stories": [
     "S-56"
    ],
-   "notes": []
+   "notes": [
+    "Not drawn either: a Slices fold on cards built in slices, each slice with its pull request, Todd's yes, merge time, cost and HITL interventions (0056)."
+   ]
   }
  ],
  "gaps": [
