@@ -56,6 +56,17 @@ Every `execute_command` shell gets `FORCE_COLOR=1` and `CLICOLOR_FORCE=1` on top
 | `scripts/watch-pr/watch-pr ...` (poteto-mode) | `env -u CLICOLOR_FORCE .agents/skills/poteto-mode/scripts/watch-pr/watch-pr ...`. Without it every GitHub status query fails with `JSON Parse error: Unrecognized token`, the watcher retries every 60s and shows no statuses. |
 | Any script that parses `gh ... --json` output | Prefix it with `env -u CLICOLOR_FORCE`. |
 
+Two habits that go with this shell:
+
+- Reclaim a port by port or process group (`fuser -k 3114/tcp`, or `process.kill(-pid)`), never by command name. `pkill -f "node server.js"` also matches the shell running it and kills its own command, so the check you were about to run never starts.
+- Write each gate's output to a file and echo its exit code (`npm run lint > /tmp/lint.log 2>&1; echo $?`). Tool output is truncated to the tail, so a green last line can hide the first failing gate in a chain.
+
+## Hooks
+
+Mastra Code loads hooks from the session's project directory and from the user-level `~/.mastracode/hooks.json`. A session started outside the repository, such as `/home/ubuntu`, loads no project hooks at all, so a hook wired only in the repository never runs there: Julia's stop ping posted nothing for sessions opened from `~`.
+
+`node scripts/install-hooks.mjs` writes the user-level entry: a `Notification` hook that runs `stop-ping.mjs --global`, which exits silently where the project already wires the ping. It keeps every other global hook and is safe to re-run after an upgrade. Verify it from a session opened outside the repository, then read `~/.local/state/julia/stops.jsonl` to see whether the stop was recorded.
+
 ## Unproven
 
 - Setting reasoning effort per subagent. Mastra Code 1.14.0 exposes no field for it at the tool or subagent-definition level; only the session `thinkingLevel` exists.

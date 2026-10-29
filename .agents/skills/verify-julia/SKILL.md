@@ -1,11 +1,13 @@
 ---
 name: verify-julia
-description: "Drive Julia (the household Next.js web app) the way a user does on this Linux server: launch an isolated local server or point at a given address such as a Vercel preview, check it is the right build, drive the home page and install manifest in a named Playwright CLI browser, and keep the proof. Use after changing anything a user sees, or to check a candidate build or preview."
+description: "Drive any Next.js app served from this repo the way a user does on this Linux server, including Julia the household cookbook and the dashboard's Ready list, Start screen and health address: launch an isolated local server or point at a given address such as a Vercel preview or the tailnet address, confirm the address serves the build under review, drive the pages in a named Playwright CLI browser, and keep the proof. Use after changing anything a user sees, or to check a candidate build or preview address."
 ---
 
 # Verify Julia
 
 Julia is a Next.js web app. Its user surface is the home page (`/`), the install manifest and icons, and the household recipe library (`/recipes`) behind a Google sign-in. `/api/health` is a machine check, not a user surface. A local run uses the Firebase Auth and Firestore emulators, so nothing touches the household's real library; specs sign in as the fake household accounts in `tests/household.mjs`.
+
+The dashboard is a second Next.js app in `dashboard/`. Its surfaces are the Ready list (`/`), the Start screen (`/start/<card>`) and the health address (`/api/health`), which is a machine check. It has its own dependencies and its own service, so `launch` below, which builds and serves the cookbook at the repository root, does not drive it. Start it from `dashboard/` the way its service does (`npm ci && npm run build`, then `node server.js` with `DASHBOARD_HOST`, `DASHBOARD_PORT` and `DASHBOARD_STATE_DIR` set), and drive it and keep the proof the same way. Its lane runner is `dashboard/scripts/lanes.mjs`.
 
 All commands run in bash from the repository root. Each command below reads the active run from `.artifacts/verify-julia/run.json`, so a new shell picks the run back up.
 
@@ -23,6 +25,8 @@ Local launch picks a free port on 127.0.0.1, starts `next dev` in its own proces
 
 Launch returns only when Julia is usable: both emulators answer, `/api/health` answers `{"status":"ok"}` and `/` returns 200 with a `<main>` element. The first local compile takes about 10 to 30 seconds and the emulators about 20, so a first launch can take 40; the limit is 120 seconds. If Julia is not usable by then, including a `--url` that cannot be reached, launch exits 1 with `Julia did not become usable at <url>` and the last probe result. Launch writes `$EVIDENCE/launch.json` before it waits, and again with the readiness result, with the run ID, URL, browser session name, commit, branch, dirty flag, worktree SHA-256, and Node, Next.js and Playwright versions. It refuses to start while another run is active; run Cleanup first. If launch is interrupted or fails, run Cleanup: it stops the server and emulators launch started and keeps the evidence.
 
+Before you hand an address to a person, launch that exact address yourself and drive it cold. A server you started on another port, and a lane that starts its own `127.0.0.1` server, prove nothing about the address they will open: the address they were given has to be the one you loaded, after a normal page load, in the browser you kept the proof from.
+
 ## Doctor
 
 Run before driving and whenever anything looks wrong:
@@ -32,6 +36,8 @@ node .agents/skills/verify-julia/verify-julia.mjs doctor
 ```
 
 It is read-only and writes `$EVIDENCE/doctor.json`. For a local run it checks that the commit and worktree digest still match the launch record (an edit since launch fails it), the server process is alive, every listener on the port is in that process group, and both emulators still answer. For both modes it checks that health and home are usable. A remote run reports `servedCommit` from `/api/health` (Vercel sets it); compare it to the commit you meant to check. Exit code 1 means do not drive. Clean up and launch again.
+
+Doctor proves the surface renders, not which build rendered it. Matching the strings you expect on the page passes just as well on an older build that shows the same marks, so record the commit that address reports and compare it to the commit you meant to check. When the app reports no commit, say the address's build is unproven instead of calling the address OK.
 
 ## Drive
 
