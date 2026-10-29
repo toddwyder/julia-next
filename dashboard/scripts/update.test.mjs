@@ -1,6 +1,3 @@
-// update.test.mjs -- the update decision, and the proof that a skip leaves the checkout
-// alone (JUL-276 PR-2, decision D5). The checkout is a real git repository here: the whole
-// point of the test is that a skipped update does not move it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -14,7 +11,6 @@ const head = cwd => execFileSync('git', ['-C', cwd, 'rev-parse', 'HEAD'], { enco
 
 const runEntry = (id, status) => ({ file: `/runs/${id}.json`, run: { id, status, startedAt: '2026-10-29T09:00:00.000Z' }, error: '' });
 
-// A bare remote, a source clone that pushes to it, and the checkout under test.
 function repository() {
   const root = mkdtempSync(join(tmpdir(), 'jul-276-update-'));
   const remote = join(root, 'remote.git');

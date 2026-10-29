@@ -1,5 +1,3 @@
-// install-service.test.mjs -- the two things this script must never get wrong: it refuses to
-// run anywhere but this server, and its env file carries no secret (JUL-276 PR-2, decision D8).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

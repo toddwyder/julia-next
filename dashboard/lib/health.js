@@ -1,9 +1,3 @@
-// health.js -- the three checks behind /api/health (JUL-276 PR-2, decision D7).
-//
-// The route, the watchdog and the tests all ask the same question here: is Linear
-// answering, is the state folder writable, and does every run file parse? A check never
-// throws: each one answers `{name, ok, detail}` so the failure is named rather than blank.
-// The Linear key is never echoed: every message from the provider is redacted first.
 import { mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readRuns, stateFolder } from './state.js';
@@ -51,8 +45,6 @@ export async function checkLinear({ apiKey, fetchImpl = fetch } = {}) {
   return { name: 'linear', ok: true, detail: 'Linear answered' };
 }
 
-// Writability is proven by writing, not by asking about permissions: the service user owns
-// the folder and a mode bit is not the same thing as a successful write.
 export function checkStateFolder(env = process.env) {
   const dir = stateFolder(env);
   try {

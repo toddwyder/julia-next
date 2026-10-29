@@ -1,4 +1,3 @@
-// state.test.mjs -- the run-file contract PR-7 will write against (JUL-276 PR-2, decision D3).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

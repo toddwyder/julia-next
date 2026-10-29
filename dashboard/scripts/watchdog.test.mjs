@@ -1,5 +1,3 @@
-// watchdog.test.mjs -- the third-failure notice, the recovery, and the single blip that must
-// send nothing (JUL-276 PR-2, decision D6).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FAILURES_BEFORE_NOTICE, healthAddress, nextWatchdogState, probeHealth, runWatchdog } from './watchdog.mjs';

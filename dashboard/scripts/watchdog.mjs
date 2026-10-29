@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// watchdog.mjs -- the one-minute health watch the julia-dashboard-watchdog.timer runs
-// (JUL-276 PR-2, decision D6).
-//
-// It runs outside the dashboard process, so it still works while the dashboard is down. It
-// reads the health check the dashboard serves, keeps the count in the state folder, and
-// sends Todd exactly one notice after three consecutive failures, then one recovery notice
-// when health returns. A single failed probe sends nothing, and nothing repeats while the
-// dashboard stays down.
-//
-// The notice is delivered by a child process that runs under the vault wrapper, so the
-// Linear key still comes from 1Password and never touches disk. A probe does not need the
-// wrapper, so a 1Password outage cannot stop the watch from working.
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readJsonRecord, watchdogRecordFile, writeJsonRecord } from '../lib/state.js';
@@ -34,7 +22,6 @@ export const EMPTY_WATCHDOG_STATE = Object.freeze({
   lastDetail: null, lastNoticeAt: null, lastNoticeKind: null, lastRecoveredAt: null,
 });
 
-// One probe. Down is any answer that is not a 200 whose body says ok, including no answer.
 export async function probeHealth({ url, fetchImpl = fetch, timeoutMs = 5000 }) {
   let response;
   try {
@@ -58,9 +45,6 @@ export async function probeHealth({ url, fetchImpl = fetch, timeoutMs = 5000 }) 
   return { ok: true, detail: `${url} answered ok` };
 }
 
-// The decision alone: previous state plus one probe result gives the next state and at most
-// one notice. Third consecutive failure notifies; while down, nothing repeats; the first
-// good probe after a notified outage is the recovery.
 export function nextWatchdogState(previous, result, now = new Date().toISOString()) {
   const state = { ...EMPTY_WATCHDOG_STATE, ...(previous ?? {}) };
   if (result.ok) {
@@ -86,8 +70,6 @@ export function nextWatchdogState(previous, result, now = new Date().toISOString
   };
 }
 
-// Delivers one notice through the vault wrapper in a child process, so the key arrives from
-// 1Password. Injectable in the tests, which never reach Linear.
 export function sendThroughVault(notice, { env = process.env } = {}) {
   const wrapper = env.DASHBOARD_VAULT_WRAPPER || VAULT_WRAPPER;
   const child = spawnSync(process.execPath, [wrapper, '--', process.execPath, self, '--notify', notice.kind, JSON.stringify({

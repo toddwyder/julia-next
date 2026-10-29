@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-// server.js -- the process the julia-dashboard unit runs (JUL-276 PR-2, decision D1).
-//
-// Built on the installed Next 16.3.5 custom-server pattern:
-// node_modules/next/dist/docs/01-app/02-guides/custom-server.md
-// It exists so the unit can hand the port and the bind address in through the environment,
-// report a failed start as a non-zero exit and one `julia-dashboard:` line naming the
-// reason, instead of a process that dies quietly and leaves the page blank.
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import next from 'next';

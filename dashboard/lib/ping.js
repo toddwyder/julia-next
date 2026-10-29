@@ -1,5 +1,3 @@
-// ping.js -- the dashboard's one outbound notice to Todd (JUL-276 PR-2, decision D6).
-//
 // A comment written with Todd's own key does not notify him, so the notice is the pair the
 // existing stop-ping route uses: a comment on JUL-276, then an issueReminder he is
 // notified about. No service issue is created. The sender lives here, outside the dashboard
@@ -16,8 +14,6 @@ const oneLine = (value, limit = 400) => String(value ?? '').replace(/\s+/g, ' ')
 
 export const KINDS = Object.freeze(['down', 'recovery']);
 
-// The notice text. It names the dashboard, the address probed and, on the way down, the
-// last failure, so the notification is usable on a phone without opening anything.
 export function dashboardNotice({ kind, detail = '', address = '', at = new Date().toISOString(), downSince = null } = {}) {
   if (!KINDS.includes(kind)) throw new Error(`unknown dashboard notice kind: ${kind}`);
   const where = address ? ` at ${address}` : '';
@@ -41,8 +37,6 @@ export function dashboardNotice({ kind, detail = '', address = '', at = new Date
   ].join('\n');
 }
 
-// Posts the comment, then sets the reminder that actually notifies. `sender` is injectable so
-// the watchdog tests can prove the decision without reaching Linear.
 export async function sendDashboardNotice(notice, { apiKey, fetchImpl = fetch, card = DASHBOARD_CARD } = {}) {
   const body = dashboardNotice(notice);
   const { issue } = await linearGraphQL(ISSUE_ID_QUERY, { id: card }, { apiKey, fetchImpl });

@@ -1,10 +1,3 @@
-// /api/health -- the one address the watchdog and Todd can both read (JUL-276 PR-2, decision D7).
-//
-// It answers ok only when Linear answers, the state folder is writable and every run file
-// parses. Otherwise it names the failing piece and the failing files and answers 503.
-// JSON for machines; when the request accepts HTML, a small page in the dashboard's own
-// rose failure colour. The key is never echoed: lib/health.js redacts every provider message.
-//
 // Route Handler contract: node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/route.md
 // `dynamic = 'force-dynamic'`: node_modules/next/dist/docs/01-app/02-guides/caching-without-cache-components.md
 import { checkHealth } from '../../../lib/health.js';

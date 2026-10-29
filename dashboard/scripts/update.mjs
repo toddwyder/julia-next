@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// update.mjs -- the five-minute update the julia-dashboard-update.timer runs (JUL-276 PR-2, decision D5).
-//
-// Two parts, tested separately. `decideUpdate` is the decision: no run starting or running
-// means update; any run starting or running means skip and leave the checkout exactly where
-// it is. `runUpdate` is the action: fetch, fast-forward only, npm ci, npm run build, restart
-// the unit, then record the served commit. A run record that cannot be read fails closed:
-// an active build is never risked to save five minutes.
-//
-// Every phase writes one structured line with the `julia-dashboard:` prefix, so an update is
-// readable in the journal without opening the script.
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -22,7 +12,6 @@ const trimSlash = value => value.replace(/\/+$/, '');
 export const checkoutDir = (env = process.env) => trimSlash(env.DASHBOARD_CHECKOUT || DEFAULT_CHECKOUT);
 export const updateRef = (env = process.env) => env.DASHBOARD_UPDATE_REF || DEFAULT_REF;
 
-// The decision alone: no filesystem, no git, no clock.
 export function decideUpdate(entries = []) {
   const unreadable = entries.filter(entry => entry.error);
   if (unreadable.length) {
@@ -55,7 +44,6 @@ function runCommand(command, args, { capture = true, cwd } = {}) {
 
 const isSha = value => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
 
-// The action. `run` is injectable so the tests can prove a skipped update never touches git.
 export function runUpdate({ env = process.env, run = runCommand, log = line => console.log(`julia-dashboard: ${line}`), now = () => new Date().toISOString(), entries } = {}) {
   const decided = entries ?? readRuns(env).entries;
   const checkout = checkoutDir(env);

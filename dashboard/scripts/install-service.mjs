@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-// install-service.mjs -- installs the dashboard service on this server (JUL-276 PR-2, decision D8).
-//
-// Run it with sudo from the checkout you want to install from:
-//   sudo node dashboard/scripts/install-service.mjs --host 100.119.112.9
-//
-// It refuses to run anywhere but this server, and it is safe to run twice: every step either
-// rewrites the same content or asks systemd for a state it already has. The unit files come
-// from dashboard/ops, so they have one source of truth in the repository.
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { hostname as osHostname } from 'node:os';
@@ -32,8 +24,6 @@ export const TIMERS = Object.freeze(['julia-dashboard-update.timer', 'julia-dash
 const here = dirname(fileURLToPath(import.meta.url));
 const opsDir = join(here, '..', 'ops');
 
-// The one reason this server is the right one, or '' when it is. A lane worktree, a laptop or
-// the operator checkout all fail here, which is the point: this writes to /etc and /var/lib.
 export function serverIdentityProblem({ hostname = osHostname(), operatorCheckout = OPERATOR_CHECKOUT, checkout = DEFAULT_CHECKOUT, exists = existsSync, read = readFileSync } = {}) {
   if (hostname !== SERVER_HOSTNAME) return `this is ${hostname}, not the Julia server ${SERVER_HOSTNAME}`;
   if (!exists(join(operatorCheckout, '.git'))) return `the operator checkout ${operatorCheckout} is not a git checkout`;
@@ -51,10 +41,7 @@ export function serverIdentityProblem({ hostname = osHostname(), operatorCheckou
 }
 
 export function envFileContent({ host = '127.0.0.1', port = '4313', checkout = DEFAULT_CHECKOUT, ref = 'origin/main', stateDir = STATE_DIR } = {}) {
-  return `# ${ENV_FILE} -- non-secret settings for the julia-dashboard units.
-# Written by dashboard/scripts/install-service.mjs, root:root 0600. Read by systemd, not by
-# the app: the units pass these through EnvironmentFile=.
-# No secret belongs in this file. LINEAR_API_KEY is resolved from 1Password by the vault
+  return `# No secret belongs in this file. LINEAR_API_KEY is resolved from 1Password by the vault
 # wrapper named in each ExecStart, so it never touches disk.
 DASHBOARD_HOST=${host}
 DASHBOARD_PORT=${port}
@@ -80,8 +67,6 @@ function runCommand(command, args, { capture = true, cwd, env } = {}) {
 
 const envPrefix = (user, settings = {}) => ['-u', user, '/usr/bin/env', ...Object.entries(settings).map(([key, value]) => `${key}=${value}`)];
 
-// Every step is a real system command; `steps` is the record the caller prints and the tests
-// read, so the install cannot claim a step it did not run.
 export function installService({ host = '127.0.0.1', port = '4313', ref = 'origin/main', checkout = DEFAULT_CHECKOUT, stateDir = STATE_DIR, uid = process.getuid?.() ?? -1, run = runCommand, log = line => console.log(`julia-dashboard: ${line}`), identity = serverIdentityProblem() } = {}) {
   if (identity) throw new Error(`install-service refuses to run: ${identity}`);
   if (uid !== 0) throw new Error('install-service must run as root: use sudo');

@@ -1,4 +1,3 @@
-// health.test.mjs -- the three checks behind /api/health (JUL-276 PR-2, decision D7).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

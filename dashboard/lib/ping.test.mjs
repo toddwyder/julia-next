@@ -1,5 +1,3 @@
-// ping.test.mjs -- the notice Todd actually gets, and the reminder that delivers it
-// (JUL-276 PR-2, decision D6). A comment on his own key does not notify him.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkForToddGuard } from '../../scripts/linear-cli.mjs';
