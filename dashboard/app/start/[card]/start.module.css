@@ -40,7 +40,87 @@
 
 .stale { border-left: 4px solid var(--amber); background: #fffbeb; color: #92400e; padding: 16px 20px; border-radius: 8px; margin: 0; }
 
-.readonly { margin: 0; color: var(--slate); }
+.hint { margin: 0 0 10px; color: #475569; }
+
+.notice { margin: 0 0 10px; padding: 10px 12px; border-left: 3px solid var(--amber); background: #fffbeb; color: #92400e; border-radius: 6px; }
+
+.saved { margin: 12px 0 0; color: var(--slate); font-size: 0.9rem; }
+
+.groups { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.group { border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 12px; background: #f8fafc; min-width: 0; }
+
+.groupRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; min-width: 0; }
+
+.groupName { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; }
+
+.arrow { color: var(--slate); width: 1em; }
+
+.modelButton { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-height: 44px; max-width: 100%; padding: 6px 10px; border: 1px solid #dbe2ea; border-radius: 8px; background: white; font: inherit; text-align: left; cursor: pointer; }
+
+.modelButton:hover { border-color: var(--iris); }
+
+.roles { list-style: none; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 6px; }
+
+.role { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 4px 0; min-width: 0; }
+
+.roleName { color: #475569; overflow-wrap: anywhere; min-width: 0; max-width: 100%; }
+
+.roleOverride { border-left: 3px solid var(--iris); padding-left: 8px; }
+
+.roleOverride .roleName { color: #4338ca; font-weight: 700; }
+
+.override { font-size: 0.8rem; color: #4338ca; background: #eef2ff; border-radius: 999px; padding: 2px 8px; }
+
+.infoButton { min-width: 32px; min-height: 32px; padding: 0 6px; border: 1px solid #cbd5e1; border-radius: 999px; background: white; color: #4338ca; font-size: 0.85rem; line-height: 1; cursor: pointer; }
+
+.info { flex-basis: 100%; margin: 0; color: #334155; font-size: 0.9rem; }
+
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+
+.chip { display: inline-flex; flex-wrap: wrap; align-items: center; align-items: center; gap: 6px; max-width: 100%; padding: 4px 4px 4px 10px; border: 1px solid #dbe2ea; border-radius: 999px; background: white; }
+
+.chip .model, .chip .price { min-width: 0; white-space: normal; }
+
+.chipCross { min-width: 32px; min-height: 32px; border: 0; border-radius: 999px; background: #eef2f6; color: #334155; font-size: 1rem; line-height: 1; cursor: pointer; }
+
+.chipCross:hover { background: #e2e8f0; }
+
+.addChip { min-height: 40px; padding: 0 12px; border: 1px dashed #94a3b8; border-radius: 999px; background: none; color: #4338ca; font: inherit; cursor: pointer; }
+
+.effortPick { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; padding: 4px 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+
+.effort .info { align-self: stretch; margin-top: 4px; }
+
+.whyText { margin: 0; border-top: 1px solid #eef2f6; padding-top: 12px; color: #334155; }
+
+.pickerBackdrop { position: fixed; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: #0f172a99; }
+
+.picker { display: flex; flex-direction: column; width: min(560px, 100%); max-height: 80vh; background: white; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px #0f172a33; }
+
+.pickerHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #e2e8f0; }
+
+.pickerHead h3 { margin: 0; font-size: 1rem; }
+
+.closePicker { min-height: 40px; padding: 0 14px; border: 1px solid #dbe2ea; border-radius: 8px; background: white; font: inherit; cursor: pointer; }
+
+.pickList { list-style: none; margin: 0; padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+
+.pickModel { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #dbe2ea; border-radius: 10px; background: white; font: inherit; text-align: left; cursor: pointer; }
+
+.pickModel:hover { border-color: var(--iris); }
+
+.inPanel { font-size: 0.8rem; color: #475569; }
+
+@media (min-width: 641px) {
+  .pickerBackdrop { align-items: center; padding: 24px; }
+  .picker { border-radius: 16px; max-height: 86vh; }
+}
+
+@media (max-width: 360px) {
+  .price, .modelButton .price, .groupName .price { white-space: normal; }
+  .modelButton, .groupName { min-width: 0; }
+}
 
 @media (max-width: 480px) {
   .efforts { grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); }

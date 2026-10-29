@@ -1,16 +1,16 @@
+import { join } from 'node:path';
 import { connection } from 'next/server';
+import ROLES from '../../../config/roles.json';
 import { getReadyCard } from '../../../lib/linear.js';
-import { priceLabel, readModels, startModels } from '../../../lib/models.js';
+import { displayName, priceLabel, readModels, startModels } from '../../../lib/models.js';
+import { initialChoice, mergeDraft } from '../../../lib/roles.js';
+import { readJsonRecord, stateFolder, writeJsonRecord } from '../../../lib/state.js';
+import StartScreen from './start-screen.jsx';
 import styles from './start.module.css';
 
-const EFFORTS = [
-  { id: 'small', name: 'Small', brains: 1 },
-  { id: 'medium', name: 'Medium', brains: 2 },
-  { id: 'large', name: 'Large', brains: 3 },
-  { id: 'unlimited', name: 'Unlimited', brains: 4 },
-];
+const { groups: GROUPS } = ROLES;
+const DRAFT_FILE = () => join(stateFolder(), 'draft.json');
 
-const EXPLANATION = 'How hard the models think. More brains is slower and costs more.';
 const SWEEP_MISSING = 'No model sweep has run yet, so there are no models or prices to show. Go back to the list and open this card again after the weekly sweep.';
 const UNPRICED_MISSING = 'The sweep has saved no model with a price, so this screen has nothing to show. Go back to the list and open this card again after the next sweep.';
 
@@ -18,8 +18,34 @@ function sweepDay(date) {
   return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date);
 }
 
-function ModelLine({ model }) {
-  return <dd><span className={styles.model}>{model.displayName}</span> <span className={styles.price}>{priceLabel(model)}</span></dd>;
+// Only a model the sweep recorded a price for may reach the screen, even if the file was
+// edited by hand. A free model is priced at zero, so it counts as priced.
+function pricedModels(saved) {
+  return (saved.models ?? []).filter(model => model.free === true
+    || (Number.isFinite(model.inputPerMillion) && Number.isFinite(model.outputPerMillion)));
+}
+
+const modelLine = model => ({ name: model.displayName ?? displayName(model), price: priceLabel(model) });
+
+// The browser sends the whole draft back, so it is treated as untrusted: every group, role
+// and model is checked against the config and the latest sweep before anything is written.
+async function saveDraft(next) {
+  'use server';
+  const saved = readModels();
+  const picked = startModels(saved);
+  const models = pricedModels(saved);
+  const modelIds = models.map(model => model.id);
+  const fallback = initialChoice({
+    groups: GROUPS, modelIds, fallback: picked.mainSession?.id ?? '', effort: picked.effort,
+  });
+  const choice = mergeDraft({ saved: next, fallback, modelIds });
+  const updatedAt = new Date().toISOString();
+  writeJsonRecord(DRAFT_FILE(), {
+    ...choice,
+    card: String(next?.card ?? '').slice(0, 40),
+    updatedAt,
+  });
+  return { updatedAt };
 }
 
 export default async function StartPage({ params }) {
@@ -43,6 +69,26 @@ export default async function StartPage({ params }) {
     }
   }
   const picked = saved ? startModels(saved) : null;
+  const models = saved ? pricedModels(saved) : [];
+
+  let draft;
+  if (picked?.mainSession && picked?.shipping) {
+    const record = readJsonRecord(DRAFT_FILE());
+    if (record.error) console.error(`julia-dashboard: draft.json ${record.error}; starting from the sweep defaults.`);
+    draft = record.value;
+  }
+  const fresh = picked?.mainSession
+    ? initialChoice({
+      card: identifier, groups: GROUPS, modelIds: models.map(model => model.id),
+      fallback: picked.mainSession.id, effort: picked.effort,
+    })
+    : null;
+  const choice = draft && fresh
+    ? mergeDraft({ saved: draft, fallback: fresh, modelIds: models.map(model => model.id) })
+    : fresh;
+  const picks = models
+    .map(model => ({ id: model.id, ...modelLine(model) }))
+    .sort((left, right) => left.name.localeCompare(right.name));
 
   return <><a className="back" href="/">← Back to Ready cards</a>
     <header><p className="eyebrow">Start screen</p>
@@ -51,30 +97,13 @@ export default async function StartPage({ params }) {
       : !card ? <p className="empty">This card is not in Julia-next Ready. Go Back to choose a Ready card.</p>
       : modelsProblem ? <p className="problem" role="alert">{modelsProblem}</p>
       : saved.status === 'missing' || saved.status === 'empty' ? <p className="empty">{SWEEP_MISSING}</p>
-      : !picked.mainSession || !picked.shipping ? <p className="empty">{UNPRICED_MISSING}</p>
+      : !picked.mainSession || !picked.shipping || !choice ? <p className="empty">{UNPRICED_MISSING}</p>
       : <div className={styles.screen}>
         {saved.status === 'stale' ? <p className={styles.stale} role="status">
           The last sweep was on {sweepDay(saved.sweptAt)}. That is more than eight days ago. Run the weekly sweep to refresh these prices.
         </p> : null}
-        <section className={styles.section} aria-labelledby="settings-heading">
-          <h2 id="settings-heading">Settings</h2>
-          <dl className={styles.summary}>
-            <div className={styles.row}><dt>Main session</dt><ModelLine model={picked.mainSession} /></div>
-            <div className={styles.row}><dt>Shipping</dt><ModelLine model={picked.shipping} /></div>
-            <div className={styles.row}><dt>Effort</dt><dd>{EFFORTS.find(effort => effort.id === picked.effort)?.name ?? 'Large'}</dd></div>
-          </dl>
-        </section>
-        <section className={styles.section} aria-labelledby="effort-heading">
-          <h2 id="effort-heading">Effort</h2>
-          <ul className={styles.efforts}>
-            {EFFORTS.map(effort => <li key={effort.id} className={effort.id === picked.effort ? `${styles.effort} ${styles.chosen}` : styles.effort} aria-current={effort.id === picked.effort ? 'true' : undefined}>
-              <span className={styles.brains} aria-hidden="true">{'🧠'.repeat(effort.brains)}</span>
-              <span className={styles.effortName}>{effort.name}</span>
-            </li>)}
-          </ul>
-          <details className={styles.why}><summary className={styles.whyLabel}>What effort means</summary>
-            <p>{EXPLANATION}</p></details>
-        </section>
+        <StartScreen card={identifier} groups={GROUPS} models={picks} initial={choice}
+          mainSession={modelLine(picked.mainSession)} shipping={modelLine(picked.shipping)} saveDraft={saveDraft} />
         <section className={styles.section} aria-labelledby="prices-heading">
           <h2 id="prices-heading">Prices</h2>
           <p className={styles.sources}>Prices paid per million tokens. ↓ is what you are charged for what you send, ↑ for what the model writes. Read from each provider&apos;s pricing page on {sweepDay(saved.sweptAt)}.</p>
@@ -82,7 +111,6 @@ export default async function StartPage({ params }) {
             <span className={styles.model}>{account.name}</span> <span className={styles.price}>{account.modelCount} {account.modelCount === 1 ? 'model' : 'models'}</span>
           </li>)}</ul>
         </section>
-        <p className={styles.readonly}>This screen is read only for now. Choosing models and effort arrives in the next slice.</p>
       </div>}
   </>;
 }
