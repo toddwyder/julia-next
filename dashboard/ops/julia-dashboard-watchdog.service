@@ -1,0 +1,13 @@
+[Unit]
+Description=Watch the Julia dashboard health check and tell Todd when it is down
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/julia-dashboard
+EnvironmentFile=/etc/julia-dashboard.env
+Environment=HOME=/home/ubuntu
+ExecStart=/usr/local/bin/node /home/ubuntu/julia-dashboard/dashboard/scripts/watchdog.mjs

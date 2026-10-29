@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch the Julia dashboard every minute
+
+[Timer]
+Unit=julia-dashboard-watchdog.service
+OnBootSec=60s
+OnUnitInactiveSec=1min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

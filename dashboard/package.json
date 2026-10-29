@@ -7,8 +7,8 @@
     "dev": "next dev --hostname ${DASHBOARD_HOST:?Set DASHBOARD_HOST} --port 4313",
     "build": "next build",
     "start": "next start --hostname ${DASHBOARD_HOST:?Set DASHBOARD_HOST} --port 4313",
-    "lint": "eslint --no-config-lookup --ext .jsx,.js,.mjs --parser-options '{\"ecmaVersion\":\"latest\",\"sourceType\":\"module\",\"ecmaFeatures\":{\"jsx\":true}}' --rule 'no-unreachable:error' --rule 'no-constant-condition:error' --rule 'eqeqeq:error' app lib tests playwright.config.mjs",
-    "test": "node --test lib/*.test.mjs",
+    "lint": "eslint --no-config-lookup --ext .jsx,.js,.mjs --parser-options '{\"ecmaVersion\":\"latest\",\"sourceType\":\"module\",\"ecmaFeatures\":{\"jsx\":true}}' --rule 'no-unreachable:error' --rule 'no-constant-condition:error' --rule 'eqeqeq:error' app lib tests scripts server.js playwright.config.mjs",
+    "test": "node --test lib/*.test.mjs scripts/*.test.mjs",
     "test:browser": "playwright test"
   },
   "dependencies": {

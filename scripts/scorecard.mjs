@@ -123,6 +123,18 @@ export function cardForThread(dbPath, threadId) {
   return thread ? cardWindows(thread, thread.events).at(-1)?.card : undefined;
 }
 
+// The directory the thread was started in, so a ping can name the checkout to resume
+// in even when the session itself is running somewhere else.
+export function threadProjectPath(dbPath, threadId) {
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const row = db.prepare('select json(metadata) as metadata from mastra_threads where id = ?').get(threadId);
+    return row ? JSON.parse(row.metadata ?? '{}').projectPath : undefined;
+  } finally {
+    db.close();
+  }
+}
+
 // ---- prices ------------------------------------------------------------------
 
 export function loadPrices(mastracodeDir) {

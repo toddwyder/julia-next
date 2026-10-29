@@ -1,0 +1,25 @@
+[Unit]
+Description=Julia dashboard
+# The plan's promise is that the dashboard always comes back, so the start rate limit that
+# would leave it dead after five quick failures is off. RestartSec keeps the retries at one
+# every two seconds, and tailscaled is waited for because DASHBOARD_HOST is the tailnet address.
+After=network-online.target tailscaled.service
+Wants=network-online.target tailscaled.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/julia-dashboard
+EnvironmentFile=/etc/julia-dashboard.env
+Environment=NODE_ENV=production
+Environment=HOME=/home/ubuntu
+# LINEAR_API_KEY comes from 1Password through the vault wrapper; nothing secret is on disk.
+ExecStart=/usr/local/bin/node /home/ubuntu/julia-mastra/scripts/julia-agents.mjs -- /usr/local/bin/node /home/ubuntu/julia-dashboard/dashboard/server.js
+Restart=always
+RestartSec=2
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

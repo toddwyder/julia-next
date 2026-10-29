@@ -1,0 +1,11 @@
+[Unit]
+Description=Update the Julia dashboard from main every five minutes
+
+[Timer]
+Unit=julia-dashboard-update.service
+OnBootSec=90s
+OnUnitInactiveSec=5min
+AccuracySec=15s
+
+[Install]
+WantedBy=timers.target
