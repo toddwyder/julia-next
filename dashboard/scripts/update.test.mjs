@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decideUpdate, runUpdate } from './update.mjs';
@@ -124,7 +124,9 @@ test('an update fast-forwards, rebuilds, restarts the unit and records the serve
       'git -C ' + repo.checkout + ' fetch',
       'git -C ' + repo.checkout + ' rev-parse',
       'git -C ' + repo.checkout + ' rev-parse',
+      'git -C ' + repo.checkout + ' merge-base',
       'git -C ' + repo.checkout + ' merge',
+      'git -C ' + repo.checkout + ' rev-parse',
       'npm ci',
       'npm run build',
       'sudo -n systemctl restart',
@@ -178,6 +180,41 @@ test('the ref under watch is DASHBOARD_UPDATE_REF, so a lane can watch a real fa
     assert.equal(result.action, 'updated');
     assert.equal(result.commit, lane);
     assert.equal(head(repo.checkout), lane);
+  } finally {
+    repo.clean();
+  }
+});
+
+test('a checkout ahead of the ref stands still instead of reporting a build it never made', () => {
+  const repo = repository();
+  try {
+    git(repo.checkout, 'commit', '--allow-empty', '-m', 'local work');
+    const ahead = head(repo.checkout);
+    const run = (command, args) => (command === 'git' ? execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() : '');
+    const result = runUpdate({ env: repo.env, run, log: () => {}, entries: [] });
+    assert.equal(result.action, 'up-to-date');
+    assert.equal(result.commit, ahead);
+    assert.equal(result.updated, false);
+    assert.equal(head(repo.checkout), ahead);
+  } finally {
+    repo.clean();
+  }
+});
+
+test('a merge that leaves the checkout behind is a failure, not a recorded build', () => {
+  const repo = repository();
+  try {
+    repo.advance();
+    const record = join(repo.state, 'state', 'build.json');
+    const run = (command, args) => {
+      if (command !== 'git') throw new Error(`unexpected command: ${command}`);
+      if (args.includes('merge')) return '';
+      return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    };
+    const result = runUpdate({ env: repo.env, run, log: () => {}, entries: [] });
+    assert.equal(result.action, 'failed');
+    assert.equal(result.phase, 'fast-forward');
+    assert.equal(existsSync(record), false);
   } finally {
     repo.clean();
   }
