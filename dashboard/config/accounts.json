@@ -1,0 +1,19 @@
+{
+  "accounts": [
+    {
+      "id": "claude",
+      "name": "Claude subscription",
+      "provider": "anthropic"
+    },
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT plan",
+      "provider": "openai"
+    },
+    {
+      "id": "commandcode",
+      "name": "CommandCode grant",
+      "provider": "mastracode/commandcode"
+    }
+  ]
+}

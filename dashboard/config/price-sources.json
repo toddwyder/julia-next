@@ -1,0 +1,17 @@
+{
+  "anthropic": {
+    "url": "https://claude.com/pricing",
+    "parser": "anthropic",
+    "label": "Anthropic"
+  },
+  "openai": {
+    "url": "https://developers.openai.com/api/docs/pricing",
+    "parser": "openai",
+    "label": "OpenAI"
+  },
+  "mastracode/commandcode": {
+    "url": "https://commandcode.ai/docs/resources/pricing-limits",
+    "parser": "commandcode",
+    "label": "CommandCode"
+  }
+}

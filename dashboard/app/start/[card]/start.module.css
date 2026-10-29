@@ -1,0 +1,49 @@
+.screen { display: flex; flex-direction: column; gap: 20px; }
+
+.section { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 2px 5px #1e293b08; }
+
+.section h2 { margin: 0 0 12px; font-size: 1rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--slate); }
+
+.summary { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+
+.row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; border-top: 1px solid #eef2f6; padding-top: 12px; }
+
+.row:first-child { border-top: 0; padding-top: 0; }
+
+.row dt { color: #475569; }
+
+.row dd { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+
+.model { font-weight: 700; overflow-wrap: anywhere; }
+
+.price { color: #4338ca; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.efforts { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; }
+
+.effort { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 8px; border: 1px solid #dbe2ea; border-radius: 10px; background: #f8fafc; min-width: 0; }
+
+.chosen { border-color: var(--iris); background: #eef2ff; box-shadow: inset 0 0 0 1px var(--iris); }
+
+.brains { font-size: 1.1rem; letter-spacing: 0.08em; white-space: nowrap; }
+
+.effortName { font-size: 0.95rem; font-weight: 700; text-align: center; overflow-wrap: anywhere; }
+
+.why { border-top: 1px solid #eef2f6; padding-top: 12px; }
+
+.whyLabel { cursor: pointer; color: #4338ca; min-height: 24px; }
+
+.why p { margin: 8px 0 0; color: #334155; }
+
+.sources { margin: 0 0 8px; color: #475569; }
+
+.accounts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+
+.stale { border-left: 4px solid var(--amber); background: #fffbeb; color: #92400e; padding: 16px 20px; border-radius: 8px; margin: 0; }
+
+.readonly { margin: 0; color: var(--slate); }
+
+@media (max-width: 480px) {
+  .efforts { grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); }
+  .brains { font-size: 0.95rem; letter-spacing: 0; }
+  .section { padding: 16px; }
+}

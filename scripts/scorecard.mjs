@@ -6,7 +6,7 @@
 //   node scripts/scorecard.mjs JUL-273 --write    write docs/scorecards/JUL-273.md
 import { DatabaseSync } from 'node:sqlite';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statfsSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -82,7 +82,8 @@ export function cardWindows(thread, events) {
     windows.push({ thread, card, start: user.at, end: Infinity });
   }
   if (!windows.length) {
-    const card = (thread.title ?? '').match(/\bJUL-\d+\b/)?.[0];
+    // A chat started by naming the card rather than by a kickoff line still belongs to that card.
+    const card = (thread.title ?? '').match(/\bJUL-\d+\b/)?.[0] ?? (events.users[0]?.text ?? '').match(/\bJUL-\d+\b/)?.[0];
     if (card && events.users.length) windows.push({ thread, card, start: events.users[0].at, end: Infinity });
   }
   return windows;
@@ -109,7 +110,7 @@ export function findStops(events) {
 export function readThreads(dbPath) {
   const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
-    return db.prepare('select id, title, json(metadata) as metadata from mastra_threads').all().map(thread => {
+    return db.prepare("select id, title, case when json_valid(metadata) then json(metadata) end as metadata from mastra_threads").all().map(thread => {
       const rows = db.prepare('select role, type, createdAt, content from mastra_messages where thread_id = ? order by createdAt').all(thread.id);
       return { id: thread.id, title: thread.title, usage: JSON.parse(thread.metadata ?? '{}').tokenUsage, events: threadEvents(rows) };
     });
@@ -128,7 +129,7 @@ export function cardForThread(dbPath, threadId) {
 export function threadProjectPath(dbPath, threadId) {
   const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
-    const row = db.prepare('select json(metadata) as metadata from mastra_threads where id = ?').get(threadId);
+    const row = db.prepare('select case when json_valid(metadata) then json(metadata) end as metadata from mastra_threads where id = ?').get(threadId);
     return row ? JSON.parse(row.metadata ?? '{}').projectPath : undefined;
   } finally {
     db.close();
@@ -173,8 +174,23 @@ export function mastracodeDir() {
   return resolve(dirname(realpathSync(bin)), '..');
 }
 
+// The trace store can be larger than the room left on disk — this machine's was
+// 22 GB against 20 GB free. Copying then fails with ENOSPC and takes the whole
+// scorecard with it, so check first and report the skip in the card instead.
+const TRACE_COPY_MARGIN = 512 * 1024 * 1024;
+
+export function traceCopyFits(size, room) {
+  return size + TRACE_COPY_MARGIN <= room;
+}
+
 async function readTracing(dir, file, threadIds) {
-  if (!existsSync(file) || !threadIds.length) return { metrics: [], requested: [] };
+  if (!existsSync(file) || !threadIds.length) return { metrics: [], requested: [], skipped: null };
+  const fileSize = statSync(file).size + (existsSync(file + '.wal') ? statSync(file + '.wal').size : 0);
+  const free = statfsSync(tmpdir());
+  const room = Number(free.bavail) * Number(free.bsize);
+  if (!traceCopyFits(fileSize, room)) {
+    return { metrics: [], requested: [], skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it` };
+  }
   const { DuckDBInstance } = createRequire(join(dir, 'package.json'))('@duckdb/node-api');
   // A running Mastra Code holds the trace file's lock, so read a copy.
   const copy = mkdtempSync(join(tmpdir(), 'scorecard-'));
@@ -189,7 +205,7 @@ async function readTracing(dir, file, threadIds) {
       from metric_events where threadId in (${ids}) and name like 'mastra_model_%tokens'`);
     const requested = await rows(`select threadId, epoch_ms(timestamp) as at, entityName, json_extract_string(attributes, '$.model') as model,
       json_extract_string(attributes, '$.provider') as provider from span_events where threadId in (${ids}) and spanType = 'model_generation' and endedAt is null`);
-    return { metrics, requested };
+    return { metrics, requested, skipped: null };
   } finally {
     instance.closeSync?.();
     rmSync(copy, { recursive: true, force: true });
@@ -232,7 +248,10 @@ export function judgeStops(stops, uat) {
 
 export function buildScorecard({ card, threads, prices, tracing, pulls, pings, uat }) {
   const windows = threads.flatMap(t => cardWindows(t, t.events)).filter(w => w.card === card);
-  const pull = pulls.find(p => p.headRefName.toLowerCase().includes(card.toLowerCase()));
+  // A pstack slice runs on its card's branch (feat/jul-276-…), so the branch name
+  // may never mention the slice id; the search that found the PR already matched
+  // the card, so a lone result is that card's PR.
+  const pull = pulls.find(p => p.headRefName.toLowerCase().includes(card.toLowerCase())) ?? (pulls.length === 1 ? pulls[0] : undefined);
   const runs = [];
   let stops = [];
   const cost = [];
@@ -281,6 +300,7 @@ export function buildScorecard({ card, threads, prices, tracing, pulls, pings, u
   const counted = stops.filter(s => s.counts);
   return {
     card, windows: windows.length, runs, stops, cost, pull, uat,
+    tracingSkipped: tracing?.skipped,
     usd: cost.reduce((a, c) => a + c.usd, 0),
     success: uat && windows.length ? counted.length === 0 : undefined,
     stopsBeforeUat: counted.length,
@@ -288,6 +308,7 @@ export function buildScorecard({ card, threads, prices, tracing, pulls, pings, u
 }
 
 const utc = ms => new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
+const gigabytes = bytes => `${(bytes / 1024 ** 3).toFixed(0)} GB`;
 const usd = n => `$${n.toFixed(2)}`;
 const minutes = ms => `${Math.round(ms / 60_000)} min`;
 const tok = n => (n == null ? '' : n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n));
@@ -303,7 +324,16 @@ export function renderScorecard(s, generatedAt = new Date()) {
   const verdict = !s.windows ? 'not decided yet (no matching run records)' : s.success === undefined ? 'not decided yet (no UAT yes recorded)' : s.success ? 'yes' : 'no';
   const uat = s.uat ? `${utc(Date.parse(s.uat.yesAt))} ("${cell(s.uat.said)}")` : 'not recorded';
   lines.push(`- Success: **${verdict}**. Stops before Todd's UAT yes: ${s.stopsBeforeUat}. Todd's UAT yes: ${uat}.`);
-  lines.push(s.cost.length ? `- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.` : '- Cost: **unknown**. No usage records found for this card.');
+  // Rows with no token detail cannot add up to a number, so say unknown rather
+  // than print $0.00 for a card that plainly cost something.
+  const measured = s.cost.some(c => Object.keys(c.tokens ?? {}).length);
+  const unknownCost = s.tracingSkipped
+    ? `- Cost: **unknown**. Mastra's trace store was not read: ${s.tracingSkipped}.`
+    : s.cost.length
+      ? '- Cost: **unknown**. Mastra kept no token detail for these runs.'
+      : '- Cost: **unknown**. No usage records found for this card.';
+  lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.` : unknownCost);
+  if (s.tracingSkipped && measured) lines.push(`- Tracing not read: ${s.tracingSkipped}. Rows below come from the thread's own usage records.`);
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');

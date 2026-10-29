@@ -1,0 +1,18 @@
+[Unit]
+Description=Sweep the models Todd's accounts offer and record their prices
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/julia-dashboard
+EnvironmentFile=/etc/julia-dashboard.env
+Environment=NODE_ENV=production
+Environment=HOME=/home/ubuntu
+# The sweep asks Mastra Code which models the signed-in accounts offer, so it needs the
+# program's location. systemd's PATH leaves out /home/ubuntu/.local/bin.
+Environment=MASTRACODE_PROGRAM=/home/ubuntu/.local/lib/mastracode-program
+TimeoutStartSec=600
+ExecStart=/usr/local/bin/node /home/ubuntu/julia-dashboard/dashboard/scripts/sweep.mjs

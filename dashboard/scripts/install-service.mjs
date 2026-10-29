@@ -21,8 +21,14 @@ export const UNITS = Object.freeze([
   'julia-dashboard-update.timer',
   'julia-dashboard-watchdog.service',
   'julia-dashboard-watchdog.timer',
+  'julia-dashboard-sweep.service',
+  'julia-dashboard-sweep.timer',
 ]);
-export const TIMERS = Object.freeze(['julia-dashboard-update.timer', 'julia-dashboard-watchdog.timer']);
+export const TIMERS = Object.freeze([
+  'julia-dashboard-update.timer',
+  'julia-dashboard-watchdog.timer',
+  'julia-dashboard-sweep.timer',
+]);
 
 const here = dirname(fileURLToPath(import.meta.url));
 const opsDir = join(here, '..', 'ops');
