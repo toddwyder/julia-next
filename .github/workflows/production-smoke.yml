@@ -1,0 +1,26 @@
+name: Production smoke
+
+# Vercel reports each deployment to GitHub. When production finishes deploying,
+# check that Julia's address serves that commit and its pages load.
+on:
+  deployment_status:
+
+jobs:
+  production:
+    if: github.event.deployment_status.state == 'success' && github.event.deployment.environment == 'Production'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - name: Install application dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Check production serves this commit
+        run: node scripts/production-smoke.mjs ${{ github.event.deployment.sha }}

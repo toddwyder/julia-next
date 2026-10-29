@@ -9,5 +9,8 @@ test('production serves the merged commit without browser errors', async ({ page
   expect(await response.json()).toEqual({ status: 'ok', commit: process.env.JULIA_SMOKE_COMMIT });
   await page.goto('/');
   await expect(page.getByText('what are we cooking today?')).toBeVisible();
+  await page.goto('/recipes');
+  await expect(page).toHaveTitle('Julia');
+  await expect(page.getByRole('button', { name: 'Sign in with Google' })).toBeVisible();
   expect(errors).toEqual([]);
 });
