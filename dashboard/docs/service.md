@@ -79,6 +79,10 @@ Every line the scripts write starts with `julia-dashboard:` and carries its phas
 skip, a failed build and a restart are distinguishable without opening the code. A skipped update
 names the run that blocked it.
 
+`state/build.json` names the commit the running checkout was built from, and
+`systemctl show -p ActiveEnterTimestamp julia-dashboard` says when the current process started, so
+the two together name the build that is being served.
+
 ## When Todd is told
 
 The watchdog tells Todd only twice per outage: once after three consecutive failed probes, and
