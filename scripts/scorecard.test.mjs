@@ -212,3 +212,22 @@ test('a card with no trace store at all still says no usage records were found',
   const scorecard = buildScorecard({ card: 'JUL-283', threads: [], prices: {}, tracing: { metrics: [], requested: [], skipped: null }, pulls: [], pings: [], uat: undefined });
   assert.match(renderScorecard(scorecard), /No usage records found for this card/);
 });
+
+test('a slice card finds its PR even when the branch is named after the parent card', () => {
+  const pull = { number: 378, headRefName: 'feat/jul-276-model-sweep', createdAt: T('19:20') };
+  const s = buildScorecard({ card: 'JUL-283', threads: [], prices: {}, tracing: { metrics: [], requested: [] }, pulls: [pull], pings: [], uat: undefined });
+  assert.equal(s.pull, pull);
+  assert.match(renderScorecard(s), /PR #378, opened 2026-10-26 19:20/);
+});
+
+test('two PRs that mention the card are not guessed at', () => {
+  const s = buildScorecard({ card: 'JUL-283', threads: [], prices: {}, tracing: { metrics: [], requested: [] }, pulls: [{ number: 378, headRefName: 'feat/jul-276-a' }, { number: 379, headRefName: 'feat/jul-276-b' }], pings: [], uat: undefined });
+  assert.equal(s.pull, undefined);
+});
+
+test('rows with no token detail say unknown instead of claiming zero spend', () => {
+  const scorecard = buildScorecard({ card: 'JUL-283', threads: [], prices: {}, tracing: { metrics: [], requested: [], skipped: null }, pulls: [], pings: [], uat: undefined });
+  const priced = { ...scorecard, cost: [{ agent: 'Code Agent (main chat)', requested: 'commandcode/…', answered: 'not recorded', tokens: {}, usd: 0, unpriced: true, basis: 'thread total' }] };
+  assert.match(renderScorecard(priced), /Cost: \*\*unknown\*\*\. Mastra kept no token detail for these runs\./);
+  assert.doesNotMatch(renderScorecard(priced), /Cost: \*\*\$0\.00\*\*/);
+});

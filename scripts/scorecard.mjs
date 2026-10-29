@@ -248,7 +248,10 @@ export function judgeStops(stops, uat) {
 
 export function buildScorecard({ card, threads, prices, tracing, pulls, pings, uat }) {
   const windows = threads.flatMap(t => cardWindows(t, t.events)).filter(w => w.card === card);
-  const pull = pulls.find(p => p.headRefName.toLowerCase().includes(card.toLowerCase()));
+  // A pstack slice runs on its card's branch (feat/jul-276-…), so the branch name
+  // may never mention the slice id; the search that found the PR already matched
+  // the card, so a lone result is that card's PR.
+  const pull = pulls.find(p => p.headRefName.toLowerCase().includes(card.toLowerCase())) ?? (pulls.length === 1 ? pulls[0] : undefined);
   const runs = [];
   let stops = [];
   const cost = [];
@@ -321,8 +324,16 @@ export function renderScorecard(s, generatedAt = new Date()) {
   const verdict = !s.windows ? 'not decided yet (no matching run records)' : s.success === undefined ? 'not decided yet (no UAT yes recorded)' : s.success ? 'yes' : 'no';
   const uat = s.uat ? `${utc(Date.parse(s.uat.yesAt))} ("${cell(s.uat.said)}")` : 'not recorded';
   lines.push(`- Success: **${verdict}**. Stops before Todd's UAT yes: ${s.stopsBeforeUat}. Todd's UAT yes: ${uat}.`);
-  lines.push(s.cost.length ? `- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.` : s.tracingSkipped ? `- Cost: **unknown**. Mastra's trace store was not read: ${s.tracingSkipped}, so these numbers come from the thread's own usage records only.` : '- Cost: **unknown**. No usage records found for this card.');
-  if (s.tracingSkipped && s.cost.length) lines.push(`- Tracing not read: ${s.tracingSkipped}. Rows below come from the thread's own usage records.`);
+  // Rows with no token detail cannot add up to a number, so say unknown rather
+  // than print $0.00 for a card that plainly cost something.
+  const measured = s.cost.some(c => Object.keys(c.tokens ?? {}).length);
+  const unknownCost = s.tracingSkipped
+    ? `- Cost: **unknown**. Mastra's trace store was not read: ${s.tracingSkipped}.`
+    : s.cost.length
+      ? '- Cost: **unknown**. Mastra kept no token detail for these runs.'
+      : '- Cost: **unknown**. No usage records found for this card.';
+  lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.` : unknownCost);
+  if (s.tracingSkipped && measured) lines.push(`- Tracing not read: ${s.tracingSkipped}. Rows below come from the thread's own usage records.`);
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
