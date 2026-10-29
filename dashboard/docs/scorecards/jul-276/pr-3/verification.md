@@ -36,6 +36,10 @@ cd dashboard && npm run check:start-address -- http://ovh.tail91f394.ts.net:4314
 this build started on `127.0.0.1`; none of them ever opened a handed-over address, which is how the
 wrong one reached Todd.
 
+Two screenshots of that address at 1280 by 800, taken after the branch was pushed:
+`start-screen-desktop.png`, and `start-screen-effort-desktop.png` with "What effort means" open, so
+the explanation line shows the way lane 4 proves it.
+
 ## What is in this slice
 
 | File | What it does |
