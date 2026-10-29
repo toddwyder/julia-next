@@ -1,0 +1,13 @@
+[Unit]
+Description=Sweep the model prices every Monday
+
+[Timer]
+Unit=julia-dashboard-sweep.service
+# Persistent catches up a sweep missed while the server was off, so a brand-new model can
+# still appear the same week.
+OnCalendar=Mon 04:00
+Persistent=true
+AccuracySec=1h
+
+[Install]
+WantedBy=timers.target
