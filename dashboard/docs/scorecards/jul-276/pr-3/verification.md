@@ -5,6 +5,37 @@ and the Start screen read only". Branch `feat/jul-276-model-sweep`, base `origin
 
 Run on this server, 29 October 2026, from the `feat/jul-276-model-sweep` worktree.
 
+## Where to look at it
+
+The dashboard is its own Next app in `dashboard/`. Vercel builds the cookbook at the repository
+root, so a preview URL such as
+`https://julia-next-git-feat-…vercel.app/start/JUL-279` answers 404 inside the cookbook shell: that
+address never could show this screen. The first version of this document handed over exactly such
+an address without opening it.
+
+The address that does serve it, dashboards running from this worktree:
+
+```sh
+cd /home/ubuntu/verifications/jul-276/pr-3/dashboard
+DASHBOARD_STATE_DIR=/tmp/start-preview DASHBOARD_HOST=0.0.0.0 DASHBOARD_PORT=4314 \
+  setsid node ../scripts/julia-agents.mjs -- node server.js
+# http://ovh.tail91f394.ts.net:4314/start/JUL-279  (tailnet only, no sign-in)
+```
+
+`http://ovh.tail91f394.ts.net:4313/start/JUL-279` is the live dashboard built from `main`: it
+answers, but shows the older read-only card with no prices. After this branch merges, 4313 carries
+the screen below by itself.
+
+Before any address is handed over, ask it what it serves:
+
+```sh
+cd dashboard && npm run check:start-address -- http://ovh.tail91f394.ts.net:4314/start/JUL-279
+```
+
+`OK … serves the Start screen.` or a `FAIL` that names the cause. The ten lanes below open a server
+this build started on `127.0.0.1`; none of them ever opened a handed-over address, which is how the
+wrong one reached Todd.
+
 ## What is in this slice
 
 | File | What it does |
