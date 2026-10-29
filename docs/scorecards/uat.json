@@ -16,5 +16,10 @@
     "yesAt": "2026-10-27T11:50:07Z",
     "said": "UAT passed: I saved a recipe on desktop, opened it on my phone with Google sign-in, and it was unchanged. This is my yes for the sign-in and sync behavior only.",
     "scope": "sign-in and sync only; merge waits on the Sentry/Axiom save-failure proof and the formal verification being shown on JUL-208"
+  },
+  "JUL-276": {
+    "yesAt": "2026-10-29T04:36:14Z",
+    "said": "UAT yes for PR-2: I tested the Ready list, Start and Back earlier, and after the reboot the dashboard came back on its own. Before merging, two changes. 1) Move the merge step out of server-runbook.md into the updater: since it only follows main (decision 0022), after a merge it must move the deploy checkout onto origin/main by itself, including after a squash merge. Prove it with a test shown failing without the change, and remove the runbook steps. 2) Yes, bind card-less chats to a card so their stops ping too, and prove it with a real ping from a chat started outside the repo. Success: both proven, PR green, and nothing about merging left for a person to remember. Then merge PR-2.",
+    "alsoAsked": "the updater moves the deploy checkout onto main after a squash merge, and card-less chats ping; both are shown in docs/scorecards/jul-276/pr-2/verification.md"
   }
 }

@@ -296,7 +296,9 @@ installations side by side, which the plan never needed.
 
 ## Open
 
-- Todd's yes in chat, which the plan requires before merge.
+- Todd's UAT yes: given in chat at `2026-10-29T04:36Z` and quoted in `docs/scorecards/uat.json`.
+  The two changes he asked for before merge are the two sections above: the updater moves the
+  deploy checkout onto main after a squash merge, and a chat with no card still pings.
 - The dashboard address is reachable on the tailnet only; a real phone over Tailscale was not
   used, the 390x844 viewport stands in for it.
 - The service runs `node dashboard/server.js` through the operator checkout's
