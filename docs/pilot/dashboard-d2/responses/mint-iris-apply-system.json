@@ -1,0 +1,93 @@
+{
+  "id": 1793144067932,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"projectId\":\"12943705270951129641\",\"sessionId\":\"6884806216132285132\",\"outputComponents\":[{\"design\":{\"screens\":[{\"screenshot\":{\"name\":\"projects/12943705270951129641/files/4cf04c1fd6e9412e96a7a3b5aadc0f10\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/4cf04c1fd6e9412e96a7a3b5aadc0f10:download\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/e5b32e2d334a4f4b97a2c6593b38d479\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/e5b32e2d334a4f4b97a2c6593b38d479:download\",\"mimeType\":\"text/html\"},\"id\":\"1bf5cf3ba518483691ae0afd71855b85\",\"generatedBy\":\"polish_edit_theme_agent\",\"width\":\"780\",\"height\":\"1768\",\"title\":\"Mint & Iris - Accordion - As loaded - Phone\",\"prompt\":\"Convert this screen to a true native mobile layout (device_type: mobile, 390px viewport width) titled 'Mint & Iris - Accordion - As loaded - Phone'. Do not render a phone frame centered inside a desktop viewport; use a full 100% width mobile page layout.\\n\\nSpecifications:\\n- Font: Public Sans (or clean system sans), colors: Mint (#059669, #D1FAE5), Iris (#6366F1, #EEF2FF), background #F3F6F8, cards pure white #FFFFFF, 12px border radius (rounded-xl).\\n- Typography: compact but clean and readable, minimum 13px font size.\\n- Header: 'Todd\\\\'s Factory' with a small, discreet 'Decision support' link/pill with chevron.\\n- Remove invented text: Remove '8 stages active', remove 'ACTION REQUIRED', remove 'Ready for review', remove 'Passed validation suite'.\\n- Top 'Needs you' strip: Exactly 'Needs you (2)' badge/header and two compact clickable link rows:\\n  1. 'Try the recipe screens (UAT)'\\n  2. 'Approve 3 retro fixes'\\n  No subtitles, no extra copy or button tags like 'Review' or 'Approve' if not requested, just compact clean actionable rows.\\n- 8 Stages in order with counts (using dots/chevrons):\\n  1. Backlog · 30 (folded header only, chevron down)\\n  2. Ready · 1 (folded header only, chevron down) [contains hidden card 'Scorecard for every run, plus a ping' with 'Start' action inside folded body]\\n  3. Implementation · 1 (OPEN stage, chevron up): shows ONE compact collapsed card row: 'New machine: retry and pause' with iris badge 'Running'. (Card has hidden details in DOM/collapsible: Step 4 of 8; Doing now: running tests; Active 40s ago; 12 min elapsed; $0.84 spent; Context 41% full; 2 agents inside: Main session, Coder; Stop button; Linear issue link). No metrics shown visible on initial load.\\n  4. Evidence review · 0 (folded header only, chevron down)\\n  5. Remediation · 1 (OPEN stage, chevron up): shows ONE compact collapsed card row: 'Practice: real failure path' with rose badge 'Stuck'. (Contains hidden detail in DOM: No activity for 7 min).\\n  6. Staging/smoke test · 0 (folded header only, chevron down)\\n  7. UAT · 1 (OPEN stage, chevron up): shows ONE compact collapsed card row: 'Recipe screens look like Julia\\\\'s vintage design' with amber badge 'Waiting on you' (distinct amber styling, not rose).\\n  8. Complete · 12 (folded header only, chevron down)\\n- Ensure all 8 stages fit comfortably within the mobile viewport (~844px height), with complete wrapped titles, no ellipsis or cutoffs. Native mobile styling without desktop margins.\",\"name\":\"projects/12943705270951129641/screens/1bf5cf3ba518483691ae0afd71855b85\",\"theme\":{\"colorMode\":\"LIGHT\",\"roundness\":\"ROUND_TWELVE\",\"customColor\":\"#10B981\",\"headlineFont\":\"PUBLIC_SANS\",\"bodyFont\":\"PUBLIC_SANS\",\"colorVariant\":\"FIDELITY\",\"overridePrimaryColor\":\"#059669\",\"overrideSecondaryColor\":\"#6366F1\",\"overrideTertiaryColor\":\"#F59E0B\",\"overrideNeutralColor\":\"#64748B\"},\"deviceType\":\"MOBILE\",\"screenType\":\"DESIGN\",\"screenMetadata\":{\"agentType\":\"PRO_AGENT\",\"status\":\"COMPLETE\"},\"designSystem\":{\"name\":\"assets/17575707340211662328\",\"designSystem\":{\"displayName\":\"Mint & Iris\",\"theme\":{\"colorMode\":\"LIGHT\",\"roundness\":\"ROUND_TWELVE\",\"customColor\":\"#10B981\",\"headlineFont\":\"PUBLIC_SANS\",\"bodyFont\":\"PUBLIC_SANS\",\"designMd\":\"# Mint & Iris\\nSource: projects/12943705270951129641/screens/bab9a7fc3eea45e288ab3a81f19f33d2, titled Todd's Factory Board - Mint & Iris. Reproduce its actual HTML tokens: Public Sans headings and body, Plus Jakarta Sans heading fallback, JetBrains Mono metrics only. Pale cool page #F3F6F8, white cards, slate-800 text, slate-200 borders. Mint palette #ECFDF5 #D1FAE5 #A7F3D0 #10B981 #059669 #047857. Iris palette #EEF2FF #E0E7FF #C7D2FE #818CF8 #6366F1 #4F46E5 #4338CA. Rounded 12px cards and pill badges, fine tinted borders, soft shadows. Running is iris, stuck is rose, waiting on you is amber, complete is mint. Never copy invented content or desktop navigation from the source. This is a light colourful household dashboard, not a terminal.\",\"colorVariant\":\"FIDELITY\",\"overridePrimaryColor\":\"#059669\",\"overrideSecondaryColor\":\"#6366F1\",\"overrideTertiaryColor\":\"#F59E0B\",\"overrideNeutralColor\":\"#64748B\"}},\"version\":\"1\"}}],\"theme\":{\"colorMode\":\"LIGHT\",\"roundness\":\"ROUND_TWELVE\",\"customColor\":\"#10B981\",\"headlineFont\":\"PUBLIC_SANS\",\"bodyFont\":\"PUBLIC_SANS\",\"designMd\":\"# Mint & Iris\\nSource: projects/12943705270951129641/screens/bab9a7fc3eea45e288ab3a81f19f33d2, titled Todd's Factory Board - Mint & Iris. Reproduce its actual HTML tokens: Public Sans headings and body, Plus Jakarta Sans heading fallback, JetBrains Mono metrics only. Pale cool page #F3F6F8, white cards, slate-800 text, slate-200 borders. Mint palette #ECFDF5 #D1FAE5 #A7F3D0 #10B981 #059669 #047857. Iris palette #EEF2FF #E0E7FF #C7D2FE #818CF8 #6366F1 #4F46E5 #4338CA. Rounded 12px cards and pill badges, fine tinted borders, soft shadows. Running is iris, stuck is rose, waiting on you is amber, complete is mint. Never copy invented content or desktop navigation from the source. This is a light colourful household dashboard, not a terminal.\",\"colorVariant\":\"FIDELITY\",\"overridePrimaryColor\":\"#059669\",\"overrideSecondaryColor\":\"#6366F1\",\"overrideTertiaryColor\":\"#F59E0B\",\"overrideNeutralColor\":\"#64748B\"}}}]}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "outputComponents": [
+        {
+          "design": {
+            "screens": [
+              {
+                "designSystem": {
+                  "designSystem": {
+                    "displayName": "Mint & Iris",
+                    "theme": {
+                      "bodyFont": "PUBLIC_SANS",
+                      "colorMode": "LIGHT",
+                      "colorVariant": "FIDELITY",
+                      "customColor": "#10B981",
+                      "designMd": "# Mint & Iris\nSource: projects/12943705270951129641/screens/bab9a7fc3eea45e288ab3a81f19f33d2, titled Todd's Factory Board - Mint & Iris. Reproduce its actual HTML tokens: Public Sans headings and body, Plus Jakarta Sans heading fallback, JetBrains Mono metrics only. Pale cool page #F3F6F8, white cards, slate-800 text, slate-200 borders. Mint palette #ECFDF5 #D1FAE5 #A7F3D0 #10B981 #059669 #047857. Iris palette #EEF2FF #E0E7FF #C7D2FE #818CF8 #6366F1 #4F46E5 #4338CA. Rounded 12px cards and pill badges, fine tinted borders, soft shadows. Running is iris, stuck is rose, waiting on you is amber, complete is mint. Never copy invented content or desktop navigation from the source. This is a light colourful household dashboard, not a terminal.",
+                      "headlineFont": "PUBLIC_SANS",
+                      "overrideNeutralColor": "#64748B",
+                      "overridePrimaryColor": "#059669",
+                      "overrideSecondaryColor": "#6366F1",
+                      "overrideTertiaryColor": "#F59E0B",
+                      "roundness": "ROUND_TWELVE"
+                    }
+                  },
+                  "name": "assets/17575707340211662328",
+                  "version": "1"
+                },
+                "deviceType": "MOBILE",
+                "generatedBy": "polish_edit_theme_agent",
+                "height": "1768",
+                "htmlCode": {
+                  "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/e5b32e2d334a4f4b97a2c6593b38d479:download",
+                  "mimeType": "text/html",
+                  "name": "projects/12943705270951129641/files/e5b32e2d334a4f4b97a2c6593b38d479"
+                },
+                "id": "1bf5cf3ba518483691ae0afd71855b85",
+                "name": "projects/12943705270951129641/screens/1bf5cf3ba518483691ae0afd71855b85",
+                "prompt": "Convert this screen to a true native mobile layout (device_type: mobile, 390px viewport width) titled 'Mint & Iris - Accordion - As loaded - Phone'. Do not render a phone frame centered inside a desktop viewport; use a full 100% width mobile page layout.\n\nSpecifications:\n- Font: Public Sans (or clean system sans), colors: Mint (#059669, #D1FAE5), Iris (#6366F1, #EEF2FF), background #F3F6F8, cards pure white #FFFFFF, 12px border radius (rounded-xl).\n- Typography: compact but clean and readable, minimum 13px font size.\n- Header: 'Todd\\'s Factory' with a small, discreet 'Decision support' link/pill with chevron.\n- Remove invented text: Remove '8 stages active', remove 'ACTION REQUIRED', remove 'Ready for review', remove 'Passed validation suite'.\n- Top 'Needs you' strip: Exactly 'Needs you (2)' badge/header and two compact clickable link rows:\n  1. 'Try the recipe screens (UAT)'\n  2. 'Approve 3 retro fixes'\n  No subtitles, no extra copy or button tags like 'Review' or 'Approve' if not requested, just compact clean actionable rows.\n- 8 Stages in order with counts (using dots/chevrons):\n  1. Backlog · 30 (folded header only, chevron down)\n  2. Ready · 1 (folded header only, chevron down) [contains hidden card 'Scorecard for every run, plus a ping' with 'Start' action inside folded body]\n  3. Implementation · 1 (OPEN stage, chevron up): shows ONE compact collapsed card row: 'New machine: retry and pause' with iris badge 'Running'. (Card has hidden details in DOM/collapsible: Step 4 of 8; Doing now: running tests; Active 40s ago; 12 min elapsed; $0.84 spent; Context 41% full; 2 agents inside: Main session, Coder; Stop button; Linear issue link). No metrics shown visible on initial load.\n  4. Evidence review · 0 (folded header only, chevron down)\n  5. Remediation · 1 (OPEN stage, chevron up): shows ONE compact collapsed card row: 'Practice: real failure path' with rose badge 'Stuck'. (Contains hidden detail in DOM: No activity for 7 min).\n  6. Staging/smoke test · 0 (folded header only, chevron down)\n  7. UAT · 1 (OPEN stage, chevron up): shows ONE compact collapsed card row: 'Recipe screens look like Julia\\'s vintage design' with amber badge 'Waiting on you' (distinct amber styling, not rose).\n  8. Complete · 12 (folded header only, chevron down)\n- Ensure all 8 stages fit comfortably within the mobile viewport (~844px height), with complete wrapped titles, no ellipsis or cutoffs. Native mobile styling without desktop margins.",
+                "screenMetadata": {
+                  "agentType": "PRO_AGENT",
+                  "status": "COMPLETE"
+                },
+                "screenType": "DESIGN",
+                "screenshot": {
+                  "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/4cf04c1fd6e9412e96a7a3b5aadc0f10:download",
+                  "name": "projects/12943705270951129641/files/4cf04c1fd6e9412e96a7a3b5aadc0f10"
+                },
+                "theme": {
+                  "bodyFont": "PUBLIC_SANS",
+                  "colorMode": "LIGHT",
+                  "colorVariant": "FIDELITY",
+                  "customColor": "#10B981",
+                  "headlineFont": "PUBLIC_SANS",
+                  "overrideNeutralColor": "#64748B",
+                  "overridePrimaryColor": "#059669",
+                  "overrideSecondaryColor": "#6366F1",
+                  "overrideTertiaryColor": "#F59E0B",
+                  "roundness": "ROUND_TWELVE"
+                },
+                "title": "Mint & Iris - Accordion - As loaded - Phone",
+                "width": "780"
+              }
+            ],
+            "theme": {
+              "bodyFont": "PUBLIC_SANS",
+              "colorMode": "LIGHT",
+              "colorVariant": "FIDELITY",
+              "customColor": "#10B981",
+              "designMd": "# Mint & Iris\nSource: projects/12943705270951129641/screens/bab9a7fc3eea45e288ab3a81f19f33d2, titled Todd's Factory Board - Mint & Iris. Reproduce its actual HTML tokens: Public Sans headings and body, Plus Jakarta Sans heading fallback, JetBrains Mono metrics only. Pale cool page #F3F6F8, white cards, slate-800 text, slate-200 borders. Mint palette #ECFDF5 #D1FAE5 #A7F3D0 #10B981 #059669 #047857. Iris palette #EEF2FF #E0E7FF #C7D2FE #818CF8 #6366F1 #4F46E5 #4338CA. Rounded 12px cards and pill badges, fine tinted borders, soft shadows. Running is iris, stuck is rose, waiting on you is amber, complete is mint. Never copy invented content or desktop navigation from the source. This is a light colourful household dashboard, not a terminal.",
+              "headlineFont": "PUBLIC_SANS",
+              "overrideNeutralColor": "#64748B",
+              "overridePrimaryColor": "#059669",
+              "overrideSecondaryColor": "#6366F1",
+              "overrideTertiaryColor": "#F59E0B",
+              "roundness": "ROUND_TWELVE"
+            }
+          }
+        }
+      ],
+      "projectId": "12943705270951129641",
+      "sessionId": "6884806216132285132"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": 1793140631734,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/ccffaeccd94349538104d64200d83290\",\"title\":\"Todd's Factory - Warm Editorial Infographic\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/011a1b1ae13841d18cf912d0c2d741c3\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/011a1b1ae13841d18cf912d0c2d741c3:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/d2960adb27fc47619d65cdf4e369ba00\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d2960adb27fc47619d65cdf4e369ba00:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"1768\",\"deviceType\":\"MOBILE\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "MOBILE",
+      "height": "1768",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d2960adb27fc47619d65cdf4e369ba00:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/d2960adb27fc47619d65cdf4e369ba00"
+      },
+      "name": "projects/12943705270951129641/screens/ccffaeccd94349538104d64200d83290",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/011a1b1ae13841d18cf912d0c2d741c3:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/011a1b1ae13841d18cf912d0c2d741c3"
+      },
+      "title": "Todd's Factory - Warm Editorial Infographic",
+      "width": "780"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793143586850,
+  "method": "tools/call",
+  "params": {
+    "name": "edit_screens",
+    "arguments": {
+      "projectId": "12943705270951129641",
+      "selectedScreenIds": [
+        "c6ab3d9a95b640ddad94cb0e37e0a6bb"
+      ],
+      "deviceType": "MOBILE",
+      "prompt": "Make a SECOND screen named Mint & Iris - Accordion - Card open. Keep the exact native phone 390 CSS px / 780 physical px canvas, colours, Public Sans fonts, rounded cards, header and vertical accordion from the selected screen. This is the same dashboard after tapping the running card, not a redesign. Expand ONLY the Implementation card New machine: retry and pause in place. Its title and iris Running badge stay visible. Beneath add all these readable exact details: Step 4 of 8 with 4/8 progress; Doing now: running tests; Active 40 s ago; 12 min elapsed; $0.84 spent; Context 41% full with a 41% bar; 2 agents inside with Main session and Coder; a Stop button; a link labelled Linear issue. No invented issue ID or URL: use the issue URL from the selected screen if valid, otherwise # as this is only a design. Keep all eight stage headers and exact counts: Backlog 30 folded, Ready 1 folded, Implementation 1 open with its one card expanded, Evidence review 0 folded, Remediation 1 open with Practice: real failure path and rose Stuck badge but card details collapsed, Staging/smoke test 0 folded, UAT 1 open with Recipe screens look like Julia's vintage design and amber Waiting on you badge but card details collapsed, Complete 12 folded. Keep Needs you (2) and both full items Try the recipe screens (UAT) and Approve 3 retro fixes. Keep small Decision support link at top. Ready hidden content must retain Scorecard for every run, plus a ping and Start button. Remediation hidden content must retain No activity for 7 min. Keep other collapsed details in HTML, not displayed. Never remove lower stages to fit: use a taller phone screenshot to show all content; no sideways scroll. Every label 13px or larger, titles may wrap and must not be ellipsized. No extra explanatory subtitles, navigation, filler, invented text or cards. Preserve the Mint & Iris design system assets/17575707340211662328: #F3F6F8 page, white cards, mint #10B981 #059669 and iris #6366F1 #EEF2FF, rose stuck, amber waiting."
+    }
+  }
+}

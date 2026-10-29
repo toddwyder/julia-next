@@ -1,0 +1,13 @@
+{
+  "id": 1793143586850,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "The service is currently unavailable.",
+        "type": "text"
+      }
+    ],
+    "isError": true
+  }
+}

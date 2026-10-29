@@ -1,0 +1,19 @@
+{
+  "id": 1793139194286,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/2204d45e664841f186d6c424e08c3e65\",\"title\":\"Generating Screen...\",\"screenshot\":{},\"htmlCode\":{},\"deviceType\":\"MOBILE\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "MOBILE",
+      "htmlCode": {},
+      "name": "projects/12943705270951129641/screens/2204d45e664841f186d6c424e08c3e65",
+      "screenshot": {},
+      "title": "Generating Screen..."
+    }
+  }
+}

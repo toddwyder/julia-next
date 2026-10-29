@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793144238648,
+  "method": "tools/call",
+  "params": {
+    "name": "edit_screens",
+    "arguments": {
+      "projectId": "12943705270951129641",
+      "selectedScreenIds": [
+        "eb25afcef8e04cd19b2c192ce0979fff"
+      ],
+      "deviceType": "MOBILE",
+      "prompt": "Keep this exact phone picture unchanged: colours, typography, stage counts, folded/open state, card size, all text and data. Make just this HTML correction: the Implementation card link labelled Linear issue must href https://linear.app/julia-next/issue/JUL-271/new-machine-retry-and-pause (the real issue from our tracker), not a # placeholder. Keep only Implementation's card expanded; Remediation and UAT stages open but their cards collapsed. No other changes. Title Mint & Iris - Accordion - Card open - Final."
+    }
+  }
+}

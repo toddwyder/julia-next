@@ -1,0 +1,29 @@
+{
+  "id": 1793140627257,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/c56d6d9a94c442e4bbb134e3a29796a5\",\"title\":\"Todd's Factory - Solar Pop Blueprint\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/6037ed56104548b8ad046d890d0c28fc\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/6037ed56104548b8ad046d890d0c28fc:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/d68bd2a6c8a24323a213b683bca59d57\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d68bd2a6c8a24323a213b683bca59d57:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"1768\",\"deviceType\":\"MOBILE\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "MOBILE",
+      "height": "1768",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/d68bd2a6c8a24323a213b683bca59d57:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/d68bd2a6c8a24323a213b683bca59d57"
+      },
+      "name": "projects/12943705270951129641/screens/c56d6d9a94c442e4bbb134e3a29796a5",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/6037ed56104548b8ad046d890d0c28fc:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/6037ed56104548b8ad046d890d0c28fc"
+      },
+      "title": "Todd's Factory - Solar Pop Blueprint",
+      "width": "780"
+    }
+  }
+}

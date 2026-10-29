@@ -1,0 +1,29 @@
+{
+  "id": 1793140224514,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/dbb1b0e5bb2a411baac2686555e226cb\",\"title\":\"Todd's Factory - Neo-Vibrant Grit\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/2ade4fc0fc6a4dacb4789153ecdc937c\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/2ade4fc0fc6a4dacb4789153ecdc937c:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/a256b71b7e6c4e598d114f28c469fe5a\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a256b71b7e6c4e598d114f28c469fe5a:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"3738\",\"deviceType\":\"MOBILE\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "MOBILE",
+      "height": "3738",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a256b71b7e6c4e598d114f28c469fe5a:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/a256b71b7e6c4e598d114f28c469fe5a"
+      },
+      "name": "projects/12943705270951129641/screens/dbb1b0e5bb2a411baac2686555e226cb",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/2ade4fc0fc6a4dacb4789153ecdc937c:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/2ade4fc0fc6a4dacb4789153ecdc937c"
+      },
+      "title": "Todd's Factory - Neo-Vibrant Grit",
+      "width": "780"
+    }
+  }
+}

@@ -1,0 +1,364 @@
+{
+  "id": 1793140195297,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"projectId\":\"12943705270951129641\",\"sessionId\":\"2210591833569930059\",\"outputComponents\":[{\"design\":{\"screens\":[{\"screenshot\":{\"name\":\"projects/12943705270951129641/files/a1e3e983d54948a0ba13b5a788d44e3d\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a1e3e983d54948a0ba13b5a788d44e3d:download\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/61a6105876f4456bad34db8350495853\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/61a6105876f4456bad34db8350495853:download\",\"mimeType\":\"text/html\"},\"id\":\"5506e9428f2a45cf83cc93f66845415c\",\"generatedBy\":\"figaro_agent\",\"width\":\"780\",\"height\":\"1768\",\"title\":\"Todd's Factory Board - Landscape\",\"prompt\":\"Design a mobile landscape dashboard screen for \\\"Todd's Factory\\\" titled \\\"Todd's Factory Board - Landscape View\\\".\\n\\nCRITICAL LAYOUT REQUIREMENT:\\nThe viewport/layout orientation is mobile in landscape orientation (wide horizontal phone layout: columns scroll horizontally side-by-side, while the top header bar and \\\"Needs you\\\" action strip stay pinned/docked at the top).\\n\\nHeader:\\n- Brand: \\\"Todd's Factory\\\" with robot/factory icon and status indicator \\\"3 active workflows • all systems nominal\\\".\\n- Top right: \\\"Decision Support\\\" pill link/button with robot/support icon, plus quick stats (e.g. 8 lanes, $3.42 spend, 2 items need Todd).\\n\\nSticky Top Strip:\\n- \\\"Needs you (2)\\\" banner / unblock strip with high visual prominence (warm amber/accent container).\\n- Two urgent action cards inside:\\n  1. \\\"Try the recipe screens (UAT)\\\" — LIN-142, Ready 14m, with a bold action button \\\"Review Now →\\\"\\n  2. \\\"Approve 3 retro fixes\\\" — Validation suite • Passed 98%, with a primary action button \\\"Approve (3)\\\"\\n\\nHorizontal Scrolling Board (8 Columns left-to-right, scrolling sideways):\\nColumns with colorful status headers, count badge, and clean cards (Trello/Grit style visual cards with diagrams/progress bars, glanceable status):\\n\\n1. Backlog (1):\\n   - Card: \\\"Bring my Samsung Food recipes into Julia\\\"\\n   - Pill: #LIN-112, Specification needed icon/tag, subtle data ingestion badge.\\n\\n2. Ready (1):\\n   - Card: \\\"Scorecard for every run, plus a ping\\\"\\n   - Pill: #LIN-215, Clean specs, runner ready.\\n   - Action: Bright green \\\"Start Run\\\" button with icon, estimated cost ~$0.45.\\n\\n3. Implementation (1 live):\\n   - Card: \\\"New machine: retry and pause\\\" (Run #418, LIN-204).\\n   - Visual telemetry: Step 4 of 8 segmented visual progress bar (\\\"Doing now: running tests - 50% completed\\\").\\n   - Glanceable metrics grid: Heartbeat (Active 40s ago), Duration (12 min elapsed), Spend ($0.84 spent), Context window gauge (41% full).\\n   - Agents chips: Main session, Coder.\\n   - Action: \\\"Stop\\\" button and \\\"Inspect\\\" button.\\n\\n4. Evidence Review (1):\\n   - Card: \\\"Clean telemetry snapshot & trace bundle\\\" (#LIN-115, 94% pass rate badge).\\n   - Visual: Artifact bundle bar (2.4 MB), coverage heat gauge.\\n   - Action: \\\"Inspect Artifacts\\\".\\n\\n5. Remediation (STUCK - 1):\\n   - Card: \\\"Practice: real failure path\\\" (LIN-198, marked prominently in bold red \\\"MARKED STUCK\\\").\\n   - Warning banner: \\\"No activity for 7 min — Linter failed on edge-case schema parser\\\".\\n   - Action: Red primary button \\\"Assist Agent\\\".\\n\\n6. Staging / Smoke (1):\\n   - Card: \\\"Automated smoke check: Auth & Session recovery\\\" (LIN-121, Smoke Suite).\\n   - Visual test matrix: 9/9 checks green dots (100% stable).\\n\\n7. UAT (1 - WAITING ON TODD):\\n   - Card: \\\"Recipe screens look like Julia's vintage design\\\" (LIN-142, bold amber badge \\\"Waiting on you (UAT)\\\" - clearly distinct from Stuck).\\n   - Note: Staging build deployed to sandbox. UI components matched against Figma layout specs with 99.2% alignment.\\n   - Actions: \\\"Sandbox Preview Ready\\\", \\\"Open Feedback\\\".\\n\\n8. Complete:\\n   - Card: \\\"Add a recipe and find it by title\\\" (LIN-95, Shipped to main yesterday, green checkmark icon).\\n\\nTaste & Aesthetic (Todd's words):\\n- Clean, light and colorful; vibrant data-density without terminal clutter.\\n- Whitespace, clear typography (Plus Jakarta Sans), rich status colors (blue for implementation, amber for waiting on you, red for stuck, green for ready/passed, violet for backlog).\\n- Linear issue badges with outbound link icons on each tile.\\n- Smooth sideways scroll with subtle lane divider cues.\",\"name\":\"projects/12943705270951129641/screens/5506e9428f2a45cf83cc93f66845415c\",\"theme\":{\"colorMode\":\"LIGHT\",\"font\":\"PLUS_JAKARTA_SANS\",\"roundness\":\"ROUND_EIGHT\",\"customColor\":\"#2563eb\",\"headlineFont\":\"PLUS_JAKARTA_SANS\",\"bodyFont\":\"PLUS_JAKARTA_SANS\",\"labelFont\":\"PLUS_JAKARTA_SANS\",\"namedColors\":{\"inverse_on_surface\":\"#eaf1ff\",\"on_primary_container\":\"#eeefff\",\"surface_dim\":\"#cbdbf5\",\"inverse_primary\":\"#b4c5ff\",\"surface_container_lowest\":\"#ffffff\",\"on_secondary_fixed_variant\":\"#005137\",\"on_primary\":\"#ffffff\",\"surface\":\"#f8f9ff\",\"on_surface_variant\":\"#434655\",\"surface_tint\":\"#0053db\",\"primary\":\"#004ac6\",\"outline\":\"#737686\",\"secondary_fixed\":\"#85f8c4\",\"surface_container_low\":\"#eff4ff\",\"background\":\"#f8f9ff\",\"tertiary_fixed_dim\":\"#ffb95f\",\"outline_variant\":\"#c3c6d7\",\"secondary_fixed_dim\":\"#68dba9\",\"tertiary_fixed\":\"#ffddb8\",\"surface_container_high\":\"#dce9ff\",\"on_tertiary_container\":\"#ffeedd\",\"on_secondary_container\":\"#00714e\",\"on_error_container\":\"#93000a\",\"on_tertiary\":\"#ffffff\",\"secondary\":\"#006c4a\",\"on_tertiary_fixed_variant\":\"#653e00\",\"on_surface\":\"#0b1c30\",\"error\":\"#ba1a1a\",\"primary_fixed\":\"#dbe1ff\",\"tertiary_container\":\"#996100\",\"on_error\":\"#ffffff\",\"on_tertiary_fixed\":\"#2a1700\",\"surface_variant\":\"#d3e4fe\",\"surface_container\":\"#e5eeff\",\"on_background\":\"#0b1c30\",\"secondary_container\":\"#82f5c1\",\"primary_fixed_dim\":\"#b4c5ff\",\"on_secondary_fixed\":\"#002114\",\"on_primary_fixed_variant\":\"#003ea8\",\"primary_container\":\"#2563eb\",\"tertiary\":\"#784b00\",\"on_primary_fixed\":\"#00174b\",\"inverse_surface\":\"#213145\",\"error_container\":\"#ffdad6\",\"surface_bright\":\"#f8f9ff\",\"surface_container_highest\":\"#d3e4fe\",\"on_secondary\":\"#ffffff\"},\"colorVariant\":\"FIDELITY\",\"overridePrimaryColor\":\"#2563eb\",\"overrideSecondaryColor\":\"#059669\",\"overrideTertiaryColor\":\"#f59e0b\",\"overrideNeutralColor\":\"#64748b\",\"spacingScale\":2,\"typography\":{\"body-sm\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"13px\",\"fontWeight\":\"500\",\"lineHeight\":\"18px\"},\"headline-sm\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"18px\",\"fontWeight\":\"600\",\"lineHeight\":\"24px\",\"letterSpacing\":\"-0.01em\"},\"headline-lg\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"28px\",\"fontWeight\":\"700\",\"lineHeight\":\"36px\",\"letterSpacing\":\"-0.02em\"},\"label-md\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"12px\",\"fontWeight\":\"600\",\"lineHeight\":\"16px\",\"letterSpacing\":\"0.02em\"},\"label-sm\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"11px\",\"fontWeight\":\"700\",\"lineHeight\":\"14px\",\"letterSpacing\":\"0.04em\"},\"display-lg\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"36px\",\"fontWeight\":\"800\",\"lineHeight\":\"44px\",\"letterSpacing\":\"-0.03em\"},\"headline-md\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"22px\",\"fontWeight\":\"700\",\"lineHeight\":\"28px\",\"letterSpacing\":\"-0.015em\"},\"body-lg\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"16px\",\"fontWeight\":\"400\",\"lineHeight\":\"24px\"},\"body-md\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"14px\",\"fontWeight\":\"400\",\"lineHeight\":\"20px\"},\"headline-lg-mobile\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"24px\",\"fontWeight\":\"700\",\"lineHeight\":\"32px\",\"letterSpacing\":\"-0.02em\"}},\"spacing\":{\"margin\":\"1.5rem\",\"margin-mobile\":\"1rem\",\"space-md\":\"0.875rem\",\"space-xs\":\"0.25rem\",\"space-xl\":\"2rem\",\"gutter\":\"1rem\",\"space-lg\":\"1.25rem\",\"gutter-lg\":\"1.5rem\",\"space-sm\":\"0.5rem\"},\"headlineFontFamily\":\"Plus Jakarta Sans\",\"bodyFontFamily\":\"Plus Jakarta Sans\",\"labelFontFamily\":\"Plus Jakarta Sans\"},\"deviceType\":\"MOBILE\",\"screenType\":\"DESIGN\",\"screenMetadata\":{\"agentType\":\"PRO_AGENT\",\"status\":\"COMPLETE\"},\"designSystem\":{\"name\":\"assets/9d8a6cac5a31418a853ce11b94fe4831\",\"designSystem\":{\"displayName\":\"Luminous Factory\",\"styleGuidelines\":\"## Brand & Style\\n\\nThis design system embodies an energetic, luminous, and human-friendly software delivery workspace. It balances the playful tactile simplicity of consumer productivity tools with the dense, informative clarity of editorial data journalism. \\n\\nThe aesthetic is clean, warm, and distinctly optimistic:\\n- **Atmosphere:** Sunlit, approachable, crisp, and organized. Work feels tangible, progressive, and satisfying rather than grueling or bureaucratic.\\n- **Visual Stance:** Modern tactile-editorial. High-contrast typography paired with soft pill forms, vibrant semantic tint washes, and crisp hairline structural boundaries.\\n- **Emotional Target:** Confidence, momentum, and calm mastery. Complex continuous-delivery pipelines feel as effortless and visual as moving cards on a pinboard.\\n\\n## Layout & Spacing\\n\\nA 12-column responsive fluid grid establishes consistent rhythm across dense board layouts, analytical panels, and pipeline tracks:\\n\\n- **Desktop (1200px+):** 12 columns with `1.5rem` gutters and `2rem` outer margins. Kanban columns, telemetry decks, and pipeline maps dock seamlessly into flexible modular tracks.\\n- **Tablet (768px - 1199px):** 8 columns with `1rem` gutters and `1.5rem` outer canvas padding. Metric headers compress into a 2x2 summary grid, and workflow lanes become horizontally swipeable.\\n- **Mobile (\\u003c768px):** 4 columns with `0.75rem` gutters and `1rem` margins. Cards expand to full width; status filters switch to a sticky horizontal pill list.\\n- **Vertical Rhythm:** Internal card padding is locked to `space-md` (14px) or `space-lg` (20px), maintaining tight information density without visual crowding.\\n\\n## Elevation & Depth\\n\\nDepth is established through soft, multi-layered ambient drop shadows and crisp perimeter strokes, eliminating heavy dark scrims in favor of natural daylight projection:\\n\\n- **Level 0 (Canvas):** Flat warm base `#FAFAF9` with zero shadow.\\n- **Level 1 (Default Cards & Tiles):** Surface `#FFFFFF`, enclosed in a 1px hairline stroke (`#E2E8F0`), supported by an ambient drop shadow: `0 1px 3px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.03)`.\\n- **Level 2 (Hover / Active Drag):** Cards elevate on hover with a buoyant physical lift: `0 8px 24px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04)` with a slight -2px Y-axis translate.\\n- **Level 3 (Modals, Overlays, Floating Action Menus):** `0 16px 40px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.04)` accompanied by a subtle backdrop blur (`backdrop-blur-sm` over a 20% slate overlay).\\n- **Status Halos:** Attention-critical cards (e.g., stuck or failing checks) feature a subtle 2px glow ring tinted in the semantic coral color at 25% opacity.\\n\\n## Components\\n\\n- **Cards:** Crisp white backgrounds, hairline perimeter borders, and top or left-edge semantic status pinstripes (3px solid in stage accent color). Cards include inline micro-headers, expandable checklist sections, and footer metadata docks.\\n- **Micro-Progress Gauges:** \\n  - Radial mini-rings (24px to 32px) displaying task completion percentages with smooth rounded stroke ends.\\n  - Horizontal multi-segment trackbars indicating step distribution (e.g., violet for backlog, blue for building, green for verified).\\n- **Status Rings & Badges:** Compact pill chips featuring a filled 6px circular indicator dot paired with high-contrast text. Badge backgrounds utilize a 10-15% tint of their respective semantic color (e.g., soft mint `#ECFDF5` with `#059669` text).\\n- **Avatar Chips:** Compact, 28px circular images flanked by an overlapping status glyph or micro-initial dot. Multi-assignee stacks overlap by 8px with a 2px white masking boundary.\\n- **Buttons:** \\n  - *Primary:* Solid semantic blue or emerald fill, bold white text, subtle downward shadow, smooth spring hover transition.\\n  - *Secondary:* Clean white surface with hairline slate border, darkening subtly on hover.\\n  - *Tertiary / Ghost:* Borderless, active slate fill wash on interaction.\\n- **Inputs & Filters:** Pill and rounded search bars with clean inset search icons, clear-button affordances, and focused states framed in a 2px azure halo.\\n- **Glanceable Metric Widgets:** Compact square and rectangular hero cards displaying an oversized metric counter (`display-lg`), a sparkline or delta pill (+12% vs last cycle), and a subtle tinted background icon.\",\"theme\":{\"colorMode\":\"LIGHT\",\"font\":\"PLUS_JAKARTA_SANS\",\"roundness\":\"ROUND_EIGHT\",\"customColor\":\"#2563eb\",\"headlineFont\":\"PLUS_JAKARTA_SANS\",\"bodyFont\":\"PLUS_JAKARTA_SANS\",\"labelFont\":\"PLUS_JAKARTA_SANS\",\"namedColors\":{\"surface_container\":\"#e5eeff\",\"on_primary\":\"#ffffff\",\"on_tertiary_fixed\":\"#2a1700\",\"surface_container_highest\":\"#d3e4fe\",\"on_secondary_fixed\":\"#002114\",\"primary_fixed_dim\":\"#b4c5ff\",\"primary_container\":\"#2563eb\",\"tertiary_fixed\":\"#ffddb8\",\"on_tertiary_container\":\"#ffeedd\",\"surface_variant\":\"#d3e4fe\",\"tertiary_container\":\"#996100\",\"on_error_container\":\"#93000a\",\"on_secondary_fixed_variant\":\"#005137\",\"on_primary_fixed_variant\":\"#003ea8\",\"on_secondary_container\":\"#00714e\",\"on_secondary\":\"#ffffff\",\"inverse_surface\":\"#213145\",\"on_primary_fixed\":\"#00174b\",\"secondary_fixed_dim\":\"#68dba9\",\"on_primary_container\":\"#eeefff\",\"error_container\":\"#ffdad6\",\"on_tertiary_fixed_variant\":\"#653e00\",\"on_tertiary\":\"#ffffff\",\"background\":\"#f8f9ff\",\"on_surface_variant\":\"#434655\",\"surface_tint\":\"#0053db\",\"on_error\":\"#ffffff\",\"surface_bright\":\"#f8f9ff\",\"on_background\":\"#0b1c30\",\"inverse_primary\":\"#b4c5ff\",\"surface_container_lowest\":\"#ffffff\",\"primary_fixed\":\"#dbe1ff\",\"secondary_container\":\"#82f5c1\",\"error\":\"#ba1a1a\",\"surface_container_high\":\"#dce9ff\",\"secondary\":\"#006c4a\",\"outline\":\"#737686\",\"on_surface\":\"#0b1c30\",\"inverse_on_surface\":\"#eaf1ff\",\"secondary_fixed\":\"#85f8c4\",\"primary\":\"#004ac6\",\"surface\":\"#f8f9ff\",\"surface_container_low\":\"#eff4ff\",\"outline_variant\":\"#c3c6d7\",\"tertiary\":\"#784b00\",\"tertiary_fixed_dim\":\"#ffb95f\",\"surface_dim\":\"#cbdbf5\"},\"designMd\":\"---\\nname: Luminous Factory\\ncolors:\\n  surface: '#f8f9ff'\\n  surface-dim: '#cbdbf5'\\n  surface-bright: '#f8f9ff'\\n  surface-container-lowest: '#ffffff'\\n  surface-container-low: '#eff4ff'\\n  surface-container: '#e5eeff'\\n  surface-container-high: '#dce9ff'\\n  surface-container-highest: '#d3e4fe'\\n  on-surface: '#0b1c30'\\n  on-surface-variant: '#434655'\\n  inverse-surface: '#213145'\\n  inverse-on-surface: '#eaf1ff'\\n  outline: '#737686'\\n  outline-variant: '#c3c6d7'\\n  surface-tint: '#0053db'\\n  primary: '#004ac6'\\n  on-primary: '#ffffff'\\n  primary-container: '#2563eb'\\n  on-primary-container: '#eeefff'\\n  inverse-primary: '#b4c5ff'\\n  secondary: '#006c4a'\\n  on-secondary: '#ffffff'\\n  secondary-container: '#82f5c1'\\n  on-secondary-container: '#00714e'\\n  tertiary: '#784b00'\\n  on-tertiary: '#ffffff'\\n  tertiary-container: '#996100'\\n  on-tertiary-container: '#ffeedd'\\n  error: '#ba1a1a'\\n  on-error: '#ffffff'\\n  error-container: '#ffdad6'\\n  on-error-container: '#93000a'\\n  primary-fixed: '#dbe1ff'\\n  primary-fixed-dim: '#b4c5ff'\\n  on-primary-fixed: '#00174b'\\n  on-primary-fixed-variant: '#003ea8'\\n  secondary-fixed: '#85f8c4'\\n  secondary-fixed-dim: '#68dba9'\\n  on-secondary-fixed: '#002114'\\n  on-secondary-fixed-variant: '#005137'\\n  tertiary-fixed: '#ffddb8'\\n  tertiary-fixed-dim: '#ffb95f'\\n  on-tertiary-fixed: '#2a1700'\\n  on-tertiary-fixed-variant: '#653e00'\\n  background: '#f8f9ff'\\n  on-background: '#0b1c30'\\n  surface-variant: '#d3e4fe'\\ntypography:\\n  display-lg:\\n    fontFamily: Plus Jakarta Sans\\n    fontSize: 36px\\n    fontWeight: '800'\\n    lineHeight: 44px\\n    letterSpacing: -0.03em\\n  headline-lg:\\n    fontFamily: Plus Jakarta Sans\\n    fontSize: 28px\\n    fontWeight: '700'\\n    lineHeight: 36px\\n    letterSpacing: -0.02em\\n  headline-md:\\n    fontFamily: Plus Jakarta Sans\\n    fontSize: 22px\\n    fontWeight: '700'\\n    lineHeight: 28px\\n    letterSpacing: -0.015em\\n  headline-sm:\\n    fontFamily: Plus Jakarta Sans\\n    fontSize: 18px\\n    fontWeight: '600'\\n    lineHeight: 24px\\n    letterSpacing: -0.01em\\n  body-lg:\\n    fontFamily: Plus Jakarta Sans\\n    fontSize: 16px\\n    fontWeight: '400'\\n    lineHeight: 24px\\n  body-md:\\n    fontFamily: Plus Jakarta Sans\\n    fontSize: 14px\\n    fontWeight: '400'\\n    lineHeight: 20px\\n  body-sm:\\n    fontFamily: Plus Jakarta Sans\\n    fontSize: 13px\\n    fontWeight: '500'\\n    lineHeight: 18px\\n  label-md:\\n    fontFamily: Plus Jakarta Sans\\n    fontSize: 12px\\n    fontWeight: '600'\\n    lineHeight: 16px\\n    letterSpacing: 0.02em\\n  label-sm:\\n    fontFamily: Plus Jakarta Sans\\n    fontSize: 11px\\n    fontWeight: '700'\\n    lineHeight: 14px\\n    letterSpacing: 0.04em\\n  headline-lg-mobile:\\n    fontFamily: Plus Jakarta Sans\\n    fontSize: 24px\\n    fontWeight: '700'\\n    lineHeight: 32px\\n    letterSpacing: -0.02em\\nrounded:\\n  sm: 0.25rem\\n  DEFAULT: 0.5rem\\n  md: 0.75rem\\n  lg: 1rem\\n  xl: 1.5rem\\n  full: 9999px\\nspacing:\\n  gutter: 1rem\\n  gutter-lg: 1.5rem\\n  margin: 1.5rem\\n  margin-mobile: 1rem\\n  space-xs: 0.25rem\\n  space-sm: 0.5rem\\n  space-md: 0.875rem\\n  space-lg: 1.25rem\\n  space-xl: 2rem\\n---\\n\\n## Brand & Style\\n\\nThis design system embodies an energetic, luminous, and human-friendly software delivery workspace. It balances the playful tactile simplicity of consumer productivity tools with the dense, informative clarity of editorial data journalism. \\n\\nThe aesthetic is clean, warm, and distinctly optimistic:\\n- **Atmosphere:** Sunlit, approachable, crisp, and organized. Work feels tangible, progressive, and satisfying rather than grueling or bureaucratic.\\n- **Visual Stance:** Modern tactile-editorial. High-contrast typography paired with soft pill forms, vibrant semantic tint washes, and crisp hairline structural boundaries.\\n- **Emotional Target:** Confidence, momentum, and calm mastery. Complex continuous-delivery pipelines feel as effortless and visual as moving cards on a pinboard.\\n\\n## Colors\\n\\nThe color palette pairs a warm, sunlit off-white base with distinct, vivid chromatic lanes to enable instantaneous status recognition at a glance:\\n\\n- **Canvas & Surfaces:**\\n  - Base canvas: `#FAFAF9` (warm stone-tinted off-white)\\n  - Card & Container surface: `#FFFFFF` (pure crisp white)\\n  - Sub-surface / Muted fill: `#F1F5F9` (cool clean slate wash)\\n  - Hairline border: `#E2E8F0` (subtle framing slate)\\n\\n- **Semantic Workflow Colors:**\\n  - **In-Flight / Implementation:** `#2563EB` (Azure) / Soft wash `#EFF6FF`\\n  - **Complete / Shipped:** `#059669` (Mint/Emerald) / Soft wash `#ECFDF5`\\n  - **Ready / Waiting:** `#F59E0B` (Sunny Amber) / Soft wash `#FFFBEB`\\n  - **Stuck / Blocked / Attention:** `#F43F5E` (Electric Coral/Rose) / Soft wash `#FFF1F2`\\n  - **Backlog / Concept:** `#7C3AED` (Lavender/Violet) / Soft wash `#F5F3FF`\\n  - **Evidence / Staging / Review:** `#6366F1` (Periwinkle/Indigo) / Soft wash `#EEF2FF`\\n\\n- **Typography & Text Contrast:**\\n  - Ink Primary: `#0F172A` (deep midnight slate, AA/AAA compliance on light surfaces)\\n  - Ink Secondary: `#475569` (balanced medium slate for metadata and auxiliary labels)\\n  - Ink Muted: `#94A3B8` (light slate for structural icons, timestamps, and subtle counts)\\n\\n## Typography\\n\\nPlus Jakarta Sans is utilized across all typographic roles. Its clean geometric construction combined with soft, welcoming terminals bridges the gap between playful warmth and technical precision.\\n\\n- **Numerics & Metrics:** Tabular figures (`tnum`) should be enabled for counters, gauges, speedometers, and timestamp displays to eliminate layout jitter.\\n- **Micro-labels:** Category indicators, pipeline stages, and token tags make use of `label-sm` in all-caps or title case with slight positive tracking (+0.04em) to ensure crisp scanning against colorful badge backgrounds.\\n- **Headlines:** Large titles employ tight tracking and strong weights (700/800) to anchor modular dashboard panes.\\n\\n## Layout & Spacing\\n\\nA 12-column responsive fluid grid establishes consistent rhythm across dense board layouts, analytical panels, and pipeline tracks:\\n\\n- **Desktop (1200px+):** 12 columns with `1.5rem` gutters and `2rem` outer margins. Kanban columns, telemetry decks, and pipeline maps dock seamlessly into flexible modular tracks.\\n- **Tablet (768px - 1199px):** 8 columns with `1rem` gutters and `1.5rem` outer canvas padding. Metric headers compress into a 2x2 summary grid, and workflow lanes become horizontally swipeable.\\n- **Mobile (\\u003c768px):** 4 columns with `0.75rem` gutters and `1rem` margins. Cards expand to full width; status filters switch to a sticky horizontal pill list.\\n- **Vertical Rhythm:** Internal card padding is locked to `space-md` (14px) or `space-lg` (20px), maintaining tight information density without visual crowding.\\n\\n## Elevation & Depth\\n\\nDepth is established through soft, multi-layered ambient drop shadows and crisp perimeter strokes, eliminating heavy dark scrims in favor of natural daylight projection:\\n\\n- **Level 0 (Canvas):** Flat warm base `#FAFAF9` with zero shadow.\\n- **Level 1 (Default Cards & Tiles):** Surface `#FFFFFF`, enclosed in a 1px hairline stroke (`#E2E8F0`), supported by an ambient drop shadow: `0 1px 3px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.03)`.\\n- **Level 2 (Hover / Active Drag):** Cards elevate on hover with a buoyant physical lift: `0 8px 24px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04)` with a slight -2px Y-axis translate.\\n- **Level 3 (Modals, Overlays, Floating Action Menus):** `0 16px 40px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.04)` accompanied by a subtle backdrop blur (`backdrop-blur-sm` over a 20% slate overlay).\\n- **Status Halos:** Attention-critical cards (e.g., stuck or failing checks) feature a subtle 2px glow ring tinted in the semantic coral color at 25% opacity.\\n\\n## Shapes\\n\\nThe interface embraces a softened, friendly geometric contour that echoes modern mobile habit applications:\\n\\n- **Cards & Modules:** 16px (`rounded-lg`) corner radii create a comfortable, approachable silhouette.\\n- **Buttons, Badges, and Avatar Rings:** Pill-shaped fully rounded radii (`rounded-full` / 9999px) for active states, tags, and chips.\\n- **Form Controls & Inputs:** 10px to 12px radii (`rounded-md` to `rounded-lg`) to preserve interior space while matching card roundness.\\n- **Progress Trackers:** Fully rounded capsule ends on horizontal trackbars and segmented step indicators.\\n\\n## Components\\n\\n- **Cards:** Crisp white backgrounds, hairline perimeter borders, and top or left-edge semantic status pinstripes (3px solid in stage accent color). Cards include inline micro-headers, expandable checklist sections, and footer metadata docks.\\n- **Micro-Progress Gauges:** \\n  - Radial mini-rings (24px to 32px) displaying task completion percentages with smooth rounded stroke ends.\\n  - Horizontal multi-segment trackbars indicating step distribution (e.g., violet for backlog, blue for building, green for verified).\\n- **Status Rings & Badges:** Compact pill chips featuring a filled 6px circular indicator dot paired with high-contrast text. Badge backgrounds utilize a 10-15% tint of their respective semantic color (e.g., soft mint `#ECFDF5` with `#059669` text).\\n- **Avatar Chips:** Compact, 28px circular images flanked by an overlapping status glyph or micro-initial dot. Multi-assignee stacks overlap by 8px with a 2px white masking boundary.\\n- **Buttons:** \\n  - *Primary:* Solid semantic blue or emerald fill, bold white text, subtle downward shadow, smooth spring hover transition.\\n  - *Secondary:* Clean white surface with hairline slate border, darkening subtly on hover.\\n  - *Tertiary / Ghost:* Borderless, active slate fill wash on interaction.\\n- **Inputs & Filters:** Pill and rounded search bars with clean inset search icons, clear-button affordances, and focused states framed in a 2px azure halo.\\n- **Glanceable Metric Widgets:** Compact square and rectangular hero cards displaying an oversized metric counter (`display-lg`), a sparkline or delta pill (+12% vs last cycle), and a subtle tinted background icon.\",\"colorVariant\":\"FIDELITY\",\"overridePrimaryColor\":\"#2563eb\",\"overrideSecondaryColor\":\"#059669\",\"overrideTertiaryColor\":\"#f59e0b\",\"overrideNeutralColor\":\"#64748b\",\"spacingScale\":2,\"typography\":{\"label-sm\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"11px\",\"fontWeight\":\"700\",\"lineHeight\":\"14px\",\"letterSpacing\":\"0.04em\"},\"label-md\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"12px\",\"fontWeight\":\"600\",\"lineHeight\":\"16px\",\"letterSpacing\":\"0.02em\"},\"body-lg\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"16px\",\"fontWeight\":\"400\",\"lineHeight\":\"24px\"},\"body-md\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"14px\",\"fontWeight\":\"400\",\"lineHeight\":\"20px\"},\"headline-sm\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"18px\",\"fontWeight\":\"600\",\"lineHeight\":\"24px\",\"letterSpacing\":\"-0.01em\"},\"display-lg\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"36px\",\"fontWeight\":\"800\",\"lineHeight\":\"44px\",\"letterSpacing\":\"-0.03em\"},\"headline-lg\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"28px\",\"fontWeight\":\"700\",\"lineHeight\":\"36px\",\"letterSpacing\":\"-0.02em\"},\"headline-lg-mobile\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"24px\",\"fontWeight\":\"700\",\"lineHeight\":\"32px\",\"letterSpacing\":\"-0.02em\"},\"headline-md\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"22px\",\"fontWeight\":\"700\",\"lineHeight\":\"28px\",\"letterSpacing\":\"-0.015em\"},\"body-sm\":{\"fontFamily\":\"Plus Jakarta Sans\",\"fontSize\":\"13px\",\"fontWeight\":\"500\",\"lineHeight\":\"18px\"}},\"spacing\":{\"gutter\":\"1rem\",\"gutter-lg\":\"1.5rem\",\"space-sm\":\"0.5rem\",\"margin-mobile\":\"1rem\",\"margin\":\"1.5rem\",\"space-lg\":\"1.25rem\",\"space-md\":\"0.875rem\",\"space-xs\":\"0.25rem\",\"space-xl\":\"2rem\"},\"headlineFontFamily\":\"Plus Jakarta Sans\",\"bodyFontFamily\":\"Plus Jakarta Sans\",\"labelFontFamily\":\"Plus Jakarta Sans\"}},\"version\":\"1\"}}],\"theme\":{}}},{\"text\":\"Here is **Todd's Factory Board** designed specifically for a mobile landscape perspective (`Todd's Factory Board - Landscape`).\\n\\n### Design Highlights:\\n1. **Layout & Pinned Header**:\\n   - **Sticky Top Bar & Action Strip**: The top bar displays brand status, active lanes, and a quick **Decision Support** trigger. Directly beneath, the **\\\"Needs you (2)\\\"** banner is locked in place so Todd's two immediate unblocking items (*\\\"Try the recipe screens\\\"* and *\\\"Approve 3 retro fixes\\\"*) remain accessible at all times.\\n2. **Sideways-Scrolling 8-Column Pipeline**:\\n   - Designed for wide horizontal exploration across all eight lifecycle stages: **Backlog**, **Ready**, **Implementation**, **Evidence review**, **Remediation**, **Staging/smoke test**, **UAT**, and **Complete**.\\n3. **Visual-First Status (\\\"Glance, don't read\\\")**:\\n   - **Implementation**: Displays segmented step progress (Step 4 of 8, 50% completed), heartbeat timer, context window circular gauge (41%), spend counter ($0.84), active agents (`Main session`, `Coder`), and emergency controls (`Stop` / `Inspect`).\\n   - **Remediation (Stuck)**: Distinct high-contrast rose-red card with an idle alert (\\\"No activity for 7 min\\\") and quick `Assist Agent` CTA.\\n   - **UAT (Waiting on Todd)**: Specially distinguished warm amber badge (\\\"Waiting on you (UAT)\\\") paired with sandbox preview launch buttons.\\n   - **Ready**: Actionable green `Start Run` button with cost estimation.\\n   - **Backlog & Complete**: Clean Linear identifiers (`#LIN-...`) with status icons and clean delivery indicators.\"},{\"suggestion\":\"Add an interactive quick-filter for stuck vs waiting lanes\"},{\"suggestion\":\"Show a slide-over drawer when tapping the Decision Support button\"},{\"suggestion\":\"Add a live agent activity sparkline inside the Implementation tile\"}]}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "outputComponents": [
+        {
+          "design": {
+            "screens": [
+              {
+                "designSystem": {
+                  "designSystem": {
+                    "displayName": "Luminous Factory",
+                    "styleGuidelines": "## Brand & Style\n\nThis design system embodies an energetic, luminous, and human-friendly software delivery workspace. It balances the playful tactile simplicity of consumer productivity tools with the dense, informative clarity of editorial data journalism. \n\nThe aesthetic is clean, warm, and distinctly optimistic:\n- **Atmosphere:** Sunlit, approachable, crisp, and organized. Work feels tangible, progressive, and satisfying rather than grueling or bureaucratic.\n- **Visual Stance:** Modern tactile-editorial. High-contrast typography paired with soft pill forms, vibrant semantic tint washes, and crisp hairline structural boundaries.\n- **Emotional Target:** Confidence, momentum, and calm mastery. Complex continuous-delivery pipelines feel as effortless and visual as moving cards on a pinboard.\n\n## Layout & Spacing\n\nA 12-column responsive fluid grid establishes consistent rhythm across dense board layouts, analytical panels, and pipeline tracks:\n\n- **Desktop (1200px+):** 12 columns with `1.5rem` gutters and `2rem` outer margins. Kanban columns, telemetry decks, and pipeline maps dock seamlessly into flexible modular tracks.\n- **Tablet (768px - 1199px):** 8 columns with `1rem` gutters and `1.5rem` outer canvas padding. Metric headers compress into a 2x2 summary grid, and workflow lanes become horizontally swipeable.\n- **Mobile (<768px):** 4 columns with `0.75rem` gutters and `1rem` margins. Cards expand to full width; status filters switch to a sticky horizontal pill list.\n- **Vertical Rhythm:** Internal card padding is locked to `space-md` (14px) or `space-lg` (20px), maintaining tight information density without visual crowding.\n\n## Elevation & Depth\n\nDepth is established through soft, multi-layered ambient drop shadows and crisp perimeter strokes, eliminating heavy dark scrims in favor of natural daylight projection:\n\n- **Level 0 (Canvas):** Flat warm base `#FAFAF9` with zero shadow.\n- **Level 1 (Default Cards & Tiles):** Surface `#FFFFFF`, enclosed in a 1px hairline stroke (`#E2E8F0`), supported by an ambient drop shadow: `0 1px 3px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.03)`.\n- **Level 2 (Hover / Active Drag):** Cards elevate on hover with a buoyant physical lift: `0 8px 24px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04)` with a slight -2px Y-axis translate.\n- **Level 3 (Modals, Overlays, Floating Action Menus):** `0 16px 40px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.04)` accompanied by a subtle backdrop blur (`backdrop-blur-sm` over a 20% slate overlay).\n- **Status Halos:** Attention-critical cards (e.g., stuck or failing checks) feature a subtle 2px glow ring tinted in the semantic coral color at 25% opacity.\n\n## Components\n\n- **Cards:** Crisp white backgrounds, hairline perimeter borders, and top or left-edge semantic status pinstripes (3px solid in stage accent color). Cards include inline micro-headers, expandable checklist sections, and footer metadata docks.\n- **Micro-Progress Gauges:** \n  - Radial mini-rings (24px to 32px) displaying task completion percentages with smooth rounded stroke ends.\n  - Horizontal multi-segment trackbars indicating step distribution (e.g., violet for backlog, blue for building, green for verified).\n- **Status Rings & Badges:** Compact pill chips featuring a filled 6px circular indicator dot paired with high-contrast text. Badge backgrounds utilize a 10-15% tint of their respective semantic color (e.g., soft mint `#ECFDF5` with `#059669` text).\n- **Avatar Chips:** Compact, 28px circular images flanked by an overlapping status glyph or micro-initial dot. Multi-assignee stacks overlap by 8px with a 2px white masking boundary.\n- **Buttons:** \n  - *Primary:* Solid semantic blue or emerald fill, bold white text, subtle downward shadow, smooth spring hover transition.\n  - *Secondary:* Clean white surface with hairline slate border, darkening subtly on hover.\n  - *Tertiary / Ghost:* Borderless, active slate fill wash on interaction.\n- **Inputs & Filters:** Pill and rounded search bars with clean inset search icons, clear-button affordances, and focused states framed in a 2px azure halo.\n- **Glanceable Metric Widgets:** Compact square and rectangular hero cards displaying an oversized metric counter (`display-lg`), a sparkline or delta pill (+12% vs last cycle), and a subtle tinted background icon.",
+                    "theme": {
+                      "bodyFont": "PLUS_JAKARTA_SANS",
+                      "bodyFontFamily": "Plus Jakarta Sans",
+                      "colorMode": "LIGHT",
+                      "colorVariant": "FIDELITY",
+                      "customColor": "#2563eb",
+                      "designMd": "---\nname: Luminous Factory\ncolors:\n  surface: '#f8f9ff'\n  surface-dim: '#cbdbf5'\n  surface-bright: '#f8f9ff'\n  surface-container-lowest: '#ffffff'\n  surface-container-low: '#eff4ff'\n  surface-container: '#e5eeff'\n  surface-container-high: '#dce9ff'\n  surface-container-highest: '#d3e4fe'\n  on-surface: '#0b1c30'\n  on-surface-variant: '#434655'\n  inverse-surface: '#213145'\n  inverse-on-surface: '#eaf1ff'\n  outline: '#737686'\n  outline-variant: '#c3c6d7'\n  surface-tint: '#0053db'\n  primary: '#004ac6'\n  on-primary: '#ffffff'\n  primary-container: '#2563eb'\n  on-primary-container: '#eeefff'\n  inverse-primary: '#b4c5ff'\n  secondary: '#006c4a'\n  on-secondary: '#ffffff'\n  secondary-container: '#82f5c1'\n  on-secondary-container: '#00714e'\n  tertiary: '#784b00'\n  on-tertiary: '#ffffff'\n  tertiary-container: '#996100'\n  on-tertiary-container: '#ffeedd'\n  error: '#ba1a1a'\n  on-error: '#ffffff'\n  error-container: '#ffdad6'\n  on-error-container: '#93000a'\n  primary-fixed: '#dbe1ff'\n  primary-fixed-dim: '#b4c5ff'\n  on-primary-fixed: '#00174b'\n  on-primary-fixed-variant: '#003ea8'\n  secondary-fixed: '#85f8c4'\n  secondary-fixed-dim: '#68dba9'\n  on-secondary-fixed: '#002114'\n  on-secondary-fixed-variant: '#005137'\n  tertiary-fixed: '#ffddb8'\n  tertiary-fixed-dim: '#ffb95f'\n  on-tertiary-fixed: '#2a1700'\n  on-tertiary-fixed-variant: '#653e00'\n  background: '#f8f9ff'\n  on-background: '#0b1c30'\n  surface-variant: '#d3e4fe'\ntypography:\n  display-lg:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 36px\n    fontWeight: '800'\n    lineHeight: 44px\n    letterSpacing: -0.03em\n  headline-lg:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 28px\n    fontWeight: '700'\n    lineHeight: 36px\n    letterSpacing: -0.02em\n  headline-md:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 22px\n    fontWeight: '700'\n    lineHeight: 28px\n    letterSpacing: -0.015em\n  headline-sm:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 18px\n    fontWeight: '600'\n    lineHeight: 24px\n    letterSpacing: -0.01em\n  body-lg:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 16px\n    fontWeight: '400'\n    lineHeight: 24px\n  body-md:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 14px\n    fontWeight: '400'\n    lineHeight: 20px\n  body-sm:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 13px\n    fontWeight: '500'\n    lineHeight: 18px\n  label-md:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 12px\n    fontWeight: '600'\n    lineHeight: 16px\n    letterSpacing: 0.02em\n  label-sm:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 11px\n    fontWeight: '700'\n    lineHeight: 14px\n    letterSpacing: 0.04em\n  headline-lg-mobile:\n    fontFamily: Plus Jakarta Sans\n    fontSize: 24px\n    fontWeight: '700'\n    lineHeight: 32px\n    letterSpacing: -0.02em\nrounded:\n  sm: 0.25rem\n  DEFAULT: 0.5rem\n  md: 0.75rem\n  lg: 1rem\n  xl: 1.5rem\n  full: 9999px\nspacing:\n  gutter: 1rem\n  gutter-lg: 1.5rem\n  margin: 1.5rem\n  margin-mobile: 1rem\n  space-xs: 0.25rem\n  space-sm: 0.5rem\n  space-md: 0.875rem\n  space-lg: 1.25rem\n  space-xl: 2rem\n---\n\n## Brand & Style\n\nThis design system embodies an energetic, luminous, and human-friendly software delivery workspace. It balances the playful tactile simplicity of consumer productivity tools with the dense, informative clarity of editorial data journalism. \n\nThe aesthetic is clean, warm, and distinctly optimistic:\n- **Atmosphere:** Sunlit, approachable, crisp, and organized. Work feels tangible, progressive, and satisfying rather than grueling or bureaucratic.\n- **Visual Stance:** Modern tactile-editorial. High-contrast typography paired with soft pill forms, vibrant semantic tint washes, and crisp hairline structural boundaries.\n- **Emotional Target:** Confidence, momentum, and calm mastery. Complex continuous-delivery pipelines feel as effortless and visual as moving cards on a pinboard.\n\n## Colors\n\nThe color palette pairs a warm, sunlit off-white base with distinct, vivid chromatic lanes to enable instantaneous status recognition at a glance:\n\n- **Canvas & Surfaces:**\n  - Base canvas: `#FAFAF9` (warm stone-tinted off-white)\n  - Card & Container surface: `#FFFFFF` (pure crisp white)\n  - Sub-surface / Muted fill: `#F1F5F9` (cool clean slate wash)\n  - Hairline border: `#E2E8F0` (subtle framing slate)\n\n- **Semantic Workflow Colors:**\n  - **In-Flight / Implementation:** `#2563EB` (Azure) / Soft wash `#EFF6FF`\n  - **Complete / Shipped:** `#059669` (Mint/Emerald) / Soft wash `#ECFDF5`\n  - **Ready / Waiting:** `#F59E0B` (Sunny Amber) / Soft wash `#FFFBEB`\n  - **Stuck / Blocked / Attention:** `#F43F5E` (Electric Coral/Rose) / Soft wash `#FFF1F2`\n  - **Backlog / Concept:** `#7C3AED` (Lavender/Violet) / Soft wash `#F5F3FF`\n  - **Evidence / Staging / Review:** `#6366F1` (Periwinkle/Indigo) / Soft wash `#EEF2FF`\n\n- **Typography & Text Contrast:**\n  - Ink Primary: `#0F172A` (deep midnight slate, AA/AAA compliance on light surfaces)\n  - Ink Secondary: `#475569` (balanced medium slate for metadata and auxiliary labels)\n  - Ink Muted: `#94A3B8` (light slate for structural icons, timestamps, and subtle counts)\n\n## Typography\n\nPlus Jakarta Sans is utilized across all typographic roles. Its clean geometric construction combined with soft, welcoming terminals bridges the gap between playful warmth and technical precision.\n\n- **Numerics & Metrics:** Tabular figures (`tnum`) should be enabled for counters, gauges, speedometers, and timestamp displays to eliminate layout jitter.\n- **Micro-labels:** Category indicators, pipeline stages, and token tags make use of `label-sm` in all-caps or title case with slight positive tracking (+0.04em) to ensure crisp scanning against colorful badge backgrounds.\n- **Headlines:** Large titles employ tight tracking and strong weights (700/800) to anchor modular dashboard panes.\n\n## Layout & Spacing\n\nA 12-column responsive fluid grid establishes consistent rhythm across dense board layouts, analytical panels, and pipeline tracks:\n\n- **Desktop (1200px+):** 12 columns with `1.5rem` gutters and `2rem` outer margins. Kanban columns, telemetry decks, and pipeline maps dock seamlessly into flexible modular tracks.\n- **Tablet (768px - 1199px):** 8 columns with `1rem` gutters and `1.5rem` outer canvas padding. Metric headers compress into a 2x2 summary grid, and workflow lanes become horizontally swipeable.\n- **Mobile (<768px):** 4 columns with `0.75rem` gutters and `1rem` margins. Cards expand to full width; status filters switch to a sticky horizontal pill list.\n- **Vertical Rhythm:** Internal card padding is locked to `space-md` (14px) or `space-lg` (20px), maintaining tight information density without visual crowding.\n\n## Elevation & Depth\n\nDepth is established through soft, multi-layered ambient drop shadows and crisp perimeter strokes, eliminating heavy dark scrims in favor of natural daylight projection:\n\n- **Level 0 (Canvas):** Flat warm base `#FAFAF9` with zero shadow.\n- **Level 1 (Default Cards & Tiles):** Surface `#FFFFFF`, enclosed in a 1px hairline stroke (`#E2E8F0`), supported by an ambient drop shadow: `0 1px 3px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.03)`.\n- **Level 2 (Hover / Active Drag):** Cards elevate on hover with a buoyant physical lift: `0 8px 24px rgba(15, 23, 42, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04)` with a slight -2px Y-axis translate.\n- **Level 3 (Modals, Overlays, Floating Action Menus):** `0 16px 40px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.04)` accompanied by a subtle backdrop blur (`backdrop-blur-sm` over a 20% slate overlay).\n- **Status Halos:** Attention-critical cards (e.g., stuck or failing checks) feature a subtle 2px glow ring tinted in the semantic coral color at 25% opacity.\n\n## Shapes\n\nThe interface embraces a softened, friendly geometric contour that echoes modern mobile habit applications:\n\n- **Cards & Modules:** 16px (`rounded-lg`) corner radii create a comfortable, approachable silhouette.\n- **Buttons, Badges, and Avatar Rings:** Pill-shaped fully rounded radii (`rounded-full` / 9999px) for active states, tags, and chips.\n- **Form Controls & Inputs:** 10px to 12px radii (`rounded-md` to `rounded-lg`) to preserve interior space while matching card roundness.\n- **Progress Trackers:** Fully rounded capsule ends on horizontal trackbars and segmented step indicators.\n\n## Components\n\n- **Cards:** Crisp white backgrounds, hairline perimeter borders, and top or left-edge semantic status pinstripes (3px solid in stage accent color). Cards include inline micro-headers, expandable checklist sections, and footer metadata docks.\n- **Micro-Progress Gauges:** \n  - Radial mini-rings (24px to 32px) displaying task completion percentages with smooth rounded stroke ends.\n  - Horizontal multi-segment trackbars indicating step distribution (e.g., violet for backlog, blue for building, green for verified).\n- **Status Rings & Badges:** Compact pill chips featuring a filled 6px circular indicator dot paired with high-contrast text. Badge backgrounds utilize a 10-15% tint of their respective semantic color (e.g., soft mint `#ECFDF5` with `#059669` text).\n- **Avatar Chips:** Compact, 28px circular images flanked by an overlapping status glyph or micro-initial dot. Multi-assignee stacks overlap by 8px with a 2px white masking boundary.\n- **Buttons:** \n  - *Primary:* Solid semantic blue or emerald fill, bold white text, subtle downward shadow, smooth spring hover transition.\n  - *Secondary:* Clean white surface with hairline slate border, darkening subtly on hover.\n  - *Tertiary / Ghost:* Borderless, active slate fill wash on interaction.\n- **Inputs & Filters:** Pill and rounded search bars with clean inset search icons, clear-button affordances, and focused states framed in a 2px azure halo.\n- **Glanceable Metric Widgets:** Compact square and rectangular hero cards displaying an oversized metric counter (`display-lg`), a sparkline or delta pill (+12% vs last cycle), and a subtle tinted background icon.",
+                      "font": "PLUS_JAKARTA_SANS",
+                      "headlineFont": "PLUS_JAKARTA_SANS",
+                      "headlineFontFamily": "Plus Jakarta Sans",
+                      "labelFont": "PLUS_JAKARTA_SANS",
+                      "labelFontFamily": "Plus Jakarta Sans",
+                      "namedColors": {
+                        "background": "#f8f9ff",
+                        "error": "#ba1a1a",
+                        "error_container": "#ffdad6",
+                        "inverse_on_surface": "#eaf1ff",
+                        "inverse_primary": "#b4c5ff",
+                        "inverse_surface": "#213145",
+                        "on_background": "#0b1c30",
+                        "on_error": "#ffffff",
+                        "on_error_container": "#93000a",
+                        "on_primary": "#ffffff",
+                        "on_primary_container": "#eeefff",
+                        "on_primary_fixed": "#00174b",
+                        "on_primary_fixed_variant": "#003ea8",
+                        "on_secondary": "#ffffff",
+                        "on_secondary_container": "#00714e",
+                        "on_secondary_fixed": "#002114",
+                        "on_secondary_fixed_variant": "#005137",
+                        "on_surface": "#0b1c30",
+                        "on_surface_variant": "#434655",
+                        "on_tertiary": "#ffffff",
+                        "on_tertiary_container": "#ffeedd",
+                        "on_tertiary_fixed": "#2a1700",
+                        "on_tertiary_fixed_variant": "#653e00",
+                        "outline": "#737686",
+                        "outline_variant": "#c3c6d7",
+                        "primary": "#004ac6",
+                        "primary_container": "#2563eb",
+                        "primary_fixed": "#dbe1ff",
+                        "primary_fixed_dim": "#b4c5ff",
+                        "secondary": "#006c4a",
+                        "secondary_container": "#82f5c1",
+                        "secondary_fixed": "#85f8c4",
+                        "secondary_fixed_dim": "#68dba9",
+                        "surface": "#f8f9ff",
+                        "surface_bright": "#f8f9ff",
+                        "surface_container": "#e5eeff",
+                        "surface_container_high": "#dce9ff",
+                        "surface_container_highest": "#d3e4fe",
+                        "surface_container_low": "#eff4ff",
+                        "surface_container_lowest": "#ffffff",
+                        "surface_dim": "#cbdbf5",
+                        "surface_tint": "#0053db",
+                        "surface_variant": "#d3e4fe",
+                        "tertiary": "#784b00",
+                        "tertiary_container": "#996100",
+                        "tertiary_fixed": "#ffddb8",
+                        "tertiary_fixed_dim": "#ffb95f"
+                      },
+                      "overrideNeutralColor": "#64748b",
+                      "overridePrimaryColor": "#2563eb",
+                      "overrideSecondaryColor": "#059669",
+                      "overrideTertiaryColor": "#f59e0b",
+                      "roundness": "ROUND_EIGHT",
+                      "spacing": {
+                        "gutter": "1rem",
+                        "gutter-lg": "1.5rem",
+                        "margin": "1.5rem",
+                        "margin-mobile": "1rem",
+                        "space-lg": "1.25rem",
+                        "space-md": "0.875rem",
+                        "space-sm": "0.5rem",
+                        "space-xl": "2rem",
+                        "space-xs": "0.25rem"
+                      },
+                      "spacingScale": 2,
+                      "typography": {
+                        "body-lg": {
+                          "fontFamily": "Plus Jakarta Sans",
+                          "fontSize": "16px",
+                          "fontWeight": "400",
+                          "lineHeight": "24px"
+                        },
+                        "body-md": {
+                          "fontFamily": "Plus Jakarta Sans",
+                          "fontSize": "14px",
+                          "fontWeight": "400",
+                          "lineHeight": "20px"
+                        },
+                        "body-sm": {
+                          "fontFamily": "Plus Jakarta Sans",
+                          "fontSize": "13px",
+                          "fontWeight": "500",
+                          "lineHeight": "18px"
+                        },
+                        "display-lg": {
+                          "fontFamily": "Plus Jakarta Sans",
+                          "fontSize": "36px",
+                          "fontWeight": "800",
+                          "letterSpacing": "-0.03em",
+                          "lineHeight": "44px"
+                        },
+                        "headline-lg": {
+                          "fontFamily": "Plus Jakarta Sans",
+                          "fontSize": "28px",
+                          "fontWeight": "700",
+                          "letterSpacing": "-0.02em",
+                          "lineHeight": "36px"
+                        },
+                        "headline-lg-mobile": {
+                          "fontFamily": "Plus Jakarta Sans",
+                          "fontSize": "24px",
+                          "fontWeight": "700",
+                          "letterSpacing": "-0.02em",
+                          "lineHeight": "32px"
+                        },
+                        "headline-md": {
+                          "fontFamily": "Plus Jakarta Sans",
+                          "fontSize": "22px",
+                          "fontWeight": "700",
+                          "letterSpacing": "-0.015em",
+                          "lineHeight": "28px"
+                        },
+                        "headline-sm": {
+                          "fontFamily": "Plus Jakarta Sans",
+                          "fontSize": "18px",
+                          "fontWeight": "600",
+                          "letterSpacing": "-0.01em",
+                          "lineHeight": "24px"
+                        },
+                        "label-md": {
+                          "fontFamily": "Plus Jakarta Sans",
+                          "fontSize": "12px",
+                          "fontWeight": "600",
+                          "letterSpacing": "0.02em",
+                          "lineHeight": "16px"
+                        },
+                        "label-sm": {
+                          "fontFamily": "Plus Jakarta Sans",
+                          "fontSize": "11px",
+                          "fontWeight": "700",
+                          "letterSpacing": "0.04em",
+                          "lineHeight": "14px"
+                        }
+                      }
+                    }
+                  },
+                  "name": "assets/9d8a6cac5a31418a853ce11b94fe4831",
+                  "version": "1"
+                },
+                "deviceType": "MOBILE",
+                "generatedBy": "figaro_agent",
+                "height": "1768",
+                "htmlCode": {
+                  "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/61a6105876f4456bad34db8350495853:download",
+                  "mimeType": "text/html",
+                  "name": "projects/12943705270951129641/files/61a6105876f4456bad34db8350495853"
+                },
+                "id": "5506e9428f2a45cf83cc93f66845415c",
+                "name": "projects/12943705270951129641/screens/5506e9428f2a45cf83cc93f66845415c",
+                "prompt": "Design a mobile landscape dashboard screen for \"Todd's Factory\" titled \"Todd's Factory Board - Landscape View\".\n\nCRITICAL LAYOUT REQUIREMENT:\nThe viewport/layout orientation is mobile in landscape orientation (wide horizontal phone layout: columns scroll horizontally side-by-side, while the top header bar and \"Needs you\" action strip stay pinned/docked at the top).\n\nHeader:\n- Brand: \"Todd's Factory\" with robot/factory icon and status indicator \"3 active workflows • all systems nominal\".\n- Top right: \"Decision Support\" pill link/button with robot/support icon, plus quick stats (e.g. 8 lanes, $3.42 spend, 2 items need Todd).\n\nSticky Top Strip:\n- \"Needs you (2)\" banner / unblock strip with high visual prominence (warm amber/accent container).\n- Two urgent action cards inside:\n  1. \"Try the recipe screens (UAT)\" — LIN-142, Ready 14m, with a bold action button \"Review Now →\"\n  2. \"Approve 3 retro fixes\" — Validation suite • Passed 98%, with a primary action button \"Approve (3)\"\n\nHorizontal Scrolling Board (8 Columns left-to-right, scrolling sideways):\nColumns with colorful status headers, count badge, and clean cards (Trello/Grit style visual cards with diagrams/progress bars, glanceable status):\n\n1. Backlog (1):\n   - Card: \"Bring my Samsung Food recipes into Julia\"\n   - Pill: #LIN-112, Specification needed icon/tag, subtle data ingestion badge.\n\n2. Ready (1):\n   - Card: \"Scorecard for every run, plus a ping\"\n   - Pill: #LIN-215, Clean specs, runner ready.\n   - Action: Bright green \"Start Run\" button with icon, estimated cost ~$0.45.\n\n3. Implementation (1 live):\n   - Card: \"New machine: retry and pause\" (Run #418, LIN-204).\n   - Visual telemetry: Step 4 of 8 segmented visual progress bar (\"Doing now: running tests - 50% completed\").\n   - Glanceable metrics grid: Heartbeat (Active 40s ago), Duration (12 min elapsed), Spend ($0.84 spent), Context window gauge (41% full).\n   - Agents chips: Main session, Coder.\n   - Action: \"Stop\" button and \"Inspect\" button.\n\n4. Evidence Review (1):\n   - Card: \"Clean telemetry snapshot & trace bundle\" (#LIN-115, 94% pass rate badge).\n   - Visual: Artifact bundle bar (2.4 MB), coverage heat gauge.\n   - Action: \"Inspect Artifacts\".\n\n5. Remediation (STUCK - 1):\n   - Card: \"Practice: real failure path\" (LIN-198, marked prominently in bold red \"MARKED STUCK\").\n   - Warning banner: \"No activity for 7 min — Linter failed on edge-case schema parser\".\n   - Action: Red primary button \"Assist Agent\".\n\n6. Staging / Smoke (1):\n   - Card: \"Automated smoke check: Auth & Session recovery\" (LIN-121, Smoke Suite).\n   - Visual test matrix: 9/9 checks green dots (100% stable).\n\n7. UAT (1 - WAITING ON TODD):\n   - Card: \"Recipe screens look like Julia's vintage design\" (LIN-142, bold amber badge \"Waiting on you (UAT)\" - clearly distinct from Stuck).\n   - Note: Staging build deployed to sandbox. UI components matched against Figma layout specs with 99.2% alignment.\n   - Actions: \"Sandbox Preview Ready\", \"Open Feedback\".\n\n8. Complete:\n   - Card: \"Add a recipe and find it by title\" (LIN-95, Shipped to main yesterday, green checkmark icon).\n\nTaste & Aesthetic (Todd's words):\n- Clean, light and colorful; vibrant data-density without terminal clutter.\n- Whitespace, clear typography (Plus Jakarta Sans), rich status colors (blue for implementation, amber for waiting on you, red for stuck, green for ready/passed, violet for backlog).\n- Linear issue badges with outbound link icons on each tile.\n- Smooth sideways scroll with subtle lane divider cues.",
+                "screenMetadata": {
+                  "agentType": "PRO_AGENT",
+                  "status": "COMPLETE"
+                },
+                "screenType": "DESIGN",
+                "screenshot": {
+                  "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/a1e3e983d54948a0ba13b5a788d44e3d:download",
+                  "name": "projects/12943705270951129641/files/a1e3e983d54948a0ba13b5a788d44e3d"
+                },
+                "theme": {
+                  "bodyFont": "PLUS_JAKARTA_SANS",
+                  "bodyFontFamily": "Plus Jakarta Sans",
+                  "colorMode": "LIGHT",
+                  "colorVariant": "FIDELITY",
+                  "customColor": "#2563eb",
+                  "font": "PLUS_JAKARTA_SANS",
+                  "headlineFont": "PLUS_JAKARTA_SANS",
+                  "headlineFontFamily": "Plus Jakarta Sans",
+                  "labelFont": "PLUS_JAKARTA_SANS",
+                  "labelFontFamily": "Plus Jakarta Sans",
+                  "namedColors": {
+                    "background": "#f8f9ff",
+                    "error": "#ba1a1a",
+                    "error_container": "#ffdad6",
+                    "inverse_on_surface": "#eaf1ff",
+                    "inverse_primary": "#b4c5ff",
+                    "inverse_surface": "#213145",
+                    "on_background": "#0b1c30",
+                    "on_error": "#ffffff",
+                    "on_error_container": "#93000a",
+                    "on_primary": "#ffffff",
+                    "on_primary_container": "#eeefff",
+                    "on_primary_fixed": "#00174b",
+                    "on_primary_fixed_variant": "#003ea8",
+                    "on_secondary": "#ffffff",
+                    "on_secondary_container": "#00714e",
+                    "on_secondary_fixed": "#002114",
+                    "on_secondary_fixed_variant": "#005137",
+                    "on_surface": "#0b1c30",
+                    "on_surface_variant": "#434655",
+                    "on_tertiary": "#ffffff",
+                    "on_tertiary_container": "#ffeedd",
+                    "on_tertiary_fixed": "#2a1700",
+                    "on_tertiary_fixed_variant": "#653e00",
+                    "outline": "#737686",
+                    "outline_variant": "#c3c6d7",
+                    "primary": "#004ac6",
+                    "primary_container": "#2563eb",
+                    "primary_fixed": "#dbe1ff",
+                    "primary_fixed_dim": "#b4c5ff",
+                    "secondary": "#006c4a",
+                    "secondary_container": "#82f5c1",
+                    "secondary_fixed": "#85f8c4",
+                    "secondary_fixed_dim": "#68dba9",
+                    "surface": "#f8f9ff",
+                    "surface_bright": "#f8f9ff",
+                    "surface_container": "#e5eeff",
+                    "surface_container_high": "#dce9ff",
+                    "surface_container_highest": "#d3e4fe",
+                    "surface_container_low": "#eff4ff",
+                    "surface_container_lowest": "#ffffff",
+                    "surface_dim": "#cbdbf5",
+                    "surface_tint": "#0053db",
+                    "surface_variant": "#d3e4fe",
+                    "tertiary": "#784b00",
+                    "tertiary_container": "#996100",
+                    "tertiary_fixed": "#ffddb8",
+                    "tertiary_fixed_dim": "#ffb95f"
+                  },
+                  "overrideNeutralColor": "#64748b",
+                  "overridePrimaryColor": "#2563eb",
+                  "overrideSecondaryColor": "#059669",
+                  "overrideTertiaryColor": "#f59e0b",
+                  "roundness": "ROUND_EIGHT",
+                  "spacing": {
+                    "gutter": "1rem",
+                    "gutter-lg": "1.5rem",
+                    "margin": "1.5rem",
+                    "margin-mobile": "1rem",
+                    "space-lg": "1.25rem",
+                    "space-md": "0.875rem",
+                    "space-sm": "0.5rem",
+                    "space-xl": "2rem",
+                    "space-xs": "0.25rem"
+                  },
+                  "spacingScale": 2,
+                  "typography": {
+                    "body-lg": {
+                      "fontFamily": "Plus Jakarta Sans",
+                      "fontSize": "16px",
+                      "fontWeight": "400",
+                      "lineHeight": "24px"
+                    },
+                    "body-md": {
+                      "fontFamily": "Plus Jakarta Sans",
+                      "fontSize": "14px",
+                      "fontWeight": "400",
+                      "lineHeight": "20px"
+                    },
+                    "body-sm": {
+                      "fontFamily": "Plus Jakarta Sans",
+                      "fontSize": "13px",
+                      "fontWeight": "500",
+                      "lineHeight": "18px"
+                    },
+                    "display-lg": {
+                      "fontFamily": "Plus Jakarta Sans",
+                      "fontSize": "36px",
+                      "fontWeight": "800",
+                      "letterSpacing": "-0.03em",
+                      "lineHeight": "44px"
+                    },
+                    "headline-lg": {
+                      "fontFamily": "Plus Jakarta Sans",
+                      "fontSize": "28px",
+                      "fontWeight": "700",
+                      "letterSpacing": "-0.02em",
+                      "lineHeight": "36px"
+                    },
+                    "headline-lg-mobile": {
+                      "fontFamily": "Plus Jakarta Sans",
+                      "fontSize": "24px",
+                      "fontWeight": "700",
+                      "letterSpacing": "-0.02em",
+                      "lineHeight": "32px"
+                    },
+                    "headline-md": {
+                      "fontFamily": "Plus Jakarta Sans",
+                      "fontSize": "22px",
+                      "fontWeight": "700",
+                      "letterSpacing": "-0.015em",
+                      "lineHeight": "28px"
+                    },
+                    "headline-sm": {
+                      "fontFamily": "Plus Jakarta Sans",
+                      "fontSize": "18px",
+                      "fontWeight": "600",
+                      "letterSpacing": "-0.01em",
+                      "lineHeight": "24px"
+                    },
+                    "label-md": {
+                      "fontFamily": "Plus Jakarta Sans",
+                      "fontSize": "12px",
+                      "fontWeight": "600",
+                      "letterSpacing": "0.02em",
+                      "lineHeight": "16px"
+                    },
+                    "label-sm": {
+                      "fontFamily": "Plus Jakarta Sans",
+                      "fontSize": "11px",
+                      "fontWeight": "700",
+                      "letterSpacing": "0.04em",
+                      "lineHeight": "14px"
+                    }
+                  }
+                },
+                "title": "Todd's Factory Board - Landscape",
+                "width": "780"
+              }
+            ],
+            "theme": {}
+          }
+        },
+        {
+          "text": "Here is **Todd's Factory Board** designed specifically for a mobile landscape perspective (`Todd's Factory Board - Landscape`).\n\n### Design Highlights:\n1. **Layout & Pinned Header**:\n   - **Sticky Top Bar & Action Strip**: The top bar displays brand status, active lanes, and a quick **Decision Support** trigger. Directly beneath, the **\"Needs you (2)\"** banner is locked in place so Todd's two immediate unblocking items (*\"Try the recipe screens\"* and *\"Approve 3 retro fixes\"*) remain accessible at all times.\n2. **Sideways-Scrolling 8-Column Pipeline**:\n   - Designed for wide horizontal exploration across all eight lifecycle stages: **Backlog**, **Ready**, **Implementation**, **Evidence review**, **Remediation**, **Staging/smoke test**, **UAT**, and **Complete**.\n3. **Visual-First Status (\"Glance, don't read\")**:\n   - **Implementation**: Displays segmented step progress (Step 4 of 8, 50% completed), heartbeat timer, context window circular gauge (41%), spend counter ($0.84), active agents (`Main session`, `Coder`), and emergency controls (`Stop` / `Inspect`).\n   - **Remediation (Stuck)**: Distinct high-contrast rose-red card with an idle alert (\"No activity for 7 min\") and quick `Assist Agent` CTA.\n   - **UAT (Waiting on Todd)**: Specially distinguished warm amber badge (\"Waiting on you (UAT)\") paired with sandbox preview launch buttons.\n   - **Ready**: Actionable green `Start Run` button with cost estimation.\n   - **Backlog & Complete**: Clean Linear identifiers (`#LIN-...`) with status icons and clean delivery indicators."
+        },
+        {
+          "suggestion": "Add an interactive quick-filter for stuck vs waiting lanes"
+        },
+        {
+          "suggestion": "Show a slide-over drawer when tapping the Decision Support button"
+        },
+        {
+          "suggestion": "Add a live agent activity sparkline inside the Implementation tile"
+        }
+      ],
+      "projectId": "12943705270951129641",
+      "sessionId": "2210591833569930059"
+    }
+  }
+}

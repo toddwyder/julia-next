@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793144067932,
+  "method": "tools/call",
+  "params": {
+    "name": "apply_design_system",
+    "arguments": {
+      "projectId": "12943705270951129641",
+      "assetId": "17575707340211662328",
+      "selectedScreenInstances": [
+        {
+          "id": "c6ab3d9a95b640ddad94cb0e37e0a6bb",
+          "sourceScreen": "projects/12943705270951129641/screens/c6ab3d9a95b640ddad94cb0e37e0a6bb"
+        }
+      ]
+    }
+  }
+}

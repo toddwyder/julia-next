@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793140123832,
+  "method": "tools/call",
+  "params": {
+    "name": "list_projects",
+    "arguments": {}
+  }
+}

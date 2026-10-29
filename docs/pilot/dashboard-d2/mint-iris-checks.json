@@ -1,0 +1,141 @@
+{
+  "method": "PNG signature + HTML tokens + Chromium DOM/default accordion state and click; external assets blocked (not a rendered layout test)",
+  "results": [
+    {
+      "file": "mint-iris-accordion-loaded-applied",
+      "pngSignature": true,
+      "matchingTokens": true,
+      "stages": [
+        {
+          "title": "Backlog · 30",
+          "open": false,
+          "cards": []
+        },
+        {
+          "title": "Ready · 1",
+          "open": false,
+          "cards": [
+            {
+              "title": "Scorecard for every run, plus a ping Queued",
+              "open": false
+            }
+          ]
+        },
+        {
+          "title": "Implementation · 1",
+          "open": true,
+          "cards": [
+            {
+              "title": "New machine: retry and pause Running",
+              "open": false
+            }
+          ]
+        },
+        {
+          "title": "Evidence review · 0",
+          "open": false,
+          "cards": []
+        },
+        {
+          "title": "Remediation · 1",
+          "open": true,
+          "cards": [
+            {
+              "title": "Practice: real failure path Stuck",
+              "open": false
+            }
+          ]
+        },
+        {
+          "title": "Staging/smoke test · 0",
+          "open": false,
+          "cards": []
+        },
+        {
+          "title": "UAT · 1",
+          "open": true,
+          "cards": [
+            {
+              "title": "Recipe screens look like Julia's vintage design Waiting on you",
+              "open": false
+            }
+          ]
+        },
+        {
+          "title": "Complete · 12",
+          "open": false,
+          "cards": []
+        }
+      ],
+      "runningCardToggles": true
+    },
+    {
+      "file": "mint-iris-accordion-card-open-final",
+      "pngSignature": true,
+      "matchingTokens": true,
+      "stages": [
+        {
+          "title": "Backlog · 30",
+          "open": false,
+          "cards": []
+        },
+        {
+          "title": "Ready · 1",
+          "open": false,
+          "cards": [
+            {
+              "title": "Scorecard for every run, plus a ping Queued",
+              "open": false
+            }
+          ]
+        },
+        {
+          "title": "Implementation · 1",
+          "open": true,
+          "cards": [
+            {
+              "title": "New machine: retry and pause Running",
+              "open": true
+            }
+          ]
+        },
+        {
+          "title": "Evidence review · 0",
+          "open": false,
+          "cards": []
+        },
+        {
+          "title": "Remediation · 1",
+          "open": true,
+          "cards": [
+            {
+              "title": "Practice: real failure path Stuck",
+              "open": false
+            }
+          ]
+        },
+        {
+          "title": "Staging/smoke test · 0",
+          "open": false,
+          "cards": []
+        },
+        {
+          "title": "UAT · 1",
+          "open": true,
+          "cards": [
+            {
+              "title": "Recipe screens look like Julia's vintage design Waiting on you",
+              "open": false
+            }
+          ]
+        },
+        {
+          "title": "Complete · 12",
+          "open": false,
+          "cards": []
+        }
+      ],
+      "runningCardToggles": true
+    }
+  ]
+}

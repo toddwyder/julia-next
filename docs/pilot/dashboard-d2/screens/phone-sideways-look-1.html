@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Todd's Factory Board - Grit Habit &amp; Fresh Mint</title>
+<!-- Material Symbols Outlined Font -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Plus Jakarta Sans & Outfit Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'Plus Jakarta Sans', 'sans-serif'],
+            display: ['Outfit', 'sans-serif'],
+          },
+          colors: {
+            mint: {
+              50: '#f0fdf7',
+              100: '#dcfce9',
+              200: '#bbf7d2',
+              300: '#86efb1',
+              400: '#4ade8b',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              800: '#065f46',
+            },
+            cornflower: {
+              50: '#eef6ff',
+              100: '#d9ecff',
+              200: '#bce0ff',
+              400: '#60a5fa',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            },
+            tangerine: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              200: '#fed7aa',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c',
+            },
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      display: inline-block;
+      vertical-align: middle;
+      line-height: 1;
+    }
+    /* Smooth custom horizontal scrolling */
+    .kanban-scroll::-webkit-scrollbar {
+      height: 6px;
+    }
+    .kanban-scroll::-webkit-scrollbar-track {
+      background: rgba(16, 185, 129, 0.08);
+      border-radius: 9999px;
+    }
+    .kanban-scroll::-webkit-scrollbar-thumb {
+      background: #a7f3d0;
+      border-radius: 9999px;
+    }
+    .kanban-scroll::-webkit-scrollbar-thumb:hover {
+      background: #34d399;
+    }
+    body {
+      min-height: 100dvh;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-[#f0fdf9] via-[#f4fbf7] to-[#eff6ff] text-slate-800 antialiased overflow-hidden select-none h-screen w-screen flex flex-col font-sans">
+<!-- TOP APP BAR -->
+<header class="bg-white/90 backdrop-blur-md border-b border-emerald-100 shadow-sm flex-none z-40 px-4 py-2 flex items-center justify-between">
+<!-- Brand / Identity Left -->
+<div class="flex items-center space-x-3">
+<div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-mint-500 to-cornflower-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 flex-none">
+<span class="material-symbols-outlined text-xl" data-icon="precision_manufacturing">precision_manufacturing</span>
+</div>
+<div>
+<div class="flex items-center space-x-2">
+<span class="text-base font-extrabold text-slate-900 tracking-tight">Todd's Factory</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+          LIVE
+        </span>
+</div>
+<p class="text-[11px] font-medium text-slate-500 flex items-center gap-1.5 leading-none mt-0.5">
+<span>3 active workflows</span>
+<span class="text-slate-300">•</span>
+<span class="text-emerald-600 font-semibold flex items-center gap-0.5">
+<span class="material-symbols-outlined text-[12px]">check_circle</span>
+          all systems nominal
+        </span>
+</p>
+</div>
+</div>
+<!-- Telemetry Pills (Compact & Pop) -->
+<div class="hidden sm:flex items-center space-x-2 bg-emerald-50/70 border border-emerald-100 px-3 py-1 rounded-2xl">
+<div class="flex items-center space-x-1.5 text-xs font-semibold text-slate-600">
+<span class="material-symbols-outlined text-base text-cornflower-500" data-icon="view_kanban">view_kanban</span>
+<span>8 lanes</span>
+</div>
+<div class="h-3 w-px bg-emerald-200"></div>
+<div class="flex items-center space-x-1.5 text-xs font-semibold text-slate-600">
+<span class="material-symbols-outlined text-base text-emerald-600" data-icon="payments">payments</span>
+<span>$3.42 spend</span>
+</div>
+<div class="h-3 w-px bg-emerald-200"></div>
+<div class="flex items-center space-x-1 text-xs font-bold text-tangerine-600">
+<span class="w-2 h-2 rounded-full bg-tangerine-500 animate-ping"></span>
+<span>2 items need Todd</span>
+</div>
+</div>
+<!-- Right Trail: Decision Support Action Anchor -->
+<div class="flex items-center space-x-2">
+<button class="flex items-center space-x-1.5 bg-gradient-to-r from-cornflower-50 to-blue-50 hover:from-cornflower-100 hover:to-blue-100 border border-cornflower-200 text-cornflower-700 px-3 py-1.5 rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all">
+<span class="material-symbols-outlined text-base text-cornflower-600" data-icon="smart_toy">smart_toy</span>
+<span>Decision Support</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-cornflower-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm ring-2 ring-emerald-200/60">
+      TF
+    </div>
+</div>
+</header>
+<!-- STICKY TOP STRIP: "NEEDS YOU (2)" UNBLOCK ACTION DOCK -->
+<section class="flex-none bg-gradient-to-r from-amber-50 via-orange-50/80 to-amber-50/90 text-amber-950 px-4 py-2.5 shadow-sm z-30 border-b border-orange-200/70 flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-2">
+<span class="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center font-extrabold text-[11px] shadow-sm">2</span>
+<span class="text-xs font-extrabold text-amber-900 tracking-wider uppercase">Needs you</span>
+<span class="text-xs font-medium text-amber-800/80 hidden sm:inline">• 2 critical actions waiting for confirmation</span>
+</div>
+<span class="text-[11px] font-bold text-amber-700 flex items-center gap-1.5 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-300/60">
+<span class="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping"></span> Action Required
+    </span>
+</div>
+<div class="flex flex-col gap-2 w-full">
+<!-- Item 1 -->
+<div class="flex items-center justify-between bg-white/95 backdrop-blur-sm px-3.5 py-2.5 rounded-xl border border-amber-200 shadow-sm hover:shadow transition-shadow">
+<div class="flex flex-col min-w-0 mr-3">
+<div class="flex items-center space-x-2">
+<span class="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-extrabold rounded-md border border-amber-200 flex-none">LIN-142</span>
+<span class="text-xs font-bold text-slate-800 truncate">Try the recipe screens (UAT)</span>
+</div>
+<span class="text-[11px] text-amber-700 font-medium mt-0.5">LIN-142 • Ready 14m</span>
+</div>
+<button class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm hover:shadow transition-all active:scale-95 flex items-center space-x-1 flex-none">
+<span>Review Now</span>
+<span class="material-symbols-outlined text-xs" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<!-- Item 2 -->
+<div class="flex items-center justify-between bg-white/95 backdrop-blur-sm px-3.5 py-2.5 rounded-xl border border-emerald-200 shadow-sm hover:shadow transition-shadow">
+<div class="flex flex-col min-w-0 mr-3">
+<div class="flex items-center space-x-2">
+<span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-extrabold rounded-md border border-emerald-200 flex-none">LIN-204</span>
+<span class="text-xs font-bold text-slate-800 truncate">Approve 3 retro fixes</span>
+</div>
+<span class="text-[11px] text-emerald-600 font-medium mt-0.5">Validation suite • Passed 98%</span>
+</div>
+<button class="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm hover:shadow transition-all active:scale-95 flex items-center space-x-1 flex-none">
+<span class="material-symbols-outlined text-xs" data-icon="check">check</span>
+<span>Approve (3)</span>
+</button>
+</div>
+</div>
+</section>
+<!-- HORIZONTAL SCROLLING KANBAN BOARD CONTAINER -->
+<main class="flex-1 overflow-x-auto overflow-y-hidden kanban-scroll px-4 py-3 flex space-x-3.5 items-stretch">
+<!-- LANE 1: BACKLOG -->
+<div class="w-72 flex-none flex flex-col bg-white/70 backdrop-blur-sm rounded-2xl p-2.5 shadow-sm border border-slate-200/80">
+<div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-sm"></span>
+<span class="text-xs font-bold text-slate-800 uppercase tracking-wide">Backlog</span>
+<span class="bg-purple-100 text-purple-700 text-[11px] font-bold px-2 py-0.5 rounded-full">1</span>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-base" data-icon="more_horiz">more_horiz</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-2 pr-0.5">
+<div class="bg-white p-3 rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-purple-200 transition-all duration-150">
+<div class="flex items-center justify-between text-xs mb-1.5">
+<span class="text-purple-600 font-bold flex items-center gap-0.5 hover:underline">
+            #LIN-112
+            <span class="material-symbols-outlined text-xs" data-icon="open_in_new">open_in_new</span>
+</span>
+<span class="bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+<span class="material-symbols-outlined text-xs" data-icon="integration_instructions">integration_instructions</span>
+            Spec Needed
+          </span>
+</div>
+<h4 class="font-bold text-slate-800 text-sm leading-snug">Bring my Samsung Food recipes into Julia</h4>
+<p class="text-xs text-slate-500 mt-1.5 line-clamp-2">Parser mapping for ingredients, tags, and serving metadata from JSON dump.</p>
+<div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+<span class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[11px] font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-xs text-purple-500" data-icon="input">input</span>
+            Data ingestion
+          </span>
+<span class="text-slate-400 text-[11px] font-medium">Est. 1h</span>
+</div>
+</div>
+</div>
+</div>
+<!-- LANE 2: READY -->
+<div class="w-72 flex-none flex flex-col bg-white/70 backdrop-blur-sm rounded-2xl p-2.5 shadow-sm border border-slate-200/80">
+<div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-mint-500 shadow-sm"></span>
+<span class="text-xs font-bold text-slate-800 uppercase tracking-wide">Ready</span>
+<span class="bg-mint-100 text-mint-800 text-[11px] font-bold px-2 py-0.5 rounded-full">1</span>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-base" data-icon="tune">tune</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-2 pr-0.5">
+<div class="bg-white p-3 rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md hover:border-mint-200 transition-all duration-150">
+<div class="flex items-center justify-between text-xs mb-1.5">
+<span class="text-mint-700 font-bold flex items-center gap-0.5 hover:underline">
+            #LIN-215
+            <span class="material-symbols-outlined text-xs" data-icon="open_in_new">open_in_new</span>
+</span>
+<span class="bg-mint-50 text-mint-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-mint-200">
+            Clean specs
+          </span>
+</div>
+<h4 class="font-bold text-slate-800 text-sm leading-snug">Scorecard for every run, plus a ping</h4>
+<p class="text-xs text-slate-500 mt-1.5">Runner configuration verified against staging sandbox cluster.</p>
+<div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+<span class="text-xs text-slate-500">Cost: <strong class="text-slate-800 font-bold">~$0.45</strong></span>
+<button class="bg-gradient-to-r from-mint-500 to-emerald-500 hover:from-mint-600 hover:to-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1 shadow-sm hover:shadow active:scale-95 transition-all">
+<span class="material-symbols-outlined text-xs" data-icon="play_arrow">play_arrow</span>
+<span>Start Run</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- LANE 3: IMPLEMENTATION (RUNNING) -->
+<div class="w-80 flex-none flex flex-col bg-emerald-50/50 backdrop-blur-sm rounded-2xl p-2.5 shadow-sm border border-emerald-200 ring-2 ring-emerald-400/20">
+<div class="flex items-center justify-between pb-2 mb-2 border-b border-emerald-100 bg-white/80 -mx-2.5 px-2.5 -mt-2.5 pt-2.5 rounded-t-2xl">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+<span class="text-xs font-extrabold text-emerald-900 uppercase tracking-wide">Implementation</span>
+<span class="bg-emerald-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-xs">1 live</span>
+</div>
+<span class="text-[11px] font-bold text-emerald-700 flex items-center gap-1 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+<span class="material-symbols-outlined text-xs animate-spin" data-icon="sync">sync</span> Run #418
+      </span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-2 pr-0.5">
+<div class="bg-white p-3.5 rounded-xl border border-emerald-200/80 shadow-md">
+<div class="flex items-center justify-between text-xs mb-1.5">
+<span class="text-emerald-700 font-bold flex items-center gap-0.5 hover:underline">
+            #LIN-204
+            <span class="material-symbols-outlined text-xs" data-icon="open_in_new">open_in_new</span>
+</span>
+<span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-extrabold border border-emerald-200">
+            Doing: Tests
+          </span>
+</div>
+<h4 class="font-bold text-slate-800 text-sm leading-snug">New machine: retry and pause</h4>
+<!-- Segmented Track Bar -->
+<div class="mt-2.5 bg-slate-50 p-2 rounded-lg border border-slate-100">
+<div class="flex justify-between items-center text-[11px] font-medium text-slate-600 mb-1.5">
+<span class="font-semibold text-slate-700">Step 4 of 8: running tests</span>
+<span class="font-extrabold text-emerald-600">50%</span>
+</div>
+<div class="grid grid-cols-8 gap-1 h-2">
+<div class="bg-emerald-500 rounded-sm"></div>
+<div class="bg-emerald-500 rounded-sm"></div>
+<div class="bg-emerald-500 rounded-sm"></div>
+<div class="bg-emerald-500 rounded-sm animate-pulse"></div>
+<div class="bg-slate-200 rounded-sm"></div>
+<div class="bg-slate-200 rounded-sm"></div>
+<div class="bg-slate-200 rounded-sm"></div>
+<div class="bg-slate-200 rounded-sm"></div>
+</div>
+</div>
+<!-- Glanceable Telemetry Grid -->
+<div class="grid grid-cols-2 gap-2 mt-2.5 p-2 bg-emerald-50/60 rounded-xl text-xs border border-emerald-100/60">
+<div class="flex flex-col">
+<span class="text-[10px] text-slate-500 uppercase font-medium">Heartbeat</span>
+<span class="font-bold text-emerald-700 flex items-center gap-1 mt-0.5">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> active 40s ago
+            </span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-slate-500 uppercase font-medium">Duration</span>
+<span class="font-bold text-slate-800 mt-0.5">12m elapsed</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-slate-500 uppercase font-medium">Compute Spend</span>
+<span class="font-bold text-slate-800 mt-0.5">$0.84 spent</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] text-slate-500 uppercase font-medium">Context Window</span>
+<span class="font-bold text-cornflower-600 mt-0.5">41% full</span>
+</div>
+</div>
+<!-- Agents & Actions -->
+<div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+<div class="flex items-center -space-x-1.5">
+<span class="w-6 h-6 rounded-full bg-cornflower-100 text-cornflower-700 text-[10px] font-extrabold flex items-center justify-center border-2 border-white" title="Main Session">M</span>
+<span class="w-6 h-6 rounded-full bg-mint-200 text-mint-800 text-[10px] font-extrabold flex items-center justify-center border-2 border-white" title="Coder Agent">C</span>
+<span class="pl-3 text-[11px] text-slate-500 font-semibold">Main • Coder</span>
+</div>
+<div class="flex items-center space-x-1.5">
+<button class="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg text-xs font-bold active:scale-95 transition-all">
+              Stop
+            </button>
+<button class="bg-cornflower-500 hover:bg-cornflower-600 text-white px-3 py-1 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition-all flex items-center space-x-0.5">
+<span>Inspect</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- LANE 4: EVIDENCE REVIEW -->
+<div class="w-72 flex-none flex flex-col bg-white/70 backdrop-blur-sm rounded-2xl p-2.5 shadow-sm border border-slate-200/80">
+<div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-cornflower-500 shadow-sm"></span>
+<span class="text-xs font-bold text-slate-800 uppercase tracking-wide">Evidence Review</span>
+<span class="bg-cornflower-100 text-cornflower-700 text-[11px] font-bold px-2 py-0.5 rounded-full">1</span>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-base" data-icon="policy">policy</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-2 pr-0.5">
+<div class="bg-white p-3 rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-150">
+<div class="flex items-center justify-between text-xs mb-1.5">
+<span class="text-cornflower-700 font-bold flex items-center gap-0.5 hover:underline">
+            #LIN-115
+            <span class="material-symbols-outlined text-xs" data-icon="open_in_new">open_in_new</span>
+</span>
+<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-2 py-0.5 rounded-md font-extrabold">
+            94% Pass
+          </span>
+</div>
+<h4 class="font-bold text-slate-800 text-sm leading-snug">Clean telemetry snapshot &amp; trace bundle</h4>
+<div class="mt-2.5 p-2 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+<div class="flex justify-between mb-1 text-[11px]">
+<span class="text-slate-500">Artifact Bundle:</span>
+<strong class="text-slate-800 font-bold">2.4 MB</strong>
+</div>
+<div class="flex justify-between mb-1.5 text-[11px]">
+<span class="text-slate-500">Coverage Heat:</span>
+<strong class="text-emerald-600 font-extrabold">Optimal</strong>
+</div>
+<div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden flex">
+<div class="bg-emerald-500 h-full w-[88%]"></div>
+<div class="bg-amber-400 h-full w-[6%]"></div>
+<div class="bg-rose-500 h-full w-[6%]"></div>
+</div>
+</div>
+<div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-end">
+<button class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-xs" data-icon="fact_check">fact_check</span>
+<span>Inspect Artifacts</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- LANE 5: REMEDIATION (STUCK - 1) -->
+<div class="w-76 flex-none flex flex-col bg-rose-50/60 backdrop-blur-sm rounded-2xl p-2.5 shadow-sm border border-rose-200 ring-2 ring-rose-400/20">
+<div class="flex items-center justify-between pb-2 mb-2 border-b border-rose-200 bg-rose-100/60 -mx-2.5 px-2.5 -mt-2.5 pt-2.5 rounded-t-2xl">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+<span class="text-xs font-extrabold text-rose-900 uppercase tracking-wide">Remediation</span>
+<span class="bg-rose-600 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-xs">STUCK (1)</span>
+</div>
+<span class="material-symbols-outlined text-rose-600 text-base" data-icon="warning">warning</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-2 pr-0.5">
+<div class="bg-white p-3.5 rounded-xl border border-rose-200 shadow-md">
+<div class="flex items-center justify-between text-xs mb-1.5">
+<span class="text-rose-600 font-bold flex items-center gap-0.5 hover:underline">
+            #LIN-198
+            <span class="material-symbols-outlined text-xs" data-icon="open_in_new">open_in_new</span>
+</span>
+<span class="bg-rose-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-md tracking-wider uppercase shadow-xs">
+            Marked Stuck
+          </span>
+</div>
+<h4 class="font-bold text-slate-800 text-sm leading-snug">Practice: real failure path</h4>
+<div class="mt-2.5 p-2 bg-rose-50/80 border border-rose-200 rounded-lg">
+<div class="flex items-start space-x-1.5">
+<span class="material-symbols-outlined text-rose-600 text-sm mt-0.5 flex-none" data-icon="report_problem">report_problem</span>
+<p class="text-[11px] text-rose-900 font-medium leading-snug">
+<strong>No activity for 7 min:</strong> Linter failed on edge-case schema parser regex loop.
+            </p>
+</div>
+</div>
+<div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+<span class="text-[11px] text-rose-600 font-bold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Needs Human
+          </span>
+<button class="bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1 shadow-sm hover:shadow active:scale-95 transition-all">
+<span class="material-symbols-outlined text-xs" data-icon="support_agent">support_agent</span>
+<span>Assist Agent</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- LANE 6: STAGING / SMOKE -->
+<div class="w-72 flex-none flex flex-col bg-white/70 backdrop-blur-sm rounded-2xl p-2.5 shadow-sm border border-slate-200/80">
+<div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-sm"></span>
+<span class="text-xs font-bold text-slate-800 uppercase tracking-wide">Staging / Smoke</span>
+<span class="bg-indigo-100 text-indigo-700 text-[11px] font-bold px-2 py-0.5 rounded-full">1</span>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-base" data-icon="flaky">flaky</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-2 pr-0.5">
+<div class="bg-white p-3 rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-150">
+<div class="flex items-center justify-between text-xs mb-1.5">
+<span class="text-indigo-600 font-bold flex items-center gap-0.5 hover:underline">
+            #LIN-121
+            <span class="material-symbols-outlined text-xs" data-icon="open_in_new">open_in_new</span>
+</span>
+<span class="bg-indigo-50 text-indigo-700 text-[10px] px-2 py-0.5 rounded-md font-bold border border-indigo-200">
+            Smoke Suite
+          </span>
+</div>
+<h4 class="font-bold text-slate-800 text-sm leading-snug">Automated smoke check: Auth &amp; Session recovery</h4>
+<div class="mt-2.5 p-2 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+<div class="flex justify-between items-center text-[11px] mb-1.5">
+<span class="text-slate-500 font-medium">Test Matrix Result:</span>
+<span class="font-bold text-emerald-600">9/9 passed (100%)</span>
+</div>
+<div class="flex items-center justify-between px-1">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+</div>
+</div>
+<div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+<span class="text-[11px] text-slate-500 font-medium">Ready for UAT</span>
+<span class="material-symbols-outlined text-emerald-500 text-base" data-icon="verified">verified</span>
+</div>
+</div>
+</div>
+</div>
+<!-- LANE 7: UAT (WAITING ON TODD) -->
+<div class="w-80 flex-none flex flex-col bg-amber-50/60 backdrop-blur-sm rounded-2xl p-2.5 shadow-sm border border-amber-200 ring-2 ring-amber-400/20">
+<div class="flex items-center justify-between pb-2 mb-2 border-b border-amber-200 bg-amber-100/70 -mx-2.5 px-2.5 -mt-2.5 pt-2.5 rounded-t-2xl">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
+<span class="text-xs font-extrabold text-amber-900 uppercase tracking-wide">UAT</span>
+<span class="bg-amber-500 text-white text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-xs">Waiting on Todd</span>
+</div>
+<span class="material-symbols-outlined text-amber-700 text-base" data-icon="rate_review">rate_review</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-2 pr-0.5">
+<div class="bg-white p-3.5 rounded-xl border border-amber-200 shadow-md">
+<div class="flex items-center justify-between text-xs mb-1.5">
+<span class="text-amber-800 font-bold flex items-center gap-0.5 hover:underline">
+            #LIN-142
+            <span class="material-symbols-outlined text-xs" data-icon="open_in_new">open_in_new</span>
+</span>
+<span class="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] px-2 py-0.5 rounded-full font-bold shadow-xs">
+            Waiting on you (UAT)
+          </span>
+</div>
+<h4 class="font-bold text-slate-800 text-sm leading-snug">Recipe screens look like Julia's vintage design</h4>
+<div class="mt-2.5 p-2 bg-amber-50/70 border border-amber-200 rounded-lg">
+<p class="text-[11px] text-amber-900 font-medium leading-relaxed">
+            Staging build deployed to sandbox. UI components matched against Figma specs with <strong class="text-amber-950 font-bold">99.2% alignment</strong>.
+          </p>
+</div>
+<div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+<button class="bg-slate-100 hover:bg-slate-200 text-amber-900 px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-xs" data-icon="preview">preview</span>
+<span>Sandbox Preview</span>
+</button>
+<button class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm active:scale-95 transition-all">
+            Open Feedback
+          </button>
+</div>
+</div>
+</div>
+</div>
+<!-- LANE 8: COMPLETE -->
+<div class="w-72 flex-none flex flex-col bg-white/70 backdrop-blur-sm rounded-2xl p-2.5 shadow-sm border border-slate-200/80">
+<div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+<div class="flex items-center space-x-2">
+<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm"></span>
+<span class="text-xs font-bold text-slate-800 uppercase tracking-wide">Complete</span>
+<span class="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5 rounded-full">1</span>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-base" data-icon="task_alt">task_alt</span>
+</div>
+<div class="flex-1 overflow-y-auto space-y-2 pr-0.5">
+<div class="bg-white p-3 rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-150">
+<div class="flex items-center justify-between text-xs mb-1.5">
+<span class="text-emerald-700 font-bold flex items-center gap-0.5 hover:underline">
+            #LIN-95
+            <span class="material-symbols-outlined text-xs" data-icon="open_in_new">open_in_new</span>
+</span>
+<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] px-2 py-0.5 rounded-md font-bold flex items-center gap-0.5">
+<span class="material-symbols-outlined text-xs" data-icon="check_circle">check_circle</span>
+            Shipped
+          </span>
+</div>
+<h4 class="font-bold text-slate-800 text-sm leading-snug">Add a recipe and find it by title</h4>
+<p class="text-xs text-slate-500 mt-1.5">Merged to main yesterday • Verified in production telemetry.</p>
+<div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+<span>Deployed by Factory #402</span>
+<span class="text-emerald-600 font-bold flex items-center gap-0.5">
+<span class="material-symbols-outlined text-xs">done_all</span> Closed
+          </span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BOTTOM STATUS DOCK -->
+<footer class="bg-white/95 backdrop-blur-md border-t border-emerald-100/80 shadow-lg flex-none px-4 py-2 flex items-center justify-between z-30">
+<div class="hidden sm:flex items-center space-x-1 text-mint-800 text-[11px] font-bold bg-mint-50 px-2.5 py-1 rounded-full border border-mint-200">
+<span class="material-symbols-outlined text-xs" data-icon="swipe_left">swipe_left</span>
+<span>Scroll for more lanes →</span>
+</div>
+<div class="flex items-center space-x-2 text-xs text-slate-600">
+<span class="flex items-center space-x-1.5">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="text-slate-800 font-bold">Grit Orchestrator: Active</span>
+</span>
+<span class="text-slate-300">•</span>
+<span class="font-medium text-slate-500">Sideways scroll enabled (8 lanes)</span>
+</div>
+<div class="flex items-center space-x-3">
+<div class="flex items-center space-x-1 text-xs text-slate-400">
+<span class="material-symbols-outlined text-xs" data-icon="update">update</span>
+<span>Auto-synced 12s ago</span>
+</div>
+<button class="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200/80 transition-all">
+<span class="material-symbols-outlined text-xs" data-icon="filter_list">filter_list</span>
+<span>Filters</span>
+</button>
+</div>
+</footer>
+</body></html>

@@ -1,0 +1,29 @@
+{
+  "id": 1793140405885,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/ceaf6b9095f4425e88dd9a2fa0137898\",\"title\":\"Todd's Factory Board - Mobile Stacked Strip\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/b5f148d8e3e947f49d3bef3bc4592ff2\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/b5f148d8e3e947f49d3bef3bc4592ff2:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/f915344ffe1046ada0846a1e60ce0689\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/f915344ffe1046ada0846a1e60ce0689:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"1768\",\"deviceType\":\"MOBILE\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "MOBILE",
+      "height": "1768",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/f915344ffe1046ada0846a1e60ce0689:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/f915344ffe1046ada0846a1e60ce0689"
+      },
+      "name": "projects/12943705270951129641/screens/ceaf6b9095f4425e88dd9a2fa0137898",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/b5f148d8e3e947f49d3bef3bc4592ff2:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/b5f148d8e3e947f49d3bef3bc4592ff2"
+      },
+      "title": "Todd's Factory Board - Mobile Stacked Strip",
+      "width": "780"
+    }
+  }
+}

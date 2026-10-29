@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793143547718,
+  "method": "tools/call",
+  "params": {
+    "name": "get_project",
+    "arguments": {
+      "name": "projects/12943705270951129641"
+    }
+  }
+}

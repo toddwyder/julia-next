@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793143285828,
+  "method": "tools/call",
+  "params": {
+    "name": "generate_screen_from_text",
+    "arguments": {
+      "projectId": "12943705270951129641",
+      "designSystem": "assets/17575707340211662328",
+      "deviceType": "MOBILE",
+      "prompt": "Draw a phone dashboard titled Mint & Iris - Accordion - As loaded. Use the Mint & Iris design system, copied from source screen bab9a7fc3eea45e288ab3a81f19f33d2. This is a NEW VERTICAL ACCORDION, not columns, not tabs. 390 CSS px wide, zero sideways scrolling. Keep all eight stages visible in this full phone picture, with readable 13-16px text. Header Todd's Factory, small Decision support link. Top strip shows exactly Needs you (2), then both items fully readable: Try the recipe screens (UAT), Approve 3 retro fixes. No invented toolbar, bottom nav, run IDs, metrics, cards or issue numbers. Eight stages stacked vertically, each stage has a single-line header with its complete name, card count and chevron. Order and exact counts: Backlog · 30; Ready · 1; Implementation · 1; Evidence review · 0; Remediation · 1; Staging/smoke test · 0; UAT · 1; Complete · 12. On load Backlog, Ready, Evidence review, Staging/smoke test and Complete are FOLDED: show headers ONLY, do not show their cards. Implementation, Remediation and UAT are OPEN. Inside each open stage show just a compact tappable card top row, wrapping its title if needed, with a status pill and expansion chevron. Implementation card title New machine: retry and pause, status Running in iris. Remediation card title Practice: real failure path, status Stuck in rose. UAT card title Recipe screens look like Julia's vintage design, status Waiting on you in amber: visually DIFFERENT from stuck. All three cards are COLLAPSED on this screen. No detail metrics on this initial picture. Retain hidden expanded content in the HTML if possible: Ready card Scorecard for every run, plus a ping with Start; running card Step 4 of 8, Doing now: running tests, Active 40 s ago, 12 min elapsed, $0.84 spent, Context 41% full, 2 agents inside: Main session and Coder, Stop button and Linear issue link; stuck detail No activity for 7 min. Those details are not visible until tapped. The look MUST match source: Public Sans headings and body (not a different font), JetBrains Mono only numeric metrics. Page #F3F6F8, white cards, #059669 mint actions and #D1FAE5 pale mint, iris #6366F1 #4F46E5 #EEF2FF #C7D2FE for Running. 12px card corners, fine tinted borders, soft shadows, pill badges. Light, colourful, airy yet compact. Keep the COMPLETE titles readable, never ellipsize. No technical wording beyond exact labels specified."
+    }
+  }
+}

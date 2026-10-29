@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1793138999104,
+  "method": "tools/call",
+  "params": {
+    "name": "generate_screen_from_text",
+    "arguments": {
+      "projectId": "12943705270951129641",
+      "deviceType": "DESKTOP",
+      "prompt": "# Board prompt\n\nA board for one person, Todd, to see his software factory at a glance. Eight columns left to right: Backlog, Ready, Implementation, Evidence review, Remediation, Staging/smoke test, UAT, Complete. One tile per card. Top strip “Needs you (2)”: “Try the recipe screens (UAT)” and “Approve 3 retro fixes”.\n\nTiles:\n\nBacklog: “Bring my Samsung Food recipes into Julia”.\nReady: “Scorecard for every run, plus a ping”, with a Start button.\nImplementation, running: “New machine: retry and pause”. Step 4 of 8, “Doing now: running tests”, active 40 s ago, 12 min elapsed, $0.84 spent, context 41% full, two agents inside (Main session, Coder), Stop button.\nRemediation, stuck: “Practice: real failure path”. No activity for 7 min, marked stuck.\nUAT, waiting on Todd: “Recipe screens look like Julia’s vintage design”, marked waiting on you (distinct from stuck).\nComplete: “Add a recipe and find it by title”.\n\nEach tile links to its Linear issue. A small “Decision support” link at the top.\n\n# Taste profile (Todd’s words)\n\nFeel: clean, light and colourful; information you see before you read it, with room to explore.\nLikes: Trello (easy to see what’s on each card, white space, colour that means something); Grit habit tracker (clean and colourful); NYT interactives and Tableau Viz of the Day (interesting ways of displaying information); flowcharts, blueprints, cards, interactivity, drill-down.\nDislikes: dark or terminal looks; lots of text to read; hard to find things; lots of scrolling; information meant for agents, not Todd; technical wording; no visual appeal.\nWants: glance, don’t read; status as pictures and charts; the most important thing where the eye lands first; each view fits a phone screen; plain words; only what he needs, with detail one tap away.\n\n\nLayout: Desktop: all eight columns visible."
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": 1793140220111,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/4c039666d4454369815c6312d4f9b431\",\"title\":\"Todd's Factory Board - Vibrant Pop\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/c1cf45c1a2dd46508726ca8b2e9d7589\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/c1cf45c1a2dd46508726ca8b2e9d7589:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/04f96f19bd4341bc9b42a44a267297e0\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/04f96f19bd4341bc9b42a44a267297e0:download\",\"mimeType\":\"text/html\"},\"width\":\"2560\",\"height\":\"2048\",\"deviceType\":\"DESKTOP\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "DESKTOP",
+      "height": "2048",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/04f96f19bd4341bc9b42a44a267297e0:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/04f96f19bd4341bc9b42a44a267297e0"
+      },
+      "name": "projects/12943705270951129641/screens/4c039666d4454369815c6312d4f9b431",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/c1cf45c1a2dd46508726ca8b2e9d7589:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/c1cf45c1a2dd46508726ca8b2e9d7589"
+      },
+      "title": "Todd's Factory Board - Vibrant Pop",
+      "width": "2560"
+    }
+  }
+}

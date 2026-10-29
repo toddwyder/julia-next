@@ -1,0 +1,29 @@
+{
+  "id": 1793140233670,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "{\"name\":\"projects/12943705270951129641/screens/1118044880194fd28a23505d95accbcb\",\"title\":\"Todd's Factory - Blueprint Data\",\"screenshot\":{\"name\":\"projects/12943705270951129641/files/be96093075f14df980de8bc95e839912\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/be96093075f14df980de8bc95e839912:download\",\"mimeType\":\"png\"},\"htmlCode\":{\"name\":\"projects/12943705270951129641/files/af003fe260eb4a84a76db4a6b85150e0\",\"downloadUrl\":\"https://stitch.googleapis.com/v1/projects/12943705270951129641/files/af003fe260eb4a84a76db4a6b85150e0:download\",\"mimeType\":\"text/html\"},\"width\":\"780\",\"height\":\"3428\",\"deviceType\":\"MOBILE\"}",
+        "type": "text"
+      }
+    ],
+    "structuredContent": {
+      "deviceType": "MOBILE",
+      "height": "3428",
+      "htmlCode": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/af003fe260eb4a84a76db4a6b85150e0:download",
+        "mimeType": "text/html",
+        "name": "projects/12943705270951129641/files/af003fe260eb4a84a76db4a6b85150e0"
+      },
+      "name": "projects/12943705270951129641/screens/1118044880194fd28a23505d95accbcb",
+      "screenshot": {
+        "downloadUrl": "https://stitch.googleapis.com/v1/projects/12943705270951129641/files/be96093075f14df980de8bc95e839912:download",
+        "mimeType": "png",
+        "name": "projects/12943705270951129641/files/be96093075f14df980de8bc95e839912"
+      },
+      "title": "Todd's Factory - Blueprint Data",
+      "width": "780"
+    }
+  }
+}

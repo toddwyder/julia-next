@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Todd's Factory · Operations Control</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Newsreader (Editorial Serif) & Plus Jakarta Sans (Precision Sans) -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..800;1,6..72,400..700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "surface-tint": "#243260",
+            "surface-container": "#F2EDE4",
+            "surface-container-low": "#FAF6F0",
+            "on-tertiary": "#ffffff",
+            "surface-bright": "#FDFBF7",
+            "surface-container-lowest": "#FFFFFF",
+            "primary-container": "#243260",
+            "surface": "#FDFBF7",
+            "primary-fixed-dim": "#D8E2FF",
+            "on-primary-fixed": "#091436",
+            "on-error": "#ffffff",
+            "inverse-primary": "#BAC8FF",
+            "background": "#F7F4EE",
+            "surface-container-high": "#ECE6DC",
+            "secondary": "#0D655C",
+            "on-secondary-fixed-variant": "#004F47",
+            "surface-dim": "#E5DFD4",
+            "inverse-on-surface": "#F7F4EE",
+            "error-container": "#FEE2E2",
+            "inverse-surface": "#1E2024",
+            "on-surface-variant": "#57534E",
+            "on-secondary-fixed": "#00201C",
+            "on-tertiary-fixed": "#3E2404",
+            "tertiary-fixed-dim": "#FED7AA",
+            "on-primary-fixed-variant": "#1E2C5B",
+            "on-secondary": "#ffffff",
+            "on-tertiary-container": "#7C2D12",
+            "secondary-container": "#CCFBF1",
+            "on-error-container": "#991B1B",
+            "on-primary-container": "#E0E7FF",
+            "on-secondary-container": "#115E59",
+            "secondary-fixed-dim": "#99F6E4",
+            "on-primary": "#ffffff",
+            "tertiary-container": "#B45309",
+            "tertiary-fixed": "#FFEDD5",
+            "primary-fixed": "#EEF2FF",
+            "outline-variant": "#E4DDD0",
+            "outline": "#78716C",
+            "surface-variant": "#EFE9DF",
+            "on-surface": "#1C1E21",
+            "on-tertiary-fixed-variant": "#78350F",
+            "on-background": "#1C1E21",
+            "tertiary": "#B45309",
+            "error": "#BE123C",
+            "surface-container-highest": "#E4DDD0",
+            "primary": "#1E2B58",
+            "secondary-fixed": "#CCFBF1"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-md": "0.75rem",
+            "margin": "1rem",
+            "space-sm": "0.5rem",
+            "space-xs": "0.25rem",
+            "gutter": "0.75rem",
+            "space-xl": "1.5rem",
+            "space-lg": "1rem"
+          },
+          "fontFamily": {
+            "label-sm": ["Plus Jakarta Sans", "sans-serif"],
+            "body-sm": ["Plus Jakarta Sans", "sans-serif"],
+            "headline-xl": ["Newsreader", "Georgia", "serif"],
+            "headline-md": ["Newsreader", "Georgia", "serif"],
+            "body-md": ["Plus Jakarta Sans", "sans-serif"],
+            "headline-lg": ["Newsreader", "Georgia", "serif"],
+            "label-md": ["Plus Jakarta Sans", "sans-serif"],
+            "label-lg": ["Plus Jakarta Sans", "sans-serif"],
+            "headline-sm": ["Newsreader", "Georgia", "serif"],
+            "body-lg": ["Plus Jakarta Sans", "sans-serif"],
+            "serif": ["Newsreader", "Georgia", "serif"]
+          },
+          "fontSize": {
+            "label-sm": ["10px", { "lineHeight": "12px", "fontWeight": "700" }],
+            "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+            "headline-xl": ["28px", { "lineHeight": "34px", "fontWeight": "700" }],
+            "headline-md": ["20px", { "lineHeight": "26px", "fontWeight": "700" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "headline-lg": ["23px", { "lineHeight": "29px", "fontWeight": "700" }],
+            "label-md": ["11px", { "lineHeight": "14px", "fontWeight": "600" }],
+            "label-lg": ["12px", { "lineHeight": "16px", "fontWeight": "700" }],
+            "headline-sm": ["17px", { "lineHeight": "23px", "fontWeight": "700" }],
+            "body-lg": ["15px", { "lineHeight": "22px", "fontWeight": "500" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .soft-card-shadow {
+      box-shadow: 0 1px 3px rgba(35, 30, 22, 0.05), 0 4px 16px rgba(35, 30, 22, 0.04);
+    }
+    .amber-glow {
+      box-shadow: 0 0 0 1px #FDBA74, 0 6px 20px -2px rgba(234, 88, 12, 0.12);
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    body {
+      min-height: max(884px, 100dvh);
+      background-color: #F7F4EE;
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface antialiased min-h-screen pb-28 selection:bg-tertiary-fixed-dim selection:text-tertiary-container">
+<!-- TOP APP BAR -->
+<header class="bg-[#FDFBF7] dark:bg-inverse-surface border-b border-[#E8E2D5] shadow-xs sticky top-0 z-40">
+<div class="flex justify-between items-center w-full px-margin py-space-sm">
+<div class="flex items-center space-x-2.5">
+<div class="w-8 h-8 rounded-lg bg-[#EAE4D7] border border-[#DDD5C7] flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[19px]" data-icon="precision_manufacturing">precision_manufacturing</span>
+</div>
+<div>
+<span class="font-serif text-[21px] font-bold text-on-surface tracking-tight leading-tight block">Todd's Factory</span>
+<div class="flex items-center space-x-1.5 mt-0.5">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant font-medium tracking-wide">3 active workflows • all systems nominal</span>
+</div>
+</div>
+</div>
+<!-- Trailing Action: Decision Support -->
+<button class="flex items-center space-x-1.5 bg-[#FFFFFF] text-on-surface px-space-md py-1.5 rounded-full border border-[#DCD5C8] shadow-2xs hover:bg-[#F5EFE4] hover:border-[#CDC4B4] transition-colors scale-98 active:scale-95 duration-150 ease-out">
+<span class="material-symbols-outlined text-[17px] text-tertiary" data-icon="smart_toy">smart_toy</span>
+<span class="text-label-lg font-label-lg tracking-tight">Decision Support</span>
+</button>
+</div>
+</header>
+<!-- MAIN SCROLLABLE CONTENT CANVAS -->
+<main class="px-margin pt-3 max-w-lg mx-auto flex flex-col space-y-4">
+<!-- TOP URGENT BANNER: "Needs you (2)" -->
+<section class="bg-[#FFF7ED] text-[#431407] rounded-2xl p-3.5 border border-[#FDBA74] amber-glow transition-all">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center space-x-2">
+<div class="flex items-center justify-center w-6 h-6 rounded-full bg-[#EA580C] text-white">
+<span class="material-symbols-outlined text-[15px]" data-icon="warning">warning</span>
+</div>
+<h2 class="font-serif text-[19px] font-bold tracking-tight text-[#431407] flex items-center gap-1.5">
+            Needs you
+            <span class="bg-[#EA580C] text-white text-label-sm font-label-sm px-2 py-0.5 rounded-full font-sans font-bold">2</span>
+</h2>
+</div>
+<span class="text-label-sm font-label-sm text-[#9A3412] bg-[#FFEDD5] border border-[#FDBA74]/70 px-2.5 py-0.5 rounded-full font-semibold">2 blocking items</span>
+</div>
+<div class="grid grid-cols-1 gap-2 pt-1">
+<!-- Item 1: UAT -->
+<div class="bg-surface-container-lowest rounded-xl p-2.5 flex items-center justify-between border border-[#FED7AA] shadow-2xs">
+<div class="flex items-center space-x-2.5 min-w-0">
+<span class="w-2.5 h-2.5 rounded-full bg-[#EA580C] animate-pulse shrink-0"></span>
+<div class="truncate">
+<p class="text-body-sm font-body-lg text-on-surface truncate font-semibold">Try the recipe screens (UAT)</p>
+<div class="flex items-center space-x-1.5 text-label-sm font-label-sm text-outline">
+<span class="font-mono text-[10px] font-bold text-stone-600">LIN-142</span>
+<span>•</span>
+<span>Ready 14m</span>
+</div>
+</div>
+</div>
+<button class="shrink-0 ml-2 bg-primary text-on-primary text-label-sm font-label-lg px-2.5 py-1.5 rounded-lg active:scale-95 transition-transform flex items-center space-x-1 shadow-2xs">
+<span>Review Now</span>
+<span class="material-symbols-outlined text-label-sm" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<!-- Item 2: Approval -->
+<div class="bg-surface-container-lowest rounded-xl p-2.5 flex items-center justify-between border border-[#FED7AA] shadow-2xs">
+<div class="flex items-center space-x-2.5 min-w-0">
+<span class="w-2.5 h-2.5 rounded-full bg-error shrink-0"></span>
+<div class="truncate">
+<p class="text-body-sm font-body-lg text-on-surface truncate font-semibold">Approve 3 retro fixes</p>
+<div class="flex items-center space-x-1.5 text-label-sm font-label-sm text-outline">
+<span>Validation suite</span>
+<span>•</span>
+<span class="text-secondary font-semibold">Passed 98.4%</span>
+</div>
+</div>
+</div>
+<button class="shrink-0 ml-2 bg-secondary text-on-secondary text-label-sm font-label-lg px-3 py-1.5 rounded-lg active:scale-95 transition-transform shadow-2xs">
+            Approve (3)
+          </button>
+</div>
+</div>
+</section>
+<!-- COLUMN PICKER (TABS) -->
+<section class="space-y-2">
+<div class="flex items-center justify-between">
+<h3 class="text-label-lg font-label-lg text-on-surface-variant flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+<span class="material-symbols-outlined text-body-md text-stone-500" data-icon="view_kanban">view_kanban</span>
+          Pipeline Stages (8)
+        </h3>
+<span class="text-label-sm font-label-sm text-primary font-bold border-b border-primary/30 pb-0.5">Showing All Active</span>
+</div>
+<!-- 8-Stage Horizontal Scrollable Track -->
+<div class="overflow-x-auto no-scrollbar -mx-margin px-margin flex space-x-2 py-1">
+<!-- 1. Backlog (1) -->
+<button class="shrink-0 bg-surface-container-lowest text-on-surface-variant border border-outline-variant rounded-xl px-3 py-2 flex items-center space-x-1.5 hover:bg-surface-container transition-colors shadow-2xs">
+<span class="text-label-md font-label-md">Backlog</span>
+<span class="bg-[#EDE7DC] text-on-surface-variant text-label-sm font-label-sm px-1.5 py-0.5 rounded-full font-semibold">1</span>
+</button>
+<!-- 2. Ready (1) -->
+<button class="shrink-0 bg-surface-container-lowest text-on-surface-variant border border-outline-variant rounded-xl px-3 py-2 flex items-center space-x-1.5 hover:bg-surface-container transition-colors shadow-2xs">
+<span class="text-label-md font-label-md">Ready</span>
+<span class="bg-[#CCFBF1] text-[#0D655C] text-label-sm font-label-sm px-1.5 py-0.5 rounded-full font-bold">1</span>
+</button>
+<!-- 3. Implementation (1 live) [ACTIVE TAB] -->
+<button class="shrink-0 bg-primary text-on-primary rounded-xl px-3.5 py-2 flex items-center space-x-2 shadow-sm font-bold scale-100">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-300 opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-teal-300"></span>
+</span>
+<span class="text-label-md font-label-md tracking-tight">Implementation</span>
+<span class="bg-[#E0E7FF] text-[#1E2B58] text-label-sm font-label-sm px-1.5 py-0.5 rounded-full font-bold">1 live</span>
+</button>
+<!-- 4. Evidence review (0) -->
+<button class="shrink-0 bg-surface-container-low text-outline border border-outline-variant/60 rounded-xl px-3 py-2 flex items-center space-x-1.5 opacity-65">
+<span class="text-label-md font-label-md">Evidence review</span>
+<span class="text-label-sm font-label-sm font-medium">0</span>
+</button>
+<!-- 5. Remediation (1 stuck) [Alert dot] -->
+<button class="shrink-0 bg-[#FEE2E2] text-[#991B1B] border border-[#FECACA] rounded-xl px-3 py-2 flex items-center space-x-1.5 shadow-2xs">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="text-label-md font-label-md font-bold">Remediation</span>
+<span class="bg-error text-on-error text-label-sm font-label-sm px-1.5 py-0.5 rounded-full font-bold">1 stuck</span>
+</button>
+<!-- 6. Staging/smoke test (0) -->
+<button class="shrink-0 bg-surface-container-low text-outline border border-outline-variant/60 rounded-xl px-3 py-2 flex items-center space-x-1.5 opacity-65">
+<span class="text-label-md font-label-md">Staging/smoke</span>
+<span class="text-label-sm font-label-sm font-medium">0</span>
+</button>
+<!-- 7. UAT (1 waiting) [Attention dot] -->
+<button class="shrink-0 bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A] rounded-xl px-3 py-2 flex items-center space-x-1.5 shadow-2xs">
+<span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+<span class="text-label-md font-label-md font-bold">UAT</span>
+<span class="bg-tertiary text-on-tertiary text-label-sm font-label-sm px-1.5 py-0.5 rounded-full font-bold">1 waiting</span>
+</button>
+<!-- 8. Complete (1) -->
+<button class="shrink-0 bg-surface-container-lowest text-on-surface-variant border border-outline-variant rounded-xl px-3 py-2 flex items-center space-x-1.5 shadow-2xs">
+<span class="text-label-md font-label-md">Complete</span>
+<span class="bg-[#CCFBF1] text-[#0D655C] text-label-sm font-label-sm px-1.5 py-0.5 rounded-full font-bold">1</span>
+</button>
+</div>
+</section>
+<!-- PRIMARY PIPELINE TILES FEED -->
+<div class="space-y-3.5">
+<!-- TILE 1: IMPLEMENTATION (RUNNING / HIGH VISIBILITY BENTO) -->
+<article class="bg-surface-container-lowest rounded-2xl p-4 soft-card-shadow border border-[#E6DFD3] relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1.5 h-full bg-primary"></div>
+<!-- Header Strip -->
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center space-x-2">
+<span class="inline-flex items-center gap-1.5 bg-[#EEF2FF] text-[#1E2B58] border border-[#D8E2FF] text-label-sm font-label-sm px-2 py-0.5 rounded-md font-bold tracking-wider">
+<span class="relative flex h-1.5 w-1.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
+</span>
+              STAGE 3 · IMPLEMENTATION
+            </span>
+<span class="text-label-sm font-label-sm text-stone-500 font-mono">Run #418</span>
+</div>
+<!-- Linear Badge -->
+<a class="inline-flex items-center space-x-1 text-[#1E2B58] hover:text-black text-label-sm font-label-sm bg-[#F5EFE4] border border-[#DDD5C7] px-2 py-0.5 rounded-md font-mono" href="#">
+<span>LIN-204</span>
+<span class="material-symbols-outlined text-[13px]" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+<!-- Title -->
+<h4 class="font-serif text-[20px] font-bold text-on-surface mb-2 tracking-tight">New machine: retry and pause</h4>
+<!-- Visual Step Gauge -->
+<div class="bg-[#FAF6F0] rounded-xl p-2.5 mb-3 border border-[#E8E1D5]">
+<div class="flex items-center justify-between text-label-sm font-label-sm mb-1.5">
+<span class="font-medium text-on-surface">Step 4 of 8: <span class="text-primary font-bold">Doing now: running tests</span></span>
+<span class="text-secondary font-bold font-mono">50% completed</span>
+</div>
+<!-- 8 Segmented progress bars -->
+<div class="grid grid-cols-8 gap-1">
+<div class="h-1.5 rounded-full bg-primary"></div>
+<div class="h-1.5 rounded-full bg-primary"></div>
+<div class="h-1.5 rounded-full bg-primary"></div>
+<div class="h-1.5 rounded-full bg-primary animate-pulse"></div>
+<div class="h-1.5 rounded-full bg-[#E0D8CA]"></div>
+<div class="h-1.5 rounded-full bg-[#E0D8CA]"></div>
+<div class="h-1.5 rounded-full bg-[#E0D8CA]"></div>
+<div class="h-1.5 rounded-full bg-[#E0D8CA]"></div>
+</div>
+</div>
+<!-- Live Telemetry Bento Grid -->
+<div class="grid grid-cols-2 gap-2 mb-3">
+<!-- Heartbeat -->
+<div class="bg-[#FAF7F2] rounded-xl p-2.5 border border-[#EBE4D8] flex items-center space-x-2.5">
+<span class="relative flex h-2 w-2 shrink-0">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+</span>
+<div>
+<p class="text-[10px] uppercase font-label-sm tracking-wider text-stone-500">Heartbeat</p>
+<p class="text-label-md font-label-md text-on-surface font-bold">Active 40s ago</p>
+</div>
+</div>
+<!-- Duration -->
+<div class="bg-[#FAF7F2] rounded-xl p-2.5 border border-[#EBE4D8] flex items-center space-x-2.5">
+<span class="material-symbols-outlined text-stone-500 text-body-md" data-icon="schedule">schedule</span>
+<div>
+<p class="text-[10px] uppercase font-label-sm tracking-wider text-stone-500">Duration</p>
+<p class="text-label-md font-label-md text-on-surface font-bold">12 min elapsed</p>
+</div>
+</div>
+<!-- Spend -->
+<div class="bg-[#FAF7F2] rounded-xl p-2.5 border border-[#EBE4D8] flex items-center space-x-2.5">
+<span class="material-symbols-outlined text-secondary text-body-md" data-icon="payments">payments</span>
+<div>
+<p class="text-[10px] uppercase font-label-sm tracking-wider text-stone-500">Spend</p>
+<p class="text-label-md font-label-md text-secondary font-bold font-mono">$0.84 spent</p>
+</div>
+</div>
+<!-- Context Window -->
+<div class="bg-[#FAF7F2] rounded-xl p-2.5 border border-[#EBE4D8] flex items-center space-x-2.5">
+<div class="w-4 h-4 rounded-full border-2 border-[#D8CFC2] border-t-primary border-r-primary rotate-45 shrink-0"></div>
+<div>
+<p class="text-[10px] uppercase font-label-sm tracking-wider text-stone-500">Context Window</p>
+<p class="text-label-md font-label-md text-on-surface font-bold font-mono">41% full</p>
+</div>
+</div>
+</div>
+<!-- Multi-Agent Chips & Control Buttons -->
+<div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#EAE3D6]">
+<div class="flex items-center space-x-1.5">
+<div class="inline-flex items-center space-x-1 bg-[#F3EDE2] border border-[#DDD5C7] px-2 py-1 rounded-full text-label-sm font-label-sm text-on-surface">
+<span class="w-3.5 h-3.5 rounded-full bg-primary text-on-primary flex items-center justify-center text-[8px]">🤖</span>
+<span>Main session</span>
+</div>
+<div class="inline-flex items-center space-x-1 bg-[#F3EDE2] border border-[#DDD5C7] px-2 py-1 rounded-full text-label-sm font-label-sm text-on-surface">
+<span class="w-3.5 h-3.5 rounded-full bg-secondary text-on-secondary flex items-center justify-center text-[8px]">💻</span>
+<span>Coder</span>
+</div>
+</div>
+<div class="flex items-center space-x-2">
+<button class="bg-[#FEE2E2] text-[#991B1B] hover:bg-[#FCA5A5] hover:text-[#7F1D1D] text-label-sm font-label-lg px-2.5 py-1 rounded-lg border border-[#FECACA] active:scale-95 transition-all">
+              Stop
+            </button>
+<button class="bg-primary text-on-primary text-label-sm font-label-lg px-2.5 py-1 rounded-lg active:scale-95 transition-all flex items-center space-x-0.5 shadow-2xs">
+<span>Inspect</span>
+<span class="material-symbols-outlined text-label-sm" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</div>
+</article>
+<!-- TILE 2: REMEDIATION (STUCK / NEEDS ASSISTANCE) -->
+<article class="bg-surface-container-lowest rounded-2xl p-4 soft-card-shadow border border-[#FECACA] relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1.5 h-full bg-error"></div>
+<div class="flex items-center justify-between mb-2">
+<span class="inline-flex items-center gap-1.5 bg-[#FEE2E2] text-[#991B1B] border border-[#FECACA] text-label-sm font-label-sm px-2 py-0.5 rounded-md font-bold tracking-wider">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+            STAGE 5 · REMEDIATION
+          </span>
+<a class="inline-flex items-center space-x-1 text-on-surface-variant hover:text-black text-label-sm font-label-sm bg-[#F5EFE4] border border-[#DDD5C7] px-2 py-0.5 rounded-md font-mono" href="#">
+<span>LIN-198</span>
+<span class="material-symbols-outlined text-[13px]" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+<div class="flex items-start justify-between gap-2 mb-2">
+<h4 class="font-serif text-[20px] font-bold text-on-surface tracking-tight">Practice: real failure path</h4>
+<span class="shrink-0 bg-[#BE123C] text-white text-label-sm font-label-sm px-2 py-0.5 rounded-full font-bold">
+            Marked Stuck
+          </span>
+</div>
+<div class="bg-[#FFF1F2] rounded-xl p-2.5 mb-3 border border-[#FECDD3] flex items-center justify-between">
+<div class="flex items-center space-x-2.5">
+<span class="material-symbols-outlined text-[#BE123C] text-headline-sm" data-icon="report_problem">report_problem</span>
+<div>
+<p class="text-label-md font-label-md text-[#9F1239] font-bold">No activity for 7 min</p>
+<p class="text-label-sm font-label-sm text-stone-600">Linter failed on edge-case schema parser</p>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-[#EAE3D6]">
+<div class="flex items-center space-x-1.5 text-label-sm font-label-sm text-stone-500">
+<span class="material-symbols-outlined text-label-lg" data-icon="psychology">psychology</span>
+<span>Agent idle in retry block</span>
+</div>
+<button class="bg-[#BE123C] text-white text-label-sm font-label-lg px-3 py-1.5 rounded-lg active:scale-95 transition-transform flex items-center space-x-1 shadow-2xs hover:bg-[#9F1239]">
+<span class="material-symbols-outlined text-label-sm" data-icon="build">build</span>
+<span>Assist Agent</span>
+</button>
+</div>
+</article>
+<!-- TILE 3: UAT (WAITING ON TODD - DISTINCT WARM AMBER) -->
+<article class="bg-surface-container-lowest rounded-2xl p-4 soft-card-shadow border border-[#FDE68A] relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1.5 h-full bg-[#B45309]"></div>
+<div class="flex items-center justify-between mb-2">
+<span class="inline-flex items-center gap-1.5 bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A] text-label-sm font-label-sm px-2 py-0.5 rounded-md font-bold tracking-wider">
+<span class="w-1.5 h-1.5 rounded-full bg-[#B45309] animate-pulse"></span>
+            STAGE 7 · UAT
+          </span>
+<a class="inline-flex items-center space-x-1 text-on-surface-variant hover:text-black text-label-sm font-label-sm bg-[#F5EFE4] border border-[#DDD5C7] px-2 py-0.5 rounded-md font-mono" href="#">
+<span>LIN-142</span>
+<span class="material-symbols-outlined text-[13px]" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+<div class="flex items-start justify-between gap-2 mb-2">
+<h4 class="font-serif text-[20px] font-bold text-on-surface tracking-tight">Recipe screens look like Julia's vintage design</h4>
+<span class="shrink-0 bg-[#B45309] text-white text-label-sm font-label-sm px-2 py-0.5 rounded-full font-bold">
+            Waiting on you (UAT)
+          </span>
+</div>
+<p class="text-body-sm font-body-sm text-stone-600 mb-3 leading-relaxed">
+          Staging build deployed to sandbox. UI components matched against Figma layout specs with 99.2% alignment.
+        </p>
+<div class="flex items-center justify-between pt-2 border-t border-[#EAE3D6]">
+<div class="flex items-center space-x-1 text-label-sm font-label-sm text-[#0D655C] font-bold">
+<span class="material-symbols-outlined text-label-lg" data-icon="preview">preview</span>
+<span>Sandbox Preview Ready</span>
+</div>
+<button class="bg-[#B45309] text-white text-label-sm font-label-lg px-3 py-1.5 rounded-lg active:scale-95 transition-transform flex items-center space-x-1 shadow-2xs hover:bg-[#92400E]">
+<span>Open Feedback</span>
+<span class="material-symbols-outlined text-label-sm" data-icon="rate_review">rate_review</span>
+</button>
+</div>
+</article>
+<!-- TILE 4: READY (ACTIONABLE START) -->
+<article class="bg-surface-container-lowest rounded-2xl p-4 soft-card-shadow border border-[#E6DFD3] relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1.5 h-full bg-[#0D655C]"></div>
+<div class="flex items-center justify-between mb-2">
+<span class="inline-flex items-center gap-1 bg-[#CCFBF1] text-[#0D655C] border border-[#99F6E4] text-label-sm font-label-sm px-2 py-0.5 rounded-md font-bold tracking-wider">
+            STAGE 2 · READY
+          </span>
+<a class="inline-flex items-center space-x-1 text-on-surface-variant hover:text-black text-label-sm font-label-sm bg-[#F5EFE4] border border-[#DDD5C7] px-2 py-0.5 rounded-md font-mono" href="#">
+<span>LIN-215</span>
+<span class="material-symbols-outlined text-[13px]" data-icon="open_in_new">open_in_new</span>
+</a>
+</div>
+<div class="flex items-start justify-between gap-2 mb-2">
+<h4 class="font-serif text-[20px] font-bold text-on-surface tracking-tight">Scorecard for every run, plus a ping</h4>
+<span class="shrink-0 bg-[#EDE7DC] text-stone-700 text-label-sm font-label-sm px-2 py-0.5 rounded-full font-medium">
+            Queued
+          </span>
+</div>
+<p class="text-body-sm font-body-sm text-stone-600 mb-3 leading-relaxed">
+          Spec verified, architecture diagram approved. Runner resources available immediately.
+        </p>
+<div class="flex items-center justify-between pt-2 border-t border-[#EAE3D6]">
+<span class="text-label-sm font-label-sm text-stone-500 font-mono">Est. cost: ~$0.45</span>
+<button class="bg-[#0D655C] text-white text-label-sm font-label-lg px-3 py-1.5 rounded-lg active:scale-95 transition-transform flex items-center space-x-1 shadow-2xs hover:bg-[#0A4D46]">
+<span class="material-symbols-outlined text-label-sm" data-icon="play_arrow">play_arrow</span>
+<span>Start Run</span>
+</button>
+</div>
+</article>
+<!-- TILE 5 & 6: BACKLOG & COMPLETE (COLLAPSED GLANCEABLE PAIR) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+<!-- Backlog Tile -->
+<article class="bg-surface-container-lowest rounded-2xl p-3.5 soft-card-shadow border border-[#E6DFD3]">
+<div class="flex items-center justify-between mb-1">
+<span class="text-[10px] uppercase font-label-sm text-stone-500 tracking-wider font-bold">STAGE 1 · BACKLOG</span>
+<span class="text-label-sm font-label-sm text-stone-500 font-mono">LIN-112</span>
+</div>
+<h5 class="font-serif text-[17px] font-bold text-on-surface mb-2 leading-snug">Bring my Samsung Food recipes into Julia</h5>
+<div class="flex items-center justify-between text-label-sm font-label-sm text-stone-500 pt-2 border-t border-[#EAE3D6]">
+<span>Specification needed</span>
+<span class="material-symbols-outlined text-body-md text-stone-400" data-icon="edit_note">edit_note</span>
+</div>
+</article>
+<!-- Complete Tile -->
+<article class="bg-surface-container-lowest rounded-2xl p-3.5 soft-card-shadow border border-[#99F6E4]/70">
+<div class="flex items-center justify-between mb-1">
+<span class="text-[10px] uppercase font-label-sm text-[#0D655C] font-bold tracking-wider">STAGE 8 · COMPLETE</span>
+<span class="text-label-sm font-label-sm text-stone-500 font-mono">LIN-95</span>
+</div>
+<h5 class="font-serif text-[17px] font-bold text-on-surface mb-2 leading-snug">Add a recipe and find it by title</h5>
+<div class="flex items-center justify-between text-label-sm font-label-sm text-[#0D655C] font-bold pt-2 border-t border-[#EAE3D6]">
+<span class="inline-flex items-center gap-1">
+<span class="material-symbols-outlined text-label-sm text-[#0D655C]" data-icon="check_circle">check_circle</span>
+              Shipped to main
+            </span>
+<span class="text-stone-400 font-normal">Yesterday</span>
+</div>
+</article>
+</div>
+</div>
+</main>
+<!-- BOTTOM NAVBAR -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-margin py-space-xs shadow-lg bg-[#FDFBF7] border-t border-[#E8E2D5] dark:bg-inverse-surface">
+<!-- Tab 1: Pipeline (ACTIVE) -->
+<a class="flex flex-col items-center justify-center bg-[#EAE4D7] text-[#1E2B58] border border-[#DDD5C7] rounded-xl px-space-md py-space-xs active:scale-95 duration-150 ease-out" href="#pipeline">
+<span class="material-symbols-outlined text-headline-sm" data-icon="view_kanban" data-weight="fill" style="font-variation-settings: 'FILL' 1;">view_kanban</span>
+<span class="text-label-sm font-label-sm mt-0.5 font-bold">Pipeline</span>
+</a>
+<!-- Tab 2: Urgent -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-on-surface px-space-md py-space-xs hover:bg-[#F5EFE4] rounded-xl active:scale-95 duration-150 ease-out relative" href="#urgent">
+<span class="material-symbols-outlined text-headline-sm" data-icon="warning">warning</span>
+<span class="text-label-sm font-label-sm mt-0.5 font-medium">Urgent</span>
+<!-- Urgent Badge Pip -->
+<span class="absolute top-1.5 right-3 w-2 h-2 rounded-full bg-[#EA580C]"></span>
+</a>
+<!-- Tab 3: Agents -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-on-surface px-space-md py-space-xs hover:bg-[#F5EFE4] rounded-xl active:scale-95 duration-150 ease-out" href="#agents">
+<span class="material-symbols-outlined text-headline-sm" data-icon="smart_toy">smart_toy</span>
+<span class="text-label-sm font-label-sm mt-0.5 font-medium">Agents</span>
+</a>
+<!-- Tab 4: Metrics -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-on-surface px-space-md py-space-xs hover:bg-[#F5EFE4] rounded-xl active:scale-95 duration-150 ease-out" href="#metrics">
+<span class="material-symbols-outlined text-headline-sm" data-icon="monitoring">monitoring</span>
+<span class="text-label-sm font-label-sm mt-0.5 font-medium">Metrics</span>
+</a>
+</nav>
+</body></html>
