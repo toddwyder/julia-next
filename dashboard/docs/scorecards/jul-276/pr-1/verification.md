@@ -51,3 +51,43 @@ Empty-list verification remains BLOCKED by unrelated Ready JUL-276. It was neith
 The retained UAT package includes phone and desktop screenshots and a 35-second list, Start, and Back video. Independent swarm, 200 percent zoom verification, real phone over Tailscale, and Todd's UAT yes remain unclaimed. No merge or deployment is authorized.
 
 The regenerated scorecard remains program-wide. It selects earlier PR #371 rather than PR-1 #372. It has unpriced usage and missing ping receipts. Its priced subtotal is not the total program cost, and no UAT yes is recorded.
+
+## Fixes after the independent check
+
+The independent check of `637d64d` found four ways the Ready screen could fail without saying so. Commit `cd1740c` fixes each where it happens; this section records the fresh proof.
+
+Verdict. All four defects are gone and each is now covered by a check that fails on the old code. Independent verification, Todd's UAT, and the blocked empty-list lane are unchanged below.
+
+### The browser was told a file was missing
+
+The app declared no icon. Chrome asked for `/favicon.ico`, the route did not exist, and the failed request appeared as a console error on a load that was otherwise clean.
+
+The icon is now `app/favicon.ico`, made from the Julia mark in the root app. Next's icon decoder rejected the first attempt outright with `The PNG is not in RGBA format!`, which failed the whole page rather than the icon alone, so the source was converted to an RGBA PNG inside the ICO container. The committed file is 666 bytes at 192 by 192.
+
+Proof in the dev server and in a clean production build: `/favicon.ico` returns 200 with `image/x-icon`, the page head carries `<link rel="icon" href="/favicon.ico?…" sizes="192x192" type="image/x-icon">`, and Chromium both fetched and decoded the image at 192 by 192.
+
+The no-key browser test now asserts that status and type, so the gate no longer depends on a human noticing a console line. Removing the file made both viewports fail with `Expected: 200, Received: 404`; restoring it made both pass.
+
+### Linear stopped explaining itself
+
+A non-2xx reply threw away Linear's own explanation and kept only `HTTP <status>`. The reply body is now read, the provider messages are kept, the API key is removed, and the text is cut at 400 characters. A body that is not JSON still reports the status, without pretending to parse.
+
+Proof. A 400 reply carrying `Field "team" is unknown test-secret` now reads `Linear request failed. HTTP 400. Field "team" is unknown [redacted]`. An HTML 502 body and an empty 401 body read as their status alone, and a 5,000-character provider message stays under 500 characters. With the old line restored, two of the eight unit tests fail.
+
+### A cut-off reply looked like a parse bug
+
+A body that stopped partway was reported as `malformed response`, which points a reader at the parser instead of the connection. The reply is now read before parsing: an abort or timeout names the ten-second limit, any other stream failure names a reply that ended early, and only a complete body that fails to parse is called malformed.
+
+Proof. A stream that errors with `AbortError` reads `Linear did not finish its reply within 10 seconds`; one that errors otherwise reads `Linear ended its reply before it was complete`; neither contains `malformed`. A fetch that times out reads `could not reach Linear within 10 seconds`. The assertion for the old text was strengthened from `/HTTP 503/` to `/HTTP 503\.$/` so the message is checked to its end.
+
+### Failures existed only in the browser
+
+Neither page wrote anything to the server, so a failure that Todd saw had no matching record. Both now log with the `julia-dashboard:` prefix. The Start screen reduces the card identifier to 40 characters of `[\w-]` first, so an identifier cannot forge a log line.
+
+Proof from a real server process with no key: `julia-dashboard: Ready cards failed to load: Error: Linear configuration failure. LINEAR_API_KEY is missing.` on `/`, the same line for `JUL-276` on `/start/JUL-276`, and, for `/start/JUL-1%0Aforged%20line%3Dx`, a single line naming `JUL-10Aforged20line3Dx` with no break. The same logging appears in the no-key browser run, in the server output the test captures.
+
+### The fixes ran against the real Ready list
+
+With the production build on `127.0.0.1:3104` and real Linear credentials through `scripts/julia-agents.mjs`, `DASHBOARD_URL=http://127.0.0.1:3104` ran the journey on both viewports. The list, Start, and Back were checked against fresh Linear reads of JUL-276, JUL-279, and JUL-280, Start and Back ran twice, and `ready.png`, `start-0.png`, and `start-1.png` were captured per viewport. No console error, page error, or response of 400 or worse occurred; that last condition is new in this change. Lint, the eight unit tests, and the production build passed.
+
+The screenshots were checked as pixels, not only as element boxes: the page renders `#1e293b` ink on `#f3f6f8` with white cards and borders, and the crop contains 6,978 dark pixels inside the expected text area.
