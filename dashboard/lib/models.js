@@ -269,6 +269,32 @@ export function readModels({ directory = stateDir(), now = new Date() } = {}) {
   };
 }
 
+// An account can answer to more than one provider name. Mastra Code lists the CommandCode
+// models as `commandcode/…` and, for the two in its model pack, as `mastracode/commandcode/…`.
+export function accountProviders(account = {}) {
+  const providers = account.providers ?? (account.provider ? [account.provider] : []);
+  return providers.filter(Boolean);
+}
+
+// Mastra Code lists one model under several ids: an alias beside its dated snapshot
+// (claude-haiku-4-5 and claude-haiku-4-5-20251001), and the same model again under a second
+// provider when two accounts can run it. Those are one model at one price, so the screen keeps
+// the shortest id and drops the rest. A name at two different prices stays twice, because
+// picking one spends a different account's money.
+export function onePerName(models = []) {
+  const kept = new Map();
+  for (const model of models) {
+    const name = model.displayName ?? displayName(model);
+    const price = model.free ? 'free' : `${model.inputPerMillion}/${model.outputPerMillion}`;
+    const key = `${name}\u0000${price}`;
+    const seen = kept.get(key);
+    if (!seen || String(model.id).length < String(seen.id).length) {
+      kept.set(key, { ...model, displayName: name });
+    }
+  }
+  return [...kept.values()];
+}
+
 export function startModels(saved) {
   // Only a model the sweep recorded a price for may reach the screen, even if the file was
   // edited by hand. A free model is priced at zero, so it counts as priced.

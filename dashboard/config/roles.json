@@ -1,0 +1,143 @@
+{
+  "groups": [
+    {
+      "id": "building",
+      "name": "Building",
+      "roles": [
+        {
+          "id": "feature-refactoring",
+          "name": "feature/refactoring",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
+          "explanation": "Builds new features, or reorganizes code without changing what it does."
+        },
+        {
+          "id": "bug-fix",
+          "name": "bug-fix",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
+          "explanation": "Reproduces a reported problem, finds the cause and fixes it."
+        },
+        {
+          "id": "perf-issue",
+          "name": "perf-issue",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
+          "explanation": "Fixes one measured slowness."
+        },
+        {
+          "id": "hillclimb",
+          "name": "hillclimb",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
+          "explanation": "Keeps improving one number toward a target, trying one idea at a time and keeping only what helps."
+        }
+      ]
+    },
+    {
+      "id": "judgment",
+      "name": "Judgment",
+      "roles": [
+        {
+          "id": "judgment-and-prose",
+          "name": "judgment and prose",
+          "default": "openai/gpt-6.1-sol",
+          "explanation": "Writing, and judgment calls about what the work should say."
+        },
+        {
+          "id": "hardest-tasks",
+          "name": "hardest tasks",
+          "default": "openai/gpt-6.1-sol",
+          "explanation": "The trickiest code changes, where getting it wrong costs the most."
+        }
+      ]
+    },
+    {
+      "id": "investigating",
+      "name": "Investigating",
+      "roles": [
+        {
+          "id": "how-explorer",
+          "name": "how explorer",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
+          "explanation": "Reads the code to find how something works."
+        },
+        {
+          "id": "how-explainer",
+          "name": "how explainer",
+          "default": "openai/gpt-6.1-sol",
+          "explanation": "Turns that reading into a plain explanation."
+        },
+        {
+          "id": "why-investigators",
+          "name": "why investigators",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
+          "explanation": "Digs through history for why something was built this way."
+        },
+        {
+          "id": "why-synthesizer",
+          "name": "why synthesizer",
+          "default": "openai/gpt-6.1-sol",
+          "explanation": "Pulls those findings into one answer with sources."
+        }
+      ]
+    },
+    {
+      "id": "learning",
+      "name": "Learning",
+      "roles": [
+        {
+          "id": "reflect-tooling",
+          "name": "reflect tooling",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
+          "explanation": "Reviews a finished session for lessons about tools."
+        },
+        {
+          "id": "reflect-judgment",
+          "name": "reflect judgment",
+          "default": "openai/gpt-6.1-sol",
+          "explanation": "Reviews the session for lessons about decisions."
+        }
+      ]
+    },
+    {
+      "id": "panels",
+      "name": "Panels",
+      "panel": true,
+      "roles": [
+        {
+          "id": "arena-runners",
+          "name": "arena runners",
+          "default": ["commandcode/deepseek/deepseek-v4.1-flash", "openai/gpt-6.1-sol"],
+          "explanation": "Several models attempt the same task side by side."
+        },
+        {
+          "id": "arena-cross-judge-pool",
+          "name": "arena cross-judge pool",
+          "default": ["commandcode/deepseek/deepseek-v4.1-flash", "openai/gpt-6.1-sol"],
+          "explanation": "Models that may judge those attempts."
+        },
+        {
+          "id": "architect-runners",
+          "name": "architect runners",
+          "default": ["commandcode/deepseek/deepseek-v4.1-flash", "openai/gpt-6.1-sol"],
+          "explanation": "Several models sketch the design before code."
+        },
+        {
+          "id": "interrogate-reviewers",
+          "name": "interrogate reviewers",
+          "default": ["commandcode/deepseek/deepseek-v4.1-flash", "openai/gpt-6.1-sol"],
+          "explanation": "Models that try to break the change."
+        }
+      ]
+    },
+    {
+      "id": "workers",
+      "name": "Workers",
+      "roles": [
+        {
+          "id": "swarm-workers",
+          "name": "swarm workers",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
+          "explanation": "Parallel helpers for many small jobs and for checking work."
+        }
+      ]
+    }
+  ]
+}
