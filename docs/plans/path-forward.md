@@ -49,7 +49,7 @@ Working document. Each line is a decision Todd agreed in conversation.
 - Structural fix: CI fails if two installed skills share a name. The separate pstack folder is cut (24 Oct).
 
 ## Card shape (Todd, 24 Oct)
-- A card is a short Outcome of one or two sentences plus the acceptance criteria describing what Todd sees, as many as the card needs; pstack slices a large card when it plans the build (Todd, 28 Oct; the five-criteria limit is lifted).
+- A card is a short Outcome of one or two sentences plus the acceptance criteria describing what Todd sees, as many as the card needs; pstack slices a large card when it plans the build (Todd, 28 Oct; the five-criteria limit is lifted). Each slice is a Linear sub-issue of the card, in order, with that slice's done-means; the card completes only when its last sub-issue does (Todd, 29 Oct).
 - Requirements, Contracts, Proof and Out of scope sections are retired. A constraint that matters to Todd, including how something must be proven, is written as a criterion.
 - Triage writes that shape. (Start's admission check was removed with the old machine on 26 Oct.)
 
