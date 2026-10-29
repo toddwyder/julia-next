@@ -1,0 +1,22 @@
+[Unit]
+Description=Prune and compact Mastra Code's trace store so it cannot fill the disk
+After=network.target
+# A session may hold the store for hours. The unit is cheap, so let the next timer
+# firing try again instead of giving up for a day.
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/julia-dashboard
+Environment=HOME=/home/ubuntu
+Environment=NODE_ENV=production
+# 22.6 GB of trace spans grew unnoticed because nothing reported the size. The script
+# keeps the cost rows, deletes spans and logs older than the cutoff, compacts the file,
+# and writes the before/after sizes into the report at ~/.local/state/julia.
+ExecStart=/usr/local/bin/node /home/ubuntu/julia-dashboard/scripts/trace-store.mjs prune
+# A live session holds an exclusive DuckDB lock; exiting 0 with status busy is the
+# normal outcome, not a failure.
+SuccessExitStatus=0
+TimeoutStartSec=3600

@@ -183,13 +183,42 @@ export function traceCopyFits(size, room) {
   return size + TRACE_COPY_MARGIN <= room;
 }
 
+// scripts/trace-store.mjs writes this small ledger of the cost rows while no
+// session holds the trace store, so a card keeps its cost after pruning.
+export function ledgerFile(env = process.env) {
+  if (env.MASTRA_TRACE_LEDGER) return env.MASTRA_TRACE_LEDGER;
+  return join(env.XDG_STATE_HOME || join(homedir(), '.local', 'state'), 'julia', 'trace-costs.json');
+}
+
+// Reads the ledger instead of the store: no lock, no copy, no disk headroom.
+// Returns null when the ledger says nothing about these threads.
+export function ledgerTracing(threadIds, file = ledgerFile()) {
+  if (!existsSync(file) || !threadIds.length) return null;
+  const ledger = JSON.parse(readFileSync(file, 'utf8'));
+  const wanted = new Set(threadIds);
+  const metrics = (ledger.rows ?? []).filter(r => wanted.has(r.threadId));
+  if (!metrics.length) return null;
+  const covered = new Set(metrics.map(r => r.threadId));
+  return {
+    metrics,
+    requested: (ledger.requested ?? []).filter(r => wanted.has(r.threadId)),
+    skipped: null,
+    ledgerAt: ledger.updatedAt ?? null,
+    ledgerMissing: threadIds.filter(id => !covered.has(id)).length,
+  };
+}
+
 async function readTracing(dir, file, threadIds) {
   if (!existsSync(file) || !threadIds.length) return { metrics: [], requested: [], skipped: null };
   const fileSize = statSync(file).size + (existsSync(file + '.wal') ? statSync(file + '.wal').size : 0);
   const free = statfsSync(tmpdir());
   const room = Number(free.bavail) * Number(free.bsize);
   if (!traceCopyFits(fileSize, room)) {
-    return { metrics: [], requested: [], skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it` };
+    return {
+      metrics: [],
+      requested: [],
+      skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it; \`node scripts/trace-store.mjs prune\` caps it and writes the cost ledger`,
+    };
   }
   const { DuckDBInstance } = createRequire(join(dir, 'package.json'))('@duckdb/node-api');
   // A running Mastra Code holds the trace file's lock, so read a copy.
@@ -301,6 +330,8 @@ export function buildScorecard({ card, threads, prices, tracing, pulls, pings, u
   return {
     card, windows: windows.length, runs, stops, cost, pull, uat,
     tracingSkipped: tracing?.skipped,
+    ledgerAt: tracing?.ledgerAt ?? null,
+    ledgerMissing: tracing?.ledgerMissing ?? 0,
     usd: cost.reduce((a, c) => a + c.usd, 0),
     success: uat && windows.length ? counted.length === 0 : undefined,
     stopsBeforeUat: counted.length,
@@ -334,6 +365,7 @@ export function renderScorecard(s, generatedAt = new Date()) {
       : '- Cost: **unknown**. No usage records found for this card.';
   lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.` : unknownCost);
   if (s.tracingSkipped && measured) lines.push(`- Tracing not read: ${s.tracingSkipped}. Rows below come from the thread's own usage records.`);
+  if (s.ledgerAt) lines.push(`- Cost source: the cost ledger written ${utc(Date.parse(s.ledgerAt))} by scripts/trace-store.mjs, because the live trace store could not be read${s.ledgerMissing ? `; it has no rows for ${s.ledgerMissing} of this card's threads, so treat the total as a floor` : ''}.`);
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
@@ -401,9 +433,12 @@ async function main() {
   const threads = readThreads(join(data, 'mastra.db'));
   const ids = threads.filter(t => cardWindows(t, t.events).some(w => w.card === card)).map(t => t.id);
   const tracing = await readTracing(dir, process.env.MASTRA_OBSERVABILITY_DB_PATH || join(data, 'observability.duckdb'), ids);
+  // A store too big to copy is the normal state now, so the ledger written by
+  // scripts/trace-store.mjs carries the cost instead.
+  const fromLedger = tracing.skipped ? ledgerTracing(ids) : null;
   const uatFile = fileURLToPath(new URL('../docs/scorecards/uat.json', import.meta.url));
   const uat = existsSync(uatFile) ? JSON.parse(readFileSync(uatFile, 'utf8'))[card] : undefined;
-  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });
+  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), tracing: fromLedger ?? tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });
   const markdown = renderScorecard(scorecard);
   if (flag === '--write') {
     const out = fileURLToPath(new URL(`../docs/scorecards/${card}.md`, import.meta.url));

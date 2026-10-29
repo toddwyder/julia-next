@@ -56,6 +56,27 @@ names the merge commit and `/api/health` reports `ok`. The update service writes
 it is free to update, and `code: active-run` with the run it waited for when a build is in flight,
 in which case the next timer run does the work.
 
+## Mastra Code's trace store
+
+Mastra Code writes every span and token metric to `~/.local/share/mastracode/observability.duckdb`.
+Nothing used to watch it, and by 29 October it reached 22.6 GB: full prompt payloads in
+`span_events` are most of it. `scripts/trace-store.mjs` caps it.
+
+```sh
+node scripts/trace-store.mjs status
+node scripts/trace-store.mjs ledger
+node scripts/trace-store.mjs prune --keep-days 14 --dry-run
+sudo node scripts/install-trace-store.mjs   # writes ops/julia-trace-store.{service,timer}
+```
+
+`julia-trace-store.timer` runs the prune nightly at 04:40 from the deploy checkout. The prune keeps
+`metric_events`, which carries the cost, exports it to `~/.local/state/julia/trace-costs.json`
+before deleting anything, removes spans and logs older than the cutoff, then compacts the file.
+A running session holds DuckDB's exclusive lock, so the prune exits 0 with `status: busy` and a
+PID instead of failing, and `--wait-for-lock` makes it poll until the store is free. Sizes before
+and after land in `~/.local/state/julia/trace-store-report.json`; read that file rather than
+guessing whether the store is under control.
+
 ## GitHub boundaries
 
 Use ordinary signed-in GitHub access for authorized cards. Keep authentication material inside its trusted process. Evidence and notes belong on the card branch and pull request.

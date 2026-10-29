@@ -1,19 +1,55 @@
 // Ten live lanes plus a slow-start guard for the Start screen controls. Each lane boots its own
 // server and state folder, then clicks every control the way a person does on a phone or desktop.
 // Run one lane: node scripts/lanes.mjs 3
+// Drive an address that is already running (the one handed to Todd): node scripts/lanes.mjs --url http://host:4313
+//
+// Two rules learned on 29 October, both about a lane proving the wrong thing:
+// a lane that drives a stale .next passes code that is not the code under review, and a lane that
+// starts its own 127.0.0.1 server says nothing about the address a person was given.
 import { spawn } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const LANES = '/tmp/jul-284-lanes';
-const SHOTS = join(ROOT, 'docs/scorecards/jul-276/pr-4');
+// A --url run proves someone else's build, so its screenshots must not overwrite the ones this
+// branch ships for its own build.
+const SHOTS = process.argv.includes('--url') ? '/tmp/jul-284-lanes/live' : join(ROOT, 'docs/scorecards/jul-276/pr-4');
 const MODELS = '/var/lib/julia-dashboard/state/models.json';
 const PORT_BASE = 3114;
 const CARD = 'JUL-280';
+
+// What `next build` compiles. Anything here newer than .next/BUILD_ID means the build on disk is
+// not this source, so a lane would prove the old behaviour (that is how a reverted duplicate-model
+// fix still passed until a rebuild).
+const SOURCE_DIRS = ['app', 'lib'];
+const SOURCE_FILES = ['server.js', 'next.config.mjs'];
+
+function staleBuildReason() {
+  const buildId = join(ROOT, '.next/BUILD_ID');
+  if (!existsSync(buildId)) return `${join(ROOT, '.next')} has no BUILD_ID, so there is nothing to drive -- run npm ci && npm run build`;
+  const built = statSync(buildId).mtimeMs;
+  let newest = null;
+  const consider = (file) => {
+    const mtimeMs = statSync(file).mtimeMs;
+    if (!newest || mtimeMs > newest.mtimeMs) newest = { file, mtimeMs };
+  };
+  for (const dir of SOURCE_DIRS) {
+    const path = join(ROOT, dir);
+    if (!existsSync(path)) continue;
+    for (const entry of readdirSync(path, { recursive: true, withFileTypes: true })) {
+      if (entry.isFile()) consider(join(entry.parentPath, entry.name));
+    }
+  }
+  for (const file of SOURCE_FILES) if (existsSync(join(ROOT, file))) consider(join(ROOT, file));
+  if (newest && newest.mtimeMs > built) {
+    return `the build in .next is older than ${relative(ROOT, newest.file)}, so a lane would drive old code -- run npm run build first`;
+  }
+  return null;
+}
 
 const baseFor = number => `http://127.0.0.1:${PORT_BASE + number}`;
 const stateFor = number => join(LANES, `lane-${number}`);
@@ -51,6 +87,7 @@ async function startServer(number) {
 }
 
 function stopServer(child) {
+  if (!child) return;
   try {
     process.kill(-child.pid);
   } catch {
@@ -280,10 +317,23 @@ lane(11, 'show a clear wait instead of dropping early taps', 'phone', async page
   return 'before the page was ready the controls were off with a plain wait cue; the first tap after that selected Large';
 });
 
+const args = process.argv.slice(2);
+const urlIndex = args.indexOf('--url');
+const target = urlIndex === -1 ? null : args[urlIndex + 1];
+const only = args.find(arg => /^\d+$/.test(arg));
+if (urlIndex !== -1 && !target) {
+  console.error('usage: node scripts/lanes.mjs [lane number] [--url <address>]');
+  process.exit(2);
+}
+
+async function openLane(number) {
+  if (target) return { child: null, base: target.replace(/\/+$/, ''), state: null };
+  return startServer(number);
+}
+
 async function run(number, title, kind, body) {
-  const only = process.argv[2];
   if (only && Number(only) !== number) return;
-  const { child, base, state } = await startServer(number);
+  const { child, base, state } = await openLane(number);
   const browser = await chromium.launch();
   const context = await browser.newContext(contextOptions(kind));
   if (number === 11) {
@@ -302,7 +352,7 @@ async function run(number, title, kind, body) {
     await page.goto(`${base}/start/${CARD}`, { waitUntil: 'commit' });
     const note = await body(page);
     if (errors.length) throw new Error(`console errors: ${errors.join(' / ')}`);
-    if (number === 3) {
+    if (number === 3 && state) {
       assert.ok(existsSync(join(state, 'state/draft.json')), `draft.json missing in ${state}`);
     }
     mkdirSync(SHOTS, { recursive: true });
@@ -317,6 +367,16 @@ async function run(number, title, kind, body) {
     await context.close();
     await browser.close();
     stopServer(child);
+  }
+}
+
+if (target) {
+  console.log(`Driving ${target} as it is; every choice clicked here is saved on that server.`);
+} else {
+  const stale = staleBuildReason();
+  if (stale) {
+    console.error(`lanes refused: ${stale}`);
+    process.exit(1);
   }
 }
 

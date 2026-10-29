@@ -34,3 +34,12 @@ can do the first but not the second, so `server.js` uses the documented programm
 ## Isolated build root
 
 The first build discovered the ancestor configuration and bundled Julia instrumentation. The coordinator authorized `dashboard/next.config.mjs` to set `turbopack.root` to the dashboard folder. The production build now uses Next 16.3.5 without Julia instrumentation files or Sentry imports. The production startup log contains only the dashboard startup lines.
+
+## Account and provider names
+
+One account can answer to more than one provider name. Mastra Code lists CommandCode's models
+under both `commandcode` and `mastracode/commandcode`, so `config/accounts.json` holds a set of
+names per account (`providers`) rather than a single string. The sweep asks each account once,
+prices it once, and gives those rows to every provider name the account answers to. Naming only
+one of the names drops the models filed under the other before pricing runs, which is how 72 of
+74 CommandCode models disappeared for a day.

@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { buildScorecard, cardForThread, cardWindows, findStops, priceThreadUsage, readPings, readThreads, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
+import { writeFileSync } from 'node:fs';
+import { buildScorecard, cardForThread, cardWindows, findStops, ledgerTracing, priceThreadUsage, readPings, readThreads, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
 import { stopComment } from './stop-ping.mjs';
 import { checkForToddGuard } from './linear-cli.mjs';
 import { appendFileSync } from 'node:fs';
@@ -230,4 +231,37 @@ test('rows with no token detail say unknown instead of claiming zero spend', () 
   const priced = { ...scorecard, cost: [{ agent: 'Code Agent (main chat)', requested: 'commandcode/…', answered: 'not recorded', tokens: {}, usd: 0, unpriced: true, basis: 'thread total' }] };
   assert.match(renderScorecard(priced), /Cost: \*\*unknown\*\*\. Mastra kept no token detail for these runs\./);
   assert.doesNotMatch(renderScorecard(priced), /Cost: \*\*\$0\.00\*\*/);
+});
+
+test('the ledger answers when the live trace store cannot be read', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ledger-'));
+  const file = join(dir, 'trace-costs.json');
+  try {
+    assert.equal(ledgerTracing(['thread-1'], file), null, 'a missing ledger says nothing rather than zero');
+
+    const rows = [
+      { threadId: 'thread-1', at: ms('18:10'), entityName: 'Code Agent', provider: 'commandcode.chat', model: 'deepseek/deepseek-v4.1-flash', name: 'mastra_model_total_input_tokens', value: 1_000_000, estimatedCost: 0.15 },
+      { threadId: 'thread-1', at: ms('18:10'), entityName: 'Code Agent', provider: 'commandcode.chat', model: 'deepseek/deepseek-v4.1-flash', name: 'mastra_model_total_output_tokens', value: 20_000, estimatedCost: 0.012 },
+      { threadId: 'thread-9', at: ms('18:10'), entityName: 'Code Agent', provider: 'x', model: 'y', name: 'mastra_model_total_input_tokens', value: 1, estimatedCost: 9 },
+    ];
+    writeFileSync(file, JSON.stringify({ version: 1, updatedAt: T('19:00'), rows, requested: [{ threadId: 'thread-1', at: ms('18:10'), entityName: 'Code Agent' }] }));
+
+    const tracing = ledgerTracing(['thread-1', 'thread-2'], file);
+    assert.equal(tracing.metrics.length, 2, 'only the threads asked about');
+    assert.equal(tracing.ledgerMissing, 1);
+    assert.equal(tracing.skipped, null);
+
+    // The card renders the real number the store could not be read for.
+    const skipped = 'the trace store is 21 GB and only 20 GB is free to copy it';
+    const bare = { ...thread, usage: undefined };
+    const before = buildScorecard({ card: 'JUL-272', threads: [bare], prices, tracing: { metrics: [], requested: [], skipped }, pulls: [], pings: [], uat: undefined });
+    assert.match(renderScorecard(before), /Cost: \*\*unknown\*\*/);
+    assert.doesNotMatch(renderScorecard(before), /\$0\.16/);
+
+    const after = buildScorecard({ card: 'JUL-272', threads: [bare], prices, tracing, pulls: [], pings: [], uat: undefined });
+    assert.match(renderScorecard(after), /Cost: \*\*\$0\.16\*\*/);
+    assert.match(renderScorecard(after), /Cost source: the cost ledger written 2026-10-26 19:00 .*no rows for 1 of this card's threads/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

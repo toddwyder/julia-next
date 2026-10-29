@@ -8,6 +8,7 @@
 // clear here -- callers pass it via LINEAR_API_KEY. Laptop delivery commands
 // receive it from the vault wrapper, never through argv or a shell string.
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
+import { existsSync, readFileSync } from 'node:fs';
 
 // Two identities reach Linear through this one function, and they are sent
 // DIFFERENTLY. A personal API key (`lin_api_...`) is sent raw, with no scheme
@@ -249,6 +250,41 @@ export async function setIssueState(identifier, stateName, opts) {
   return data.issueUpdate.issue;
 }
 
+// ---------------------------------------------------------------------------
+// Reading the comment body off the command line (JUL-284 retro)
+// ---------------------------------------------------------------------------
+//
+// A long comment is easier to get right when it is written to a file first, and
+// on 29 October 2026 that habit cost the board its two most important records:
+// the JUL-276 and JUL-284 merge comments both arrived as the twelve-character
+// text `/tmp/c276.md` and `/tmp/c284.md`. `comment <ID> <body>` had no way to
+// say "the body is in this file", so the path was passed where the body goes,
+// and nothing in the tool could tell the difference: a path is a string, and
+// the post succeeded.
+//
+// Three things now make that refusal loud instead of silent: `--file` reads the
+// body from a path, `-` reads it from stdin, and a body that IS the path of an
+// existing file is refused with the command that would have worked.
+export function commentBodyFromArgs(args, { readFileImpl = readFileSync, fileExists = existsSync } = {}) {
+  const [first, second, ...extra] = args;
+  if (first === '--file') {
+    if (!second || extra.length) throw new Error('usage: linear-cli.mjs comment <ID> --file <path>   (use - for stdin)');
+    try {
+      return readFileImpl(second, 'utf8');
+    } catch (error) {
+      throw new Error(`comment --file could not read ${second}: ${error.message}`);
+    }
+  }
+  if (args.length === 1 && first === '-') {
+    return readFileImpl(0, 'utf8');
+  }
+  const body = args.join(' ');
+  if (args.length === 1 && fileExists(body)) {
+    throw new Error(`refusing to post "${body}": that is the path of an existing file, not a comment body. Post its contents with: linear-cli.mjs comment <ID> --file ${body}`);
+  }
+  return body;
+}
+
 async function main() {
   const [command, identifier, ...rest] = process.argv.slice(2);
   const apiKey = process.env.LINEAR_API_KEY;
@@ -259,17 +295,23 @@ async function main() {
     } else if (command === 'get-issue') {
       const issue = await getIssue(identifier, { apiKey });
       console.log(JSON.stringify(issue, null, 2));
+    } else if (command === 'comments') {
+      const issue = await getIssue(identifier, { apiKey, includeComments: true });
+      const comments = (issue.comments?.nodes ?? []).map(comment => ({ id: comment.id, createdAt: comment.createdAt, author: comment.user?.name ?? null, body: comment.body }));
+      console.log(JSON.stringify({ identifier: issue.identifier, count: comments.length, comments }, null, 2));
     } else if (command === 'comment') {
-      const body = rest.join(' ');
+      const body = commentBodyFromArgs(rest);
       const comment = await postComment(identifier, body, { apiKey });
-      console.log(JSON.stringify(comment, null, 2));
+      // The length is the point: the two lost records were eleven characters
+      // long where they should have been thousands.
+      console.log(`posted ${body.length} characters to ${identifier}: ${comment.url}`);
     } else if (command === 'state') {
       const stateName = rest.join(' ').trim();
       if (!stateName) throw new Error('usage: linear-cli.mjs state <ID> <state name>');
       const issue = await setIssueState(identifier, stateName, { apiKey });
       console.log(JSON.stringify(issue, null, 2));
     } else {
-      console.error('usage: linear-cli.mjs list-ready | get-issue <ID> | comment <ID> <body> | state <ID> <state name>');
+      console.error('usage: linear-cli.mjs list-ready | get-issue <ID> | comments <ID> | comment <ID> <body> | comment <ID> --file <path> | comment <ID> - | state <ID> <state name>');
       process.exitCode = 2;
     }
   } catch (error) {

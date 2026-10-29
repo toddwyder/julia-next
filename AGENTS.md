@@ -10,7 +10,7 @@ Julia uses pstack (adopted 22 October 2026). pstack builds and proves. This file
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
 - Every card's PR includes its scorecard, built with `node scripts/scorecard.mjs JUL-<n> --write`, and every stop pings Todd; the rest is in [docs/adr/0024-run-scorecard-and-stop-ping.md](docs/adr/0024-run-scorecard-and-stop-ping.md). Money never stops a card.
 - Framework facts come from the installed packages and their version-matched official docs.
-- Commit and push as you go; publish with gh using the ordinary signed-in GitHub access.
+- Commit and push as you go, and open the pull request in the same step: `check-branch-pr` fails any branch that is pushed without one. Publish with gh using the ordinary signed-in GitHub access.
 
 ## Todd
 Todd decides what Julia does for the household and gives UAT. Everything else is yours: decide it and record it in the decision log. When a step truly needs his own account, show that nothing else can do it, reduce it to one approval he clicks, and keep working while it is pending.
