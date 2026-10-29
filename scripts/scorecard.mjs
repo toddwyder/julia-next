@@ -217,7 +217,7 @@ async function readTracing(dir, file, threadIds) {
     return {
       metrics: [],
       requested: [],
-      skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it; \`node scripts/trace-store.mjs prune\` caps it and writes the cost ledger`,
+      skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it; \`node scripts/trace-store.mjs sweep\` mines each session and compacts it`,
     };
   }
   const { DuckDBInstance } = createRequire(join(dir, 'package.json'))('@duckdb/node-api');

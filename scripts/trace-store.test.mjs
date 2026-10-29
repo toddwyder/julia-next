@@ -1,12 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { compactionFits, exportLedger, isLockedMessage, ledgerFile, lockOwnerFromError, mergeLedger, prune, readLedger, retentionCutoff, status, storeFile, storeBytes } from './trace-store.mjs';
+import {
+  compactStore,
+  compactionFits,
+  deletePayloads,
+  deletionRefusal,
+  exportLedger,
+  isLockedMessage,
+  ledgerFile,
+  lockOwnerFromError,
+  mergeLedger,
+  mineSession,
+  readLedger,
+  retroExists,
+  retroFile,
+  status,
+  storeFile,
+  storeBytes,
+  sweep,
+  sweepPlan,
+} from './trace-store.mjs';
 
 const REPO = new URL('..', import.meta.url).pathname;
 const duckdbDir = [
@@ -23,20 +42,34 @@ const { DuckDBInstance } = duckdbDir ? createRequire(join(duckdbDir, 'package.js
 // run the same delete, export and copy statements against a real DuckDB file.
 const SCHEMA = [
   `create table span_events (timestamp timestamp not null, traceId varchar, spanId varchar, entityName varchar, threadId varchar,
-     spanType varchar, endedAt timestamp, attributes json, input json, output json, primary key (spanId))`,
+     spanType varchar, name varchar, endedAt timestamp, attributes json, input json, output json, primary key (spanId))`,
   `create table metric_events (timestamp timestamp not null, metricId varchar primary key, threadId varchar, entityName varchar,
      provider varchar, model varchar, name varchar, value double, estimatedCost double)`,
-  `create table log_events (timestamp timestamp not null, logId varchar primary key, level varchar, message varchar)`,
+  `create table log_events (timestamp timestamp not null, logId varchar primary key, level varchar, message varchar, threadId varchar)`,
 ];
 
 const daysAgo = days => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 19).replace('T', ' ');
 
 const span = (at, id, megabytes = 1, thread = 'thread-1') =>
-  `insert into span_events (timestamp, spanId, entityName, threadId, spanType, attributes, input, output)
-   values (timestamp '${at}', '${id}', 'Code Agent', '${thread}', 'processor_run', null, '{"body":"${'x'.repeat(Math.round(megabytes * 1024 * 1024))}"}', null)`;
+  `insert into span_events (timestamp, spanId, entityName, threadId, spanType, input, output)
+   values (timestamp '${at}', '${id}', 'Code Agent', '${thread}', 'processor_run', '{"body":"${'x'.repeat(Math.round(megabytes * 1024 * 1024))}"}', null)`;
 const metric = (at, id, name, value, cost, thread = 'thread-1') =>
   `insert into metric_events (timestamp, metricId, threadId, entityName, provider, model, name, value, estimatedCost)
    values (timestamp '${at}', '${id}', '${thread}', 'Code Agent', 'commandcode.chat', 'deepseek/deepseek-v4.1-flash', '${name}', ${value}, ${cost})`;
+// The provider writes the same model two ways: the span says how it was asked
+// for, the metric row says who answered. That difference is what mining reports.
+const modelMetric = (at, id, name, value, cost, thread = 'thread-1') =>
+  `insert into metric_events (timestamp, metricId, threadId, entityName, provider, model, name, value, estimatedCost)
+   values (timestamp '${at}', '${id}', '${thread}', 'Code Agent', 'openai', 'gpt-6-1-sol', '${name}', ${value}, ${cost})`;
+const modelSpan = (at, id, model, provider, thread = 'thread-1') =>
+  `insert into span_events (timestamp, spanId, entityName, threadId, spanType, name, endedAt, attributes, input)
+   values (timestamp '${at}', '${id}', 'Code Agent', '${thread}', 'model_generation', 'llm: ''${model}''', null,
+     '{"model":"${model}","provider":"${provider}"}', '{"messages":[]}')`;
+const toolSpan = (at, id, tool, thread = 'thread-1') =>
+  `insert into span_events (timestamp, spanId, entityName, threadId, spanType, name, input)
+   values (timestamp '${at}', '${id}', 'Code Agent', '${thread}', 'tool_call', 'tool: ''${tool}''', '{"path":"/tmp/x"}')`;
+const logRow = (at, id, message, thread = 'thread-1') =>
+  `insert into log_events (timestamp, logId, level, message, threadId) values (timestamp '${at}', '${id}', 'error', '${message}', '${thread}')`;
 
 async function runChild(code) {
   await new Promise((resolve, reject) => {
@@ -45,9 +78,9 @@ async function runChild(code) {
   });
 }
 
-const ENV = ['XDG_STATE_HOME', 'MASTRA_OBSERVABILITY_DB_PATH', 'MASTRA_TRACE_LEDGER'];
+const ENV = ['XDG_STATE_HOME', 'MASTRA_OBSERVABILITY_DB_PATH', 'MASTRA_TRACE_LEDGER', 'JULIA_RETROS_DIR'];
 
-async function withStore(t, rows) {
+async function withStore(t, rows, { retros = [] } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'trace-store-'));
   const saved = Object.fromEntries(ENV.map(key => [key, process.env[key]]));
   t.after(() => {
@@ -57,7 +90,11 @@ async function withStore(t, rows) {
     }
     rmSync(dir, { recursive: true, force: true });
   });
+  const retrosDir = join(dir, 'retros');
+  mkdirSync(retrosDir, { recursive: true });
+  for (const card of retros) writeFileSync(join(retrosDir, `${card}.md`), '# retro\n');
   process.env.XDG_STATE_HOME = join(dir, 'state');
+  process.env.JULIA_RETROS_DIR = retrosDir;
   const file = join(dir, 'observability.duckdb');
   const instance = await DuckDBInstance.create(file);
   const connection = await instance.connect();
@@ -65,14 +102,28 @@ async function withStore(t, rows) {
   for (const row of rows) await connection.run(row);
   instance.closeSync();
   process.env.MASTRA_OBSERVABILITY_DB_PATH = file;
-  return { dir, file, ledger: join(dir, 'state', 'julia', 'trace-costs.json') };
+  return { dir, file, retrosDir, ledger: join(dir, 'state', 'julia', 'trace-costs.json'), stops: join(dir, 'state', 'julia', 'stops.jsonl') };
 }
 
-test('the ledger sits beside the stop log and follows MASTRA_TRACE_LEDGER', () => {
+const countOf = async (file, table, where = 'true') => {
+  const instance = await DuckDBInstance.create(file, { access_mode: 'READ_ONLY' });
+  const connection = await instance.connect();
+  const rows = (await connection.runAndReadAll(`select count(*) as n from ${table} where ${where}`)).getRowObjectsJson();
+  instance.closeSync();
+  return Number(rows[0].n);
+};
+
+test('the ledger and the retro sit where the next run looks for them', () => {
   assert.equal(ledgerFile({ XDG_STATE_HOME: '/x' }), '/x/julia/trace-costs.json');
   assert.equal(ledgerFile({ MASTRA_TRACE_LEDGER: '/tmp/l.json' }), '/tmp/l.json');
   assert.equal(storeFile({ MASTRA_OBSERVABILITY_DB_PATH: '/tmp/o.duckdb' }), '/tmp/o.duckdb');
   assert.match(storeFile({ MASTRA_APP_DATA_DIR: '/data' }), /^\/data\/observability\.duckdb$/);
+  const retrosDir = mkdtempSync(join(tmpdir(), 'retros-'));
+  writeFileSync(join(retrosDir, 'jul-231.md'), '# retro\n');
+  assert.equal(retroExists('JUL-231', { retrosDir }), true, 'the file on disk is lower case and still counts');
+  assert.equal(retroExists('JUL-999', { retrosDir }), false);
+  assert.equal(retroFile('JUL-999', { retrosDir }), join(retrosDir, 'JUL-999.md'));
+  rmSync(retrosDir, { recursive: true, force: true });
 });
 
 test('a lock refusal names the process holding the store', () => {
@@ -82,67 +133,189 @@ test('a lock refusal names the process holding the store', () => {
   assert.equal(lockOwnerFromError('Catalog Error: Table with name t does not exist'), null);
 });
 
-test('the retention cutoff is keep-days back from now', () => {
-  const now = new Date('2026-10-29T12:00:00Z');
-  assert.equal(retentionCutoff(now, 14).toISOString(), '2026-10-15T12:00:00.000Z');
-  assert.equal(retentionCutoff(now, 0).toISOString(), now.toISOString());
-});
-
 test('compaction needs room for the rows that survive, not the whole file', () => {
   const store = 20 * 1024 ** 3;
   assert.equal(compactionFits(store, 11 * 1024 ** 3), true);
   assert.equal(compactionFits(store, 9 * 1024 ** 3), false);
 });
 
-test('merging a second export keeps one row per bucket and refreshes its value', () => {
-  const first = { rows: [{ threadId: 't', at: 1, entityName: 'Code Agent', provider: 'p', model: 'm', name: 'mastra_model_total_input_tokens', value: 10, estimatedCost: 0.1 }], requested: [{ threadId: 't', at: 5, entityName: 'Code Agent' }] };
+test('merging a second export keeps one row per bucket and keeps the mined sessions', () => {
+  const first = { rows: [{ threadId: 't', at: 1, entityName: 'Code Agent', provider: 'p', model: 'm', name: 'mastra_model_total_input_tokens', value: 10, estimatedCost: 0.1 }], requested: [{ threadId: 't', at: 5, entityName: 'Code Agent' }], sessions: { t: { thread: 't', card: 'JUL-1' } } };
   const merged = mergeLedger(first, [{ threadId: 't', at: 1, entityName: 'Code Agent', provider: 'p', model: 'm', name: 'mastra_model_total_input_tokens', value: 12, estimatedCost: 0.12 }]);
   assert.equal(merged.rows.length, 1);
   assert.equal(merged.rows[0].value, 12);
   assert.equal(merged.requested.length, 1);
+  assert.equal(merged.sessions.t.card, 'JUL-1', 'a fresh export must not throw away what mining kept');
 });
 
-test('prune deletes aged spans and logs, keeps the cost rows, and gives the disk space back', { skip: noDuckdb }, async (t) => {
-  const { file, ledger, dir } = await withStore(t, [
-    span(daysAgo(20), 'old-1'),
-    span(daysAgo(19), 'old-2', 2),
-    span(daysAgo(1), 'new-1', 0.01),
-    `insert into log_events (timestamp, logId, level, message) values (timestamp '${daysAgo(20)}', 'log-old', 'info', 'old')`,
-    `insert into log_events (timestamp, logId, level, message) values (timestamp '${daysAgo(1)}', 'log-new', 'info', 'new')`,
-    metric(daysAgo(20), 'metric-old', 'mastra_model_total_input_tokens', 1000, 0.5),
-    metric(daysAgo(1), 'metric-new', 'mastra_model_total_output_tokens', 10, 0.01),
+test('a mining pass saves the session numbers and says what the store does not hold', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const minedAt = '2026-10-29T20:00:00.000Z';
+  const { file, ledger, stops } = await withStore(t, [
+    span(at, 's1', 0.05),
+    modelSpan(at, 'm1', 'gpt-6.1-sol', 'openai.responses'),
+    toolSpan(at, 't1', 'view'),
+    toolSpan(at, 't2', 'view'),
+    toolSpan(at, 't3', 'execute_command'),
+    modelMetric(at, 'k1', 'mastra_model_total_input_tokens', 1000, 0.5),
+    modelMetric(at, 'k2', 'mastra_model_input_cache_read_tokens', 800, 0.08),
+    modelMetric(at, 'k3', 'mastra_model_total_output_tokens', 200, 0.02),
+    metric(at, 'd1', 'mastra_model_duration_ms', 32000, null),
+    metric(at, 'd2', 'mastra_tool_duration_ms', 137, null),
+    logRow(at, 'l1', 'Workspace not found'),
   ]);
-  const before = storeBytes(file);
+  mkdirSync(join(stops, '..'), { recursive: true });
+  writeFileSync(stops, `${JSON.stringify({ at, thread: 'thread-1', card: 'JUL-1', reason: 'ask_question' })}\n`);
 
-  const answer = await prune({ keepDays: 14 });
+  const answer = await mineSession('thread-1', { card: 'JUL-1', stops, minedAt });
+
+  assert.equal(answer.status, 'ok');
+  const { record } = answer;
+  assert.equal(record.card, 'JUL-1');
+  assert.equal(record.totals.tokens, 2000);
+  assert.equal(record.tokens.total_input, 1000);
+  assert.equal(record.tokens.input_cache_read, 800);
+  assert.equal(record.models.length, 1);
+  assert.equal(record.models[0].asked, 'openai.responses/gpt-6.1-sol');
+  assert.equal(record.models[0].answered, 'openai/gpt-6-1-sol');
+  assert.equal(record.models[0].calls, 1);
+  assert.ok(Math.abs(record.totals.usd - 0.6) < 1e-9);
+  assert.deepEqual(record.tools, { 'tool: \'view\'': 2, 'tool: \'execute_command\'': 1 });
+  assert.equal(record.toolCalls, 3);
+  assert.deepEqual(record.stages.map(s => s.stage).sort(), ['model_duration', 'tool_duration']);
+  assert.equal(record.stops.count, 1);
+  assert.equal(record.stops.reasons.ask_question, 1);
+  assert.equal(record.compactions, 0);
+  assert.equal(record.handoffs, 0);
+  assert.equal(record.holds['stops'], 'the stop log, not the store');
+  assert.ok(record.notHeld.some(miss => miss.fact === 'compactions'), 'a zero compaction count is reported as the store being silent');
+  assert.ok(record.notHeld.some(miss => miss.fact === 'handoffs'));
+  assert.equal(record.modelChanges.count, 0);
+
+  const saved = readLedger(ledger);
+  assert.equal(saved.sessions['thread-1'].card, 'JUL-1');
+  assert.equal(saved.sessions['thread-1'].minedAt, minedAt);
+});
+
+test('a session whose payload rows were already mined keeps its numbers when the rows go', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { file, ledger, retrosDir } = await withStore(t, [span(at, 's1', 0.05), modelSpan(at, 'm1', 'gpt-6.1-sol', 'openai.responses'), modelMetric(at, 'k1', 'mastra_model_total_input_tokens', 1000, 0.5), logRow(at, 'l1', 'boom')], { retros: ['JUL-1'] });
+  await mineSession('thread-1', { card: 'JUL-1' });
+
+  const answer = await deletePayloads('thread-1', { retrosDir });
 
   assert.equal(answer.status, 'ok');
   assert.deepEqual(answer.deleted, { span_events: 2, log_events: 1 });
-  assert.ok(answer.bytesAfter < before, `expected the file to shrink from ${before}, got ${answer.bytesAfter}`);
+  assert.equal(await countOf(file, 'span_events'), 0);
+  assert.equal(await countOf(file, 'log_events'), 0);
+  assert.equal(await countOf(file, 'metric_events'), 1, 'the cost row stays: it is the reason the payloads could go');
+  assert.equal(readLedger(ledger).sessions['thread-1'].totals.tokens, 1000);
+});
+
+test('deleting the payloads of a session that was never mined is refused', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { file, retrosDir } = await withStore(t, [span(at, 's1', 0.05)], { retros: ['JUL-1'] });
+
+  const answer = await deletePayloads('thread-1', { card: 'JUL-1', retrosDir });
+
+  assert.equal(answer.status, 'refused');
+  assert.equal(answer.code, 'not-mined');
+  assert.match(answer.message, /never mined/);
+  assert.equal(await countOf(file, 'span_events'), 1, 'nothing is deleted without the numbers being kept');
+});
+
+test('deleting the payloads of a mined session with no retro is refused', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { file, retrosDir } = await withStore(t, [span(at, 's1', 0.05)]);
+  await mineSession('thread-1', { card: 'JUL-1' });
+
+  const answer = await deletePayloads('thread-1', { retrosDir });
+
+  assert.equal(answer.status, 'refused');
+  assert.equal(answer.code, 'no-retro');
+  assert.match(answer.message, /JUL-1 has no retro/);
+  assert.equal(await countOf(file, 'span_events'), 1, 'the payloads wait until the lesson is written');
+});
+
+test('a dry run says what would go and leaves every row in place', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { file, retrosDir } = await withStore(t, [span(at, 's1', 0.05), logRow(at, 'l1', 'boom')], { retros: ['JUL-1'] });
+  await mineSession('thread-1', { card: 'JUL-1' });
+
+  const answer = await deletePayloads('thread-1', { retrosDir, dryRun: true });
+
+  assert.equal(answer.status, 'dry-run');
+  assert.deepEqual(answer.deleted, { span_events: 1, log_events: 1 });
+  assert.equal(await countOf(file, 'span_events'), 1);
+  assert.equal(await countOf(file, 'log_events'), 1);
+});
+
+test('compaction gives back the room a deleted payload was using, and deletes nothing else', { skip: noDuckdb }, async (t) => {
+  const { file, retrosDir, ledger } = await withStore(t, [
+    span(daysAgo(20), 'old-1', 2, 'thread-a'),
+    span(daysAgo(20), 'old-2', 2, 'thread-a'),
+    span(daysAgo(1), 'new-1', 0.01, 'thread-b'),
+    logRow(daysAgo(20), 'log-old', 'old', 'thread-a'),
+    logRow(daysAgo(1), 'log-new', 'new', 'thread-b'),
+    metric(daysAgo(20), 'metric-old', 'mastra_model_total_input_tokens', 1000, 0.5, 'thread-a'),
+  ], { retros: ['JUL-1'] });
+  await mineSession('thread-a', { card: 'JUL-1' });
+  const beforeDelete = storeBytes(file);
+
+  const deleted = await deletePayloads('thread-a', { retrosDir });
+  assert.deepEqual(deleted.deleted, { span_events: 2, log_events: 1 });
+  const afterDelete = storeBytes(file);
+  assert.ok(afterDelete >= beforeDelete * 0.9, 'a delete marks the rows dead; the file does not shrink by itself');
+
+  const answer = await compactStore();
+
+  assert.equal(answer.status, 'ok');
+  assert.ok(answer.bytesAfter < afterDelete, `expected the file to shrink from ${afterDelete}, got ${answer.bytesAfter}`);
   assert.equal(statSync(file).size, answer.bytesAfter);
   assert.equal(existsSync(`${file}.compact`), false, 'the copy is renamed into place, not left behind');
 
-  // The cost rows and the rows inside the window survive the delete and the copy.
-  const instance = await DuckDBInstance.create(file, { access_mode: 'READ_ONLY' });
-  const connection = await instance.connect();
-  const rows = async sql => (await connection.runAndReadAll(sql)).getRowObjectsJson();
-  assert.equal((await rows('select count(*) as n from span_events'))[0].n, '1');
-  assert.equal((await rows('select count(*) as n from log_events'))[0].n, '1');
-  assert.equal((await rows('select count(*) as n from metric_events'))[0].n, '2');
-  assert.equal((await rows("select constraint_type from duckdb_constraints() where table_name = 'metric_events' and constraint_type = 'PRIMARY KEY'")).length, 1);
-  instance.closeSync();
-
-  // The cost survives the pruning in the ledger, with the minute it happened.
-  const saved = readLedger(ledger);
-  assert.deepEqual(saved.rows.map(r => [r.name, r.value, r.estimatedCost]).sort(), [
-    ['mastra_model_total_input_tokens', 1000, 0.5],
-    ['mastra_model_total_output_tokens', 10, 0.01],
-  ]);
-  assert.equal(new Date(Number(saved.rows[0].at)).getUTCSeconds(), 0, 'bucketed to the minute');
-
-  const report = JSON.parse(readFileSync(join(dir, 'state', 'julia', 'trace-store-report.json'), 'utf8'));
+  // Age is not a reason to delete: the live session is untouched and the cost stays.
+  assert.equal(await countOf(file, 'span_events'), 1);
+  assert.equal(await countOf(file, 'log_events'), 1);
+  assert.equal(await countOf(file, 'metric_events'), 1);
+  const report = JSON.parse(readFileSync(answer.report, 'utf8'));
   assert.equal(report.runs.at(-1).bytesAfter, answer.bytesAfter);
-  assert.equal(report.runs.at(-1).deleted.span_events, 2);
+  assert.equal(readLedger(ledger).sessions['thread-a'].card, 'JUL-1');
+});
+
+test('a sweep cleans only sessions that were mined, have a retro and whose card is Complete', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { file, retrosDir, ledger } = await withStore(t, [
+    span(at, 'a1', 0.05, 'thread-a'),
+    span(at, 'b1', 0.05, 'thread-b'),
+    span(at, 'c1', 0.05, 'thread-c'),
+    metric(at, 'ka', 'mastra_model_total_input_tokens', 10, 0.01, 'thread-a'),
+    metric(at, 'kb', 'mastra_model_total_input_tokens', 20, 0.02, 'thread-b'),
+    metric(at, 'kc', 'mastra_model_total_input_tokens', 30, 0.03, 'thread-c'),
+  ], { retros: ['JUL-1'] });
+  await mineSession('thread-a', { card: 'JUL-1' });
+  await mineSession('thread-b', { card: 'JUL-2' });
+  await mineSession('thread-c', { card: 'JUL-3' });
+
+  const plan = sweepPlan(readLedger(ledger), { retrosDir, completeCards: ['JUL-1', 'JUL-2', 'JUL-3'] });
+  assert.deepEqual(plan.clean, [{ thread: 'thread-a', card: 'JUL-1' }]);
+  assert.equal(plan.kept.length, 2);
+
+  const answer = await sweep({ retrosDir, completeCards: ['JUL-1', 'JUL-2', 'JUL-3'] });
+
+  assert.equal(answer.status, 'ok');
+  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-a'"), 0);
+  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-b'"), 1, 'a mined session with no retro keeps its payloads');
+  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-c'"), 1, 'a session whose card has no retro keeps its payloads');
+  assert.equal(await countOf(file, 'metric_events'), 3);
+  assert.equal(Object.keys(readLedger(ledger).sessions).length, 3);
+});
+
+test('the age rule is gone, so nothing is deleted by a date', { skip: noDuckdb }, async (t) => {
+  const { file } = await withStore(t, [span(daysAgo(400), 'ancient-1')]);
+  const answer = await compactStore({ dryRun: true });
+  assert.equal(answer.status, 'dry-run');
+  assert.equal(await countOf(file, 'span_events'), 1);
 });
 
 test('a held store is reported busy and writes no ledger rather than a zero', { skip: noDuckdb }, async (t) => {
@@ -192,6 +365,9 @@ test('a held store is reported busy and writes no ledger rather than a zero', { 
     assert.equal(answer.status, 'busy');
     assert.equal(answer.pid, holder.pid);
     assert.equal(existsSync(ledger), false);
+    const mined = await mineSession('thread-1');
+    assert.equal(mined.status, 'busy');
+    assert.equal(mined.pid, holder.pid);
   } finally {
     holder.kill();
     await new Promise(resolve => holder.once('exit', resolve));
@@ -201,15 +377,6 @@ test('a held store is reported busy and writes no ledger rather than a zero', { 
   assert.equal(again.status, 'ok');
   assert.equal(again.rows, 1);
   assert.equal(readLedger(ledger).rows[0].value, 100);
-});
-
-test('dry-run counts what would go without touching the file', { skip: noDuckdb }, async (t) => {
-  const { file } = await withStore(t, [span(daysAgo(20), 'old-1')]);
-  const before = statSync(file).size;
-  const answer = await prune({ keepDays: 14, dryRun: true });
-  assert.equal(answer.status, 'dry-run');
-  assert.equal(answer.deleted.span_events, 1);
-  assert.equal(statSync(file).size, before);
 });
 
 test('status says what is in the store before anything is deleted', { skip: noDuckdb }, async (t) => {
@@ -222,14 +389,20 @@ test('status says what is in the store before anything is deleted', { skip: noDu
   assert.equal(snapshot.tables.span_events, 2);
 });
 
-test('a store that is not there is reported, not created', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'trace-store-'));
-  process.env.MASTRA_OBSERVABILITY_DB_PATH = join(dir, 'missing.duckdb');
-  try {
-    assert.deepEqual(await prune({ keepDays: 14 }), { status: 'missing', store: join(dir, 'missing.duckdb') });
-    assert.equal(existsSync(join(dir, 'missing.duckdb')), false);
-  } finally {
-    delete process.env.MASTRA_OBSERVABILITY_DB_PATH;
-    rmSync(dir, { recursive: true, force: true });
-  }
+test('a store that is not there is reported missing instead of crashing', async () => {
+  const answer = await compactStore({ dryRun: true, store: '/tmp/no-such-trace-store.duckdb' });
+  assert.equal(answer.status, 'missing');
+});
+
+test('the guard order is mined first, card second, retro third', () => {
+  const retrosDir = mkdtempSync(join(tmpdir(), 'retros-'));
+  const ledger = { sessions: {} };
+  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir }).code, 'not-mined');
+  ledger.sessions['thread-1'] = { thread: 'thread-1', card: null };
+  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir }).code, 'no-card');
+  ledger.sessions['thread-1'].card = 'JUL-1';
+  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir }).code, 'no-retro');
+  writeFileSync(join(retrosDir, 'JUL-1.md'), '# retro\n');
+  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir }), null);
+  rmSync(retrosDir, { recursive: true, force: true });
 });
