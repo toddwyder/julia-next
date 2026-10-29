@@ -608,11 +608,11 @@
      "want": "I want to see how often I had to step in (HITL interventions), and where the trouble came from",
      "so": "I can fix the stage that causes it",
      "ac": [
-      "A tapped model shows its HITL interventions: every wait on Todd before his UAT yes, including a build asking him a question.",
+      "A tapped model shows its HITL interventions per slice and their time, against the role's other models.",
       "It shows where trouble came from, split into requirements, design and build."
      ],
      "notes": [],
-     "trace": "R1a; R1b; I 45-46; Gl \"HITL intervention\", \"Root-cause stage\"; 0045; picture 09"
+     "trace": "R1a; R1b; I 45-46; Gl \"HITL intervention\", \"Root-cause stage\"; 0045; picture 09; 0057; 0064"
     },
     {
      "id": "S-45",
@@ -642,16 +642,16 @@
     },
     {
      "id": "S-47",
-     "want": "I want compactions per round by role and model",
+     "want": "I want compactions per slice by role and model",
      "so": "I see which models run out of room",
      "ac": [
-      "Decision support shows compactions per round for each model in the selected role."
+      "Each Ranked row and the Map's tapped-bubble panel show compactions per slice against the role's other models; tapping it shows the fullest context reached on average."
      ],
      "notes": [
       "Written into the spec, not drawn (0008).",
       "Recorded by the runner as each compaction happens (0041). On the card page they show per agent in the Context fold (0045)."
      ],
-     "trace": "I 56-58; 0008; 0041; 0045"
+     "trace": "I 56-58; 0008; 0041; 0045; 0066"
     },
     {
      "id": "S-48",
@@ -668,12 +668,12 @@
      "want": "I want typical time per playbook step",
      "so": "I see which steps are slow every time",
      "ac": [
-      "Decision support shows typical time per step across cards, by role and model."
+      "Tapping a stage in the Cards view's time per stage opens its playbook steps with each one's typical time, slowest first."
      ],
      "notes": [
       "Written into the spec, not drawn (0008)."
      ],
-     "trace": "I 79-80; 0008"
+     "trace": "I 79-80; 0008; 0070"
     },
     {
      "id": "S-50",
@@ -682,12 +682,14 @@
      "ac": [
       "A Map / Ranked / Cards switch opens on Map.",
       "Each model is a bubble: across is cost per card, up is success rate, size is cards run.",
-      "A \"cheap and reliable\" zone is marked."
+      "A \"cheap and reliable\" zone is marked.",
+      "Each bubble is a model in the chosen role: across is cost per slice, up is fewer HITL interventions per slice, size is slices run (0057, 0058).",
+      "The zone covers models cheaper and with fewer interventions than the role's median (0062)."
      ],
      "notes": [
       "Stray \"RK\" and overlapping bubbles are drawing flaws (C-13)."
      ],
-     "trace": "D 55-57; 0006; picture 09"
+     "trace": "D 55-57; 0006; picture 09; 0057; 0058; 0062"
     },
     {
      "id": "S-51",
@@ -695,12 +697,14 @@
      "so": "I can read the order quickly",
      "ac": [
       "Ranked lists the role's models best first, with success rate, cost per card, cards run, times stepped in and second-round rate as small bars.",
-      "Tapping a model shows its cards."
+      "Tapping a model shows its cards.",
+      "Rows are ranked by HITL interventions per slice, fewest first; each bar is drawn against the role's other models with a tick at the median and says better or worse than most (0063, 0064).",
+      "The list covers all recorded slices and says since when."
      ],
      "notes": [
       "Sits behind the switch; its top banner goes (C-14)."
      ],
-     "trace": "D 55-57; 0006; picture 10"
+     "trace": "D 55-57; 0006; picture 10; 0063; 0064"
     },
     {
      "id": "S-52",
@@ -709,34 +713,36 @@
      "ac": [
       "Cards lists finished cards, sortable by cost, time, rounds and times stepped in.",
       "It filters by role and model.",
-      "Tapping a card opens its page."
+      "Tapping a card opens its page.",
+      "The summary shows HITL interventions per slice, typical cost per card and cards finished this month, with each card's cost as a dot and the 80th percentile marked (0061).",
+      "Sort by Cost, Time, Rounds and HITL interventions; each card shows its page's labels and its numbers against the typical card (0064, 0065)."
      ],
      "notes": [
       "Sits behind the switch (C-14); the one-line notes on picture 11 are inventions (C-15)."
      ],
-     "trace": "R1b (\"Per card\"); I 65; 0006; picture 11"
+     "trace": "R1b (\"Per card\"); I 65; 0006; picture 11; 0061; 0064; 0065"
     },
     {
      "id": "S-53",
      "want": "I want models with few cards marked",
      "so": "I don't trust numbers from too few cards",
      "ac": [
-      "A model with fewer than 10 cards shows a dashed bubble and \"too few cards to trust yet\"."
+      "A model with fewer than 10 slices in the role is drawn dashed and marked \"too few slices to trust yet\" (0058)."
      ],
      "notes": [],
-     "trace": "D 57-61; 0006; picture 09"
+     "trace": "D 57-61; 0006; picture 09; 0058"
     },
     {
      "id": "S-54",
      "want": "I want a suggestion from the dashboard",
      "so": "it may point me at something I didn't think of",
      "ac": [
-      "A \"Suggestion\" box shows one suggestion based on the numbers."
+      "An agent writes the Suggestion weekly from the recorded numbers and quotes them; it shows only where two models in the role have 10 slices (0060)."
      ],
      "notes": [
       "Named \"Suggestion\", not \"Todd's Recommendation\" (C-16)."
      ],
-     "trace": "D 57-59; 0006; picture 09"
+     "trace": "D 57-59; 0006; picture 09; 0060"
     },
     {
      "id": "S-55",
@@ -772,26 +778,24 @@
      "want": "I want to see where cards spend their time, split between the machine working and waiting on me",
      "so": "I know whether to speed up the machine or my own answers",
      "ac": [
-      "Decision support shows, across cards, the typical time spent in each stage from Start to merge.",
-      "Time waiting on me (for example UAT) is shown apart from time the machine is working."
+      "The Cards view shows each stage's typical time across finished cards, split into the machine working and waiting on Todd (0067)."
      ],
      "notes": [
       "Single-card version is on the card page (S-56), with waiting on Todd shown apart (0045). Written into the spec; no picture shows the across-cards view."
      ],
-     "trace": "I 61-62; 0045"
+     "trace": "I 61-62; 0045; 0067"
     },
     {
      "id": "S-58",
-     "want": "I want to see which kinds of acceptance criteria keep failing",
+     "want": "I want to see which acceptance criteria failed the first time",
      "so": "I fix how we write them",
      "ac": [
-      "Decision support shows how often each verdict (Proven, Not proven) occurred across cards.",
-      "A criterion that failed shows which kind of criterion it was, and the checker's reason (including when the proof tested something else)."
+      "The Cards view shows \"Failed the first time: n of m lines\", opening every line ever Not proven with its card, the checker's reason and whether the next round fixed it (0068)."
      ],
      "notes": [
-      "Needs verdicts recorded as data (B-05). No picture shows this view; where it sits is open."
+      "Kinds of criterion are not recorded; Todd reads the pattern (0068)."
      ],
-     "trace": "I 63-64; Gl; 0016; 0044"
+     "trace": "I 63-64; Gl; 0016; 0044; 0068"
     }
    ]
   }
@@ -961,7 +965,7 @@
   },
   {
    "id": "B-16",
-   "text": "The runner marks a piece of a card as waiting for Todd's yes, with screenshots and video, while the card stays in its stage.",
+   "text": "The runner marks a slice of a card as waiting for Todd's yes, with screenshots and video, while the card stays in its stage.",
    "needed": "S-34",
    "trace": "0039"
   }
