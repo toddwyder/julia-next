@@ -203,6 +203,52 @@ export async function postCommentToIssueId(issueId, body, opts) {
   return data.commentCreate.comment;
 }
 
+// ---------------------------------------------------------------------------
+// Moving a card to another workflow state
+// ---------------------------------------------------------------------------
+//
+// A card is finished only when it sits in Complete with the merge commit on it,
+// so the tool that comments the commit also has to move the card. The state is
+// named, never guessed by id: the name is what a person reads on the board, and
+// an exact match is what keeps this from silently picking "Backlog".
+
+const ISSUE_TEAM_STATES_QUERY = `
+  query IssueTeamStates($id: String!) {
+    issue(id: $id) {
+      id
+      team { states { nodes { id name type } } }
+    }
+  }
+`;
+
+const ISSUE_UPDATE_MUTATION = `
+  mutation IssueUpdate($id: String!, $stateId: String!) {
+    issueUpdate(id: $id, input: { stateId: $stateId }) {
+      success
+      issue { id identifier state { name type } }
+    }
+  }
+`;
+
+export function findStateId(states, wanted) {
+  const names = (states ?? []).map(state => state.name);
+  const match = (states ?? []).find(state => String(state.name).toLowerCase() === String(wanted).toLowerCase());
+  if (!match) {
+    throw new Error(`the team has no state named "${wanted}"; it has ${names.map(name => `"${name}"`).join(', ')}`);
+  }
+  return match.id;
+}
+
+export async function setIssueState(identifier, stateName, opts) {
+  const { issue } = await linearGraphQL(ISSUE_TEAM_STATES_QUERY, { id: identifier }, opts);
+  const stateId = findStateId(issue.team?.states?.nodes, stateName);
+  const data = await linearGraphQL(ISSUE_UPDATE_MUTATION, { id: issue.id, stateId }, opts);
+  if (!data.issueUpdate.success) {
+    throw new Error(`issueUpdate did not report success for ${identifier}`);
+  }
+  return data.issueUpdate.issue;
+}
+
 async function main() {
   const [command, identifier, ...rest] = process.argv.slice(2);
   const apiKey = process.env.LINEAR_API_KEY;
@@ -217,8 +263,13 @@ async function main() {
       const body = rest.join(' ');
       const comment = await postComment(identifier, body, { apiKey });
       console.log(JSON.stringify(comment, null, 2));
+    } else if (command === 'state') {
+      const stateName = rest.join(' ').trim();
+      if (!stateName) throw new Error('usage: linear-cli.mjs state <ID> <state name>');
+      const issue = await setIssueState(identifier, stateName, { apiKey });
+      console.log(JSON.stringify(issue, null, 2));
     } else {
-      console.error('usage: linear-cli.mjs list-ready | get-issue <ID> | comment <ID> <body>');
+      console.error('usage: linear-cli.mjs list-ready | get-issue <ID> | comment <ID> <body> | state <ID> <state name>');
       process.exitCode = 2;
     }
   } catch (error) {

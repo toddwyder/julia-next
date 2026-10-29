@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { linearGraphQL, getIssue, postComment, postCommentToIssueId, checkForToddGuard } from './linear-cli.mjs';
+import { linearGraphQL, getIssue, postComment, postCommentToIssueId, checkForToddGuard, findStateId, setIssueState } from './linear-cli.mjs';
 
 function fakeFetch(responses) {
   let call = 0;
@@ -93,6 +93,39 @@ test('postComment throws when Linear reports success: false', async () => {
     { body: { data: { commentCreate: { success: false, comment: null } } } },
   ]);
   await assert.rejects(() => postComment('JUL-77', 'x', { apiKey: 'k', fetchImpl }), /did not report success/);
+});
+
+test('setIssueState moves the card to the state named on the board', async () => {
+  const fetchImpl = fakeFetch([
+    { body: { data: { issue: { id: 'uuid-283', team: { states: { nodes: [
+      { id: 's-backlog', name: 'Backlog', type: 'backlog' },
+      { id: 's-done', name: 'Complete', type: 'completed' },
+    ] } } } } } },
+    { body: { data: { issueUpdate: { success: true, issue: { id: 'uuid-283', identifier: 'JUL-283', state: { name: 'Complete', type: 'completed' } } } } } },
+  ]);
+  const issue = await setIssueState('JUL-283', 'Complete', { apiKey: 'k', fetchImpl });
+  assert.equal(issue.state.name, 'Complete');
+});
+
+test('setIssueState matches the state name whatever its case', () => {
+  assert.equal(findStateId([{ id: 's-done', name: 'Complete' }], 'complete'), 's-done');
+});
+
+test('setIssueState refuses a name the team does not have, and names the ones it does', () => {
+  assert.throws(
+    () => findStateId([{ id: 's-backlog', name: 'Backlog' }, { id: 's-done', name: 'Complete' }], 'Done'),
+    /no state named "Done"; it has "Backlog", "Complete"/,
+  );
+});
+
+test('setIssueState never writes when the name is unknown', async () => {
+  const seen = [];
+  const fetchImpl = async (url, opts) => {
+    seen.push(JSON.parse(opts.body).query);
+    return { ok: true, status: 200, json: async () => ({ data: { issue: { id: 'uuid-283', team: { states: { nodes: [{ id: 's-backlog', name: 'Backlog' }] } } } } }) };
+  };
+  await assert.rejects(() => setIssueState('JUL-283', 'Complete', { apiKey: 'k', fetchImpl }), /no state named "Complete"/);
+  assert.equal(seen.length, 1);
 });
 
 // ---------------------------------------------------------------------------
