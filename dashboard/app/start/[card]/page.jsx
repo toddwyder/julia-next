@@ -1,8 +1,6 @@
 import { join } from 'node:path';
 import { connection } from 'next/server';
-import { readFileSync } from 'node:fs';
-
-const ROLES = JSON.parse(readFileSync(new URL('../../../config/roles.json', import.meta.url), 'utf8'));
+import ROLES from '../../../config/roles.json';
 import { getReadyCard } from '../../../lib/linear.js';
 import { accountProviders, displayName, onePerName, priceLabel, readModels, startModels } from '../../../lib/models.js';
 import { initialChoice, mergeDraft } from '../../../lib/roles.js';
