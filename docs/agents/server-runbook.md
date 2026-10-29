@@ -73,7 +73,8 @@ sudo node scripts/install-trace-store.mjs   # writes ops/julia-trace-store.{serv
 `metric_events`, which carries the cost, exports it to `~/.local/state/julia/trace-costs.json`
 before deleting anything, removes spans and logs older than the cutoff, then compacts the file.
 A running session holds DuckDB's exclusive lock, so the prune exits 0 with `status: busy` and a
-PID instead of failing, and `--wait-for-lock` makes it poll until the store is free. Sizes before
+PID instead of failing. The nightly unit passes `--wait-for-lock --minutes 60`, so a long session
+delays the prune by an hour at most rather than skipping the night. Sizes before
 and after land in `~/.local/state/julia/trace-store-report.json`; read that file rather than
 guessing whether the store is under control.
 

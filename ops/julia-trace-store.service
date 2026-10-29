@@ -15,8 +15,7 @@ Environment=NODE_ENV=production
 # 22.6 GB of trace spans grew unnoticed because nothing reported the size. The script
 # keeps the cost rows, deletes spans and logs older than the cutoff, compacts the file,
 # and writes the before/after sizes into the report at ~/.local/state/julia.
-ExecStart=/usr/local/bin/node /home/ubuntu/julia-dashboard/scripts/trace-store.mjs prune
-# A live session holds an exclusive DuckDB lock; exiting 0 with status busy is the
-# normal outcome, not a failure.
-SuccessExitStatus=0
-TimeoutStartSec=3600
+# A live session holds an exclusive DuckDB lock, so the run waits up to an hour for it
+# instead of skipping the night; a still-busy store exits 0 with status busy.
+ExecStart=/usr/local/bin/node /home/ubuntu/julia-dashboard/scripts/trace-store.mjs prune --wait-for-lock --minutes 60
+TimeoutStartSec=7200
