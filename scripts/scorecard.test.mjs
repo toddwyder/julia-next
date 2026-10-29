@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { buildScorecard, cardForThread, cardWindows, findStops, priceThreadUsage, readPings, readThreads, renderScorecard, threadEvents, tracedCost } from './scorecard.mjs';
+import { buildScorecard, cardForThread, cardWindows, findStops, priceThreadUsage, readPings, readThreads, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
 import { stopComment } from './stop-ping.mjs';
 import { checkForToddGuard } from './linear-cli.mjs';
 import { appendFileSync } from 'node:fs';
@@ -40,6 +40,13 @@ test('kickoff messages split one thread into card windows', () => {
 test('a thread with no kickoff falls back to the JUL id in its title', () => {
   const t = { id: 't', title: 'JUL-274 trace probe', events: threadEvents([user('10:00', 'Reply ok.')]) };
   assert.deepEqual(cardWindows(t, t.events).map(w => w.card), ['JUL-274']);
+});
+
+test('a chat that names the card in its opening message is that card run, and one that names none is not', () => {
+  const named = { id: 't', title: 'Slice 3 handoff', events: threadEvents([user('10:00', 'Continue Slice 3 (JUL-283) from the branch.'), user('10:30', 'continue.')]) };
+  assert.deepEqual(cardWindows(named, named.events).map(w => w.card), ['JUL-283']);
+  const unnamed = { id: 't', title: 'Untitled', events: threadEvents([user('10:00', 'Reply ok.')]) };
+  assert.deepEqual(cardWindows(unnamed, unnamed.events), []);
 });
 
 test('a stop lasts from the last agent activity to the reply; an ask_user answer is not agent activity, and back-to-back user messages are one stop', () => {
@@ -140,6 +147,24 @@ test('mastra.db is read the way Mastra Code stores it, and a session maps to its
   }
 });
 
+test('a thread whose metadata is not JSON does not stop the scorecard reading the others', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'scorecard-blob-'));
+  try {
+    const db = new DatabaseSync(join(dir, 'mastra.db'));
+    db.exec('create table mastra_threads (id text, title text, metadata text); create table mastra_messages (thread_id text, role text, type text, createdAt text, content text)');
+    db.prepare('insert into mastra_threads values (?, ?, ?)').run('thread-1', 'Some title', JSON.stringify({ tokenUsage: thread.usage }));
+    db.prepare('insert into mastra_threads values (?, ?, ?)').run('thread-2', 'A blob', Buffer.from([0xff, 0xfe, 0x00, 0x01]));
+    for (const r of rows) db.prepare('insert into mastra_messages values (?, ?, ?, ?, ?)').run('thread-1', r.role, r.type, r.createdAt, r.content);
+    db.close();
+    const threads = readThreads(join(dir, 'mastra.db'));
+    assert.deepEqual(threads.map(t => t.title), ['Some title', 'A blob']);
+    assert.equal(threads[1].usage, undefined);
+    assert.equal(threadProjectPath(join(dir, 'mastra.db'), 'thread-2'), undefined);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('stop and ping lines with one id merge into one record', () => {
   const dir = mkdtempSync(join(tmpdir(), 'scorecard-stops-'));
   try {
@@ -159,4 +184,31 @@ test('every stop comment mentions Todd and passes the For-Todd guard', () => {
     assert.match(body, /> Which colour\?\n> Red or blue/);
     assert.deepEqual(checkForToddGuard(body), { ok: true });
   }
+});
+
+test('the trace store is only copied when there is room left on the disk', () => {
+  const gb = 1024 ** 3;
+  assert.equal(traceCopyFits(22 * gb, 20 * gb), false);
+  assert.equal(traceCopyFits(2 * gb, 20 * gb), true);
+  assert.equal(traceCopyFits(19.6 * gb, 20 * gb), false);
+});
+
+test('a card whose trace store was too large to copy says why its cost is unknown', () => {
+  const skipped = 'the trace store is 21 GB and only 20 GB is free to copy it';
+  const scorecard = buildScorecard({
+    card: 'JUL-283',
+    threads: [],
+    prices: {},
+    tracing: { metrics: [], requested: [], skipped },
+    pulls: [],
+    pings: [],
+    uat: undefined,
+  });
+  assert.equal(scorecard.tracingSkipped, skipped);
+  assert.match(renderScorecard(scorecard), /Mastra's trace store was not read: the trace store is 21 GB and only 20 GB is free to copy it/);
+});
+
+test('a card with no trace store at all still says no usage records were found', () => {
+  const scorecard = buildScorecard({ card: 'JUL-283', threads: [], prices: {}, tracing: { metrics: [], requested: [], skipped: null }, pulls: [], pings: [], uat: undefined });
+  assert.match(renderScorecard(scorecard), /No usage records found for this card/);
 });
