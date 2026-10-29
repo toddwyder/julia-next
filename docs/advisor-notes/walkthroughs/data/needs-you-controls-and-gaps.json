@@ -1,0 +1,379 @@
+{
+ "controls": [
+  {
+   "n": 1,
+   "x": -1,
+   "y": 45,
+   "name": "\"\u2039 Board\" back link",
+   "what": "Returns to the board.",
+   "from": "Navigation only. No data.",
+   "status": "ok",
+   "stories": [
+    "S-01"
+   ],
+   "notes": []
+  },
+  {
+   "n": 2,
+   "x": -1,
+   "y": 75,
+   "name": "Title \"Needs You\"",
+   "what": "The name of the screen. The spec reads \"Needs you (N)\", with the number of items waiting.",
+   "from": "The count of the items in the list.",
+   "status": "build",
+   "stories": [
+    "S-32"
+   ],
+   "notes": [
+    "The picture drew the title without the count (C-07)."
+   ]
+  },
+  {
+   "n": 3,
+   "x": -1,
+   "y": 105,
+   "name": "Profile icon",
+   "what": "A round profile button.",
+   "from": "Drawn by Stitch as part of its frame. Not built (decision 0008).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 4,
+   "x": -1,
+   "y": 140,
+   "name": "The list, oldest first",
+   "what": "One row for every item waiting on Todd, the longest-waiting at the top.",
+   "from": "The machine and Linear, read live: each row is read from the state of the thing it waits on, so a row leaves by itself when that thing changes (decision 0034).",
+   "status": "open",
+   "stories": [
+    "S-32",
+    "S-33"
+   ],
+   "notes": [
+    "Updates live, without refreshing (R-03)."
+   ]
+  },
+  {
+   "n": 5,
+   "x": -1,
+   "y": 215,
+   "name": "Row: \"Try it\" with \"Open preview\"",
+   "what": "A card, or one piece of a big card, waiting for Todd's yes. The title names the card and the piece, for example \"JUL-276: Ready cards on one page\". Each row shows its kind, its title, how long it has waited and one button.",
+   "from": "A card in the UAT status, or a piece the runner has marked as waiting for Todd's yes while its card stays in Implementation (decision 0039). Open preview opens what Todd tries: the Vercel preview for a Julia card, the candidate running on the server over Tailscale for a dashboard card.",
+   "status": "build",
+   "stories": [
+    "S-33",
+    "S-34"
+   ],
+   "notes": [
+    "Added from the re-review against real waiting items (decision 0039). Pstack's Shipping flow decides when a card reaches UAT (B-11)."
+   ]
+  },
+  {
+   "n": 6,
+   "x": -1,
+   "y": 255,
+   "name": "\"Waiting 3 h\"",
+   "what": "How long the item has waited: hours, or minutes under an hour.",
+   "from": "The time the thing began waiting on Todd, from the machine or Linear.",
+   "status": "build",
+   "stories": [
+    "S-33"
+   ],
+   "notes": [
+    "The wait starts at the item's own start; for a stopped card, the time it stopped."
+   ]
+  },
+  {
+   "n": 7,
+   "x": -1,
+   "y": 292,
+   "name": "\"Linear notification sent\"",
+   "what": "A line under each row saying a notification went out.",
+   "from": "Drawn by Stitch. Not built (C-06); every new item sends one anyway.",
+   "status": "frame",
+   "stories": [
+    "S-41"
+   ],
+   "notes": []
+  },
+  {
+   "n": 8,
+   "x": -1,
+   "y": 400,
+   "name": "Row: \"Card stopped: restart plan\" with \"Read plan\"",
+   "what": "A card stopped after two failures, waiting for Todd to approve its restart plan. Each row shows its kind, its title, how long it has waited and one button.",
+   "from": "The runner's record of the stop and the root-cause analysis (B-04, B-05).",
+   "status": "open",
+   "stories": [
+    "S-33",
+    "S-35"
+   ],
+   "notes": [
+    "The card page has Approve restart (decision 0025). A card Todd stopped himself: G4. Its icon pulses, as a stopped card does on the board (decision 0036)."
+   ]
+  },
+  {
+   "n": 9,
+   "x": -1,
+   "y": 590,
+   "name": "Row: \"Shape to settle\" with \"Read shape\"",
+   "what": "New work waiting for Todd to say \"settled\". Each row shows its kind, its title, how long it has waited and one button.",
+   "from": "Linear: a card in Backlog with the label \"Needs settled\". The planner agent adds the Linear label \"Needs settled\" (decision 0037).",
+   "status": "open",
+   "stories": [
+    "S-33",
+    "S-36"
+   ],
+   "notes": []
+  },
+  {
+   "n": 10,
+   "x": -1,
+   "y": 790,
+   "name": "Row: \"Retro fixes to approve\" with \"Review fixes\"",
+   "what": "A finished card's retro fixes waiting for Todd's yes. Each row shows its kind, its title, how long it has waited and one button.",
+   "from": "The retro's pull request, which waits for Todd (path-forward: retro PRs need his approval).",
+   "status": "open",
+   "stories": [
+    "S-33",
+    "S-37"
+   ],
+   "notes": [
+    "Where the button goes: G2."
+   ]
+  },
+  {
+   "n": 11,
+   "x": -1,
+   "y": 975,
+   "name": "Row: \"Account approval\" with \"Approve\"",
+   "what": "A step only Todd can do in his own account, reduced to one click. Each row shows its kind, its title, how long it has waited and one button.",
+   "from": "The step that needs him. The button opens the provider's own sign-in page in a new tab; the row leaves by itself once the account is connected (decision 0038).",
+   "status": "open",
+   "stories": [
+    "S-33",
+    "S-38"
+   ],
+   "notes": []
+  },
+  {
+   "n": 12,
+   "x": -1,
+   "y": 1160,
+   "name": "Row: \"Build asking you\" with its question and \"Answer\"",
+   "what": "A running build waiting for Todd's answer. The question is shown on the row. Each row shows its kind, its title, how long it has waited and one button.",
+   "from": "The build's question, from the runner. His answer must reach the running build (B-08).",
+   "status": "open",
+   "stories": [
+    "S-33",
+    "S-39"
+   ],
+   "notes": [
+    "Two such waits went unnoticed for about 2 hours and 20 minutes on 26 Oct. The Answer box is on the running card (decision 0019)."
+   ]
+  },
+  {
+   "n": 13,
+   "x": -1,
+   "y": 1330,
+   "name": "Empty, loading and failed states (not drawn)",
+   "what": "What the screen shows with no items, while it loads, and when it cannot reach the machine.",
+   "from": "Fixed text (R-08).",
+   "status": "build",
+   "stories": [
+    "S-32"
+   ],
+   "notes": [
+    "Empty: \"Nothing needs you.\" Loading: grey placeholder rows. Failed: \"Can't reach the machine. Items may be waiting.\" with Try again, never the empty message (decision 0035)."
+   ]
+  },
+  {
+   "n": 14,
+   "x": -1,
+   "y": 1380,
+   "name": "Row: \"Didn't start\" with \"Try again\" (not drawn)",
+   "what": "A card whose build failed to start, with the one plain line saying why. Each row shows its kind, its title, how long it has waited and one button.",
+   "from": "The runner's start result (decision 0014).",
+   "status": "build",
+   "stories": [
+    "S-33",
+    "S-40"
+   ],
+   "notes": [
+    "Added by decision 0014, which called it a seventh kind."
+   ]
+  },
+  {
+   "n": 15,
+   "x": -1,
+   "y": 1420,
+   "name": "Row: \"Stuck\" with \"Open card\" (not drawn)",
+   "what": "A running card with no activity for 7 minutes. Each row shows its kind, its title, how long it has waited and one button.",
+   "from": "The runner's last-activity time (decision 0024).",
+   "status": "open",
+   "stories": [
+    "S-33",
+    "S-10"
+   ],
+   "notes": [
+    "Added by decision 0024. Its icon pulses, as Stuck does on the board (decision 0036)."
+   ]
+  },
+  {
+   "n": 16,
+   "x": -1,
+   "y": 1460,
+   "name": "Row: \"Over its limit\" with Keep going and Stop (not drawn)",
+   "what": "A running card whose cost passed the per-card limit, waiting for Todd to keep going or stop.",
+   "from": "The cost record against the limit (decision 0018). No limit exists yet, so none appears until one is set.",
+   "status": "open",
+   "stories": [
+    "S-33",
+    "S-59"
+   ],
+   "notes": [
+    "Added by decision 0018, which also called it a seventh kind. The one row with two buttons, Keep going and Stop, and the cost against the limit (decision 0032)."
+   ]
+  },
+  {
+   "n": 17,
+   "x": -1,
+   "y": 1500,
+   "name": "Row: \"Card stopped\" for a card Todd stopped (not drawn)",
+   "what": "A card Todd stopped himself, so he sees it when he comes back (decision 0029).",
+   "from": "The runner's record of the stop.",
+   "status": "open",
+   "stories": [
+    "S-33",
+    "S-35",
+    "S-17"
+   ],
+   "notes": [
+    "In the list, as \"Card stopped\" with Open card (decision 0033)."
+   ]
+  },
+  {
+   "n": 18,
+   "x": -1,
+   "y": 1540,
+   "name": "Row: \"Plan to approve\" with \"Read plan\" (not drawn)",
+   "what": "A plan for big work waiting for Todd's go. Each row shows its kind, its title, how long it has waited and one button.",
+   "from": "The plan's pull request (for example the plan for JUL-276, PR 371). The row leaves when Todd gives the go or asks for changes (decision 0040).",
+   "status": "build",
+   "stories": [
+    "S-33",
+    "S-60"
+   ],
+   "notes": [
+    "Found by checking the list against what really waited on Todd on 28 Oct."
+   ]
+  },
+  {
+   "n": 19,
+   "x": -1,
+   "y": 1580,
+   "name": "How items get on the list (not drawn)",
+   "what": "Whatever creates a wait on Todd adds a row. Its kind decides the buttons, where each goes, when the row leaves and whether it pulses.",
+   "from": "The thing that creates the wait (decision 0040).",
+   "status": "build",
+   "stories": [
+    "S-32",
+    "S-33"
+   ],
+   "notes": [
+    "Rows are added by whatever creates the wait; no model decides what needs Todd."
+   ]
+  }
+ ],
+ "gaps": [
+  {
+   "id": "G1",
+   "stories": [
+    "S-32",
+    "S-40",
+    "S-59"
+   ],
+   "text": "How many kinds of item the list holds. Picture 06 drew six. Since then three more have been decided: \"Didn't start\" (decision 0014), a card over its per-card limit (0018) and a Stuck card (0024); 0014 and 0018 each called theirs \"a seventh kind\", and the glossary and story S-32 still say six. Proposed: nine kinds, the six drawn plus Didn't start, Over its limit and Stuck; the title count and the glossary follow.",
+   "res": "Closed (Todd, 28 Oct, decision 0030): nine kinds, oldest first. \"We won't really know until we start using it\", so the set and its order are adjusted after use. The glossary now says nine."
+  },
+  {
+   "id": "G2",
+   "stories": [
+    "S-33"
+   ],
+   "text": "Where each button goes. \"Opens where Todd acts\" is all the story says. Proposed: Open preview opens the card's preview in a new tab; Read plan opens the card on the board, expanded, with the plan and Approve restart; Read shape opens the shape's Linear issue; Review fixes opens the retro pull request; Answer and Open card open the card on the board with its Answer box or detail; Try again starts the build again at once.",
+   "res": "Closed (Todd, 28 Oct, decision 0031): as proposed. Where Todd acts on the card, the button opens the card on the board with that thing in front of him; where the thing lives elsewhere, it opens that place; Try again starts the build at once."
+  },
+  {
+   "id": "G3",
+   "stories": [
+    "S-33",
+    "S-59"
+   ],
+   "text": "A row has one button, but a card over its limit needs two choices: keep going or stop. Proposed: the row has one button, \"Decide\", which opens the card on the board with Keep going and Stop.",
+   "res": "Closed (Todd, 28 Oct, decision 0032), differently from the proposal: one button that opens two buttons is pointless, so the row shows Keep going and Stop itself, with what the decision is about (\"$4.10 of $3.00\"). Stop is rose and asks \"Stop this build? The work is kept.\" first. It is the one row with two buttons."
+  },
+  {
+   "id": "G4",
+   "stories": [
+    "S-35",
+    "S-17"
+   ],
+   "text": "Whether a card Todd stopped himself is in the list. Decision 0029 says he must see it when he comes back; the list is where waiting things sit, and it has no plan to read. Proposed: yes, as \"Card stopped\" with \"Open card\", opening the card with Resume and Start over.",
+   "res": "Closed (Todd, 28 Oct, decision 0033): yes, as \"Card stopped\" with Open card, which opens the card with Resume and Start over. A card stopped after two failures keeps its own row, \"Card stopped: restart plan\", with Read plan. The row leaves when Todd resumes, starts over or approves the restart."
+  },
+  {
+   "id": "G5",
+   "stories": [
+    "S-33",
+    "S-35"
+   ],
+   "text": "What the stopped-card row's button is called now that the card page has Approve restart (decision 0025). Proposed: keep \"Read plan\"; it opens the card with the plan expanded and Approve restart below it.",
+   "res": "Closed (Todd, 28 Oct): keep \"Read plan\". It opens the card with the plan expanded and Approve restart below it, so he reads before he approves. Not a hard-to-reverse choice, so no decision record."
+  },
+  {
+   "id": "G6",
+   "stories": [
+    "S-32"
+   ],
+   "text": "How an item leaves the list. Todd settles a shape in Linear, approves retro fixes on GitHub and gives UAT elsewhere, so the list cannot rely on him pressing its button. Proposed: every row is read live from the state of the thing it waits on, so it leaves by itself when that changes, and there is nothing to dismiss.",
+   "res": "Closed (Todd, 28 Oct, decision 0034): every row is read live from the state of the thing it waits on and leaves by itself when that changes. No dismiss and no clear button."
+  },
+  {
+   "id": "G7",
+   "stories": [
+    "S-32"
+   ],
+   "text": "What the empty and failed states say. A failed list that looks like an empty one would say \"nothing needs you\" when it cannot see. Proposed: empty says \"Nothing needs you.\"; loading shows grey placeholder rows; failed says \"Can't reach the machine. Items may be waiting.\" with a Try again button, and never shows the empty message.",
+   "res": "Closed (Todd, 28 Oct, decision 0035): as proposed. Empty: \"Nothing needs you.\" Loading: grey placeholder rows. Failed: \"Can't reach the machine. Items may be waiting.\" with Try again, never the empty message. The same rule holds on every screen."
+  },
+  {
+   "id": "G8",
+   "stories": [
+    "S-32",
+    "S-10"
+   ],
+   "text": "Whether the Stuck and Stopped rows pulse. On the board both pulse until Todd acts (decisions 0017, 0029). Proposed: their row icons pulse the same way, static and bolder rose with the phone set to reduce motion; every other row is still.",
+   "res": "Closed (Todd, 28 Oct, decision 0036): as proposed. The Stuck row and both Card stopped rows pulse their icons until Todd acts; static, bolder rose with reduce-motion. Every other row is still."
+  },
+  {
+   "id": "G9",
+   "stories": [
+    "S-36"
+   ],
+   "text": "How the dashboard recognises a shape awaiting \"settled\". Nothing in Linear marks it today. Proposed: the planner agent gives the card in Backlog a Linear label \"Needs settled\" when it finishes shaping; Todd removes it, or moves the card to Ready, to settle it.",
+   "res": "Closed (Todd, 28 Oct, decision 0037): as proposed. The planner agent adds the Linear label \"Needs settled\" when it finishes shaping a card in Backlog; Todd settles it by removing the label or moving the card to Ready, and the row leaves by itself. The label must be created in Linear and the planner agent's process must apply it."
+  },
+  {
+   "id": "G10",
+   "stories": [
+    "S-38"
+   ],
+   "text": "What \"Approve\" does on an account approval. The picture shows \"Sign in to connect ChatGPT\" with one button. Proposed: the button opens the provider's own sign-in page in a new tab, and the row leaves by itself once the machine sees the account connected (G6).",
+   "res": "Closed (Todd, 28 Oct, decision 0038): as proposed. Approve opens the provider's own sign-in page in a new tab; the row leaves by itself once the machine sees the account connected. The dashboard never handles his password or a key."
+  }
+ ]
+}

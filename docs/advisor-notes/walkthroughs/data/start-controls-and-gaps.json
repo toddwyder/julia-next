@@ -1,0 +1,478 @@
+{
+ "controls": [
+  {
+   "n": 1,
+   "x": -1,
+   "y": 24,
+   "name": "Back to board",
+   "what": "Returns to the board without starting anything.",
+   "from": "Navigation only. No data.",
+   "status": "ok",
+   "stories": [
+    "S-01"
+   ],
+   "notes": []
+  },
+  {
+   "n": 2,
+   "x": -1,
+   "y": 80,
+   "name": "Card title",
+   "what": "The title of the Ready card you are about to start. The example is a real card title.",
+   "from": "The Linear issue's title. Exists today.",
+   "status": "ok",
+   "stories": [
+    "S-20"
+   ],
+   "notes": []
+  },
+  {
+   "n": 3,
+   "x": -1,
+   "y": 159,
+   "name": "Start with last settings",
+   "what": "Starts the build straight away with the same models and effort as the last build, without opening anything.",
+   "from": "Your last choices: nothing saves them today (the old machine did, and it was removed on 26 Oct), so the build must save the choices made at every Start. Starting a build: nothing exists today, so the build creates it (decision 0009).",
+   "status": "build",
+   "stories": [
+    "S-21",
+    "S-31",
+    "B-01",
+    "B-02"
+   ],
+   "notes": [
+    "After Start: back to the board with the card in Implementation, open, saying \"Starting\u2026\"; if it fails, \"Didn't start\" with Try again (decision 0014)."
+   ]
+  },
+  {
+   "n": 4,
+   "x": -1,
+   "y": 233,
+   "name": "Main session",
+   "what": "The model that runs the build's main chat: it plans, hands work to helpers and decides when the work is proven. Shown with its price.",
+   "from": "Your last choice for the main session (B-02). Price from the model list of your three accounts (decisions 0013, 0015).",
+   "status": "build",
+   "stories": [
+    "S-22",
+    "S-24",
+    "S-28"
+   ],
+   "notes": [
+    "Tap the model name to change it (decision 0011).",
+    "Main session appears only here, never inside a group (C-08)."
+   ]
+  },
+  {
+   "n": 5,
+   "x": -1,
+   "y": 266,
+   "name": "Shipping (was \"Evidence reviewer\")",
+   "what": "The model for pstack's Shipping checker: a fresh agent that didn't write the code runs the change the way you would and gives PASS or FAIL, with a verdict on each \"done means\" line (decision 0016).",
+   "from": "Your last choice (B-02). What it drives: pstack's Shipping playbook, split around your UAT (B-11).",
+   "status": "build",
+   "stories": [
+    "S-22",
+    "S-24",
+    "S-28",
+    "S-42",
+    "B-11"
+   ],
+   "notes": [
+    "Renamed from \"Evidence reviewer\" (decision 0016); the picture still shows the old name.",
+    "Tap the model name to change it (decision 0011).",
+    "Flow after a PASS: preview and smoke test, then UAT, then Shipping lands it after your yes (decision 0016)."
+   ]
+  },
+  {
+   "n": 6,
+   "x": -1,
+   "y": 299,
+   "name": "Effort (summary)",
+   "what": "Repeats the effort selected below, so the one-tap start (number 3) shows everything it will use.",
+   "from": "The selected effort, number 10.",
+   "status": "ok",
+   "stories": [
+    "S-22",
+    "S-23"
+   ],
+   "notes": []
+  },
+  {
+   "n": 7,
+   "x": -1,
+   "y": 357,
+   "name": "Effort label and \u24d8",
+   "what": "Names the picker. The \u24d8 says: \"How hard the models think. More brains is slower and costs more.\"",
+   "from": "Fixed text, agreed in design chat 3, turn 77.",
+   "status": "ok",
+   "stories": [
+    "S-23"
+   ],
+   "notes": [
+    "Your word is effort, not budget or thinking (decision 0007)."
+   ]
+  },
+  {
+   "n": 8,
+   "x": 34,
+   "y": 394,
+   "name": "Small (one brain)",
+   "what": "Lowest effort. In pstack's terms the budget \"small\": every model thinks at medium reasoning.",
+   "from": "pstack's budget ladder (setup-pstack, step 3). Mastra Code sets effort for the whole session, not per helper (fact F-06).",
+   "status": "build",
+   "stories": [
+    "S-23",
+    "B-09"
+   ],
+   "notes": []
+  },
+  {
+   "n": 9,
+   "x": 134,
+   "y": 394,
+   "name": "Medium (two brains)",
+   "what": "pstack's budget \"medium\": high reasoning.",
+   "from": "As 8.",
+   "status": "build",
+   "stories": [
+    "S-23",
+    "B-09"
+   ],
+   "notes": []
+  },
+  {
+   "n": 10,
+   "x": 234,
+   "y": 394,
+   "name": "Large (three brains, selected)",
+   "what": "pstack's budget \"large\": extra-high reasoning. Shown selected because it was last time's choice.",
+   "from": "As 8. Selected state: your last choice.",
+   "status": "build",
+   "stories": [
+    "S-23",
+    "B-02",
+    "B-09"
+   ],
+   "notes": []
+  },
+  {
+   "n": 11,
+   "x": 334,
+   "y": 394,
+   "name": "Unlimited (four brains)",
+   "what": "pstack's budget \"unlimited\": maximum reasoning.",
+   "from": "As 8.",
+   "status": "build",
+   "stories": [
+    "S-23",
+    "B-09"
+   ],
+   "notes": []
+  },
+  {
+   "n": 12,
+   "x": -1,
+   "y": 518,
+   "name": "Building group (open)",
+   "what": "One row for pstack's four building roles. The model shown applies to all four. The arrow (pointing up) closes the group; here it is open.",
+   "from": "The group model and each role's model: the pstack model settings (today a file, ~/.agents/pstack-models.md, written by setup-pstack). Whether the dashboard writes that file or keeps its own copy is for the build to decide.",
+   "status": "build",
+   "stories": [
+    "S-25",
+    "S-24",
+    "S-28"
+   ],
+   "notes": [
+    "The group names are the advisor's (design chat 3, turn 63); you accepted them. The roles inside are pstack's real names.",
+    "Every model shows its real price, \u2193$in/$out\u2191 (decision 0013). The picture shows none here."
+   ]
+  },
+  {
+   "n": 13,
+   "x": -1,
+   "y": 590,
+   "name": "feature/refactoring",
+   "what": "pstack role: builds new features, or reorganizes code without changing what it does. Its model is on the right; \u24d8 shows that explanation.",
+   "from": "pstack role line \"feature, refactoring\". Explanation from pstack's own skill files (design chat 3, turn 71).",
+   "status": "build",
+   "stories": [
+    "S-25",
+    "S-24",
+    "S-26",
+    "S-28"
+   ],
+   "notes": [
+    "Tap the model name to change this one role (decision 0011)."
+   ]
+  },
+  {
+   "n": 14,
+   "x": -1,
+   "y": 632,
+   "name": "bug-fix",
+   "what": "pstack role: reproduces a reported problem, finds the cause, fixes it.",
+   "from": "pstack role line \"bug-fix\".",
+   "status": "build",
+   "stories": [
+    "S-25",
+    "S-24",
+    "S-26",
+    "S-28"
+   ],
+   "notes": [
+    "Tap the model name to change this one role (decision 0011)."
+   ]
+  },
+  {
+   "n": 15,
+   "x": -1,
+   "y": 673,
+   "name": "perf-issue",
+   "what": "pstack role: fixes one measured slowness.",
+   "from": "pstack role line \"perf-issue\".",
+   "status": "build",
+   "stories": [
+    "S-25",
+    "S-24",
+    "S-26",
+    "S-28"
+   ],
+   "notes": [
+    "Tap the model name to change this one role (decision 0011)."
+   ]
+  },
+  {
+   "n": 16,
+   "x": -1,
+   "y": 715,
+   "name": "hillclimb",
+   "what": "pstack role: keeps improving one number toward a target. Its \u24d8 is shown tapped.",
+   "from": "pstack role line \"hillclimb\".",
+   "status": "build",
+   "stories": [
+    "S-25",
+    "S-24",
+    "S-26",
+    "S-28"
+   ],
+   "notes": [
+    "Tap the model name to change this one role (decision 0011)."
+   ]
+  },
+  {
+   "n": 17,
+   "x": -1,
+   "y": 781,
+   "name": "Explanation popup",
+   "what": "What appears when you tap a role's \u24d8: \"Keeps improving one number toward a target, trying one idea at a time and keeping only what helps.\"",
+   "from": "Fixed text per role, from pstack's skill files.",
+   "status": "ok",
+   "stories": [
+    "S-26"
+   ],
+   "notes": [
+    "Explanations show only when the \u24d8 is tapped (C-09)."
+   ]
+  },
+  {
+   "n": 18,
+   "x": -1,
+   "y": 898,
+   "name": "Judgment group",
+   "what": "Two roles: judgment and prose (writing and judgment calls); hardest tasks (the trickiest code changes). Group model GPT-6 Sol. Arrow opens it.",
+   "from": "pstack role lines \"judgment and prose\", \"hardest tasks\".",
+   "status": "build",
+   "stories": [
+    "S-25",
+    "S-24",
+    "S-28"
+   ],
+   "notes": [
+    "The picture's \"$$$$\" is replaced by real prices, \u2193$in/$out\u2191 (decision 0013)."
+   ]
+  },
+  {
+   "n": 19,
+   "x": -1,
+   "y": 990,
+   "name": "Investigating group",
+   "what": "Four roles: how explorer (reads the code to find how something works), how explainer (turns that into a plain explanation), why investigators (dig through history for why something was built this way), why synthesizer (pulls the findings into one answer with sources).",
+   "from": "pstack role lines \"how explorer\", \"how explainer\", \"why investigators\", \"why synthesizer\".",
+   "status": "build",
+   "stories": [
+    "S-25",
+    "S-24",
+    "S-28"
+   ],
+   "notes": []
+  },
+  {
+   "n": 20,
+   "x": -1,
+   "y": 1082,
+   "name": "Learning group",
+   "what": "Two roles: reflect tooling (reviews a finished session for lessons about tools); reflect judgment (for lessons about decisions). Group model Beam, shown Free because it costs nothing right now.",
+   "from": "pstack role lines \"reflect tooling\", \"reflect judgment, divergent, synthesizer\". Free comes from the current price: Beam is free only for a limited-time promotion.",
+   "status": "build",
+   "stories": [
+    "S-25",
+    "S-24",
+    "S-28"
+   ],
+   "notes": []
+  },
+  {
+   "n": 21,
+   "x": -1,
+   "y": 1175,
+   "name": "Panels group",
+   "what": "Four roles that each run several models side by side: arena runners (several models attempt the same task), arena cross-judge pool (models that may judge those attempts), architect runners (several models sketch the design before code), interrogate reviewers (models that try to break the change). Each holds a list of models; one helper runs per model, so the list's length sets how many run.",
+   "from": "pstack role lines for the four panels; list rule from setup-pstack step 3.",
+   "status": "build",
+   "stories": [
+    "S-25",
+    "S-27",
+    "S-24",
+    "S-28"
+   ],
+   "notes": [
+    "With the group open, each panel's models are chips with \u00d7, plus \"+ Add\"; at least one stays (decision 0012)."
+   ]
+  },
+  {
+   "n": 22,
+   "x": -1,
+   "y": 1267,
+   "name": "Workers group",
+   "what": "One role: swarm workers (parallel helpers for many small jobs and for checking work).",
+   "from": "pstack role line \"swarm workers\".",
+   "status": "build",
+   "stories": [
+    "S-25",
+    "S-24",
+    "S-28"
+   ],
+   "notes": []
+  },
+  {
+   "n": 23,
+   "x": -1,
+   "y": 1362,
+   "name": "Finish ping",
+   "what": "Tells you that when the build finishes, you get a Linear notification. It is a line of information, not a switch.",
+   "from": "Today: Mastra Code's \"agent done\" notification runs the stop-ping script, which comments on the card and sets you a Linear reminder (decision record 0024). For builds started from the dashboard the same must happen.",
+   "status": "build",
+   "stories": [
+    "S-29",
+    "S-41"
+   ],
+   "notes": [
+    "No Slack anywhere (C-10)."
+   ]
+  },
+  {
+   "n": 24,
+   "x": -1,
+   "y": 1553,
+   "name": "Start",
+   "what": "Starts the build with the settings as they are on screen now, after any changes. Fixed to the bottom so it is always in reach.",
+   "from": "The choices on this screen. Starting a build: created by the build (decision 0009).",
+   "status": "build",
+   "stories": [
+    "S-30",
+    "S-31",
+    "B-01"
+   ],
+   "notes": [
+    "Number 3 starts with last time's settings untouched; number 24 starts with what you changed here.",
+    "What happens after Start: decision 0014."
+   ]
+  }
+ ],
+ "gaps": [
+  {
+   "id": "G1",
+   "stories": [
+    "S-22",
+    "S-24"
+   ],
+   "text": "No control changed the main session or the Shipping model.",
+   "res": "Closed: tap any model name to change it (decision 0011)."
+  },
+  {
+   "id": "G2",
+   "stories": [
+    "S-24",
+    "S-25"
+   ],
+   "text": "How to change one role's or a group's model wasn't drawn.",
+   "res": "Closed: decision 0011."
+  },
+  {
+   "id": "G3",
+   "stories": [
+    "S-27"
+   ],
+   "text": "How to add or remove a model in a panel wasn't drawn.",
+   "res": "Closed: chips with \u00d7 and \"+ Add\", at least one (decision 0012)."
+  },
+  {
+   "id": "G4",
+   "stories": [
+    "S-28"
+   ],
+   "text": "Only Judgment showed a price, and it was wrong.",
+   "res": "Closed: real prices as \u2193$in/$out\u2191 everywhere; Free only while a model costs nothing (decision 0013)."
+  },
+  {
+   "id": "G5",
+   "stories": [
+    "S-31"
+   ],
+   "text": "What happens after Start wasn't drawn.",
+   "res": "Closed: decision 0014."
+  },
+  {
+   "id": "G6",
+   "stories": [
+    "S-24",
+    "S-28"
+   ],
+   "text": "Which models the lists offer, and from where.",
+   "res": "Closed: models from Todd's three accounts, priced, refreshing (decision 0015); built as B-10."
+  },
+  {
+   "id": "G7",
+   "stories": [
+    "S-28"
+   ],
+   "text": "Where the $ to $$$$ price levels fall.",
+   "res": "Closed: no levels; real prices (decision 0013)."
+  },
+  {
+   "id": "G8",
+   "stories": [
+    "S-23"
+   ],
+   "text": "Mastra Code sets effort per session, not per helper.",
+   "res": "Technical: the build proves it (B-09)."
+  },
+  {
+   "id": "G9",
+   "stories": [
+    "S-22",
+    "S-42"
+   ],
+   "text": "The evidence reviewer had nothing to drive.",
+   "res": "Closed: renamed Shipping, drives pstack's Shipping checker, split around UAT (decision 0016); built as B-11."
+  },
+  {
+   "id": "G10",
+   "stories": [
+    "S-42"
+   ],
+   "text": "Nothing records each request's pstack role.",
+   "res": "Technical: the build records it (B-03)."
+  }
+ ]
+}

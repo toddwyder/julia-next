@@ -1,0 +1,220 @@
+{
+ "controls": [
+  {
+   "n": 1,
+   "x": -1,
+   "y": 47,
+   "name": "\"Back to board\" link",
+   "what": "Returns to the board.",
+   "from": "Fixed text.",
+   "status": "ok",
+   "stories": [
+    "S-01"
+   ],
+   "notes": []
+  },
+  {
+   "n": 2,
+   "x": -1,
+   "y": 47,
+   "name": "Profile icon",
+   "what": "A round profile button.",
+   "from": "Stitch frame. Not built (0008, 0069).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 3,
+   "x": -1,
+   "y": 127,
+   "name": "Switch: Map, Ranked, Cards",
+   "what": "Chooses the view; Map is open by default.",
+   "from": "Fixed (0006).",
+   "status": "ok",
+   "stories": [
+    "S-50",
+    "S-51",
+    "S-52"
+   ],
+   "notes": []
+  },
+  {
+   "n": 4,
+   "x": -1,
+   "y": 192,
+   "name": "\"5 roles tested\" link",
+   "what": "A link to the list of roles.",
+   "from": "Stitch frame. Not built: the chips show the roles (0069).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 5,
+   "x": -1,
+   "y": 243,
+   "name": "Role chips",
+   "what": "Main session, Shipping, then Building, Judgment, Investigating, Learning, Panels, Workers; a second row narrows to one role line.",
+   "from": "The Start screen's groups (0007, 0059).",
+   "status": "build",
+   "stories": [
+    "S-50"
+   ],
+   "notes": [
+    "Stitch's names (Coder, Reviewer, Researcher) are replaced (0059)."
+   ]
+  },
+  {
+   "n": 6,
+   "x": -1,
+   "y": 322,
+   "name": "Title and \"Interactive\" badge",
+   "what": "The view's title.",
+   "from": "Fixed text; the badge is Stitch frame, not built (0069).",
+   "status": "ok",
+   "stories": [
+    "S-50"
+   ],
+   "notes": [
+    "Reads \"Cost vs interventions\" (0057)."
+   ]
+  },
+  {
+   "n": 7,
+   "x": -1,
+   "y": 600,
+   "name": "Bubble chart",
+   "what": "Each model in the role is a bubble: across is cost per slice, up is fewer HITL interventions per slice, size is slices run.",
+   "from": "The runner's kept record (0041), credited to the model that answered (0052, 0057, 0058).",
+   "status": "build",
+   "stories": [
+    "S-50",
+    "S-53"
+   ],
+   "notes": [
+    "A model with fewer than 10 slices is dashed, \"too few slices to trust yet\" (0058). Overlapping bubbles in the picture are a drawing flaw."
+   ]
+  },
+  {
+   "n": 8,
+   "x": -1,
+   "y": 481,
+   "name": "Zone",
+   "what": "Models cheaper and with fewer interventions than the role's median, labelled \"Cheaper and fewer interventions than most\".",
+   "from": "Computed from the role's own medians (0062).",
+   "status": "build",
+   "stories": [
+    "S-50"
+   ],
+   "notes": [
+    "The stray \"RK\" is a drawing flaw."
+   ]
+  },
+  {
+   "n": 9,
+   "x": -1,
+   "y": 915,
+   "name": "Tapped model panel",
+   "what": "The chosen model's cost per slice and HITL interventions per slice, each against the role's other models.",
+   "from": "The runner's kept record (0041) (0064).",
+   "status": "build",
+   "stories": [
+    "S-44",
+    "S-46"
+   ],
+   "notes": []
+  },
+  {
+   "n": 10,
+   "x": -1,
+   "y": 1050,
+   "name": "Tile \"HITL interventions\"",
+   "what": "Interventions per slice and their time, better or worse than most.",
+   "from": "The runner's kept record (0041) (0045, 0057, 0064).",
+   "status": "build",
+   "stories": [
+    "S-44"
+   ],
+   "notes": [
+    "Was \"Times stepped in\" (0069)."
+   ]
+  },
+  {
+   "n": 11,
+   "x": -1,
+   "y": 1050,
+   "name": "Tile \"Second-round rate\"",
+   "what": "How often this model's slices needed a second round, against the role's median.",
+   "from": "The runner's kept record (0041) (0064).",
+   "status": "build",
+   "stories": [
+    "S-44"
+   ],
+   "notes": []
+  },
+  {
+   "n": 12,
+   "x": -1,
+   "y": 1170,
+   "name": "\"Where trouble came from\"",
+   "what": "The share of interventions whose root-cause stage was requirements, design or build.",
+   "from": "Root-cause stage per intervention (B-04).",
+   "status": "build",
+   "stories": [
+    "S-44"
+   ],
+   "notes": []
+  },
+  {
+   "n": 13,
+   "x": -1,
+   "y": 1240,
+   "name": "Compactions per slice (not drawn)",
+   "what": "A fifth bar, against the role's other models; tapping shows the fullest context reached on average.",
+   "from": "The runner's kept record (0041) (0066).",
+   "status": "build",
+   "stories": [
+    "S-47"
+   ],
+   "notes": []
+  },
+  {
+   "n": 14,
+   "x": -1,
+   "y": 1288,
+   "name": "\"See 11 slices\"",
+   "what": "Opens this model's slices.",
+   "from": "Was \"View all 11 cards\" (0069).",
+   "status": "build",
+   "stories": [
+    "S-50"
+   ],
+   "notes": []
+  },
+  {
+   "n": 15,
+   "x": -1,
+   "y": 1450,
+   "name": "Suggestion",
+   "what": "Written weekly by an agent from the recorded numbers, quoting them; shown only where two models in the role have 10 slices.",
+   "from": "The weekly sweep (0060).",
+   "status": "build",
+   "stories": [
+    "S-54"
+   ],
+   "notes": []
+  },
+  {
+   "n": 16,
+   "x": -1,
+   "y": 1580,
+   "name": "Empty, loading and failed (not drawn)",
+   "what": "Empty: \"No finished slices yet. Numbers appear when the first card finishes.\" Loading: grey placeholders. Failed: \"Server unavailable\" with Try again.",
+   "from": "R-08 (0050, 0069).",
+   "status": "build",
+   "stories": [],
+   "notes": []
+  }
+ ]
+}

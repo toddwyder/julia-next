@@ -1,0 +1,310 @@
+{
+ "controls": [
+  {
+   "n": 1,
+   "x": -1,
+   "y": 38,
+   "name": "Header: logo, \"Factory Board\", bell, profile icon",
+   "what": "A name bar with a logo, a bell and a profile icon.",
+   "from": "Drawn by Stitch as part of its frame. Not built (decision 0008).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 2,
+   "x": -1,
+   "y": 115,
+   "name": "Second \"Needs you (6)\" bar with \"4 blocking release\"",
+   "what": "A warning bar across the top.",
+   "from": "Drawn by Stitch. Not built (decision 0008).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 3,
+   "x": -1,
+   "y": 200,
+   "name": "\"Needs you\" strip",
+   "what": "The board's list of things waiting on Todd. A stopped card with a restart plan is one of its items.",
+   "from": "Settled on the board (decision 0017).",
+   "status": "build",
+   "stories": [
+    "S-32",
+    "S-35"
+   ],
+   "notes": [
+    "Shown here only as the board around the stopped card."
+   ]
+  },
+  {
+   "n": 4,
+   "x": -1,
+   "y": 420,
+   "name": "Folded stages above: Backlog, Ready, Implementation, Evidence review",
+   "what": "Stages folded to one line with their card count.",
+   "from": "Settled on the board (decisions 0005, 0017). Linear statuses.",
+   "status": "build",
+   "stories": [
+    "S-04"
+   ],
+   "notes": []
+  },
+  {
+   "n": 5,
+   "x": -1,
+   "y": 610,
+   "name": "Remediation stage, open, count in rose",
+   "what": "The stage holding the stopped card, opened, its count drawn in rose.",
+   "from": "Linear status of the card. Opens on load because it holds a stopped card, and its count is rose; the stage line pulses with the card (decision 0029).",
+   "status": "build",
+   "stories": [
+    "S-04",
+    "S-18"
+   ],
+   "notes": []
+  },
+  {
+   "n": 6,
+   "x": -1,
+   "y": 668,
+   "name": "\"Stopped\" pill",
+   "what": "A rose pill with a stop icon and the word Stopped. The pill and icon pulse until Todd acts on the card (decision 0029); with the phone set to reduce motion they are a static, bolder rose.",
+   "from": "Whether the card's build has stopped, from the runner that starts, watches and stops builds (B-01).",
+   "status": "build",
+   "stories": [
+    "S-18"
+   ],
+   "notes": [
+    "Rose means a problem or a destructive action (R-07). Pulses like Stuck, for a card stopped after two failures and a card Todd stopped himself."
+   ]
+  },
+  {
+   "n": 7,
+   "x": -1,
+   "y": 715,
+   "name": "Card title: \"Practice: real failure path\"",
+   "what": "The card's title, wrapping onto two lines rather than being cut off.",
+   "from": "The Linear issue's title.",
+   "status": "ok",
+   "stories": [
+    "S-03",
+    "S-18"
+   ],
+   "notes": [
+    "Labels are never cut off (R-06). The title and $5.27 come from a real stopped practice run."
+   ]
+  },
+  {
+   "n": 8,
+   "x": -1,
+   "y": 766,
+   "name": "\"Stopped after round 2: evidence review failed twice\"",
+   "what": "One line saying when and why the card stopped.",
+   "from": "Which round it stopped in and which step failed, from the runner's record of the stop (B-04, B-05).",
+   "status": "build",
+   "stories": [
+    "S-18"
+   ],
+   "notes": [
+    "\"Evidence review\" on the picture reads \"Shipping check\" (decision 0016). The line changes with the stop: Shipping check, staging test or you sent it back (decision 0026)."
+   ]
+  },
+  {
+   "n": 9,
+   "x": -1,
+   "y": 860,
+   "name": "\"Why it stopped\" with the failed criterion",
+   "what": "What failed, in one plain line: here a \"done means\" line not proven in either round.",
+   "from": "The root-cause analysis run after the second failure (pstack's Investigation playbook), recorded as data (B-04).",
+   "status": "build",
+   "stories": [
+    "S-18"
+   ],
+   "notes": []
+  },
+  {
+   "n": 10,
+   "x": -1,
+   "y": 927,
+   "name": "\"Cause: requirements \u2014 the criterion can't be met as written\"",
+   "what": "The stage that caused the stop: requirements, design or build, with one line saying why.",
+   "from": "The root-cause stage, recorded as data by the root-cause analysis (B-04; glossary \"Root-cause stage\").",
+   "status": "build",
+   "stories": [
+    "S-18",
+    "S-44"
+   ],
+   "notes": [
+    "Todd can correct the stage when he approves retro lessons (S-45)."
+   ]
+  },
+  {
+   "n": 11,
+   "x": -1,
+   "y": 1030,
+   "name": "\"Restart plan\" with numbered steps",
+   "what": "The plan to get the card going again, in short numbered steps.",
+   "from": "Written by the root-cause analysis with the cause (path-forward: \"a restart plan for his OK\").",
+   "status": "build",
+   "stories": [
+    "S-19"
+   ],
+   "notes": [
+    "How Todd approves it: G3."
+   ]
+  },
+  {
+   "n": 12,
+   "x": -1,
+   "y": 1113,
+   "name": "\u24d8 \"Cost $5.27 \u00b7 2 rounds \u00b7 stopped 2 h ago\"",
+   "what": "What the card cost, how many rounds it ran, and how long ago it stopped.",
+   "from": "Cost: the build's cost record (decision 0022). Rounds: the runner's record of rounds (B-05). Time: the stop's time.",
+   "status": "build",
+   "stories": [
+    "S-18"
+   ],
+   "notes": [
+    "The \u24d8 Stitch drew before this line is not built (decision 0028)."
+   ]
+  },
+  {
+   "n": 13,
+   "x": 150,
+   "y": 1173,
+   "name": "\"Read full plan\"",
+   "what": "Opens the whole root-cause write-up and restart plan.",
+   "from": "The same root-cause analysis as 9 to 11. Opens in place on the card, and the same button folds it (decision 0027).",
+   "status": "build",
+   "stories": [
+    "S-19"
+   ],
+   "notes": []
+  },
+  {
+   "n": 14,
+   "x": 345,
+   "y": 1173,
+   "name": "\"Open in Linear\"",
+   "what": "Opens the card in Linear.",
+   "from": "The Linear issue's link.",
+   "status": "ok",
+   "stories": [
+    "S-19"
+   ],
+   "notes": []
+  },
+  {
+   "n": 17,
+   "x": 60,
+   "y": 1173,
+   "name": "Approve restart (added, decision 0025)",
+   "what": "Starts the restart plan: a fresh chat on the kept work. Blocked until the card text has changed when the plan says to change it. Shown only on a card stopped after two failures.",
+   "from": "The restart plan (11) and the runner (B-01).",
+   "status": "build",
+   "stories": [
+    "S-19"
+   ],
+   "notes": [
+    "Not drawn in the picture; added by decision 0025."
+   ]
+  },
+  {
+   "n": 15,
+   "x": -1,
+   "y": 1360,
+   "name": "Folded stages below: Staging/smoke test, UAT, Complete",
+   "what": "The rest of the stages, folded.",
+   "from": "Settled on the board (decisions 0005, 0017).",
+   "status": "build",
+   "stories": [
+    "S-04"
+   ],
+   "notes": []
+  },
+  {
+   "n": 16,
+   "x": -1,
+   "y": 1560,
+   "name": "Bottom menu: Board, Inbox, Pipelines, Insights",
+   "what": "A menu bar along the bottom.",
+   "from": "Drawn by Stitch. Not built (decision 0008).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  }
+ ],
+ "gaps": [
+  {
+   "id": "G1",
+   "stories": [
+    "S-17",
+    "S-20"
+   ],
+   "text": "After Todd presses Stop, how does the card start again? The Start card (being built now) says a stopped card stays in its stage and that pressing Start on it later starts fresh, but also that only Ready cards show Start. pstack's plan follows both: Stop leaves the card in Implementation, and Start refuses any card not in Ready. So a stopped card can never be started again.",
+   "res": "Closed (Todd, 28 Oct, decision 0023): a card Todd stopped shows Resume (same chat, same settings, continues where it stopped) and Start over (a fresh chat, same settings, on the kept work). Both keep the card in its stage; Start stays on Ready cards only. JUL-276 updated."
+  },
+  {
+   "id": "G2",
+   "stories": [
+    "S-17",
+    "S-18"
+   ],
+   "text": "What a card Todd stopped himself shows. The picture shows a stop after two failures, with a cause and a restart plan; a card he stopped by hand has neither.",
+   "res": "Closed (Todd, 28 Oct, added to decision 0023): a card Todd stopped shows the rose Stopped pill, \"Stopped by you \u00b7 2 h ago\", its cost and rounds, Resume, Start over and Open in Linear. No \"Why it stopped\" and no restart plan."
+  },
+  {
+   "id": "G3",
+   "stories": [
+    "S-19",
+    "S-35"
+   ],
+   "text": "How Todd approves a restart plan. The story says he approves a restart from the board, but the picture has no approve button, only \"Read full plan\" and \"Open in Linear\".",
+   "res": "Closed (Todd, 28 Oct, decision 0025): a card stopped after a second failure gets one more button, Approve restart. It starts a fresh chat on the kept work following the plan's steps; when the plan says to change the card first, the card goes back to Linear and the restart stays blocked until its text has changed. A card Todd stopped himself has no plan and no Approve restart."
+  },
+  {
+   "id": "G4",
+   "stories": [
+    "S-18"
+   ],
+   "text": "Which stops get \"Why it stopped\" and a restart plan, and what the headline says. Today's rules stop a card after a second failure of the Shipping check, of staging/smoke test, or a second UAT send-back. The picture still says \"evidence review\".",
+   "res": "Closed (Todd, 28 Oct, decision 0026): all three stops get the same card (cause, restart plan, Approve restart, cost and rounds). Only the headline changes: \"Shipping check failed twice\", \"staging test failed twice\" or \"you sent it back twice\". For a second send-back the cause and plan are written from Todd's two notes."
+  },
+  {
+   "id": "G5",
+   "stories": [
+    "S-10",
+    "S-18"
+   ],
+   "text": "Stuck and stopped disagree across documents. The delivery plan still says a build stops after 15 minutes with no activity and pauses on a runaway or a provider that stays down; the running card shows Stuck after 7 minutes and stops nothing; the glossary says Stuck after 5 minutes.",
+   "res": "Closed (Todd, 28 Oct, decision 0024): Stuck after 7 minutes with no activity, and the machine never stops or pauses a quiet build. Todd gets a Linear notification and a Needs you item and chooses Resume, Start over or Stop. A provider that stays down shows as Stuck with that reason. The plan (PR 374) and glossary now say 7 minutes."
+  },
+  {
+   "id": "G6",
+   "stories": [
+    "S-18"
+   ],
+   "text": "What the \u24d8 before the cost line shows. Nothing settled it.",
+   "res": "Closed (Todd, 28 Oct, decision 0028): the \u24d8 is not built. The cost line stands alone; the cost split by role and model is on the card page."
+  },
+  {
+   "id": "G7",
+   "stories": [
+    "S-04",
+    "S-18"
+   ],
+   "text": "How a stage holding a stopped card looks on the board. Decision 0017 settled Stuck (pulsing) and the stages that open on load (running, stuck or waiting), but not stopped: the picture shows Remediation open with its count in rose.",
+   "res": "Closed (Todd, 28 Oct, decision 0029): a stopped card pulses exactly as Stuck does (pill, icon and the stage line, folded or open; static bolder rose with reduce-motion), whether it stopped after two failures or Todd stopped it himself, until he resumes it, starts it over or approves its restart. Its stage opens on load and its count is rose. This replaces decision 0017's \"Stuck is the one thing that moves\"."
+  },
+  {
+   "id": "G8",
+   "stories": [
+    "S-19"
+   ],
+   "text": "Where \"Read full plan\" opens: in place under the card, a page of its own, or Linear.",
+   "res": "Closed (Todd, 28 Oct, decision 0027): in place. The card expands on the board and shows the whole root-cause write-up and restart plan; the same button folds it again. No new screen."
+  }
+ ]
+}

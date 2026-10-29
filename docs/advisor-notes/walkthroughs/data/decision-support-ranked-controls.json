@@ -1,0 +1,145 @@
+{
+ "controls": [
+  {
+   "n": 1,
+   "x": -1,
+   "y": 29,
+   "name": "\"Back to board\" link",
+   "what": "Returns to the board.",
+   "from": "Fixed text.",
+   "status": "ok",
+   "stories": [
+    "S-01"
+   ],
+   "notes": []
+  },
+  {
+   "n": 2,
+   "x": -1,
+   "y": 29,
+   "name": "Profile icon",
+   "what": "A round profile button.",
+   "from": "Stitch frame. Not built (0069).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 3,
+   "x": -1,
+   "y": 100,
+   "name": "Top banner",
+   "what": "\"Pick the best model for each job\".",
+   "from": "Stitch frame. Not built; the Map / Ranked / Cards switch goes here instead (0069).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 4,
+   "x": -1,
+   "y": 200,
+   "name": "Role chips",
+   "what": "Same as the Map (0059).",
+   "from": "The Start screen's groups.",
+   "status": "build",
+   "stories": [
+    "S-51"
+   ],
+   "notes": []
+  },
+  {
+   "n": 5,
+   "x": -1,
+   "y": 255,
+   "name": "\"Live stats\" badge",
+   "what": "A badge.",
+   "from": "Stitch frame. Not built (0069).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 6,
+   "x": -1,
+   "y": 345,
+   "name": "Row header: rank, model, big figure",
+   "what": "The big figure is HITL interventions per slice; rows rank fewest first.",
+   "from": "The runner's kept record (0041) (0057, 0063).",
+   "status": "build",
+   "stories": [
+    "S-51"
+   ],
+   "notes": [
+    "Success rate moves to a small line under the bars (0063)."
+   ]
+  },
+  {
+   "n": 7,
+   "x": -1,
+   "y": 360,
+   "name": "Taglines",
+   "what": "\"High reliability \u00b7 Great autonomy\".",
+   "from": "Stitch's words. Not built (0063).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 8,
+   "x": -1,
+   "y": 455,
+   "name": "Bars",
+   "what": "Cost per slice, slices run, intervention time per slice, second-round rate and compactions per slice, each drawn against the role's other models with a tick at the median, saying better or worse than most.",
+   "from": "The runner's kept record (0041) (0063, 0064, 0066).",
+   "status": "build",
+   "stories": [
+    "S-51",
+    "S-46",
+    "S-47"
+   ],
+   "notes": []
+  },
+  {
+   "n": 9,
+   "x": -1,
+   "y": 556,
+   "name": "\"Based on last 14 days\"",
+   "what": "Which slices the ranking covers: all recorded slices, \"All 23 slices since 29 Oct\".",
+   "from": "The kept record (0063).",
+   "status": "build",
+   "stories": [
+    "S-51"
+   ],
+   "notes": []
+  },
+  {
+   "n": 10,
+   "x": -1,
+   "y": 556,
+   "name": "\"Tap to see 11 cards\"",
+   "what": "Opens this model's slices: \"See 11 slices\".",
+   "from": "0058, 0069.",
+   "status": "build",
+   "stories": [
+    "S-51"
+   ],
+   "notes": []
+  },
+  {
+   "n": 11,
+   "x": -1,
+   "y": 1505,
+   "name": "Suggestion",
+   "what": "As on the Map (0060).",
+   "from": "The weekly sweep.",
+   "status": "build",
+   "stories": [
+    "S-54"
+   ],
+   "notes": [
+    "Was \"Todd's Recommendation\" (0069)."
+   ]
+  }
+ ]
+}

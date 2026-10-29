@@ -1,0 +1,177 @@
+{
+ "controls": [
+  {
+   "n": 1,
+   "x": -1,
+   "y": 32,
+   "name": "\"Back to board\" link",
+   "what": "Returns to the board.",
+   "from": "Fixed text.",
+   "status": "ok",
+   "stories": [
+    "S-01"
+   ],
+   "notes": []
+  },
+  {
+   "n": 2,
+   "x": -1,
+   "y": 105,
+   "name": "Header box \"Card costs and runs\"",
+   "what": "A heading box.",
+   "from": "Stitch frame. Not built (0069).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 3,
+   "x": -1,
+   "y": 210,
+   "name": "Summary tiles",
+   "what": "HITL interventions per slice (with average time), typical cost per card, cards finished this month.",
+   "from": "The runner's kept record (0041) (0061).",
+   "status": "build",
+   "stories": [
+    "S-52"
+   ],
+   "notes": [
+    "Was success rate (0057)."
+   ]
+  },
+  {
+   "n": 4,
+   "x": -1,
+   "y": 250,
+   "name": "Cost strip (not drawn)",
+   "what": "One dot per finished card by cost, a dashed line at the 80th percentile, \"80% of cards cost under $X\"; tapping a dot opens the card. The per-card limit is read from it.",
+   "from": "The runner's kept record (0041) (0061, 0018).",
+   "status": "build",
+   "stories": [
+    "S-52"
+   ],
+   "notes": []
+  },
+  {
+   "n": 5,
+   "x": -1,
+   "y": 282,
+   "name": "Role and Model filters",
+   "what": "Filter cards by role and by the model that answered.",
+   "from": "0052, 0059.",
+   "status": "build",
+   "stories": [
+    "S-52"
+   ],
+   "notes": []
+  },
+  {
+   "n": 6,
+   "x": -1,
+   "y": 380,
+   "name": "Sort buttons",
+   "what": "Cost, Time, Rounds, HITL interventions.",
+   "from": "0061.",
+   "status": "build",
+   "stories": [
+    "S-52"
+   ],
+   "notes": []
+  },
+  {
+   "n": 7,
+   "x": -1,
+   "y": 460,
+   "name": "Card labels",
+   "what": "Complete or Closed, plus Interrupted when the card needed Todd.",
+   "from": "The card page's labels (0042, 0065).",
+   "status": "build",
+   "stories": [
+    "S-52"
+   ],
+   "notes": [
+    "Stitch's pills (High cost, Frugal run, Multi-round) are not built (0065)."
+   ]
+  },
+  {
+   "n": 8,
+   "x": -1,
+   "y": 540,
+   "name": "Card numbers",
+   "what": "Time, rounds, HITL interventions and cost, each against the typical finished card, for example \"3\u00d7 typical cost\".",
+   "from": "The runner's kept record (0041) (0064).",
+   "status": "build",
+   "stories": [
+    "S-52"
+   ],
+   "notes": []
+  },
+  {
+   "n": 9,
+   "x": -1,
+   "y": 583,
+   "name": "One-line note",
+   "what": "\"Multiple retry loops and schema debugging\".",
+   "from": "Stitch's words. Not built (0065).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 10,
+   "x": -1,
+   "y": 631,
+   "name": "\"Tap to view card details\"",
+   "what": "Opens the card page (picture 07).",
+   "from": "0042.",
+   "status": "build",
+   "stories": [
+    "S-52",
+    "S-56"
+   ],
+   "notes": []
+  },
+  {
+   "n": 11,
+   "x": -1,
+   "y": 1000,
+   "name": "Time per stage (not drawn)",
+   "what": "One bar per stage with the typical time a finished card spends there, split machine working and waiting on Todd; tapping a stage shows its playbook steps' typical times and its slowest cards.",
+   "from": "The runner's kept record (0041) (0067, 0070).",
+   "status": "build",
+   "stories": [
+    "S-57",
+    "S-49"
+   ],
+   "notes": []
+  },
+  {
+   "n": 12,
+   "x": -1,
+   "y": 1200,
+   "name": "\"Failed the first time\" (not drawn)",
+   "what": "\"Failed the first time: 7 of 120 lines\", opening every line ever Not proven with its card, the checker's reason and whether the next round fixed it.",
+   "from": "Verdicts as data (B-05, 0068).",
+   "status": "build",
+   "stories": [
+    "S-58"
+   ],
+   "notes": []
+  },
+  {
+   "n": 13,
+   "x": -1,
+   "y": 1500,
+   "name": "Suggestion",
+   "what": "As on the Map (0060).",
+   "from": "The weekly sweep.",
+   "status": "build",
+   "stories": [
+    "S-54"
+   ],
+   "notes": [
+    "Was \"Todd's Observation\" (0069)."
+   ]
+  }
+ ]
+}
