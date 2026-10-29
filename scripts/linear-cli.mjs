@@ -207,7 +207,10 @@ async function main() {
   const [command, identifier, ...rest] = process.argv.slice(2);
   const apiKey = process.env.LINEAR_API_KEY;
   try {
-    if (command === 'get-issue') {
+    if (command === 'list-ready') {
+      const { listReady } = await import('../dashboard/lib/linear.js');
+      console.log(JSON.stringify(await listReady({ apiKey }), null, 2));
+    } else if (command === 'get-issue') {
       const issue = await getIssue(identifier, { apiKey });
       console.log(JSON.stringify(issue, null, 2));
     } else if (command === 'comment') {
@@ -215,7 +218,7 @@ async function main() {
       const comment = await postComment(identifier, body, { apiKey });
       console.log(JSON.stringify(comment, null, 2));
     } else {
-      console.error('usage: linear-cli.mjs get-issue <ID> | comment <ID> <body>');
+      console.error('usage: linear-cli.mjs list-ready | get-issue <ID> | comment <ID> <body>');
       process.exitCode = 2;
     }
   } catch (error) {

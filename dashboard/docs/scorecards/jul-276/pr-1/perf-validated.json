@@ -1,0 +1,413 @@
+{
+  "at": "2026-10-28T20:08:49.750Z",
+  "expected": [
+    {
+      "id": "d8663210-f4f4-4d89-a54d-9518cbcd3030",
+      "identifier": "JUL-280",
+      "title": "Practice: JUL-276 document dashboard loading and errors",
+      "createdAt": "2026-10-28T18:55:38.148Z"
+    },
+    {
+      "id": "67ed8e66-41ef-44ba-b1dd-b5eaaff9fdf1",
+      "identifier": "JUL-279",
+      "title": "Practice: JUL-276 document the Ready card journey",
+      "createdAt": "2026-10-28T18:55:37.773Z"
+    },
+    {
+      "id": "9800e503-61b1-4ffd-b9dc-a297833e6db9",
+      "identifier": "JUL-276",
+      "title": "Start a build from the dashboard and stop it",
+      "createdAt": "2026-10-28T13:56:05.984Z"
+    }
+  ],
+  "failures": 0,
+  "pass": true,
+  "method": "Production Next 16.3.5. Five sets of ten sequential curl requests. Each timed response itself validated. First three sets implement approved fixed 1500 ms TTFB rule. Two supplementary sets check reproducibility. Full response separately retained because streaming TTFB precedes Linear completion. No comparative speedup claim.",
+  "runs": [
+    {
+      "run": 1,
+      "samples": [
+        {
+          "ttfbMs": 18.904,
+          "fullResponseMs": 135.206,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 10.935,
+          "fullResponseMs": 135.744,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 14.774000000000001,
+          "fullResponseMs": 129.09300000000002,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 10.791,
+          "fullResponseMs": 122.476,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.016,
+          "fullResponseMs": 448.727,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.181999999999999,
+          "fullResponseMs": 127.26399999999998,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 10.992,
+          "fullResponseMs": 158.918,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.869,
+          "fullResponseMs": 118.73400000000001,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 10.982000000000001,
+          "fullResponseMs": 173.27,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.861,
+          "fullResponseMs": 121.372,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        }
+      ],
+      "medianTtfbMs": 10.863,
+      "medianFullResponseMs": 132.1495
+    },
+    {
+      "run": 2,
+      "samples": [
+        {
+          "ttfbMs": 9.671000000000001,
+          "fullResponseMs": 100.127,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.94,
+          "fullResponseMs": 133.659,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.440000000000001,
+          "fullResponseMs": 101.938,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 7.212,
+          "fullResponseMs": 116.777,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.054,
+          "fullResponseMs": 111.068,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.192,
+          "fullResponseMs": 119.422,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.072000000000001,
+          "fullResponseMs": 102.37400000000001,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.743,
+          "fullResponseMs": 118.56099999999999,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 10.206,
+          "fullResponseMs": 117.142,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 7.747000000000001,
+          "fullResponseMs": 799.577,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        }
+      ],
+      "medianTtfbMs": 9.063,
+      "medianFullResponseMs": 116.95949999999999
+    },
+    {
+      "run": 3,
+      "samples": [
+        {
+          "ttfbMs": 7.799,
+          "fullResponseMs": 128.40099999999998,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.175999999999998,
+          "fullResponseMs": 104.27799999999999,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 7.492999999999999,
+          "fullResponseMs": 100.968,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 7.4479999999999995,
+          "fullResponseMs": 134.864,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 7.368,
+          "fullResponseMs": 98.539,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 10.05,
+          "fullResponseMs": 116.74900000000001,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.697999999999999,
+          "fullResponseMs": 106.725,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.598,
+          "fullResponseMs": 113.308,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 7.657,
+          "fullResponseMs": 106.244,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.213,
+          "fullResponseMs": 111.441,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        }
+      ],
+      "medianTtfbMs": 7.987499999999999,
+      "medianFullResponseMs": 109.083
+    },
+    {
+      "run": 4,
+      "samples": [
+        {
+          "ttfbMs": 7.651,
+          "fullResponseMs": 99.941,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 7.594,
+          "fullResponseMs": 100.453,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.684999999999999,
+          "fullResponseMs": 108.89500000000001,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 12.205,
+          "fullResponseMs": 98.482,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.714,
+          "fullResponseMs": 103.15299999999999,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 7.828999999999999,
+          "fullResponseMs": 117.601,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 6.868,
+          "fullResponseMs": 274.973,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.451,
+          "fullResponseMs": 118.226,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.528,
+          "fullResponseMs": 107.779,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.003,
+          "fullResponseMs": 123.147,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        }
+      ],
+      "medianTtfbMs": 8.227,
+      "medianFullResponseMs": 108.337
+    },
+    {
+      "run": 5,
+      "samples": [
+        {
+          "ttfbMs": 7.32,
+          "fullResponseMs": 100.968,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 7.783,
+          "fullResponseMs": 134.761,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 7.433999999999999,
+          "fullResponseMs": 112.891,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 7.823999999999999,
+          "fullResponseMs": 121.297,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.519,
+          "fullResponseMs": 105.044,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.238000000000001,
+          "fullResponseMs": 113.226,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 9.75,
+          "fullResponseMs": 113.24900000000001,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.985,
+          "fullResponseMs": 185.4,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.687000000000001,
+          "fullResponseMs": 188.454,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        },
+        {
+          "ttfbMs": 8.762,
+          "fullResponseMs": 106.261,
+          "bytes": 9688,
+          "status": 200,
+          "validatedCards": 3
+        }
+      ],
+      "medianTtfbMs": 8.3785,
+      "medianFullResponseMs": 113.23750000000001
+    }
+  ]
+}
