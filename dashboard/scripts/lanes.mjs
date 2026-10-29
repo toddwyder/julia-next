@@ -205,14 +205,18 @@ lane(7, 'list every model with a price, grouped by account', 'phone', async page
   assert.ok(accounts.length >= 2, `expected account headings, saw ${accounts}`);
   const rows = await dialog.locator('ul li button').evaluateAll(nodes => nodes.map(node => node.innerText.replace(/\n+/g, ' ')));
   for (const row of rows) assert.match(row, /↓\$|Free\b/, `model without a price: ${row}`);
+  const twice = rows.filter((row, index) => rows.indexOf(row) !== index);
+  assert.deepEqual(twice, [], `the picker lists a name and price twice: ${twice.join(', ')}`);
   const commandCode = page.locator('section[aria-label^="CommandCode"]');
   assert.equal(await commandCode.count(), 1, 'the CommandCode account heading should be there');
   const commandCodeRows = await commandCode.locator('ul li button').evaluateAll(nodes => nodes.map(node => node.innerText.replace(/\n+/g, ' ')));
-  assert.equal(commandCodeRows.length, 2, `CommandCode should list two models, saw ${commandCodeRows.join(' / ')}`);
-  assert.ok(commandCodeRows[0].startsWith('DeepSeek V4.1 Flash'), `first CommandCode model: ${commandCodeRows[0]}`);
-  assert.ok(commandCodeRows[1].startsWith('Kimi K3.1 Pro'), `second CommandCode model: ${commandCodeRows[1]}`);
+  const commandCodeNames = commandCodeRows.map(modelName);
+  assert.ok(commandCodeRows.length >= 20, `CommandCode should list the models its grant offers, saw ${commandCodeRows.length}: ${commandCodeNames.join(' / ')}`);
+  for (const expected of ['DeepSeek V4.1 Flash', 'Kimi K3.1 Pro', 'MiniMax M2.5', 'Qwen 3.8 Max', 'Kimi K3']) {
+    assert.ok(commandCodeNames.includes(expected), `CommandCode is missing ${expected}: ${commandCodeNames.join(' / ')}`);
+  }
   await dialog.getByRole('button', { name: 'Close the model list' }).click();
-  return `${rows.length} models, every one priced, under ${accounts.length} account headings; CommandCode lists ${commandCodeRows.length}: DeepSeek V4.1 Flash, Kimi K3.1 Pro`;
+  return `${rows.length} models, every one priced, under ${accounts.length} account headings; CommandCode lists ${commandCodeRows.length} including DeepSeek V4.1 Flash and Kimi K3.1 Pro`;
 });
 
 lane(8, 'read a role note on a phone', 'phone', async page => {

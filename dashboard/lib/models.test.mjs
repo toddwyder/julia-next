@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   parseAnthropicPrices, parseCommandCodePrices, parseOpenAIPrices, parsePrices,
-  mergeSweep, readModels, startModels, priceLabel, stateDir,
+  mergeSweep, onePerName, readModels, startModels, priceLabel, stateDir,
 } from './models.js';
 
 const fixture = name => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -95,6 +95,30 @@ test('a model without a price on disk never reaches the Start screen', () => {
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('one model offered by two accounts shows once', () => {
+  const rows = [
+    { id: 'anthropic/claude-opus-5-5', provider: 'anthropic', displayName: 'Claude Opus 5.5', ...priced(4, 20) },
+    { id: 'commandcode/claude-opus-5-5', provider: 'commandcode', displayName: 'Claude Opus 5.5', ...priced(4, 20) },
+  ];
+  assert.deepEqual(onePerName(rows).map(row => row.id), ['anthropic/claude-opus-5-5']);
+});
+
+test('an alias and its dated snapshot show once, and a clash at another price stays twice', () => {
+  const rows = [
+    { id: 'anthropic/claude-haiku-4-5-20251001', provider: 'anthropic', displayName: 'Claude Haiku 4.5', ...priced(1, 5) },
+    { id: 'anthropic/claude-haiku-4-5', provider: 'anthropic', displayName: 'Claude Haiku 4.5', ...priced(1, 5) },
+    { id: 'anthropic/claude-opus-4-5', provider: 'anthropic', displayName: 'Claude Opus 4.5', ...priced(5, 25) },
+    { id: 'commandcode/claude-opus-4-5', provider: 'commandcode', displayName: 'Claude Opus 4.5', ...priced(9, 40) },
+    { id: 'openai/gpt-6.1-sol', provider: 'openai', displayName: 'GPT-6.1 Sol', ...priced(2, 10) },
+  ];
+  const kept = onePerName(rows);
+  const seenRows = kept.map(row => `${row.displayName} ${row.inputPerMillion}/${row.outputPerMillion}`);
+  assert.equal(new Set(seenRows).size, seenRows.length, `the picker lists a row twice: ${seenRows.join(', ')}`);
+  assert.equal(kept.filter(row => row.displayName === 'Claude Haiku 4.5').length, 1);
+  assert.deepEqual(kept.filter(row => row.displayName === 'Claude Opus 4.5').map(row => row.id).sort(),
+    ['anthropic/claude-opus-4-5', 'commandcode/claude-opus-4-5']);
 });
 
 test('the Start screen picks the saved defaults, and falls back when one is gone', () => {

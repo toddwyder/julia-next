@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-import { mergeSweep, parsePrices, stateDir } from '../lib/models.js';
+import { accountProviders, mergeSweep, parsePrices, stateDir } from '../lib/models.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dashboardRoot = dirname(here);
@@ -97,25 +97,38 @@ export function appendLog(directory, entry) {
   appendFileSync(join(directory, 'sweep-log.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`);
 }
 
-export async function sweep({ env = process.env, directory = stateDir(env), fetchImpl = fetch, now = new Date() } = {}) {
+export async function sweep({
+  env = process.env,
+  directory = stateDir(env),
+  fetchImpl = fetch,
+  now = new Date(),
+  listModels = availableModels,
+} = {}) {
   const accounts = readConfig('accounts.json').accounts;
   const sources = readConfig('price-sources.json');
   const defaults = readConfig('defaults.json');
 
-  const all = await availableModels(env);
-  const wanted = new Set(accounts.map(account => account.provider));
+  const all = await listModels(env);
   const perAccount = accounts.map(account => {
-    const models = all.filter(model => model.provider === account.provider);
-    return { id: account.id, name: account.name, provider: account.provider, models };
+    const providers = accountProviders(account);
+    return {
+      id: account.id,
+      name: account.name,
+      providers,
+      models: all.filter(model => providers.includes(model.provider)),
+    };
   });
   if (perAccount.every(account => account.models.length === 0)) {
     throw new Error('No account reported any model. The sweep wrote nothing.');
   }
 
+  // One pricing page serves every provider name its account answers to.
   const prices = {};
-  for (const [provider, source] of Object.entries(sources)) {
-    if (!wanted.has(provider)) continue;
-    prices[provider] = await fetchPrices(source, { fetchImpl, now });
+  for (const account of perAccount) {
+    const source = sources[account.id];
+    if (!source) continue;
+    const rows = await fetchPrices(source, { fetchImpl, now });
+    for (const provider of account.providers) prices[provider] = rows;
   }
 
   const available = perAccount.flatMap(account => account.models);
@@ -140,7 +153,7 @@ export async function sweep({ env = process.env, directory = stateDir(env), fetc
     accounts: perAccount.map(account => ({
       id: account.id,
       name: account.name,
-      provider: account.provider,
+      providers: account.providers,
       modelCount: account.models.length,
     })),
     models: merged.models,

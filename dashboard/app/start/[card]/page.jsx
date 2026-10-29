@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { connection } from 'next/server';
 import ROLES from '../../../config/roles.json';
 import { getReadyCard } from '../../../lib/linear.js';
-import { displayName, priceLabel, readModels, startModels } from '../../../lib/models.js';
+import { accountProviders, displayName, onePerName, priceLabel, readModels, startModels } from '../../../lib/models.js';
 import { initialChoice, mergeDraft } from '../../../lib/roles.js';
 import { readJsonRecord, stateFolder, writeJsonRecord } from '../../../lib/state.js';
 import StartScreen from './start-screen.jsx';
@@ -19,10 +19,11 @@ function sweepDay(date) {
 }
 
 // Only a model the sweep recorded a price for may reach the screen, even if the file was
-// edited by hand. A free model is priced at zero, so it counts as priced.
+// edited by hand. A free model is priced at zero, so it counts as priced. One row per name:
+// an alias and its dated snapshot are the same model to the person choosing.
 function pricedModels(saved) {
-  return (saved.models ?? []).filter(model => model.free === true
-    || (Number.isFinite(model.inputPerMillion) && Number.isFinite(model.outputPerMillion)));
+  return onePerName((saved.models ?? []).filter(model => model.free === true
+    || (Number.isFinite(model.inputPerMillion) && Number.isFinite(model.outputPerMillion))));
 }
 
 const modelLine = model => ({ name: model.displayName ?? displayName(model), price: priceLabel(model) });
@@ -86,13 +87,23 @@ export default async function StartPage({ params }) {
   const choice = draft && fresh
     ? mergeDraft({ saved: draft, fallback: fresh, modelIds: models.map(model => model.id) })
     : fresh;
-  const accountNames = new Map((saved?.accounts ?? []).map(account => [account.provider, account.name]));
-  const accountRank = provider => (saved?.accounts ?? []).findIndex(account => account.provider === provider);
+  // One account can answer to more than one provider name: Mastra Code lists the CommandCode
+  // models as both `commandcode/…` and `mastracode/commandcode/…`.
+  const savedAccounts = saved?.accounts ?? [];
+  const providersOf = account => accountProviders(account);
+  const accountFor = provider => savedAccounts.find(account => providersOf(account).includes(provider));
+  const accountRank = provider => savedAccounts.findIndex(account => providersOf(account).includes(provider));
+  const accounts = savedAccounts.map(account => ({
+    id: account.id,
+    name: account.name,
+    modelCount: models.filter(model => providersOf(account).includes(model.provider)).length,
+  }));
   const picks = models
     .map(model => ({
       id: model.id,
+      provider: model.provider,
       ...modelLine(model),
-      account: accountNames.get(model.provider) ?? model.provider,
+      account: accountFor(model.provider)?.name ?? model.provider,
     }))
     .sort((left, right) => (accountRank(left.provider) - accountRank(right.provider)) || left.name.localeCompare(right.name));
 
@@ -113,7 +124,7 @@ export default async function StartPage({ params }) {
         <section className={styles.section} aria-labelledby="prices-heading">
           <h2 id="prices-heading">Prices</h2>
           <p className={styles.sources}>Prices paid per million tokens. ↓ is what you are charged for what you send, ↑ for what the model writes. Read from each provider&apos;s pricing page on {sweepDay(saved.sweptAt)}.</p>
-          <ul className={styles.accounts}>{saved.accounts.map(account => <li key={account.id}>
+          <ul className={styles.accounts}>{accounts.map(account => <li key={account.id}>
             <span className={styles.model}>{account.name}</span> <span className={styles.price}>{account.modelCount} {account.modelCount === 1 ? 'model' : 'models'}</span>
           </li>)}</ul>
         </section>

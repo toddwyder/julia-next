@@ -3,17 +3,17 @@
     {
       "id": "claude",
       "name": "Claude subscription",
-      "provider": "anthropic"
+      "providers": ["anthropic"]
     },
     {
       "id": "chatgpt",
       "name": "ChatGPT plan",
-      "provider": "openai"
+      "providers": ["openai"]
     },
     {
       "id": "commandcode",
       "name": "CommandCode grant",
-      "provider": "mastracode/commandcode"
+      "providers": ["commandcode", "mastracode/commandcode"]
     }
   ]
 }
