@@ -35,6 +35,22 @@ function repository() {
       git(source, 'push', 'origin', 'main');
       return head(source);
     },
+    topic(text = 'branch work') {
+      git(source, 'checkout', '-b', 'topic', 'main');
+      writeFileSync(join(source, 'file.txt'), `${text}\n`);
+      git(source, 'add', '.');
+      git(source, 'commit', '-m', text);
+      git(source, 'push', 'origin', 'topic');
+      const tip = head(source);
+      git(source, 'checkout', 'main');
+      return tip;
+    },
+    squashMerge(text = 'topic squashed') {
+      git(source, 'merge', '--squash', 'topic');
+      git(source, 'commit', '-m', text);
+      git(source, 'push', 'origin', 'main');
+      return head(source);
+    },
     clean: () => rmSync(root, { recursive: true, force: true }),
   };
 }
@@ -103,7 +119,7 @@ test('a checkout already at the ref is left alone and never rebuilt', () => {
   }
 });
 
-test('an update fast-forwards, rebuilds, restarts the unit and records the served commit', () => {
+test('an update moves the checkout onto the ref, rebuilds, restarts the unit and records the served commit', () => {
   const repo = repository();
   try {
     const before = head(repo.checkout);
@@ -124,42 +140,61 @@ test('an update fast-forwards, rebuilds, restarts the unit and records the serve
       'git -C ' + repo.checkout + ' fetch',
       'git -C ' + repo.checkout + ' rev-parse',
       'git -C ' + repo.checkout + ' rev-parse',
-      'git -C ' + repo.checkout + ' merge-base',
-      'git -C ' + repo.checkout + ' merge',
+      'git -C ' + repo.checkout + ' checkout',
       'git -C ' + repo.checkout + ' rev-parse',
       'npm ci',
       'npm run build',
       'sudo -n systemctl restart',
     ]);
-    const merge = calls.find(call => call.command === 'git' && call.args.includes('merge'));
-    assert.deepEqual(merge.args.slice(-2), ['--ff-only', target]);
+    const move = calls.find(call => call.command === 'git' && call.args.includes('checkout'));
+    assert.deepEqual(move.args.slice(-2), ['--detach', target]);
     assert.equal(calls.find(call => call.command === 'npm').cwd, join(repo.checkout, 'dashboard'));
     assert.deepEqual(calls.find(call => call.command === 'sudo').args, ['-n', 'systemctl', 'restart', 'julia-dashboard']);
     assert.deepEqual(JSON.parse(readFileSync(join(repo.state, 'state', 'build.json'), 'utf8')), {
       commit: target, ref: 'origin/main', updatedAt: '2026-10-29T10:00:00.000Z', previous: before, checkout: repo.checkout,
     });
-    assert.deepEqual(logged.map(line => JSON.parse(line.replace('julia-dashboard: ', '')).phase), ['decide', 'fetch', 'resolve', 'compare', 'fast-forward', 'install', 'build', 'restart', 'record']);
+    assert.deepEqual(logged.map(line => JSON.parse(line.replace('julia-dashboard: ', '')).phase), ['decide', 'fetch', 'resolve', 'compare', 'move', 'install', 'build', 'restart', 'record']);
   } finally {
     repo.clean();
   }
 });
 
-test('a checkout that cannot fast-forward stops the update before any build or restart', () => {
+test('a squash merge leaves the branch tip off main, and the updater moves the checkout onto main by itself', () => {
+  const repo = repository();
+  try {
+    const tip = repo.topic();
+    git(repo.checkout, 'fetch', 'origin');
+    git(repo.checkout, 'checkout', '--detach', tip);
+    const merged = repo.squashMerge();
+    assert.throws(() => execFileSync('git', ['-C', repo.checkout, 'merge-base', '--is-ancestor', merged, tip], { stdio: 'ignore' }),
+      'the squash merge commit is not an ancestor of the branch tip, so no fast-forward can reach it');
+
+    const run = (command, args) => (command === 'git' ? execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() : '');
+    const result = runUpdate({ env: repo.env, run, log: () => {}, entries: [] });
+
+    assert.equal(result.action, 'updated');
+    assert.equal(result.commit, merged);
+    assert.equal(result.previous, tip);
+    assert.equal(head(repo.checkout), merged);
+  } finally {
+    repo.clean();
+  }
+});
+
+test('local changes that block the move stop the update before any build or restart', () => {
   const repo = repository();
   try {
     repo.advance();
-    writeFileSync(join(repo.checkout, 'local.txt'), 'local work\n');
-    git(repo.checkout, 'add', '.');
-    git(repo.checkout, 'commit', '-m', 'local');
+    writeFileSync(join(repo.checkout, 'file.txt'), 'local work\n');
     const calls = [];
     const run = (command, args, options = {}) => {
       calls.push({ command, args, cwd: options.cwd });
       if (command === 'git') return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-      return '';
+      throw new Error(`unexpected command: ${command}`);
     };
     const result = runUpdate({ env: repo.env, run, log: () => {}, entries: [] });
     assert.equal(result.action, 'failed');
-    assert.equal(result.phase, 'fast-forward');
+    assert.equal(result.phase, 'move');
     assert.deepEqual(calls.filter(call => call.command !== 'git'), []);
   } finally {
     repo.clean();
@@ -185,35 +220,19 @@ test('the ref under watch is DASHBOARD_UPDATE_REF, so a lane can watch a real fa
   }
 });
 
-test('a checkout ahead of the ref stands still instead of reporting a build it never made', () => {
-  const repo = repository();
-  try {
-    git(repo.checkout, 'commit', '--allow-empty', '-m', 'local work');
-    const ahead = head(repo.checkout);
-    const run = (command, args) => (command === 'git' ? execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() : '');
-    const result = runUpdate({ env: repo.env, run, log: () => {}, entries: [] });
-    assert.equal(result.action, 'up-to-date');
-    assert.equal(result.commit, ahead);
-    assert.equal(result.updated, false);
-    assert.equal(head(repo.checkout), ahead);
-  } finally {
-    repo.clean();
-  }
-});
-
-test('a merge that leaves the checkout behind is a failure, not a recorded build', () => {
+test('a move that leaves the checkout off the ref is a failure, not a recorded build', () => {
   const repo = repository();
   try {
     repo.advance();
     const record = join(repo.state, 'state', 'build.json');
     const run = (command, args) => {
       if (command !== 'git') throw new Error(`unexpected command: ${command}`);
-      if (args.includes('merge')) return '';
+      if (args.includes('checkout')) return '';
       return execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
     };
     const result = runUpdate({ env: repo.env, run, log: () => {}, entries: [] });
     assert.equal(result.action, 'failed');
-    assert.equal(result.phase, 'fast-forward');
+    assert.equal(result.phase, 'move');
     assert.equal(existsSync(record), false);
   } finally {
     repo.clean();

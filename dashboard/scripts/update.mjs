@@ -44,15 +44,6 @@ function runCommand(command, args, { capture = true, cwd } = {}) {
 
 const isSha = value => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
 
-function checkoutIsAhead({ checkout, head, target, run }) {
-  try {
-    run('git', ['-C', checkout, 'merge-base', '--is-ancestor', target, head]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function runUpdate({ env = process.env, run = runCommand, log = line => console.log(`julia-dashboard: ${line}`), now = () => new Date().toISOString(), entries } = {}) {
   const decided = entries ?? readRuns(env).entries;
   const checkout = checkoutDir(env);
@@ -95,23 +86,22 @@ export function runUpdate({ env = process.env, run = runCommand, log = line => c
     step('compare', { status: 'ok', action: 'up-to-date', commit: head });
     return { action: 'up-to-date', commit: head, checkout, ref, updated: false };
   }
-  if (checkoutIsAhead({ checkout, head, target, run })) {
-    step('compare', { status: 'ok', action: 'ahead', commit: head, target });
-    return { action: 'up-to-date', commit: head, checkout, ref, updated: false };
-  }
-  step('compare', { status: 'ok', action: 'behind', head, target });
 
-  if (!attempt('fast-forward', 'git', ['-C', checkout, 'merge', '--ff-only', target]).ok) return { action: 'failed', phase: 'fast-forward', checkout, ref, updated: false };
+  // The deploy checkout follows the ref and nothing else, so it is moved onto it rather than merged
+  // into. A squash merge puts a commit on main that the branch tip is not an ancestor of, and any
+  // rule that compares ancestry would stand still there, serving an old build forever.
+  step('compare', { status: 'ok', action: 'move', head, target });
+  if (!attempt('move', 'git', ['-C', checkout, 'checkout', '--detach', target]).ok) return { action: 'failed', phase: 'move', checkout, ref, updated: false };
   let served = head;
   try {
     served = run('git', ['-C', checkout, 'rev-parse', 'HEAD']);
   } catch (error) {
-    step('fast-forward', { status: 'failed', error: firstLine(error.message) });
-    return { action: 'failed', phase: 'fast-forward', checkout, ref, updated: false };
+    step('move', { status: 'failed', error: firstLine(error.message) });
+    return { action: 'failed', phase: 'move', checkout, ref, updated: false };
   }
   if (served !== target) {
-    step('fast-forward', { status: 'failed', error: `checkout stands at ${served}, wanted ${target}` });
-    return { action: 'failed', phase: 'fast-forward', checkout, ref, updated: false };
+    step('move', { status: 'failed', error: `checkout stands at ${served}, wanted ${target}` });
+    return { action: 'failed', phase: 'move', checkout, ref, updated: false };
   }
   const app = join(checkout, 'dashboard');
   if (!attempt('install', 'npm', ['ci'], { cwd: app, capture: false }).ok) return { action: 'failed', phase: 'install', checkout, ref, updated: false };

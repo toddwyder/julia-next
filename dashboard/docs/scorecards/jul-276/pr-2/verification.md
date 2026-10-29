@@ -71,7 +71,7 @@ above changed.
 | The page answers on the tailnet address | `curl -sS -o /dev/null -w '%{http_code}' http://ovh.tail91f394.ts.net:4313/` returns `200`, and `/api/health` returns `200 {"status":"ok"}` with `linear: Linear answered`, `state: /var/lib/julia-dashboard/state is writable`, `runs: 0 run files parse`. The same two calls on `http://100.119.112.9:4313` return `200` and the same body. |
 | The updater came back | `systemctl list-timers julia-dashboard-update.timer` shows it active with a next elapse; its first run after boot is `03:21:47` and it has run every five minutes since, the last at `04:02:37`. |
 | The watchdog came back | The timer is active with a next elapse; the first probe after boot is `03:21:15` and the latest `04:06:22`, every one `probe: ok`, `consecutiveFailures: 0`. |
-| It serves the merged build | `state/build.json` says `commit 670825c249edf3dbaceb48d4e56bd1ee20315eeb`, `ref origin/feat/jul-276-service`. This commit is the head of the branch being merged and is ahead of `main` (`4669edc`), which the updater logged at `04:02:37` as `{"phase":"compare","action":"ahead","target":"4669edc…"}` and then stopped without rebuilding. Once the merge puts `670825c` in `main`, target equals head and the timer records the same commit with no action taken; that is the one line to read back after the merge. |
+| It serves the merged build | At boot `state/build.json` said `commit 670825c249edf3dbaceb48d4e56bd1ee20315eeb`, `ref origin/feat/jul-276-service`, which is the head of the branch being merged and ahead of `main` (`4669edc`); the updater logged `{"action":"update","target":"4669edc…"}` at `04:02:37` and stood still, as recorded under "A merge needs nothing from a person" below. This row can only pass after the merge, so it was left open rather than rewritten. After the merge the updater moves the checkout onto `origin/main` and the row to read back is `state/build.json`'s `commit`, which must equal `git -C /home/ubuntu/julia-dashboard rev-parse origin/main`. |
 
 The app's first line is shortened by the 1Password wrapper the unit runs under: the project name
 inside `julia-dashboard: starting from /home/ubuntu/julia-dashboard/dashboard/` is replaced by a
@@ -117,68 +117,75 @@ treats an ahead checkout as up to date, re-reads `HEAD` after the merge, and sto
 building when the checkout is somewhere else. Two unit tests cover both cases, and both were shown red with the fix removed and green with it
 back (see "Red then green" below).
 
-## Red then green: the updater fix tests
+## Red then green: the updater moves the checkout onto main
 
-The two tests that cover the updater defect were each run against the code before the fix
-(`git show e693d67:dashboard/scripts/update.mjs`) and then against the fixed code.
+The updater used to compare ancestry and either fast-forward or stand still. Todd asked for the
+opposite after his UAT yes: the deploy checkout follows `main` and nothing else, so after a squash
+merge it must move onto the ref by itself. The two `ahead` and `ff-only` tests from the earlier
+round were replaced by the tests below, because the rule they pinned is the one that is now gone.
 
-Without the fix:
+The new tests were run against the code before this change
+(`git show 4aa4cac:dashboard/scripts/update.mjs`) and then against the changed code.
+
+Without the change:
 
 ```text
-✖ a checkout ahead of the ref stands still instead of reporting a build it never made (294.98ms)
-✖ a merge that leaves the checkout behind is a failure, not a recorded build (218.81ms)
-ℹ tests 2
-ℹ pass 0
-ℹ fail 2
+✖ an update moves the checkout onto the ref, rebuilds, restarts the unit and records the served commit
+✖ a squash merge leaves the branch tip off main, and the updater moves the checkout onto main by itself
+✖ local changes that block the move stop the update before any build or restart
+✖ a move that leaves the checkout off the ref is a failure, not a recorded build
+ℹ tests 10
+ℹ pass 6
+ℹ fail 4
 ```
 
-The failures are the defect itself: the ahead case returned `updated` where the test expects
-`up-to-date`, and the behind case returned action `install` where it expects phase
-`fast-forward`.
+The squash test fails as `actual: 'failed'` where it expects `'updated'`: `main`'s squash commit is
+not an ancestor of the branch tip, so the old `merge --ff-only` cannot reach it and the update
+stops with the server still serving the tested build. That is the defect Todd asked to remove.
 
-With the fix back:
+With the change back:
 
 ```text
-✔ a checkout ahead of the ref stands still instead of reporting a build it never made (146.85ms)
-✔ a merge that leaves the checkout behind is a failure, not a recorded build (183.86ms)
-ℹ tests 2
-ℹ pass 2
+✔ an update moves the checkout onto the ref, rebuilds, restarts the unit and records the served commit
+✔ a squash merge leaves the branch tip off main, and the updater moves the checkout onto main by itself
+✔ local changes that block the move stop the update before any build or restart
+✔ a move that leaves the checkout off the ref is a failure, not a recorded build
+ℹ tests 10
+ℹ pass 10
 ℹ fail 0
 ```
 
 Command for both runs, with the file swapped between them:
 
 ```sh
-node --test --test-name-pattern="checkout ahead of the ref|merge that leaves the checkout behind" scripts/update.test.mjs
+node --test scripts/update.test.mjs
 ```
 
-## The merge step needs no ref reset
+The squash test builds the real shape: a topic branch pushed, the checkout detached on its tip,
+then a `merge --squash` commit on `main`, and it first asserts that `merge-base --is-ancestor` says
+the merge commit is not an ancestor of the tip. That assertion is what makes the test about squash
+merges rather than about any move.
+
+## A merge needs nothing from a person
 
 Verifying a branch on the real service used to write that branch into
-`/etc/julia-dashboard.env`, which left a manual "point it back at main" step after the merge. That
-step is gone rather than remembered: `envFileContent` always writes
-`DASHBOARD_UPDATE_REF=origin/main`, and the installer passes `--ref` only to the single sync run
-(`installSyncEnv`), so the installed unit follows main from the moment it is enabled.
+`/etc/julia-dashboard.env`. `envFileContent` always writes `DASHBOARD_UPDATE_REF=origin/main`, and
+the installer passes `--ref` only to the single sync run (`installSyncEnv`), so the installed unit
+follows main from the moment it is enabled and no ref is put back afterwards.
 
-Evidence, in order:
+The checkout is the same story, moved out of prose and into the updater: when the checkout is not
+at the ref, `update.mjs` runs `git checkout --detach <ref>` and then verifies `HEAD` is the ref
+before it installs, builds and restarts. It no longer compares ancestry, so a squash merge is not
+a special case.
 
 | Check | Evidence |
 | --- | --- |
-| The env file cannot take a branch | unit test `a branch ref is a one-time sync and never reaches the env file`: `envFileContent({ ref: 'origin/feat/jul-276-service' })` still yields `origin/main`; the test fails with the pin removed and passes with it back |
+| The env file cannot take a branch | unit test `a branch ref is a one-time sync and never reaches the env file`: `envFileContent({ ref: 'origin/feat/jul-276-service' })` still yields `origin/main` |
 | The live env file follows main | `/etc/julia-dashboard.env` reads `DASHBOARD_UPDATE_REF=origin/main` |
-| Main being behind is not a rebuild | updater ran with the installed settings and logged `{"phase":"compare","action":"ahead","commit":"4d11c7c…","target":"4669edc…"}`, then stopped: no `npm ci`, no build, no restart, and the built commit stayed `4d11c7c` |
-| A merge needs no ref reset | the env file already reads `origin/main` before the merge, and the merge step only detaches the deploy checkout onto `origin/main`; nothing points the server at a branch |
-
-So the answer to "where does pointing it back at main happen" is: at install time, in
-`dashboard/scripts/install-service.mjs`, which never stores a branch. Merge time touches the env
-file not at all, and the merge step itself is written down in `docs/agents/server-runbook.md` under
-"Merging a dashboard pull request": squash-merge, fetch, detach the deploy checkout onto
-`origin/main`, start the update service, then read `build.json`'s `commit` against `origin/main`.
-
-That detach is in the written step because the deploy checkout stands on the branch tip and a
-squash merge does not make that tip an ancestor of `main`; the updater compares with
-`merge-base --is-ancestor` and reports `ahead` rather than fast-forwarding, so without the detach
-the server would keep serving the tested build while claiming it was up to date.
+| A squash merge is moved onto main | `node --test scripts/update.test.mjs`: the squash test above, red without the change and green with it |
+| A move that does not land is a failure | test `a move that leaves the checkout off the ref is a failure, not a recorded build`: no `build.json` is written |
+| Local changes still stop it | test `local changes that block the move stop the update before any build or restart`: phase `move`, no `npm ci`, no build, no restart |
+| Nothing is left to remember | `docs/agents/server-runbook.md` "Merging a dashboard pull request" is now `gh pr merge <number> --squash --delete-branch`; the fetch, detach and manual start are gone |
 
 ## Health (lanes 7, 8, 9)
 
@@ -236,6 +243,35 @@ Proof, on the server, after the reboot:
 
 The root `node scripts/test-owners.mjs --run local` in this checkout fails on tests that need
 `firebase-tools`, which is not installed here; that is unrelated to this change and CI installs it.
+
+## A chat with no card still pings
+
+A chat started in the home directory has nothing that names a card: no kickoff line, no card in its
+title, and no card branch under `/home/ubuntu`. The hook fired for such a chat and then had nowhere
+to write, which is how a stop could reach `stops.jsonl` while Todd heard nothing.
+
+The same payload against the code before this change (`git show 4aa4cac:scripts/stop-ping.mjs`),
+for this chat's own thread:
+
+```text
+{"posted":false,"card":null,"error":"no card for this thread"}
+```
+
+Now the ping falls back to the card the last recorded stop belonged to, and remembers the answer for
+that chat in `~/.local/state/julia/thread-cards.json`, so later stops do not drift to another card.
+The stop record carries where the card came from — `thread`, `branch`, `project branch`, `binding`
+or `last ping` — so an inherited card is never read as one the chat declared.
+
+Proof, on the server:
+
+| Step | Result |
+| --- | --- |
+| A real ping from outside the repository | at `04:40:54Z` the global hook, run with cwd `/home/ubuntu` for thread `5d5df123-2d91-4268-8c69-4a6676a5d209`, appended a stop record with `card: JUL-276`, `cardSource: "last ping"`, and a ping record with `comment: …#comment-dfb48afb`, `notified: true`, `remindAt: 04:41:25Z` |
+| The binding is written | `~/.local/state/julia/thread-cards.json` holds `{"5d5df123…": {"card": "JUL-276", "source": "last ping", "at": "2026-10-29T04:40:54.939Z"}}` |
+| The next stop reuses it | test `a chat started outside the repository pings the last card and stays bound to it`: after the history moves to another card, the second stop reports `cardSource: "binding"` and still posts to `JUL-276` |
+| A chat that names its own card binds nothing | test `a chat that names its own card declares it and binds nothing` |
+| A stop with no card anywhere still records and says why | test `a stop with no card anywhere is recorded and says so` |
+| Tests | `node --test scripts/stop-ping.test.mjs` 10/10 pass |
 
 ## Resume after a reboot
 

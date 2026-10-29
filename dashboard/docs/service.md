@@ -10,7 +10,7 @@ what to read when it misbehaves.
 | --- | --- | --- |
 | `julia-dashboard.service` | service | Serves the dashboard with `node dashboard/server.js` on `DASHBOARD_HOST:DASHBOARD_PORT`. `Restart=always`, `RestartSec=2`, `WantedBy=multi-user.target`. |
 | `julia-dashboard-update.timer` | timer | Runs `julia-dashboard-update.service` 90 seconds after boot, then every 5 minutes. |
-| `julia-dashboard-update.service` | oneshot | `dashboard/scripts/update.mjs`: fast-forwards the checkout to the ref, `npm ci`, `npm run build`, restart the service, record the served commit. |
+| `julia-dashboard-update.service` | oneshot | `dashboard/scripts/update.mjs`: moves the checkout onto the ref, `npm ci`, `npm run build`, restart the service, record the served commit. |
 | `julia-dashboard-watchdog.timer` | timer | Runs `julia-dashboard-watchdog.service` 60 seconds after boot, then every minute. |
 | `julia-dashboard-watchdog.service` | oneshot | `dashboard/scripts/watchdog.mjs`: probes `/api/health` and tells Todd when the dashboard is down and when it recovers. |
 
