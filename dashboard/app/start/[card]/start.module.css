@@ -104,13 +104,27 @@
 
 .closePicker { min-height: 40px; padding: 0 14px; border: 1px solid #dbe2ea; border-radius: 8px; background: white; font: inherit; cursor: pointer; }
 
-.pickList { list-style: none; margin: 0; padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.pickList { margin: 0; padding: 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+
+.pickGroup { display: flex; flex-direction: column; gap: 6px; }
+
+.pickAccount { margin: 4px 2px 0; font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase; color: #475569; }
+
+.pickAccount span { font-weight: 400; color: #64748b; }
+
+.pickModels { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 
 .pickModel { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #dbe2ea; border-radius: 10px; background: white; font: inherit; text-align: left; cursor: pointer; }
 
 .pickModel:hover { border-color: var(--iris); }
 
 .inPanel { font-size: 0.8rem; color: #475569; }
+
+.ready { margin: 0; padding: 10px 14px; border-radius: 10px; background: #fef3c7; color: #78350f; }
+
+.done { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: #ecfdf5; color: #065f46; }
+
+button:disabled { opacity: 0.55; cursor: default; }
 
 @media (min-width: 641px) {
   .pickerBackdrop { align-items: center; padding: 24px; }

@@ -86,9 +86,15 @@ export default async function StartPage({ params }) {
   const choice = draft && fresh
     ? mergeDraft({ saved: draft, fallback: fresh, modelIds: models.map(model => model.id) })
     : fresh;
+  const accountNames = new Map((saved?.accounts ?? []).map(account => [account.provider, account.name]));
+  const accountRank = provider => (saved?.accounts ?? []).findIndex(account => account.provider === provider);
   const picks = models
-    .map(model => ({ id: model.id, ...modelLine(model) }))
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .map(model => ({
+      id: model.id,
+      ...modelLine(model),
+      account: accountNames.get(model.provider) ?? model.provider,
+    }))
+    .sort((left, right) => (accountRank(left.provider) - accountRank(right.provider)) || left.name.localeCompare(right.name));
 
   return <><a className="back" href="/">← Back to Ready cards</a>
     <header><p className="eyebrow">Start screen</p>
