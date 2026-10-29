@@ -1,0 +1,386 @@
+{
+ "controls": [
+  {
+   "n": 1,
+   "x": -1,
+   "y": 45,
+   "name": "Back link: \"\u2039 Decision support\" or \"\u2039 Board\"",
+   "what": "Returns to where Todd came from, with the same view, sort and filter, and names that place (0047).",
+   "from": "Navigation only. No data.",
+   "status": "build",
+   "stories": [
+    "S-01",
+    "S-56"
+   ],
+   "notes": [
+    "Drawn with two arrows, a stray \"\u2039\" after the arrow. A drawing flaw, not built (R-09)."
+   ]
+  },
+  {
+   "n": 2,
+   "x": -1,
+   "y": 45,
+   "name": "Profile icon",
+   "what": "A round profile button.",
+   "from": "Drawn by Stitch as part of its frame. Not built (decision 0008).",
+   "status": "frame",
+   "stories": [],
+   "notes": []
+  },
+  {
+   "n": 3,
+   "x": -1,
+   "y": 103,
+   "name": "Project name \"Recipes\"",
+   "what": "The Linear project the card belongs to, small and grey above the title.",
+   "from": "Linear.",
+   "status": "build",
+   "stories": [
+    "S-56"
+   ],
+   "notes": []
+  },
+  {
+   "n": 4,
+   "x": -1,
+   "y": 103,
+   "name": "Label \"Complete\" or \"Closed\", plus \"Interrupted\"",
+   "what": "The card's final state: Complete or Closed. A small Interrupted label is added when the machine waited on Todd before his UAT yes (0042).",
+   "from": "Linear status, with the finished-card record (G2).",
+   "status": "build",
+   "stories": [
+    "S-56"
+   ],
+   "notes": [
+    "Only cards that ran have a page (0049)."
+   ]
+  },
+  {
+   "n": 5,
+   "x": -1,
+   "y": 152,
+   "name": "Title \"Add a recipe and find it by title\"",
+   "what": "The card's title.",
+   "from": "Linear.",
+   "status": "build",
+   "stories": [
+    "S-56"
+   ],
+   "notes": []
+  },
+  {
+   "n": 6,
+   "x": -1,
+   "y": 240,
+   "name": "Tile \"Cost\" ($4.13)",
+   "what": "What the whole card cost at published API prices, from the runner's kept record (0041).",
+   "from": "The cost rows in the kept record (G1). The scorecard's \"Cost\" line.",
+   "status": "build",
+   "stories": [
+    "S-56",
+    "S-46"
+   ],
+   "notes": [
+    "A value that applies but wasn't captured shows \"Not recorded\" and is left out of the total, never 0; one that doesn't apply shows N/A (0046)."
+   ]
+  },
+  {
+   "n": 7,
+   "x": -1,
+   "y": 240,
+   "name": "Tile \"Start to merge\" (2 h 34 \u2026)",
+   "what": "Time from Start to the merge, including time spent waiting on Todd.",
+   "from": "Start time from the runner; merge time from GitHub. Both in the kept record.",
+   "status": "build",
+   "stories": [
+    "S-56"
+   ],
+   "notes": [
+    "Full label and value, in a two-by-two grid of tiles on a phone (0043)."
+   ]
+  },
+  {
+   "n": 8,
+   "x": -1,
+   "y": 240,
+   "name": "Tile \"Rounds\" (2)",
+   "what": "How many Shipping checks the card needed, one per round (0016).",
+   "from": "The Shipping checker's results, one per round, in the runner's kept record (B-05, 0041).",
+   "status": "build",
+   "stories": [
+    "S-56"
+   ],
+   "notes": []
+  },
+  {
+   "n": 9,
+   "x": -1,
+   "y": 240,
+   "name": "Tile \"HITL interventions\" (1)",
+   "what": "How many times the machine waited on Todd before his UAT yes, including a build asking him a question (0045).",
+   "from": "The stops in the kept record. Glossary: \"Human intervention\".",
+   "status": "build",
+   "stories": [
+    "S-56",
+    "S-44"
+   ],
+   "notes": [
+    "Full label and value (0043)."
+   ]
+  },
+  {
+   "n": 10,
+   "x": -1,
+   "y": 339,
+   "name": "Fold \"Shipping check\", \"All proven in round 2\"",
+   "what": "The first folding section, open on load. Its line says the last round's result.",
+   "from": "The evidence reviews: the Shipping checker's verdicts for each criterion in each round (decision 0016, B-05).",
+   "status": "build",
+   "stories": [
+    "S-56"
+   ],
+   "notes": [
+    "The one fold open on load; the others start closed. \"Evidence review\" on the picture reads \"Shipping check\" (0016)."
+   ]
+  },
+  {
+   "n": 11,
+   "x": -1,
+   "y": 400,
+   "name": "Round switch: \"Round 1\", \"Round 2\"",
+   "what": "Chooses which round's verdicts are shown. Opens on the last round.",
+   "from": "The evidence reviews.",
+   "status": "build",
+   "stories": [
+    "S-56"
+   ],
+   "notes": [
+    "A card with one round has no switch (0051)."
+   ]
+  },
+  {
+   "n": 12,
+   "x": -1,
+   "y": 461,
+   "name": "Three criterion rows with \"Proven\" pills",
+   "what": "One row for each \"done means\" line of the card, with its verdict for the chosen round: Proven (mint) or Not proven (rose, with a cross). Tapping a row shows the checker's one-line reason and the proof file it looked at (0044).",
+   "from": "The card's criteria and the Shipping checker's verdicts (0016, 0044).",
+   "status": "build",
+   "stories": [
+    "S-56",
+    "S-58"
+   ],
+   "notes": [
+    "Each row shows its whole text, wrapped (0043)."
+   ]
+  },
+  {
+   "n": 13,
+   "x": -1,
+   "y": 644,
+   "name": "Line \"Round 1: 1 not proven\"",
+   "what": "What the other round found, in one line under the rows.",
+   "from": "The evidence reviews.",
+   "status": "build",
+   "stories": [
+    "S-56"
+   ],
+   "notes": [
+    "Left out on a one-round card (0051)."
+   ]
+  },
+  {
+   "n": 14,
+   "x": -1,
+   "y": 720,
+   "name": "Fold \"Cost by role and model\" ($4.13 \u00b7 3 models)",
+   "what": "Cost for each role and model, with tokens split into cached, input and output.",
+   "from": "The cost rows in the kept record (B-03).",
+   "status": "build",
+   "stories": [
+    "S-56",
+    "S-46"
+   ],
+   "notes": [
+    "A small table: role, model, cost, and tokens split cached / input / output (0045)."
+   ]
+  },
+  {
+   "n": 15,
+   "x": -1,
+   "y": 796,
+   "name": "Fold \"Time per stage\" (Longest: UAT 1 h 10 min)",
+   "what": "How long the card spent in each stage, with time waiting on Todd shown apart from time the machine worked.",
+   "from": "Stage times in the kept record.",
+   "status": "build",
+   "stories": [
+    "S-56",
+    "S-57"
+   ],
+   "notes": [
+    "Each stage with its time; time waiting on Todd shown apart (0045)."
+   ]
+  },
+  {
+   "n": 16,
+   "x": -1,
+   "y": 872,
+   "name": "Fold \"HITL interventions\" (1 \u00b7 cause: design)",
+   "what": "Each wait on Todd before his UAT yes: when, how long, its kind (question, stop or send-back), the cause and the root-cause stage (requirements, design or build) (0045).",
+   "from": "The stops with their cause and root-cause stage (B-04).",
+   "status": "build",
+   "stories": [
+    "S-56",
+    "S-44"
+   ],
+   "notes": []
+  },
+  {
+   "n": 17,
+   "x": -1,
+   "y": 948,
+   "name": "Fold \"Context\", with \"Compactions \u00b7 2\" on its right",
+   "what": "Per agent: its model, compactions, handoffs and the fullest its context got; each compaction's detail one tap further. The folded line shows the compaction total when there were any, and nothing when there were none (0045).",
+   "from": "The compactions, model changes and handoffs the runner records as the card runs (0041).",
+   "status": "build",
+   "stories": [
+    "S-56",
+    "S-47"
+   ],
+   "notes": []
+  },
+  {
+   "n": 18,
+   "x": -1,
+   "y": 1035,
+   "name": "Link \"Open in Linear\"",
+   "what": "Opens the card's Linear issue in a new tab.",
+   "from": "Linear.",
+   "status": "build",
+   "stories": [
+    "S-16",
+    "S-56"
+   ],
+   "notes": []
+  },
+  {
+   "n": 19,
+   "x": -1,
+   "y": 1035,
+   "name": "Link \"Open run record\"",
+   "what": "Opens the card's run record in a new tab.",
+   "from": "The run record, which is deleted once the card's retro is complete (B-06).",
+   "status": "build",
+   "stories": [
+    "S-16",
+    "S-56"
+   ],
+   "notes": [
+    "After the retro, replaced by the grey words \"Run record deleted\" (0048)."
+   ]
+  },
+  {
+   "n": 20,
+   "x": -1,
+   "y": 1200,
+   "name": "Empty, loading and failed states (not drawn)",
+   "what": "Loading shows grey placeholder tiles and folds. Failed says \"Server unavailable\" with Try again, never a no-record message. A page with no record behind it says \"No record for this card.\" (0049, 0050).",
+   "from": "Fixed text (R-08).",
+   "status": "build",
+   "stories": [
+    "S-56"
+   ],
+   "notes": []
+  }
+ ],
+ "gaps": [
+  {
+   "id": "G1",
+   "res": "Decided (0041): the runner records each card as it runs (stops, compactions, model changes, handoffs, time per stage, tokens and cost) into a record kept for good. This page reads only that.",
+   "stories": [
+    "S-56",
+    "S-16"
+   ],
+   "text": "Where the page's numbers live once the card's run record is deleted. The run record, with its trace, is deleted after the card's retro is complete (B-06). Everything on this page (verdicts, costs by model, stage times, stops, compactions) would go with it if the page read from there. Proposed: when a card finishes, the machine saves its numbers as a kept record, and this page and Decision support read only that. Deleting the trace never touches it."
+  },
+  {
+   "id": "G2",
+   "res": "Decided (0042, narrowed by 0049): every card that ran and reached Complete or was closed gets a page, labelled Complete or Closed, plus Interrupted if the machine waited on Todd before his yes.",
+   "stories": [
+    "S-56",
+    "S-52"
+   ],
+   "text": "Which cards get this page, and what the pill says. The picture shows a card that is Complete. Decision support also counts cards that finished with stops, and a card Todd abandoned. Proposed: a page for every card that has reached Complete or that Todd closed; the pill says Complete or Closed, and a card that had stops before Todd's yes gets a second small pill \"Not first time\" (the scorecard's \"Success: no\")."
+  },
+  {
+   "id": "G3",
+   "res": "Decided (0043): a two-by-two grid of tiles on a phone with full labels; criterion rows wrap.",
+   "stories": [
+    "S-56"
+   ],
+   "text": "The tile labels (\"Start to m\u2026\", \"Times ste\u2026\") and the criterion rows are cut off in the picture, which breaks R-06 (labels and values are never cut off). Proposed: the four tiles become a two-by-two grid on a phone with the full label and value, and each criterion row shows its whole text, wrapped."
+  },
+  {
+   "id": "G4",
+   "res": "Decided (0044): two verdicts, Proven (mint) and Not proven (rose, with a cross). Tapping a row shows the reason and the proof file.",
+   "stories": [
+    "S-56",
+    "S-58"
+   ],
+   "text": "How the other two verdicts look. Only \"Proven\" is drawn. Proposed: \"Not proven\" and \"Wrong thing tested\" are rose pills with a cross and those words (rose is a problem, R-07). Tapping a criterion row opens the checker's one-line reason and the name of the proof file it looked at."
+  },
+  {
+   "id": "G5",
+   "res": "Decided (0045): Cost by role and model; Time per stage; HITL interventions (every wait on Todd before his yes, with its kind); Context per agent, its folded line showing \"Compactions \u00b7 2\" when there were any.",
+   "stories": [
+    "S-56",
+    "S-44",
+    "S-46",
+    "S-47",
+    "S-57"
+   ],
+   "text": "What is inside the four closed folds, and what counts as a time stepped in. Proposed: Cost by role and model is a small table (role, model, cost, cached/input/output tokens); Time per stage lists each stage with its time and marks the waiting-on-Todd part apart; Times stepped in lists each stop with when, how long, cause and root-cause stage; Compactions lists each round and model with its count. A time stepped in is every stop where the machine waited on Todd before his UAT yes, as in the scorecard."
+  },
+  {
+   "id": "G6",
+   "res": "Decided (0046): \"Not recorded\" when it applies but wasn't captured (left out of totals, never 0); \"N/A\" when it doesn't apply.",
+   "stories": [
+    "S-56"
+   ],
+   "text": "What a number shows when it was never recorded. Old cards have gaps: JUL-272 to JUL-274 have unpriced rows and \"not recorded before tracing\". Proposed: a missing value says \"Not recorded\" or \"Unpriced\" and is left out of totals; it is never shown as 0."
+  },
+  {
+   "id": "G7",
+   "res": "Decided (0047): back returns to where Todd came from, same view, sort and filter, and names it: \"\u2039 Decision support\" or \"\u2039 Board\".",
+   "stories": [
+    "S-01",
+    "S-56"
+   ],
+   "text": "Where \"\u2039 Decision support\" returns to. Todd may arrive from Map, Ranked or Cards, with a sort and filter set. Proposed: back returns to the same view with the same sort and filter."
+  },
+  {
+   "id": "G8",
+   "res": "Decided (0048): the link becomes the grey words \"Run record deleted\".",
+   "stories": [
+    "S-16"
+   ],
+   "text": "What the \"Open run record\" link does after the run record is deleted. Story S-16 says the link is gone. Proposed: the link is replaced by the grey line \"Run record deleted after the retro\", so Todd sees why it is missing."
+  },
+  {
+   "id": "G9",
+   "res": "Decided (0049, 0050): grey placeholders while loading; \"Server unavailable\" with Try again when it fails; \"No record for this card.\" if a page has no record.",
+   "stories": [
+    "S-56"
+   ],
+   "text": "The empty, loading and failed states (R-08). Proposed: loading shows grey placeholder tiles and folds; a card with no kept record says \"No record for this card.\"; failed says \"Can't reach the machine.\" with Try again, never \"No record\"."
+  },
+  {
+   "id": "G10",
+   "res": "Decided (0051): no round switch and no line under the rows.",
+   "stories": [
+    "S-56"
+   ],
+   "text": "A card with one round. Proposed: no round switch, and the line under the rows is left out."
+  }
+ ]
+}

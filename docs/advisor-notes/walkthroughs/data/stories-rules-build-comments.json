@@ -195,10 +195,10 @@
      "so": "I can dig into a card when I need to",
      "ac": [
       "An open card has a link to its Linear issue and one to its run record.",
-      "After the card's retro is complete, the run-record link is gone (its trace is deleted)."
+      "After the card's retro is complete, the run-record link is replaced by the grey words \"Run record deleted\" (its trace is deleted)."
      ],
      "notes": [],
-     "trace": "R1a; R1b; I 85; 0004; picture 04"
+     "trace": "R1a; R1b; I 85; 0004; 0048; picture 04"
     },
     {
      "id": "S-17",
@@ -549,14 +549,14 @@
     },
     {
      "id": "S-44",
-     "want": "I want to see how often I had to step in, and where the trouble came from",
+     "want": "I want to see how often I had to step in (HITL interventions), and where the trouble came from",
      "so": "I can fix the stage that causes it",
      "ac": [
-      "A tapped model shows times stepped in.",
+      "A tapped model shows its HITL interventions: every wait on Todd before his UAT yes, including a build asking him a question.",
       "It shows where trouble came from, split into requirements, design and build."
      ],
      "notes": [],
-     "trace": "R1a; R1b; I 45-46; Gl \"Human intervention\", \"Root-cause stage\"; picture 09"
+     "trace": "R1a; R1b; I 45-46; Gl \"HITL intervention\", \"Root-cause stage\"; 0045; picture 09"
     },
     {
      "id": "S-45",
@@ -579,9 +579,10 @@
       "Tokens are split into cached, input and output."
      ],
      "notes": [
-      "Tokens are written into the spec, not drawn (0008)."
+      "Tokens are written into the spec, not drawn (0008).",
+      "Recorded by the runner as the card runs (0041); a value not captured shows \"Not recorded\", never 0 (0046)."
      ],
-     "trace": "R1a; I 47, 53; 0008"
+     "trace": "R1a; I 47, 53; 0008; 0041; 0046"
     },
     {
      "id": "S-47",
@@ -591,9 +592,10 @@
       "Decision support shows compactions per round for each model in the selected role."
      ],
      "notes": [
-      "Written into the spec, not drawn (0008)."
+      "Written into the spec, not drawn (0008).",
+      "Recorded by the runner as each compaction happens (0041). On the card page they show per agent in the Context fold (0045)."
      ],
-     "trace": "I 56-58; 0008"
+     "trace": "I 56-58; 0008; 0041; 0045"
     },
     {
      "id": "S-48",
@@ -697,14 +699,17 @@
      "want": "I want one finished card's whole story on one page",
      "so": "I understand what happened on that card",
      "ac": [
-      "A summary shows cost, Start to merge, rounds and times stepped in.",
-      "Folding sections show: verdict per criterion per round (proven, not proven, wrong thing tested); cost and tokens by role and model; time per stage; times stepped in with cause; compactions.",
-      "Links open the Linear issue and the run record."
+      "Every card that ran and reached Complete or was closed has a page, labelled Complete or Closed, plus Interrupted if the machine waited on Todd before his UAT yes.",
+      "A summary shows cost, Start to merge, rounds and HITL interventions, with every label and value in full.",
+      "Folding sections show: the Shipping check's verdict per criterion per round (Proven or Not proven, the reason one tap away); cost and tokens by role and model; time per stage with waiting on Todd apart; HITL interventions with kind, cause and root-cause stage; Context per agent (model, compactions, handoffs, fullest context), its folded line showing the compaction total when there were any.",
+      "Links open the Linear issue and the run record; after the retro the run-record link reads \"Run record deleted\".",
+      "Everything on the page comes from the runner's kept record of the card."
      ],
      "notes": [
-      "Verdicts per criterion come from the Shipping checker (0016)."
+      "Verdicts per criterion come from the Shipping checker (0016, 0044).",
+      "A value that applies but wasn't captured shows \"Not recorded\" and is left out of totals; one that doesn't apply shows N/A; never 0 (0046)."
      ],
-     "trace": "R1b; I 61-66; E 3-7; 0016; picture 07"
+     "trace": "R1b; I 61-66; E 3-7; 0016; 0041-0051; picture 07"
     },
     {
      "id": "S-57",
@@ -715,22 +720,22 @@
       "Time waiting on me (for example UAT) is shown apart from time the machine is working."
      ],
      "notes": [
-      "Single-card version is on the card page (S-56). Written into the spec; no picture shows the across-cards view."
+      "Single-card version is on the card page (S-56), with waiting on Todd shown apart (0045). Written into the spec; no picture shows the across-cards view."
      ],
-     "trace": "I 61-62"
+     "trace": "I 61-62; 0045"
     },
     {
      "id": "S-58",
      "want": "I want to see which kinds of acceptance criteria keep failing",
      "so": "I fix how we write them",
      "ac": [
-      "Decision support shows how often each verdict (proven, not proven, wrong thing tested) occurred across cards.",
-      "A criterion that failed shows which kind of criterion it was."
+      "Decision support shows how often each verdict (Proven, Not proven) occurred across cards.",
+      "A criterion that failed shows which kind of criterion it was, and the checker's reason (including when the proof tested something else)."
      ],
      "notes": [
       "Needs verdicts recorded as data (B-05). No picture shows this view; where it sits is open."
      ],
-     "trace": "I 63-64; Gl; 0016"
+     "trace": "I 63-64; Gl; 0016; 0044"
     }
    ]
   }
