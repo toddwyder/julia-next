@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { compactionFits, exportLedger, isLockedMessage, ledgerFile, lockOwnerFromError, mergeLedger, prune, readLedger, retentionCutoff, storeFile, storeBytes } from './trace-store.mjs';
+import { compactionFits, exportLedger, isLockedMessage, ledgerFile, lockOwnerFromError, mergeLedger, prune, readLedger, retentionCutoff, status, storeFile, storeBytes } from './trace-store.mjs';
 
 const REPO = new URL('..', import.meta.url).pathname;
 const duckdbDir = [
@@ -210,6 +210,16 @@ test('dry-run counts what would go without touching the file', { skip: noDuckdb 
   assert.equal(answer.status, 'dry-run');
   assert.equal(answer.deleted.span_events, 1);
   assert.equal(statSync(file).size, before);
+});
+
+test('status says what is in the store before anything is deleted', { skip: noDuckdb }, async (t) => {
+  const { file } = await withStore(t, [span(daysAgo(20), 'old-1'), span(daysAgo(1), 'new-1')]);
+  const snapshot = await status();
+  assert.equal(snapshot.store, file);
+  assert.equal(snapshot.busy, false);
+  assert.equal(snapshot.holderPid, null);
+  assert.ok(snapshot.freeBytes > 0, 'the free space is reported so a prune can decide before it starts');
+  assert.equal(snapshot.tables.span_events, 2);
 });
 
 test('a store that is not there is reported, not created', async () => {

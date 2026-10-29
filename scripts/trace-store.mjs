@@ -234,7 +234,7 @@ const sleep = ms => new Promise(done => setTimeout(done, ms));
 const mb = bytes => `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 const gb = bytes => `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 
-async function status() {
+export async function status() {
   const file = storeFile();
   const bytes = storeBytes(file);
   const room = freeBytes(dirname(file));
