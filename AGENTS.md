@@ -6,6 +6,7 @@ Julia uses pstack (adopted 22 October 2026). pstack builds and proves. This file
 - Build with the poteto-mode skill and follow it as written.
 - In Mastra Code, read `docs/harness/mastra-code.md` once per session and the pstack models file it names at task start.
 - Before planning a card, read [docs/plans/path-forward.md](docs/plans/path-forward.md) for Todd's delivery flow and decisions.
+- When pstack slices a card, each slice is a Linear sub-issue of that card, in order, carrying that slice's done-means from the plan. The parent completes only when its last sub-issue does.
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
 - Every card's PR includes its scorecard, built with `node scripts/scorecard.mjs JUL-<n> --write`, and every stop pings Todd; the rest is in [docs/adr/0024-run-scorecard-and-stop-ping.md](docs/adr/0024-run-scorecard-and-stop-ping.md). Money never stops a card.
 - Framework facts come from the installed packages and their version-matched official docs.
