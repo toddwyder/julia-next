@@ -7,7 +7,10 @@ export default async function StartPage({ params }) {
   let card;
   let failure;
   try { card = await getReadyCard(identifier); }
-  catch (error) { failure = error.message; }
+  catch (error) {
+    console.error(`julia-dashboard: Start screen failed for ${String(identifier).slice(0, 40).replace(/[^\w-]/g, '')}:`, error);
+    failure = error.message;
+  }
   return <><a className="back" href="/">← Back to Ready cards</a><header><p className="eyebrow">Start screen</p>
     <p className="identifier">{identifier}</p><h1>{card ? card.title : 'Card unavailable'}</h1></header>
     {failure ? <p className="problem" role="alert">{failure}</p> : card

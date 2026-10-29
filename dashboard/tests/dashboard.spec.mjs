@@ -5,6 +5,7 @@ if (process.env.DASHBOARD_URL) test('fresh real Ready list, Start and Back leave
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
   const before = await listReady();
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Ready cards', exact: true })).toBeVisible();
@@ -31,5 +32,8 @@ if (!process.env.DASHBOARD_URL) test('missing Linear configuration shows a named
   await page.goto('/');
   await expect(page.getByRole('main').getByRole('alert')).toHaveText('Linear configuration failure. LINEAR_API_KEY is missing.');
   await expect(page.getByRole('link', { name: /^Start / })).toHaveCount(0);
+  const icon = await page.request.get('/favicon.ico');
+  expect(icon.status()).toBe(200);
+  expect(icon.headers()['content-type']).toBe('image/x-icon');
   expect(errors).toEqual([]);
 });

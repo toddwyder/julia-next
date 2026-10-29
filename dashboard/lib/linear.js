@@ -7,6 +7,24 @@ const readyQuery = `query DashboardReady($after: String) {
   }
 }`;
 
+const isTimeout = error => error?.name === 'TimeoutError' || error?.name === 'AbortError';
+
+const unreachable = () => new Error('Linear connection failure. The dashboard could not reach Linear.');
+const unreachableSlow = () => new Error('Linear connection failure. The dashboard could not reach Linear within 10 seconds.');
+const replyIncomplete = () => new Error('Linear connection failure. Linear ended its reply before it was complete.');
+const replySlow = () => new Error('Linear connection failure. Linear did not finish its reply within 10 seconds.');
+
+async function readReply(response) {
+  try { return await response.text(); }
+  catch (error) { throw isTimeout(error) ? replySlow() : replyIncomplete(); }
+}
+
+function providerReason(body, apiKey) {
+  if (!Array.isArray(body?.errors) || !body.errors.length) return '';
+  const reason = body.errors.map(x => typeof x?.message === 'string' ? x.message : 'Unknown provider error').join('; ');
+  return ` ${reason.split(apiKey).join('[redacted]').slice(0, 400)}`;
+}
+
 export async function listReady({ apiKey = process.env.LINEAR_API_KEY, fetchImpl = fetch } = {}) {
   if (!apiKey) throw new Error('Linear configuration failure. LINEAR_API_KEY is missing.');
   const cards = new Map();
@@ -20,16 +38,17 @@ export async function listReady({ apiKey = process.env.LINEAR_API_KEY, fetchImpl
         headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: readyQuery, variables: { after } }),
       });
-    } catch {
-      throw new Error('Linear connection failure. The dashboard could not reach Linear within 10 seconds.');
+    } catch (error) {
+      throw isTimeout(error) ? unreachableSlow() : unreachable();
     }
-    if (!response.ok) throw new Error(`Linear request failed. HTTP ${response.status}.`);
+    const text = await readReply(response);
     let body;
-    try { body = await response.json(); }
-    catch { throw new Error('Linear returned a malformed response. Expected JSON.'); }
+    try { body = JSON.parse(text); }
+    catch { body = undefined; }
+    if (!response.ok) throw new Error(`Linear request failed. HTTP ${response.status}.${providerReason(body, apiKey)}`);
+    if (body === undefined) throw new Error('Linear returned a malformed response. Expected JSON.');
     if (Array.isArray(body?.errors) && body.errors.length) {
-      const reason = body.errors.map(x => typeof x?.message === 'string' ? x.message : 'Unknown provider error').join('; ');
-      throw new Error(`Linear request failed. ${reason.split(apiKey).join('[redacted]').slice(0, 400)}`);
+      throw new Error(`Linear request failed.${providerReason(body, apiKey)}`);
     }
     const connection = body?.data?.issues;
     if (!Array.isArray(connection?.nodes) || typeof connection?.pageInfo?.hasNextPage !== 'boolean') {

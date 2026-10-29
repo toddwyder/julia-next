@@ -45,8 +45,32 @@ test('only a valid empty response becomes an empty list', async () => {
 test('names configuration, provider, HTTP and connection failures without leaking the key', async () => {
   await assert.rejects(listReady({ apiKey: '' }), /LINEAR_API_KEY/);
   await assert.rejects(listReady(opts(async () => Response.json({ errors: [{ message: 'Permission denied test-secret' }] }))), /Permission denied \[redacted\]/);
-  await assert.rejects(listReady(opts(async () => new Response('unavailable', { status: 503 }))), /HTTP 503/);
+  await assert.rejects(listReady(opts(async () => new Response('unavailable', { status: 503 }))), /HTTP 503\.$/);
   await assert.rejects(listReady(opts(async () => { throw new Error('test-secret'); })), /could not reach Linear/);
+});
+
+test('non-2xx replies keep the provider explanation, stay bounded and survive non-JSON bodies', async () => {
+  const reply = (body, status) => opts(async () => new Response(body, { status }));
+  await assert.rejects(listReady(reply(JSON.stringify({ errors: [{ message: 'Field "team" is unknown test-secret' }] }), 400)), /HTTP 400\. Field "team" is unknown \[redacted\]/);
+  await assert.rejects(listReady(reply('<html>Bad gateway</html>', 502)), /HTTP 502\.$/);
+  await assert.rejects(listReady(reply('', 401)), /HTTP 401\.$/);
+  const long = await listReady(reply(JSON.stringify({ errors: [{ message: 'x'.repeat(5000) }] }), 500)).catch(error => error);
+  assert.match(long.message, /^Linear request failed\. HTTP 500\. x+$/);
+  assert.ok(long.message.length < 500, `explanation should be bounded, got ${long.message.length} characters`);
+});
+
+test('replies that fail partway through are connection failures, not malformed JSON', async () => {
+  const brokenReply = name => async () => new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('{"data":{"issues":'));
+      controller.error(Object.assign(new Error('reply broke'), { name }));
+    },
+  }), { status: 200 });
+  await assert.rejects(listReady(opts(brokenReply('AbortError'))), /did not finish its reply within 10 seconds/);
+  await assert.rejects(listReady(opts(brokenReply('Error'))), /ended its reply before it was complete/);
+  await assert.rejects(listReady(opts(async () => { throw Object.assign(new Error('slow'), { name: 'TimeoutError' }); })), /could not reach Linear within 10 seconds/);
+  const aborted = await listReady(opts(brokenReply('AbortError'))).catch(error => error);
+  assert.doesNotMatch(aborted.message, /malformed/);
 });
 
 test('rejects broken pagination and duplicate cards instead of dropping cards', async () => {
