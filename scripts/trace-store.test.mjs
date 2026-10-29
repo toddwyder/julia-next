@@ -13,8 +13,10 @@ const duckdbDir = [
   join(REPO, 'node_modules', '@duckdb', 'node-api'),
   join(process.env.HOME ?? '', '.local', 'lib', 'mastracode-program', 'node_modules', '@duckdb', 'node-api'),
 ].find(dir => existsSync(join(dir, 'package.json')));
-if (!duckdbDir) throw new Error('no @duckdb/node-api to run trace-store tests against');
-const { DuckDBInstance } = createRequire(join(duckdbDir, 'package.json'))('@duckdb/node-api');
+// The DuckDB client ships with the Mastra Code program, not this repo. CI has neither, so
+// the tests that open a real store skip there instead of failing: the pure rules still run.
+const noDuckdb = duckdbDir ? false : 'no @duckdb/node-api on this machine, so there is no store to open';
+const { DuckDBInstance } = duckdbDir ? createRequire(join(duckdbDir, 'package.json'))('@duckdb/node-api') : {};
 
 // The five tables Mastra Code's observability store creates, cut down to the
 // columns this job touches. The real store is DuckDB's own schema; these tests
@@ -100,7 +102,7 @@ test('merging a second export keeps one row per bucket and refreshes its value',
   assert.equal(merged.requested.length, 1);
 });
 
-test('prune deletes aged spans and logs, keeps the cost rows, and gives the disk space back', async (t) => {
+test('prune deletes aged spans and logs, keeps the cost rows, and gives the disk space back', { skip: noDuckdb }, async (t) => {
   const { file, ledger, dir } = await withStore(t, [
     span(daysAgo(20), 'old-1'),
     span(daysAgo(19), 'old-2', 2),
@@ -143,7 +145,7 @@ test('prune deletes aged spans and logs, keeps the cost rows, and gives the disk
   assert.equal(report.runs.at(-1).deleted.span_events, 2);
 });
 
-test('a held store is reported busy and writes no ledger rather than a zero', async (t) => {
+test('a held store is reported busy and writes no ledger rather than a zero', { skip: noDuckdb }, async (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'trace-store-'));
   const saved = Object.fromEntries(ENV.map(key => [key, process.env[key]]));
   t.after(() => {
@@ -201,7 +203,7 @@ test('a held store is reported busy and writes no ledger rather than a zero', as
   assert.equal(readLedger(ledger).rows[0].value, 100);
 });
 
-test('dry-run counts what would go without touching the file', async (t) => {
+test('dry-run counts what would go without touching the file', { skip: noDuckdb }, async (t) => {
   const { file } = await withStore(t, [span(daysAgo(20), 'old-1')]);
   const before = statSync(file).size;
   const answer = await prune({ keepDays: 14, dryRun: true });
