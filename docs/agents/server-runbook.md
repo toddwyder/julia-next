@@ -59,24 +59,25 @@ in which case the next timer run does the work.
 ## Mastra Code's trace store
 
 Mastra Code writes every span and token metric to `~/.local/share/mastracode/observability.duckdb`.
-Nothing used to watch it, and by 29 October it reached 22.6 GB: full prompt payloads in
-`span_events` are most of it. `scripts/trace-store.mjs` caps it.
+Nothing watched it, and by 29 October it reached 22.6 GB: full prompt payloads in `span_events`
+are most of it. `scripts/trace-store.mjs` prunes and compacts it when you run it.
 
 ```sh
 node scripts/trace-store.mjs status
 node scripts/trace-store.mjs ledger
 node scripts/trace-store.mjs prune --keep-days 14 --dry-run
-sudo node scripts/install-trace-store.mjs   # writes ops/julia-trace-store.{service,timer}
+node scripts/trace-store.mjs prune --keep-days 14
 ```
 
-`julia-trace-store.timer` runs the prune nightly at 04:40 from the deploy checkout. The prune keeps
-`metric_events`, which carries the cost, exports it to `~/.local/state/julia/trace-costs.json`
-before deleting anything, removes spans and logs older than the cutoff, then compacts the file.
-A running session holds DuckDB's exclusive lock, so the prune exits 0 with `status: busy` and a
-PID instead of failing. The nightly unit passes `--wait-for-lock --minutes 60`, so a long session
-delays the prune by an hour at most rather than skipping the night. Sizes before
-and after land in `~/.local/state/julia/trace-store-report.json`; read that file rather than
-guessing whether the store is under control.
+The prune keeps `metric_events`, which carries the cost, exports it to
+`~/.local/state/julia/trace-costs.json` before deleting anything, removes spans and logs older than
+the cutoff, then compacts the file. It refuses to start when the compaction would not fit in the
+free space. A running session holds DuckDB's exclusive lock, so the prune exits 0 with
+`status: busy` and a PID instead of failing, and `--wait-for-lock --minutes N` polls until the lock
+frees. Nothing runs it on a schedule: `scripts/scorecard.mjs` falls back to the ledger when the live
+store cannot be copied, so an unpruned store means a stale or missing ledger and `Cost: unknown` on
+recent cards. Sizes before and after land in `~/.local/state/julia/trace-store-report.json`; read
+that file rather than guessing whether the store is under control.
 
 ## GitHub boundaries
 

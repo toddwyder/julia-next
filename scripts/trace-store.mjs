@@ -13,7 +13,7 @@
 // writes a small ledger of the cost rows (which outlives the pruning), deletes
 // the aged span and log rows that carry the payloads, and compacts the file so
 // the space actually comes back. Any run that finds the store held reports that
-// and exits 0, so a timer firing mid-session is not an alarm.
+// and exits 0, so a run during a session is not an alarm.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir } from 'node:os';

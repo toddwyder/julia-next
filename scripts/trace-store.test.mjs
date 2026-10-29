@@ -223,15 +223,3 @@ test('a store that is not there is reported, not created', async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
-
-test('the nightly unit runs the cap and waits out a session that holds the store', () => {
-  const service = readFileSync(join(import.meta.dirname, '..', 'ops', 'julia-trace-store.service'), 'utf8');
-  const timer = readFileSync(join(import.meta.dirname, '..', 'ops', 'julia-trace-store.timer'), 'utf8');
-  assert.match(service, /ExecStart=\/usr\/local\/bin\/node \/home\/ubuntu\/julia-dashboard\/scripts\/trace-store\.mjs prune/);
-  assert.match(service, /Type=oneshot/);
-  assert.match(timer, /Unit=julia-trace-store\.service/);
-  assert.match(timer, /Persistent=true/);
-  // Without a wait the unit would report busy every night a session happened to be open.
-  const installer = readFileSync(join(import.meta.dirname, 'install-trace-store.mjs'), 'utf8');
-  assert.match(installer, /julia-trace-store\.timer/);
-});
