@@ -122,11 +122,11 @@
      "want": "I want a running card to say what it is doing now and when it last did something",
      "so": "I can tell working from stalled",
      "ac": [
-      "An open running card shows one line \"Doing now: \u2026\".",
+      "An open running card shows one line \"Current step: \u2026\", naming the checklist step marked working.",
       "It shows how long ago its last activity was, updating live."
      ],
      "notes": [
-      "The \"PULSE\" label on picture 03 is jargon; use plain words (C-04)."
+      "Replaces \"Doing now\" (decision 0019)."
      ],
      "trace": "I 21-23; picture 03; handoff 25 Oct (old bug: no sign of life on a running build)"
     },
@@ -206,10 +206,12 @@
      "so": "a build going wrong doesn't keep running",
      "ac": [
       "A running card has a Stop button.",
-      "Stop ends the build, keeps its work on its branch, and leaves the card in its column.",
-      "Pressing Start on that card later starts fresh."
+      "Stop asks \"Stop this build? The work is kept.\", ends the build, keeps its work on its branch, and leaves the card in its column.",
+      "The stopped card shows Resume (same chat, same settings) and Start over (fresh chat on the kept work)."
      ],
-     "notes": [],
+     "notes": [
+      "Decision 0023 replaces \"Start again starts fresh\"."
+     ],
      "trace": "I 19-20; PL (\"Start/stop\"); pictures 03, 04"
     },
     {
@@ -398,10 +400,12 @@
      "so": "nothing waits unnoticed for hours",
      "ac": [
       "A \"Needs you (N)\" strip with the count sits on top of the board.",
-      "Tapping it opens the list, oldest first."
+      "Tapping it opens the list, oldest first.",
+      "Everything that waits on Todd is one row; a row leaves by itself when what it waits on changes (decision 0034).",
+      "Empty says \"Nothing needs you.\"; loading shows grey placeholder rows; failed says \"Can't reach the machine. Items may be waiting.\" with Try again, and never the empty message (decision 0035)."
      ],
      "notes": [
-      "Title reads \"Needs you (6)\" with the count (C-07)."
+      "Title reads \"Needs you (N)\" with the count (C-07). The starting kinds are listed in decision 0040 and change after use (0030)."
      ],
      "trace": "R1a; R1b (\"Action Items\"); I 25-26; picture 06"
     },
@@ -410,10 +414,12 @@
      "want": "I want each item to show what it is, how long it has waited, and one button to act",
      "so": "I can act straight away",
      "ac": [
-      "Each row shows its kind, its title, how long it has waited, and one button that opens where Todd acts."
+      "Each row shows its kind, its title, how long it has waited, and the button its kind defines.",
+      "A row has one button, except \"Over its limit\", which has Keep going and Stop (decision 0032).",
+      "Each button opens where Todd acts, or acts at once (decision 0031)."
      ],
      "notes": [
-      "Button colours mean nothing (R-07)."
+      "Button colours mean nothing, except Stop, which is rose (R-07)."
      ],
      "trace": "I 25; E 7-9; picture 06"
     },
@@ -422,9 +428,12 @@
      "want": "I want a card waiting for my try-out (UAT) in the list",
      "so": "I try it while it's fresh",
      "ac": [
-      "A card in UAT appears as \"Try it (UAT)\" with \"Open preview\"."
+      "A card in UAT, or a piece of a card waiting for Todd's yes, appears as \"Try it\", titled with the card and the piece.",
+      "\"Open preview\" opens what Todd tries: the Vercel preview for a Julia card, the candidate on the server over Tailscale for a dashboard card."
      ],
-     "notes": [],
+     "notes": [
+      "Decision 0039. A big card has several pieces, each waiting for his yes."
+     ],
      "trace": "I 25; picture 06"
     },
     {
@@ -432,9 +441,12 @@
      "want": "I want a stopped card's restart plan in the list",
      "so": "a stopped card never sits waiting for me unseen",
      "ac": [
-      "A stopped card appears with \"Read plan\"."
+      "A card stopped after two failures appears as \"Card stopped: restart plan\" with \"Read plan\".",
+      "\"Read plan\" opens the card with the plan expanded and Approve restart below it (decisions 0025, 0027)."
      ],
-     "notes": [],
+     "notes": [
+      "The row's icon pulses until Todd acts (decision 0036)."
+     ],
      "trace": "I 25; picture 06"
     },
     {
@@ -442,9 +454,12 @@
      "want": "I want a shape waiting for my \"settled\" in the list",
      "so": "new work isn't held up by me",
      "ac": [
-      "A shape in Backlog awaiting \"settled\" appears with \"Read shape\"."
+      "A card in Backlog carrying the Linear label \"Needs settled\" appears with \"Read shape\".",
+      "Removing the label, or moving the card to Ready, removes the row."
      ],
-     "notes": [],
+     "notes": [
+      "Decision 0037. The planner agent adds the label when it finishes shaping."
+     ],
      "trace": "I 25; picture 06"
     },
     {
@@ -462,9 +477,13 @@
      "want": "I want a one-click account approval in the list",
      "so": "a step only I can do doesn't block a build",
      "ac": [
-      "An account approval appears with \"Approve\"."
+      "An account approval appears with \"Approve\".",
+      "\"Approve\" opens the provider's own sign-in page in a new tab.",
+      "The row leaves when the machine sees the account connected."
      ],
-     "notes": [],
+     "notes": [
+      "Decision 0038. The dashboard never handles a password or key."
+     ],
      "trace": "I 25; picture 06"
     },
     {
@@ -508,7 +527,7 @@
      "want": "I want to be asked when a card has cost more than its limit",
      "so": "a costly build doesn't run on unnoticed, and I decide whether it should go on",
      "ac": [
-      "When a running card's cost passes the per-card limit, Todd gets a notification and a Needs you item: keep going or stop.",
+      "When a running card's cost passes the per-card limit, Todd gets a notification and a Needs you item with Keep going and Stop, and the cost against the limit (for example \"$4.10 of $3.00\").",
       "The build keeps running until Todd answers; the limit never stops it by itself.",
       "The card shows \"$x of $limit\" and an amber mark once it is past the limit."
      ],
@@ -517,6 +536,43 @@
       "The limit's value is set later from real cards (about the 75th percentile, plus a check for repeating without progress); until then there is no limit."
      ],
      "trace": "I 94-97; P 22:58-22:59; PL"
+    },
+    {
+     "id": "S-60",
+     "want": "I want a plan waiting for my go in the list",
+     "so": "big work isn't held up by me",
+     "ac": [
+      "A plan awaiting Todd's go appears as \"Plan to approve\" with \"Read plan\", which opens the plan's pull request.",
+      "The row leaves when Todd gives the go or asks for changes."
+     ],
+     "notes": [
+      "Todd gives the go himself when pstack's plan playbook writes a plan for big work (27 Oct)."
+     ],
+     "trace": "0040; P 27 Oct (plan go)"
+    },
+    {
+     "id": "S-61",
+     "want": "I want a stuck card in the list",
+     "so": "a build gone quiet doesn't sit unnoticed",
+     "ac": [
+      "A card with no activity for 7 minutes appears as \"Stuck\" with \"Open card\".",
+      "The row's icon pulses until Todd acts."
+     ],
+     "notes": [
+      "The machine never stops a quiet build (decision 0024)."
+     ],
+     "trace": "0024; 0036"
+    },
+    {
+     "id": "S-62",
+     "want": "I want a card I stopped to be in the list",
+     "so": "I see it when I come back",
+     "ac": [
+      "A card Todd stopped appears as \"Card stopped\" with \"Open card\", which opens the card with Resume and Start over.",
+      "The row's icon pulses until Todd acts."
+     ],
+     "notes": [],
+     "trace": "0029; 0033; 0036"
     }
    ]
   },
@@ -773,12 +829,12 @@
   },
   {
    "id": "R-07",
-   "text": "Button colour carries no meaning.",
+   "text": "Rose means a problem or a destructive action (Stuck, Stopped, Stop, Didn't start); other button colours carry no meaning (decisions 0019, 0029).",
    "trace": "E 9; 0008"
   },
   {
    "id": "R-08",
-   "text": "Every screen has an empty, a loading and a failed state (no cards; the dashboard can't reach the machine).",
+   "text": "Every screen has an empty, a loading and a failed state; a failed screen never looks like an empty one (decision 0035).",
    "trace": "D 123; 0008"
   },
   {
@@ -890,6 +946,24 @@
    "text": "Per-card limit: a setting for its value, a check while a card runs, and the notification and Needs you item when the card passes it.",
    "needed": "S-14, S-59",
    "trace": "P 22:58-22:59"
+  },
+  {
+   "id": "B-14",
+   "text": "Whatever creates a wait on Todd adds a row; its kind decides the buttons, where each goes, when the row leaves and whether it pulses.",
+   "needed": "S-32, S-33, S-60 to S-62",
+   "trace": "0040"
+  },
+  {
+   "id": "B-15",
+   "text": "Create the Linear label \"Needs settled\" and have the planner agent apply it when it finishes shaping a card.",
+   "needed": "S-36",
+   "trace": "0037"
+  },
+  {
+   "id": "B-16",
+   "text": "The runner marks a piece of a card as waiting for Todd's yes, with screenshots and video, while the card stays in its stage.",
+   "needed": "S-34",
+   "trace": "0039"
   }
  ],
  "comments": [
