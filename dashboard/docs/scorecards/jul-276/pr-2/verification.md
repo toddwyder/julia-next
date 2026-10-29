@@ -60,7 +60,23 @@ the start of the new one can both be read afterwards.
 
 ### Boot results
 
-Filled in after the server is back. Everything above was written before the reboot.
+Everything above was written before the reboot; this table was filled in after it, with nothing
+above changed.
+
+| Check | Result |
+| --- | --- |
+| The machine really rebooted | `uptime -s` says `2026-10-29 03:20:10`. `journalctl --list-boots` shows a new boot id `b60026d7c7634b59ae85155614c139a3` whose first entry is `03:20:32`, and the previous boot `cfd374ecf7df49f0b88e168be74fb4b7` ends at `03:19:59`. `last -x reboot` records `reboot system boot 6.8.0-147-generi Thu Oct 29 03:20 - still running`. |
+| The service started by itself | `systemctl show -p ActiveEnterTimestamp julia-dashboard` says `Thu 2026-10-29 03:20:32 UTC`, 22 seconds after boot; `ExecMainStartTimestamp` is the same and `NRestarts` is `0`. `journalctl -b` line: `03:20:32 systemd[1]: Started julia-dashboard.service - Julia dashboard.` |
+| Nothing was started by hand | The only lifecycle lines in this boot are systemd's own: `03:20:31 Started julia-dashboard-update.timer`, `03:20:31 Started julia-dashboard-watchdog.timer`, `03:20:32 Started julia-dashboard.service`; everything after them is `Starting`/`Finished` from the two timers (`03:21:15` watchdog, `03:21:47` update). No `systemctl start` line exists in this boot, and `who` shows no login before `03:45`, twenty-five minutes after the units were up. |
+| The page answers on the tailnet address | `curl -sS -o /dev/null -w '%{http_code}' http://ovh.tail91f394.ts.net:4313/` returns `200`, and `/api/health` returns `200 {"status":"ok"}` with `linear: Linear answered`, `state: /var/lib/julia-dashboard/state is writable`, `runs: 0 run files parse`. The same two calls on `http://100.119.112.9:4313` return `200` and the same body. |
+| The updater came back | `systemctl list-timers julia-dashboard-update.timer` shows it active with a next elapse; its first run after boot is `03:21:47` and it has run every five minutes since, the last at `04:02:37`. |
+| The watchdog came back | The timer is active with a next elapse; the first probe after boot is `03:21:15` and the latest `04:06:22`, every one `probe: ok`, `consecutiveFailures: 0`. |
+| It serves the merged build | `state/build.json` says `commit 670825c249edf3dbaceb48d4e56bd1ee20315eeb`, `ref origin/feat/jul-276-service`. This commit is the head of the branch being merged and is ahead of `main` (`4669edc`), which the updater logged at `04:02:37` as `{"phase":"compare","action":"ahead","target":"4669edc…"}` and then stopped without rebuilding. Once the merge puts `670825c` in `main`, target equals head and the timer records the same commit with no action taken; that is the one line to read back after the merge. |
+
+The app's first line is shortened by the 1Password wrapper the unit runs under: the project name
+inside `julia-dashboard: starting from /home/ubuntu/julia-dashboard/dashboard/` is replaced by a
+masked token in the journal. Every `phase` line after it prints unchanged, so the log stays
+readable.
 
 ## Crash recovery (lane 2)
 
@@ -151,10 +167,18 @@ Evidence, in order:
 | The env file cannot take a branch | unit test `a branch ref is a one-time sync and never reaches the env file`: `envFileContent({ ref: 'origin/feat/jul-276-service' })` still yields `origin/main`; the test fails with the pin removed and passes with it back |
 | The live env file follows main | `/etc/julia-dashboard.env` reads `DASHBOARD_UPDATE_REF=origin/main` |
 | Main being behind is not a rebuild | updater ran with the installed settings and logged `{"phase":"compare","action":"ahead","commit":"4d11c7c…","target":"4669edc…"}`, then stopped: no `npm ci`, no build, no restart, and the built commit stayed `4d11c7c` |
-| A merge needs no action | once main contains this commit, `target` equals `head` and the same path reports up to date; the five-minute timer is the only thing involved |
+| A merge needs no ref reset | the env file already reads `origin/main` before the merge, and the merge step only detaches the deploy checkout onto `origin/main`; nothing points the server at a branch |
 
 So the answer to "where does pointing it back at main happen" is: at install time, in
-`dashboard/scripts/install-service.mjs`, which never stores a branch. Merge time touches nothing.
+`dashboard/scripts/install-service.mjs`, which never stores a branch. Merge time touches the env
+file not at all, and the merge step itself is written down in `docs/agents/server-runbook.md` under
+"Merging a dashboard pull request": squash-merge, fetch, detach the deploy checkout onto
+`origin/main`, start the update service, then read `build.json`'s `commit` against `origin/main`.
+
+That detach is in the written step because the deploy checkout stands on the branch tip and a
+squash merge does not make that tip an ancestor of `main`; the updater compares with
+`merge-base --is-ancestor` and reports `ahead` rather than fast-forwarding, so without the detach
+the server would keep serving the tested build while claiming it was up to date.
 
 ## Health (lanes 7, 8, 9)
 
@@ -181,6 +205,49 @@ Delivery was read back with the Linear `notifications` query, because a comment 
 prove a reminder was created. A second full outage was not forced, to avoid pinging Todd twice;
 the "nothing repeats while it stays down" behaviour is covered by unit test
 `the third consecutive failure notifies once, and nothing repeats while it stays down`.
+
+## The stop ping after a reboot
+
+The reboot exposed a hole the old wiring could not see. Mastra Code loads hooks from the session's
+project directory and from `~/.mastracode/hooks.json`. The stop ping was wired only in
+`.mastracode/hooks.json` inside this repository, and the chat opened after the reboot started in
+`/home/ubuntu`, so no hook ran: `loadHooksConfig('/home/ubuntu')` returned `{}`, and the last
+record in `~/.local/state/julia/stops.jsonl` was `03:18`, before the reboot.
+
+Two fixes, both in the repository:
+
+- `scripts/install-hooks.mjs` writes a global entry into `~/.mastracode/hooks.json` that calls
+  `scripts/stop-ping.mjs --global` through absolute paths, so any session on the machine pings.
+  It replaces only its own entry, so re-running it is safe.
+- The `--global` entry exits without a ping when the session's own project already wires
+  `stop-ping.mjs`, so one stop stays one comment and one reminder. The home directory resolves
+  the global file as its project file; that file is this hook, not a second one, and a test pins
+  that (`the global hook does not mistake itself for a project hook`).
+
+Proof, on the server, after the reboot:
+
+| Step | Result |
+| --- | --- |
+| Global hooks installed | `node scripts/install-hooks.mjs` wrote `~/.mastracode/hooks.json` with the Notification command `node /home/ubuntu/julia-dashboard/scripts/julia-agents.mjs -- node /home/ubuntu/julia-dashboard/scripts/stop-ping.mjs --global` |
+| The home directory now has a hook | `loadHooksConfig('/home/ubuntu')` returns one Notification hook; a repository directory returns two (global plus project) |
+| No double ping from inside the repository | the hook run with `--global` from the repository cwd left `stops.jsonl` at 75 lines, the same count as before |
+| A real ping fires from outside the repository | at `04:11:05Z` the hook, run from `/home/ubuntu` for thread `34c99d86…`, appended a stop record resolving `card: JUL-276` and wrote a second record with `comment: …#comment-ecc6ebe2` and `notified: true`, `remindAt: 04:11:36Z`; comment `ecc6ebe2` on JUL-276 carries the message and the resume line |
+| Tests | `node --test scripts/stop-ping.test.mjs` 6/6 pass, and with `scripts/scorecard.test.mjs` 18/18 |
+
+The root `node scripts/test-owners.mjs --run local` in this checkout fails on tests that need
+`firebase-tools`, which is not installed here; that is unrelated to this change and CI installs it.
+
+## Resume after a reboot
+
+`mastracode -t <thread>` is a headless-only option: it needs `--prompt`, and the interactive CLI
+silently starts a new chat instead of reopening the thread. The interactive command is
+`mastracode resume <thread-id>`. That is why the chat opened after the reboot was new, had no
+kickoff message and could not be attributed to a card. The old thread was never lost:
+thread `34c99d86…` is intact in `mastra.db`.
+
+The stop comment now says `Continue in that session: cd /home/ubuntu/julia-mastra && mastracode
+resume 34c99d86…`, naming the command that works and the directory the thread belongs to. Test:
+`the stop comment names the resume command, never -t, which opens a new chat`.
 
 ## Deviation: one installed unit for every lane
 
@@ -209,5 +276,6 @@ npm test
 npm run lint
 npm run build
 sudo node scripts/install-service.mjs --host 100.119.112.9 --ref <ref>
+node scripts/install-hooks.mjs
 curl -s http://100.119.112.9:4313/api/health
 ```
