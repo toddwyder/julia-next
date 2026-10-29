@@ -12,6 +12,9 @@ export const STATE_DIR = '/var/lib/julia-dashboard';
 export const ENV_FILE = '/etc/julia-dashboard.env';
 export const UNIT_DIR = '/etc/systemd/system';
 export const SERVICE_USER = 'ubuntu';
+// The installed unit follows main. A branch ref is only ever a one-time sync argument, so
+// merging a PR needs no follow-up step on the server.
+export const UPDATE_REF = 'origin/main';
 export const UNITS = Object.freeze([
   'julia-dashboard.service',
   'julia-dashboard-update.service',
@@ -40,14 +43,14 @@ export function serverIdentityProblem({ hostname = osHostname(), operatorCheckou
   return '';
 }
 
-export function envFileContent({ host = '127.0.0.1', port = '4313', checkout = DEFAULT_CHECKOUT, ref = 'origin/main', stateDir = STATE_DIR } = {}) {
+export function envFileContent({ host = '127.0.0.1', port = '4313', checkout = DEFAULT_CHECKOUT, stateDir = STATE_DIR } = {}) {
   return `# No secret belongs in this file. LINEAR_API_KEY is resolved from 1Password by the vault
 # wrapper named in each ExecStart, so it never touches disk.
 DASHBOARD_HOST=${host}
 DASHBOARD_PORT=${port}
 DASHBOARD_STATE_DIR=${stateDir}
 DASHBOARD_CHECKOUT=${checkout}
-DASHBOARD_UPDATE_REF=${ref}
+DASHBOARD_UPDATE_REF=${UPDATE_REF}
 `;
 }
 
@@ -58,6 +61,10 @@ export function readEnvFile(text) {
     if (match) values[match[1]] = match[2].trim();
   }
   return values;
+}
+
+export function installSyncEnv(settings, ref) {
+  return { ...settings, DASHBOARD_UPDATE_REF: ref };
 }
 
 function runCommand(command, args, { capture = true, cwd, env } = {}) {
@@ -86,7 +93,7 @@ export function installService({ host = '127.0.0.1', port = '4313', ref = 'origi
   if (existsSync(ENV_FILE)) {
     step('env', `${ENV_FILE} kept as it is`);
   } else {
-    writeFileSync(ENV_FILE, envFileContent({ host, port, checkout, ref, stateDir }), { mode: 0o600 });
+    writeFileSync(ENV_FILE, envFileContent({ host, port, checkout, stateDir }), { mode: 0o600 });
     chmodSync(ENV_FILE, 0o600);
     run('chown', ['root:root', ENV_FILE]);
     step('env', `${ENV_FILE} written root:root 0600`);
@@ -104,8 +111,8 @@ export function installService({ host = '127.0.0.1', port = '4313', ref = 'origi
   step('daemon-reload', 'systemd reread the units');
 
   const settings = readEnvFile(readFileSync(ENV_FILE, 'utf8'));
-  run('sudo', [...envPrefix(SERVICE_USER, settings), process.execPath, join(here, 'update.mjs')], { cwd: checkout, capture: false });
-  step('checkout', `${checkout} synced to ${settings.DASHBOARD_UPDATE_REF ?? ref}`);
+  run('sudo', [...envPrefix(SERVICE_USER, installSyncEnv(settings, ref)), process.execPath, join(here, 'update.mjs')], { cwd: checkout, capture: false });
+  step('checkout', `${checkout} synced to ${ref} once; the unit follows ${UPDATE_REF}`);
 
   run('systemctl', ['enable', 'julia-dashboard.service']);
   run('systemctl', ['start', 'julia-dashboard.service']);

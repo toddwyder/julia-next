@@ -58,12 +58,16 @@ Install from the checkout you want the units to come from. The script refuses to
 server, from the operator checkout, or from a lane worktree, and it is safe to run twice.
 
 ```sh
-sudo node dashboard/scripts/install-service.mjs --host 100.119.112.9 --ref origin/main
+sudo node dashboard/scripts/install-service.mjs --host 100.119.112.9
 ```
 
 It creates the state folder, writes the env file only if it is absent, copies the five unit files,
-reloads systemd, runs one update, and enables the service and both timers. Pass `--ref` to point
-the updater somewhere other than `origin/main` while verifying a branch.
+reloads systemd, runs one update, and enables the service and both timers.
+
+The env file always records `DASHBOARD_UPDATE_REF=origin/main`, so the installed unit follows main
+from then on. `--ref` moves the checkout to a branch for one sync only and is not saved, which is
+what lets a branch be verified on the real service without leaving the server pointed at a branch
+after the merge. Nothing has to be reset by hand at merge time.
 
 ## Reading a failure
 

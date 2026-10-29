@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ENV_FILE, OPERATOR_CHECKOUT, SERVER_HOSTNAME, UNITS, envFileContent, installService, readEnvFile, serverIdentityProblem } from './install-service.mjs';
+import { ENV_FILE, OPERATOR_CHECKOUT, SERVER_HOSTNAME, UNITS, envFileContent, installService, installSyncEnv, readEnvFile, serverIdentityProblem } from './install-service.mjs';
 
 const WORKTREE_GITDIR = `gitdir: ${join(OPERATOR_CHECKOUT, '.git', 'worktrees', 'julia-dashboard')}\n`;
 const thisServer = (overrides = {}) => serverIdentityProblem({
@@ -36,7 +36,7 @@ test('it refuses to write anything at all unless it is root on this server', () 
 });
 
 test('the env file holds settings only, never a secret', () => {
-  const text = envFileContent({ host: '100.119.112.9', ref: 'origin/main' });
+  const text = envFileContent({ host: '100.119.112.9' });
   assert.match(text, /^DASHBOARD_HOST=100\.119\.112\.9$/m);
   assert.match(text, /^DASHBOARD_PORT=4313$/m);
   assert.match(text, /^DASHBOARD_STATE_DIR=\/var\/lib\/julia-dashboard$/m);
@@ -49,6 +49,14 @@ test('the env file holds settings only, never a secret', () => {
     DASHBOARD_CHECKOUT: '/home/ubuntu/julia-dashboard', DASHBOARD_UPDATE_REF: 'origin/main',
   });
   assert.equal(ENV_FILE, '/etc/julia-dashboard.env');
+});
+
+test('a branch ref is a one-time sync and never reaches the env file', () => {
+  const text = envFileContent({ host: '100.119.112.9', ref: 'origin/feat/jul-276-service' });
+  assert.match(text, /^DASHBOARD_UPDATE_REF=origin\/main$/m);
+  const settings = readEnvFile(text);
+  assert.equal(settings.DASHBOARD_UPDATE_REF, 'origin/main');
+  assert.equal(installSyncEnv(settings, 'origin/feat/jul-276-service').DASHBOARD_UPDATE_REF, 'origin/feat/jul-276-service');
 });
 
 test('every unit the installer writes exists in dashboard/ops and obeys the decisions', () => {
