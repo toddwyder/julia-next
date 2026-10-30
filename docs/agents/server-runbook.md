@@ -82,8 +82,8 @@ and nothing else: no prompt payloads, no spans. A file a running session still h
 attached, so it is skipped and its PID reported. Folding the same file name twice replaces its rows
 instead of adding a second copy, so an interrupted fold is safe to re-run; a file left as
 `<name>.folding` is picked up by the next fold. The single store the launcher replaced,
-`~/.local/share/mastracode/observability.duckdb`, is folded and deleted the same way, so the 5.6 GB
-it occupies leaves the disk on the first launch after this ships.
+`~/.local/share/mastracode/observability.duckdb`, is folded and deleted the same way; that happened
+on 30 October, 5,955,137,536 B into a 3,158,016 B archive holding 44,408 cost rows.
 
 Deleting a file is what returns the disk. A delete inside a file gives nothing back even after a
 `CHECKPOINT`: on 30 October 52,443 rows were deleted and checkpointed and the file was 5,955,137,536
