@@ -71,11 +71,17 @@ Step 3 is the point of the gate: the PASS from step 2 stayed on the pull request
 went red, because it read the head again. Step 6 shows the declared identity rule refusing a model
 that verifies its own code.
 
+## CI
+
+Pull request #385 runs the whole workflow. `shipping-verdict` passes there, and so does the
+aggregate `checks` job that now requires it.
+
+The first CI run of the CLI test failed while the same test passed here. A pull request run sets
+`GITHUB_REF` to `refs/pull/385/merge`, the test's child process inherited it, and the CLI read the
+number from the ref and asked GitHub about that pull request with the test's placeholder token. The
+test now states the ref its event file describes.
+
 ## Not proven here
 
-- CI itself has not run the new job yet. The push is refused: the signed-in token is a fine-grained
-  token without the Workflows permission, and GitHub refuses any push that changes
-  `.github/workflows/ci.yml` without it. The gate's own decision is proven above; the job wiring
-  waits on that permission.
 - The first real PASS arrives from the first card build that runs a verifier. Until then card pull
   requests stay red, which is the intended state.
