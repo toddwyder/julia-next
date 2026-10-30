@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { buildScorecard, cardForThread, cardWindows, catalogueRates, findStops, priceThreadUsage, readPings, readThreads, readTracing, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
+import { buildScorecard, cardForThread, hostingSession, cardWindows, catalogueRates, findStops, priceThreadUsage, readPings, readThreads, readTracing, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
 import { stopComment } from './stop-ping.mjs';
 import { checkForToddGuard } from './linear-cli.mjs';
 import { appendFileSync } from 'node:fs';
@@ -247,8 +247,8 @@ test('a folded archive with no span rows still prices the cost rows it holds', a
 // The launcher is what gives each session its own trace file. A session started any other way
 // records nothing at all, and nothing else on the machine notices, so the card has to say so.
 test('a session that started after the launcher and recorded nothing makes the cost incomplete', () => {
-  const scorecard = (since, launcherServed = true) => buildScorecard({
-    card: 'JUL-273', threads: [thread], prices, tracing: { metrics: [], requested: [], launcher: since }, pulls: [], pings: [], uat: undefined, launcherServed,
+  const scorecard = (since, session) => buildScorecard({
+    card: 'JUL-273', threads: [thread], prices, tracing: { metrics: [], requested: [], launcher: since }, pulls: [], pings: [], uat: undefined, session,
   });
   const after = scorecard({ since: ms('18:30'), problem: null });
   assert.match(after.tracingSkipped, /^1 session of this card started after the launcher and recorded no trace rows$/);
@@ -262,12 +262,50 @@ test('a session that started after the launcher and recorded nothing makes the c
   assert.equal(replaced.tracingSkipped, 'the launcher runs something else');
   assert.match(renderScorecard(replaced), /^- Cost incomplete: the launcher runs something else\.$/m);
 
-  // A session already open when the launcher was installed never got a trace file from it,
-  // however late its thread began, so the card names it instead of calling the launcher at fault.
-  const older = scorecard({ since: ms('18:30'), problem: null }, false);
-  assert.equal(older.tracingSkipped, undefined, 'an unserved session is not a launcher loss');
-  assert.equal(older.unserved, 1);
-  assert.match(renderScorecard(older), /^- Not counted: 1 session of this card ran in a process that was already open when the launcher was installed, so it recorded no trace rows and its spend is not in this number\.$/m);
+  // A session already open when the launcher was installed never got a trace file from it, so
+  // it is named instead of counted as the launcher's fault. The excuse needs the process
+  // hosting this very thread, not just any process that predates the launcher.
+  const proven = scorecard({ since: ms('18:30'), problem: null }, { since: ms('12:00'), threadId: 'thread-1' });
+  assert.equal(proven.tracingSkipped, undefined, 'a proven older session is not a launcher loss');
+  assert.equal(proven.unserved, 1);
+  assert.match(renderScorecard(proven), /^- Not counted: 1 session of this card ran in a process that started before the launcher was installed, so it recorded no trace rows and its spend is not in this number\.$/m);
+
+  // The same proof does not excuse a window that ran in another thread's session.
+  const otherThread = scorecard({ since: ms('18:30'), problem: null }, { since: ms('12:00'), threadId: 'thread-2' });
+  assert.match(otherThread.tracingSkipped, /^1 session of this card started after the launcher/);
+  assert.equal(otherThread.unserved, 0);
+
+  // A process that started after the launcher was installed is served by it, so losing its rows
+  // is still this card's missing cost.
+  const served = scorecard({ since: ms('18:30'), problem: null }, { since: ms('19:00'), threadId: 'thread-1' });
+  assert.match(served.tracingSkipped, /^1 session of this card started after the launcher/);
+});
+
+// The excuse above is only as good as the start time behind it, so the ancestry read is tested
+// against a fake /proc rather than against whatever process happens to run the tests.
+test('the hosting session is found by walking the process ancestry through /proc', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'proc-'));
+  const proc = (pid, ppid, startTicks, command) => {
+    mkdirSync(join(dir, String(pid)), { recursive: true });
+    const fields = [pid, '(node)', 'S', ppid, ...Array(17).fill('0'), startTicks];
+    writeFileSync(join(dir, String(pid), 'stat'), `${fields.join(' ')}\n`);
+    writeFileSync(join(dir, String(pid), 'cmdline'), command);
+  };
+  try {
+    writeFileSync(join(dir, 'stat'), 'cpu 0 0 0\nbtime 1000\n');
+    // 300 is the scorecard shell, 200 the session hosting it, 100 the shell above that.
+    proc(300, 200, 9000, 'node\0scripts/scorecard.mjs\0');
+    proc(200, 100, 500, 'node\0/home/ubuntu/.local/bin/mastracode\0resume\0thread\0');
+    proc(100, 1, 100, '-bash\0');
+    assert.deepEqual(hostingSession({ pid: 300, procRoot: dir }), { since: 1005 * 1000 });
+    // A shell outside a session has no mastracode ancestor, so it proves nothing.
+    proc(200, 100, 500, '-bash\0');
+    assert.equal(hostingSession({ pid: 300, procRoot: dir }), null);
+    // A process that exited leaves no /proc entry, which is not a crash.
+    assert.equal(hostingSession({ pid: 400, procRoot: dir }), null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('a card whose trace file was too large to copy says why its cost is unknown', () => {

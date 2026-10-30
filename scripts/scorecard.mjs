@@ -156,6 +156,37 @@ export function threadExists(dbPath, threadId) {
   }
 }
 
+const TICKS_PER_SECOND = 100;
+
+// Field 22 of /proc/<pid>/stat, counted from 1, is the start time in clock ticks after boot.
+function processClock(pid, procRoot, read) {
+  const stat = read(join(procRoot, String(pid), 'stat'), 'utf8');
+  const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+  return { parent: Number(fields[1]), ticks: Number(fields[19]) };
+}
+
+// A session can only be excused for losing its traces when the process hosting it proves that it
+// started before the launcher was installed. This walks the ancestors of the process running the
+// scorecard, because the session hosting a card run is one of them, and returns the start time of
+// the nearest ancestor running mastracode. No such ancestor means no proof, so nothing is excused.
+export function hostingSession({ pid = process.pid, procRoot = '/proc', read = readFileSync } = {}) {
+  try {
+    const boot = Number(/^btime (\d+)$/m.exec(read(join(procRoot, 'stat'), 'utf8'))?.[1]);
+    if (!Number.isFinite(boot)) return null;
+    for (let at = pid, depth = 0; at > 1 && depth < 40; depth++) {
+      const clock = processClock(at, procRoot, read);
+      // Only an argument that is the session binary itself counts: a checkout path that happens
+      // to contain the word must not turn into a licence to excuse missing cost.
+      const command = read(join(procRoot, String(at), 'cmdline'), 'utf8').split('\0');
+      if (command.some(part => /(^|\/)mastracode$/.test(part))) {
+        return { since: (boot + clock.ticks / TICKS_PER_SECOND) * 1000 };
+      }
+      at = clock.parent;
+    }
+  } catch { /* no /proc, or an ancestor that exited */ }
+  return null;
+}
+
 export function newestThread(dbPath) {
   try {
     const db = new DatabaseSync(dbPath, { readOnly: true });
@@ -406,14 +437,14 @@ export function judgeStops(stops, uat) {
   });
 }
 
-export function buildScorecard({ card, threads, prices, catalogue, tracing, pulls, pings, uat, launcherServed }) {
+export function buildScorecard({ card, threads, prices, catalogue, tracing, pulls, pings, uat, session }) {
   const windows = threads.flatMap(t => cardWindows(t, t.events)).filter(w => w.card === card);
-  // The launcher hands a session its own trace file by exporting this path before it starts,
-  // so a session without it was already open when the launcher was installed. Nothing can
-  // give that session rows after the fact, and restarting is the owner's call, so the card
-  // names it on its own line rather than counting it as a loss the launcher was responsible for.
+  // A session that lost its trace rows can only be excused on proof, not on its own word: the
+  // process hosting it has to have started before the launcher was installed, and the window has
+  // to be the thread that process is hosting. Anything else still counts as missing cost.
   const launcherSince = tracing.launcher?.since ?? null;
-  const unserved = launcherSince !== null && !(launcherServed ?? Boolean(process.env.MASTRA_OBSERVABILITY_DB_PATH));
+  const unservedThread = launcherSince !== null && session?.since != null && session.since < launcherSince
+    ? session.threadId : null;
   // A pstack slice runs on its card's branch (feat/jul-276-…), so the branch name
   // may never mention the slice id; the search that found the PR already matched
   // the card, so a lone result is that card's PR.
@@ -438,7 +469,7 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
     // lost them, so this card's cost is missing a session's worth. Sessions that ran before it
     // are history, and the launcher cannot be blamed for them.
     if (!traced.length && (steps.length || subagents.length) && launcherSince !== null && w.start >= launcherSince) {
-      (unserved ? unservedSessions : untraced).push(w.thread.id);
+      (w.thread.id === unservedThread ? unservedSessions : untraced).push(w.thread.id);
     }
     if (traced.some(m => m.entityName === 'Code Agent')) {
       for (const row of tracedCost(traced, model => ratesForModel(prices, catalogue, model))) {
@@ -528,10 +559,10 @@ export function renderScorecard(s, generatedAt = new Date()) {
       : 'every row priced';
   lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${priced}.` : unknownCost);
   if (s.tracingSkipped && measured) lines.push(`- Cost incomplete: ${s.tracingSkipped}.`);
-  // Named, not hidden: a session that ran inside a process older than the launcher has no
-  // trace rows at all, so this number leaves its spend out.
+  // Named, not hidden: a session whose hosting process predates the launcher has no trace rows
+  // at all, so this number leaves its spend out.
   if (measured && s.unserved) {
-    lines.push(`- Not counted: ${s.unserved} session${s.unserved === 1 ? '' : 's'} of this card ran in a process that was already open when the launcher was installed, so it recorded no trace rows and its spend is not in this number.`);
+    lines.push(`- Not counted: ${s.unserved} session${s.unserved === 1 ? '' : 's'} of this card ran in a process that started before the launcher was installed, so it recorded no trace rows and its spend is not in this number.`);
   }
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
@@ -606,7 +637,8 @@ async function main() {
   const tracing = { ...(await readTracing(dir, tracedFiles(), ids)), launcher: launcherRecord() };
   const uatFile = fileURLToPath(new URL('../docs/scorecards/uat.json', import.meta.url));
   const uat = existsSync(uatFile) ? JSON.parse(readFileSync(uatFile, 'utf8'))[card] : undefined;
-  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), catalogue: loadCatalogue(), tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });
+  const session = { ...hostingSession(), threadId: newestThread(join(data, 'mastra.db')) };
+  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), catalogue: loadCatalogue(), tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat, session });
   const markdown = renderScorecard(scorecard);
   if (flag === '--write') {
     const out = fileURLToPath(new URL(`../docs/scorecards/${card}.md`, import.meta.url));
