@@ -98,6 +98,12 @@ refuses to start when it would not fit in the free space. Sizes before and after
 `~/.local/state/julia/trace-store-report.json`; read that file rather than guessing whether the
 store is under control.
 
+The store is opened with a memory budget of a third of the machine, at most 2 GB, spilling to a temp
+directory beside it. DuckDB's own default is 85% of memory, which on this 7 GB server is 6 GB, and on
+30 October the kernel killed a sweep at 6.15 GB the moment it started writing. For the same reason
+one open serves every session a sweep cleans: an open per session cost 3.1 GB of caches across 42 of
+them.
+
 ## GitHub boundaries
 
 Use ordinary signed-in GitHub access for authorized cards. Keep authentication material inside its trusted process. Evidence and notes belong on the card branch and pull request.

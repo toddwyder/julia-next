@@ -25,7 +25,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { homedir } from 'node:os';
+import { homedir, totalmem } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
@@ -270,10 +270,21 @@ function duckdb() {
   return createRequire(join(found, 'package.json'))('@duckdb/node-api');
 }
 
-async function openStore(file, mode) {
+// DuckDB sizes its buffer pool at 85% of the machine's memory, which on this
+// server is 6 GB of 7 GB. The sweep mined 49 sessions inside that budget at 02:51
+// on 30 October and the kernel killed it at 6.15 GB the moment it started writing,
+// before it deleted a row. A budget the machine can hold, with anything that does
+// not fit spilling to the temp directory beside the store, keeps a deep read of a
+// 22 GB file from deciding how much memory the process needs.
+export function openOptions(file, mode) {
+  const limit = Math.min(2048, Math.max(256, Math.floor(totalmem() / 2 ** 20 / 3)));
+  return { ...(mode ? { access_mode: mode } : {}), memory_limit: `${limit}MB`, temp_directory: `${file}.tmp` };
+}
+
+export async function openStore(file, mode) {
   const { DuckDBInstance } = duckdb();
   try {
-    const instance = await DuckDBInstance.create(file, mode ? { access_mode: mode } : {});
+    const instance = await DuckDBInstance.create(file, openOptions(file, mode));
     return { instance };
   } catch (error) {
     const owner = lockOwnerFromError(error.message);
@@ -511,7 +522,7 @@ export async function mineSession(thread, { census = censusFile(), ...opts } = {
 // the lesson: a retro for its card, or Todd's approval of the sessions that
 // never named a card. The numbers go first, the lesson goes first, then the
 // payloads.
-export async function deletePayloads(thread, { store = storeFile(), ledgerPath = ledgerFile(), retrosDir = retrosFolder(), census = censusFile(), ledger, dryRun = false } = {}) {
+export async function deletePayloads(thread, { store = storeFile(), ledgerPath = ledgerFile(), retrosDir = retrosFolder(), census = censusFile(), ledger, dryRun = false, instance } = {}) {
   // A dry run mines in memory and writes nothing, so the sweep hands the rows it
   // just mined in rather than making this read a ledger that is still empty.
   const minedLedger = ledger ?? readLedger(ledgerPath);
@@ -522,8 +533,10 @@ export async function deletePayloads(thread, { store = storeFile(), ledgerPath =
   const approved = !mined.card && approvedWithoutRetro(census).has(thread);
   const bytesBefore = storeBytes(store);
   // A dry run only counts rows, so it must not ask for the write lock a live
-  // session holds.
-  const opened = await openStore(store, dryRun ? 'READ_ONLY' : undefined);
+  // session holds. A caller with a store already open hands it in: opening the
+  // 22 GB file once per session left 3.1 GB of DuckDB caches behind after 42 of
+  // them on 30 October, and the kernel killed the run before it deleted a row.
+  const opened = instance ? { instance } : await openStore(store, dryRun ? 'READ_ONLY' : undefined);
   if (opened.busy) return { status: 'busy', ...opened.busy, thread };
   const counts = {};
   try {
@@ -544,7 +557,7 @@ export async function deletePayloads(thread, { store = storeFile(), ledgerPath =
       counts[table] = before - after;
     }
   } finally {
-    opened.instance.closeSync?.();
+    if (!instance) opened.instance.closeSync?.();
   }
   return {
     status: dryRun ? 'dry-run' : 'ok',
@@ -598,7 +611,9 @@ async function compact(file) {
   const temp = `${file}.compact`;
   removeQuietly(temp);
   const { DuckDBInstance } = duckdb();
-  const instance = await DuckDBInstance.create(':memory:');
+  // Copying 22 GB through an in-memory instance takes the same budget as reading
+  // it, or the copy is what runs the machine out of memory.
+  const instance = await DuckDBInstance.create(':memory:', openOptions(file));
   try {
     const connection = await instance.connect();
     await connection.run(`attach '${file}' as src (read_only)`);
@@ -701,10 +716,18 @@ export async function sweep({ dryRun = false, store = storeFile(), ledgerPath = 
   if (mined.status === 'busy') return { status: 'busy', ...mined, store };
   const plan = sweepPlan(mined.data, { retrosDir, census, hold: facts.hold, dryRun });
   const deleted = [];
-  for (const item of plan.clean) {
-    const answer = await deletePayloads(item.thread, { store, ledgerPath, retrosDir, census, ledger: mined.data, dryRun });
-    deleted.push({ thread: item.thread, card: item.card, status: answer.status, deleted: answer.deleted ?? null });
-    if (answer.status === 'busy') return { status: 'busy', ...answer, store, mined: { sessions: threads.length, mined: mined.records.length }, plan, deleted };
+  // One open for every session the plan cleans: the file is 22 GB, and an open per
+  // session kept its caches and grew this process by 3.1 GB across 42 of them.
+  const opened = plan.clean.length ? await openStore(store, dryRun ? 'READ_ONLY' : undefined) : { instance: null };
+  if (opened.busy) return { status: 'busy', ...opened.busy, store, mined: { sessions: threads.length, mined: mined.records.length }, plan, deleted };
+  try {
+    for (const item of plan.clean) {
+      const answer = await deletePayloads(item.thread, { store, ledgerPath, retrosDir, census, ledger: mined.data, dryRun, instance: opened.instance });
+      deleted.push({ thread: item.thread, card: item.card, status: answer.status, deleted: answer.deleted ?? null });
+      if (answer.status === 'busy') return { status: 'busy', ...answer, store, mined: { sessions: threads.length, mined: mined.records.length }, plan, deleted };
+    }
+  } finally {
+    opened.instance?.closeSync?.();
   }
   // Compaction copies the whole store, so it only earns its time when rows went.
   if (!plan.clean.length) {

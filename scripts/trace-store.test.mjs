@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { tmpdir, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -22,6 +22,7 @@ import {
   mergeLedger,
   mineSession,
   mineSessions,
+  openStore,
   readCensus,
   readLedger,
   retroExists,
@@ -262,14 +263,17 @@ test('one pass mines every session through one read-only connection', { skip: no
     metric(at, 'ka', 'mastra_model_total_input_tokens', 10, 0.01, a),
     metric(at, 'kb', 'mastra_model_total_input_tokens', 20, 0.02, b),
   ], { cards: { [a]: 'JUL-1', [b]: 'JUL-2' } });
-  const first = storeBytes(file);
+  const first = statSync(file).ino;
 
   const answer = await mineSessions([a, b, c], { cards: readCensus().cards });
 
   assert.equal(answer.status, 'ok');
   assert.equal(answer.records.length, 3);
   assert.equal(answer.costRows, 2);
-  assert.equal(storeBytes(file), first, 'mining reads the store and never writes to it');
+  // Not the byte count: DuckDB folds its write-ahead log into the file the first time
+  // another process opens it, so the size moves while nothing was written. A store that
+  // was rewritten to compact it gets a new inode.
+  assert.equal(statSync(file).ino, first, 'mining reads the store and never writes to it');
   const saved = readLedger(ledger);
   assert.equal(saved.sessions[a].card, 'JUL-1', 'the card comes from the census doc');
   assert.equal(saved.sessions[c].card, null, 'a session the store never saw still gets a record, so a sweep may skip it on purpose');
@@ -492,6 +496,29 @@ test('a dry run says what would go and leaves every row in place', { skip: noDuc
   assert.equal(await countOf(file, 'log_events'), 1);
 });
 
+test('a sweep hands one open store to every session it cleans', { skip: noDuckdb }, async (t) => {
+  const [a, b] = [1, 2].map(session);
+  const { file } = await withStore(t, [
+    span(daysAgo(1), 's1', 0.05, a),
+    span(daysAgo(1), 's2', 0.05, b),
+    logRow(daysAgo(1), 'l1', 'boom', a),
+    logRow(daysAgo(1), 'l2', 'boom', b),
+  ], { retros: ['JUL-1'], cards: { [a]: 'JUL-1', [b]: 'JUL-1' } });
+  await mineSession(a, {});
+  await mineSession(b, {});
+  const { instance } = await openStore(file, 'READ_ONLY');
+  t.after(() => instance.closeSync?.());
+  const first = await deletePayloads(a, { dryRun: true, instance });
+  // Reading the second session through the same open is the point: opening the
+  // 22 GB store once per session left 3.1 GB of caches behind after 42 of them,
+  // and closing a handle the caller opened stops the sweep after the first.
+  const second = await deletePayloads(b, { dryRun: true, instance });
+  assert.equal(first.status, 'dry-run');
+  assert.equal(second.status, 'dry-run');
+  const [row] = (await (await instance.connect()).runAndReadAll('select count(*) as n from span_events')).getRowObjectsJson();
+  assert.equal(Number(row.n), 2);
+});
+
 test('compaction gives back the room a deleted payload was using, and deletes nothing else', { skip: noDuckdb }, async (t) => {
   const [a, b] = [1, 2].map(session);
   const { file, ledger } = await withStore(t, [
@@ -596,14 +623,14 @@ test('a sweep with no Complete card cleans nothing and does not compact', { skip
     span(at, 'b1', 1, 'thread-b'),
     metric(at, 'ka', 'mastra_model_total_input_tokens', 10, 0.01, 'thread-a'),
   ], { retros: ['JUL-1'], open: { 'thread-a': 'JUL-1' } });
-  const before = storeBytes(file);
+  const inode = statSync(file).ino;
 
   const answer = await sweep({ sessions: ['thread-a', 'thread-b'] });
 
   assert.equal(answer.status, 'ok');
   assert.equal(answer.plan.clean.length, 0, 'an empty Complete list means no card is known Complete, not every card');
   assert.equal(answer.compact, null, 'a run that deletes nothing does not spend an hour copying the store');
-  assert.equal(storeBytes(file), before);
+  assert.equal(statSync(file).ino, inode);
   assert.equal(await countOf(file, 'span_events'), 2);
 });
 
@@ -611,7 +638,7 @@ test('a dry-run sweep plans from every session and writes nothing', { skip: noDu
   const at = daysAgo(1);
   const [a, b] = [1, 2].map(session);
   const { file, ledger } = await withStore(t, [span(at, 'a1', 0.05, a)], { retros: ['JUL-1'], cards: { [a]: 'JUL-1' } });
-  const before = storeBytes(file);
+  const inode = statSync(file).ino;
 
   const answer = await sweep({ dryRun: true, sessions: [a, b] });
 
@@ -625,7 +652,7 @@ test('a dry-run sweep plans from every session and writes nothing', { skip: noDu
   assert.equal(answer.deleted[0].deleted.span_events, 1);
   assert.equal(existsSync(ledger), false, 'a dry run leaves no ledger behind');
   assert.equal(await countOf(file, 'span_events'), 1);
-  assert.equal(storeBytes(file), before);
+  assert.equal(statSync(file).ino, inode);
 });
 
 test('the sessions a sweep mines come from the thread store, not from the spans', { skip: noDuckdb }, async (t) => {
@@ -747,6 +774,25 @@ test('status says what is in the store before anything is deleted', { skip: noDu
   assert.equal(snapshot.holderPid, null);
   assert.ok(snapshot.freeBytes > 0, 'the free space is reported so a prune can decide before it starts');
   assert.equal(snapshot.tables.span_events, 2);
+});
+
+test('a store is opened with a memory budget the machine can hold', { skip: noDuckdb }, async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'budget-'));
+  const file = join(dir, 'store.duckdb');
+  const { instance } = await openStore(file);
+  t.after(() => {
+    instance.closeSync?.();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const connection = await instance.connect();
+  const [row] = (await connection.runAndReadAll("select current_setting('memory_limit') as budget, current_setting('temp_directory') as spill")).getRowObjectsJson();
+  const bytes = text => {
+    const [size, unit] = String(text).split(' ');
+    const scale = /GiB/i.test(unit) ? 1024 ** 3 : /MiB/i.test(unit) ? 1024 ** 2 : /KiB/i.test(unit) ? 1024 : 1;
+    return Number(size) * scale;
+  };
+  assert.ok(bytes(row.budget) <= totalmem() * 0.4, `DuckDB's own default is 85% of this machine, which is 6 GB of the 7 GB it has: the kernel killed the sweep at 6.15 GB before it deleted a row (budget was ${row.budget})`);
+  assert.equal(row.spill, `${file}.tmp`, 'what does not fit in the budget spills beside the store instead of asking the kernel for more');
 });
 
 test('a store that is not there is reported missing instead of crashing', async () => {
