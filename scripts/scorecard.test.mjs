@@ -1,14 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { buildScorecard, cardForThread, cardWindows, catalogueRates, findStops, priceThreadUsage, readPings, readThreads, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
+import { buildScorecard, cardForThread, cardWindows, catalogueRates, findStops, priceThreadUsage, readPings, readThreads, readTracing, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
 import { stopComment } from './stop-ping.mjs';
 import { checkForToddGuard } from './linear-cli.mjs';
 import { appendFileSync } from 'node:fs';
+
+const REPO = new URL('..', import.meta.url).pathname;
+const duckdbDir = [
+  join(REPO, 'node_modules', '@duckdb', 'node-api'),
+  join(process.env.HOME ?? '', '.local', 'lib', 'mastracode-program', 'node_modules', '@duckdb', 'node-api'),
+].find(dir => existsSync(join(dir, 'package.json')));
+// Reading real trace files is the only way to test the one-file-per-session rule, so CI
+// opens them: the client is a dev dependency, and a silently skipped read proves nothing.
+if (!duckdbDir && process.env.CI) {
+  throw new Error('the scorecard tests cannot skip in CI: run npm ci so @duckdb/node-api is installed');
+}
+const duckdb = duckdbDir ? createRequire(join(duckdbDir, 'package.json'))('@duckdb/node-api') : {};
 
 const T = iso => `2026-10-26T${iso}:00.000Z`;
 const ms = iso => Date.parse(T(iso));
@@ -191,6 +204,44 @@ test('the trace store is only copied when there is room left on the disk', () =>
   assert.equal(traceCopyFits(22 * gb, 20 * gb), false);
   assert.equal(traceCopyFits(2 * gb, 20 * gb), true);
   assert.equal(traceCopyFits(19.6 * gb, 20 * gb), false);
+});
+
+test('a folded archive with no span rows still prices the cost rows it holds', async t => {
+  const { DuckDBInstance } = duckdb;
+  const dir = mkdtempSync(join(tmpdir(), 'scorecard-fold-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const thread = '13351dad-0d36-42f1-a43b-6e1d016cfa3e';
+  const make = async (file, statements) => {
+    const instance = await DuckDBInstance.create(file);
+    const connection = await instance.connect();
+    try {
+      for (const sql of statements) await connection.run(sql);
+    } finally {
+      connection.closeSync();
+      instance.closeSync();
+    }
+  };
+  const metric = `create table metric_events (timestamp timestamp, threadId varchar, entityName varchar, provider varchar,
+    model varchar, name varchar, value double, estimatedCost double)`;
+  // A session file has both tables. The archive the fold builds keeps cost rows only.
+  await make(join(dir, 'session.duckdb'), [
+    metric,
+    `create table span_events (timestamp timestamp, threadId varchar, entityName varchar, attributes json, spanType varchar, endedAt timestamp)`,
+    `insert into metric_events values (timestamp '2026-10-30 03:00:00', '${thread}', 'Code Agent', 'commandcode.chat',
+      'deepseek/deepseek-v4.1-flash', 'mastra_model_total_input_tokens', 1000, 0.15)`,
+    `insert into span_events values (timestamp '2026-10-30 03:00:00', '${thread}', 'Code Agent',
+      '{"provider":"commandcode.chat","model":"deepseek/deepseek-v4.1-flash"}', 'model_generation', null)`,
+  ]);
+  await make(join(dir, 'archive.duckdb'), [
+    metric,
+    `insert into metric_events values (timestamp '2026-10-30 18:00:00', '${thread}', 'Code Agent', 'commandcode.chat',
+      'deepseek/deepseek-v4.1-flash', 'mastra_model_total_input_tokens', 2000, 0.30)`,
+  ]);
+
+  const tracing = await readTracing(REPO, [{ path: join(dir, 'session.duckdb'), name: 'session.duckdb' }, { path: join(dir, 'archive.duckdb'), name: 'archive.duckdb' }], [thread]);
+  assert.equal(tracing.skipped, null, 'a file with no spans is not an unreadable file');
+  assert.deepEqual(tracing.metrics.map(m => m.value), [1000, 2000], 'both files price the card');
+  assert.equal(tracing.requested.length, 1, 'only the session file can name the model that answered');
 });
 
 test('a card whose trace file was too large to copy says why its cost is unknown', () => {

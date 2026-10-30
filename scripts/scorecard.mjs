@@ -279,7 +279,7 @@ export function traceCopyFits(size, room) {
   return size + TRACE_COPY_MARGIN <= room;
 }
 
-async function readTracing(dir, files, threadIds) {
+export async function readTracing(dir, files, threadIds) {
   if (!files.length || !threadIds.length) return { metrics: [], requested: [], skipped: null };
   const { DuckDBInstance } = createRequire(join(dir, 'package.json'))('@duckdb/node-api');
   const metrics = [];
@@ -305,8 +305,13 @@ async function readTracing(dir, files, threadIds) {
         const rows = async sql => (await connection.runAndReadAll(sql)).getRowObjectsJson();
         metrics.push(...await rows(`select threadId, epoch_ms(timestamp) as at, entityName, provider, model, name, value, estimatedCost
           from metric_events where threadId in (${ids}) and name like 'mastra_model_%tokens'`));
-        requested.push(...await rows(`select threadId, epoch_ms(timestamp) as at, entityName, json_extract_string(attributes, '$.model') as model,
-          json_extract_string(attributes, '$.provider') as provider from span_events where threadId in (${ids}) and spanType = 'model_generation' and endedAt is null`));
+        // A folded file keeps the cost rows and nothing else, so it has no spans to ask
+        // which model answered. Only a session file does.
+        const [{ tables }] = await rows("select count(*) as tables from duckdb_tables() where table_name = 'span_events'");
+        if (Number(tables)) {
+          requested.push(...await rows(`select threadId, epoch_ms(timestamp) as at, entityName, json_extract_string(attributes, '$.model') as model,
+            json_extract_string(attributes, '$.provider') as provider from span_events where threadId in (${ids}) and spanType = 'model_generation' and endedAt is null`));
+        }
       } finally {
         instance.closeSync?.();
       }
