@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import { writeFileSync } from 'node:fs';
-import { buildScorecard, cardForThread, cardWindows, findStops, ledgerTracing, priceThreadUsage, readPings, readThreads, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
+import { buildScorecard, cardForThread, cardWindows, catalogueRates, findStops, ledgerTracing, priceThreadUsage, readPings, readThreads, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
 import { stopComment } from './stop-ping.mjs';
 import { checkForToddGuard } from './linear-cli.mjs';
 import { appendFileSync } from 'node:fs';
@@ -264,4 +264,38 @@ test('the ledger answers when the live trace store cannot be read', () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// 30 October: JUL-284 read "no usage records" while the ledger held 678 rows for its
+// session, and JUL-283 read $0.04 for 65 million tokens because Mastra publishes no price
+// for CommandCode. Both are the scorecard's own doing, so both are checked here.
+test('a resumed session keeps the card the census gave it, priced from our own list', () => {
+  const catalogue = { models: [{ provider: 'commandcode', name: 'deepseek/deepseek-v4.1-flash', inputPerMillion: 0.15, outputPerMillion: 0.6 }] };
+  assert.deepEqual(catalogueRates(catalogue, 'commandcode.chat/deepseek/deepseek-v4.1-flash-1017-cm'), { input: 0.15, output: 0.6 });
+  assert.equal(catalogueRates(catalogue, 'anthropic/claude-sonnet-5'), undefined, 'a provider our sweep never priced stays unpriced');
+
+  const line = name => ({ threadId: 'thread-9', at: ms('10:05'), entityName: 'Code Agent', provider: 'commandcode.chat', model: 'deepseek/deepseek-v4.1-flash-1017-cm', name, value: 0, estimatedCost: null });
+  const traced = [
+    line('mastra_model_total_input_tokens'),
+    line('mastra_model_total_output_tokens'),
+    { ...line('mastra_model_input_text_tokens'), value: 1_000_000 },
+    { ...line('mastra_model_input_cache_read_tokens'), value: 1_000_000 },
+    { ...line('mastra_model_total_output_tokens'), value: 1_000_000 },
+  ];
+  const [priced] = tracedCost(traced, model => catalogueRates(catalogue, model));
+  // A cache read with no rate of its own is charged at the input rate, as priceThreadUsage does.
+  assert.equal(priced.unpriced, false);
+  assert.equal(priced.usd.toFixed(2), (0.15 + 0.15 + 0.6).toFixed(2));
+
+  const resumed = { id: 'thread-9', title: 'Shrinking trace store', events: threadEvents([user('10:00', 'Reply ok.')]) };
+  assert.deepEqual(cardWindows(resumed, resumed.events), [], 'a resumed thread names no card of its own');
+  const card = buildScorecard({
+    card: 'JUL-284', threads: [resumed], prices: {}, catalogue, cards: new Map([['thread-9', 'JUL-284']]),
+    tracing: { metrics: traced, requested: [{ threadId: 'thread-9', at: ms('10:05'), entityName: 'Code Agent', provider: null, model: null }], skipped: null },
+    pulls: [], pings: [], uat: undefined,
+  });
+  assert.equal(card.windows, 1);
+  assert.equal(card.usd.toFixed(2), (0.15 + 0.15 + 0.6).toFixed(2));
+  assert.equal(card.cost[0].basis, 'our price list');
+  assert.equal(card.cost[0].requested, 'not recorded', 'a span that names no model is not a model called null/null');
 });

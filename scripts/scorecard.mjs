@@ -178,6 +178,46 @@ export function ratesFor(prices, model) {
   return prices[provider.split('.')[0]]?.models?.[rest.join('/')]?.cost;
 }
 
+// Mastra's table has no entry for a provider we added ourselves. CommandCode is served
+// through the gateway, so every CommandCode row reached the card as "unpriced" and a card
+// that spent 65 million tokens read $0.04 — only the Anthropic observer rows counted. The
+// start screen's sweep already reads each account's published page, so its catalogue prices
+// what Mastra cannot.
+export function loadCatalogue(env = process.env) {
+  const file = env.JULIA_MODEL_CATALOGUE
+    || join(env.DASHBOARD_STATE_DIR || '/var/lib/julia-dashboard', 'state', 'models.json');
+  if (!existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+// One account answers to several provider names (`commandcode`, `mastracode/commandcode`,
+// `commandcode.chat`), and a model id can carry a suffix the catalogue lists without:
+// `deepseek/deepseek-v4.1-flash-1017-cm` is the catalogue's `deepseek/deepseek-v4.1-flash`.
+const accountName = provider => String(provider).split('.')[0].replace(/^mastracode\//, '');
+const bareName = name => String(name).replace(/-\d{4,}(-[a-z]{1,3})?$/i, '');
+
+export function catalogueRates(catalogue, model) {
+  const [provider, ...rest] = String(model).split('/');
+  const name = rest.join('/');
+  const account = accountName(provider);
+  const rows = (catalogue?.models ?? []).filter(row => accountName(row.provider) === account);
+  const found = rows.find(row => row.name === name)
+    ?? rows.find(row => bareName(row.name) === bareName(name))
+    ?? rows.find(row => row.name === bareName(name));
+  if (!found) return undefined;
+  if (found.free) return { input: 0, output: 0 };
+  if (!Number.isFinite(found.inputPerMillion) || !Number.isFinite(found.outputPerMillion)) return undefined;
+  return { input: found.inputPerMillion, output: found.outputPerMillion };
+}
+
+export function ratesForModel(prices, catalogue, model) {
+  return ratesFor(prices, model) ?? catalogueRates(catalogue, model);
+}
+
 // Prices a Mastra Code thread `tokenUsage` (AI SDK totals: promptTokens includes cache reads and writes).
 // Without rates it still splits the tokens, so unpriced usage is reported in tokens.
 export function priceThreadUsage(usage, rates) {
@@ -238,6 +278,20 @@ export function ledgerTracing(threadIds, file = ledgerFile()) {
   };
 }
 
+// The ledger records which card the census gave each session, which is the only record left
+// once a resumed thread's kickoff message is compacted away.
+export function ledgerCards(file = ledgerFile()) {
+  if (!existsSync(file)) return new Map();
+  try {
+    const ledger = JSON.parse(readFileSync(file, 'utf8'));
+    return new Map(Object.entries(ledger.sessions ?? {})
+      .map(([threadId, record]) => [threadId, record?.card])
+      .filter(([, card]) => Boolean(card)));
+  } catch {
+    return new Map();
+  }
+}
+
 async function readTracing(dir, file, threadIds) {
   if (!existsSync(file) || !threadIds.length) return { metrics: [], requested: [], skipped: null };
   const fileSize = statSync(file).size + (existsSync(file + '.wal') ? statSync(file + '.wal').size : 0);
@@ -271,9 +325,23 @@ async function readTracing(dir, file, threadIds) {
   }
 }
 
+// A traced row carries the parts of the bill but no price of its own, so the parts are
+// priced with the rule priceThreadUsage uses: a cache read or write with no rate of its
+// own is charged at the input rate.
+export function priceTracedTokens(tokens, rates) {
+  const fresh = Number(tokens.input_text ?? 0);
+  const cacheRead = Number(tokens.input_cache_read ?? 0);
+  const cacheWrite = Number(tokens.input_cache_write ?? 0);
+  const output = Number(tokens.total_output ?? 0);
+  return (fresh * rates.input
+    + cacheRead * (rates.cache_read ?? rates.input)
+    + cacheWrite * (rates.cache_write ?? rates.input)
+    + output * rates.output) / 1e6;
+}
+
 // Sums Mastra's own cost estimate. Only the two total metrics carry the whole
 // cost; the input/cache/output detail metrics repeat parts of it.
-export function tracedCost(metrics) {
+export function tracedCost(metrics, ratesForRow) {
   const byAgent = new Map();
   for (const m of metrics) {
     const key = `${m.entityName}\u0000${m.provider}/${m.model}`;
@@ -286,7 +354,12 @@ export function tracedCost(metrics) {
     }
     byAgent.set(key, row);
   }
-  return [...byAgent.values()];
+  return [...byAgent.values()].map(row => {
+    if (!row.unpriced) return row;
+    const rates = ratesForRow?.(row.answered);
+    if (!rates) return row;
+    return { ...row, usd: priceTracedTokens(row.tokens, rates), unpriced: false, pricedFrom: 'our price list' };
+  });
 }
 
 // ---- scorecard ---------------------------------------------------------------
@@ -305,8 +378,17 @@ export function judgeStops(stops, uat) {
   });
 }
 
-export function buildScorecard({ card, threads, prices, tracing, pulls, pings, uat }) {
-  const windows = threads.flatMap(t => cardWindows(t, t.events)).filter(w => w.card === card);
+// A resumed or compacted thread loses the kickoff message that named its card, and the
+// ledger's census record is then the only place that says which card it was on.
+function windowsFrom(thread, cards) {
+  const own = cardWindows(thread, thread.events);
+  const remembered = cards?.get(thread.id);
+  if (!remembered || own.some(w => w.card === remembered)) return own;
+  return [...own, { card: remembered, thread, start: 0, end: Number.MAX_SAFE_INTEGER }];
+}
+
+export function buildScorecard({ card, threads, prices, catalogue, cards, tracing, pulls, pings, uat }) {
+  const windows = threads.flatMap(t => windowsFrom(t, cards)).filter(w => w.card === card);
   // A pstack slice runs on its card's branch (feat/jul-276-…), so the branch name
   // may never mention the slice id; the search that found the PR already matched
   // the card, so a lone result is that card's PR.
@@ -326,9 +408,12 @@ export function buildScorecard({ card, threads, prices, tracing, pulls, pings, u
     }
     const traced = tracing.metrics.filter(m => m.threadId === w.thread.id && inWindow(w, Number(m.at)));
     if (traced.some(m => m.entityName === 'Code Agent')) {
-      for (const row of tracedCost(traced)) {
+      for (const row of tracedCost(traced, model => ratesForModel(prices, catalogue, model))) {
         const asked = tracing.requested.find(r => r.threadId === w.thread.id && r.entityName === row.agent && inWindow(w, Number(r.at)));
-        cost.push({ ...row, requested: asked ? `${asked.provider}/${asked.model}` : 'not recorded', basis: row.unpriced ? 'traced; no published price' : 'traced, Mastra estimate' });
+        // A generation span that names no model leaves provider and model null; that is
+        // not a model called "null/null".
+        const named = asked?.provider && asked?.model ? `${asked.provider}/${asked.model}` : 'not recorded';
+        cost.push({ ...row, requested: named, basis: row.unpriced ? 'traced; no published price' : (row.pricedFrom ?? 'traced, Mastra estimate') });
       }
       continue;
     }
@@ -336,7 +421,7 @@ export function buildScorecard({ card, threads, prices, tracing, pulls, pings, u
     const models = [...new Set(events.steps.map(s => s.model))];
     const allSteps = events.steps.length;
     const share = steps.length / allSteps;
-    const rates = models.length === 1 ? ratesFor(prices, models[0]) : undefined;
+    const rates = models.length === 1 ? ratesForModel(prices, catalogue, models[0]) : undefined;
     const priced = usage ? priceThreadUsage(usage, rates) : undefined;
     const scale = n => Math.round(n * share);
     cost.push({
@@ -395,7 +480,7 @@ export function renderScorecard(s, generatedAt = new Date()) {
       : '- Cost: **unknown**. No usage records found for this card.';
   lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.` : unknownCost);
   if (s.tracingSkipped && measured) lines.push(`- Tracing not read: ${s.tracingSkipped}. Rows below come from the thread's own usage records.`);
-  if (s.ledgerAt) lines.push(`- Cost source: the cost ledger written ${utc(Date.parse(s.ledgerAt))} by scripts/trace-store.mjs, because the live trace store could not be read${s.ledgerMissing ? `; it has no rows for ${s.ledgerMissing} of this card's threads, so treat the total as a floor` : ''}.`);
+  if (s.ledgerAt) lines.push(`- Cost source: the cost ledger written ${utc(Date.parse(s.ledgerAt))} by scripts/trace-store.mjs, ${s.tracingSkipped ? 'because the live trace store could not be read' : "because the store holds no rows for this card's sessions"}${s.ledgerMissing ? `; it has no rows for ${s.ledgerMissing} of this card's threads, so treat the total as a floor` : ''}.`);
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
@@ -461,14 +546,20 @@ async function main() {
   const dir = mastracodeDir();
   const data = appDataDir();
   const threads = readThreads(join(data, 'mastra.db'));
-  const ids = threads.filter(t => cardWindows(t, t.events).some(w => w.card === card)).map(t => t.id);
+  // The ledger's census record says which card each session was on, so a thread whose
+  // kickoff line was compacted away still counts as one of the card's sessions.
+  const cards = ledgerCards();
+  const named = threads.filter(t => cardWindows(t, t.events).some(w => w.card === card)).map(t => t.id);
+  const remembered = [...cards].filter(([, on]) => on === card).map(([id]) => id);
+  const ids = [...new Set([...named, ...remembered])];
   const tracing = await readTracing(dir, process.env.MASTRA_OBSERVABILITY_DB_PATH || join(data, 'observability.duckdb'), ids);
-  // A store too big to copy is the normal state now, so the ledger written by
-  // scripts/trace-store.mjs carries the cost instead.
-  const fromLedger = tracing.skipped ? ledgerTracing(ids) : null;
+  // A store too big to copy, or one that no longer holds this card's sessions, is the
+  // normal state now, so the ledger written by scripts/trace-store.mjs carries the cost.
+  const ledgered = tracing.metrics.length ? null : ledgerTracing(ids);
+  const fromLedger = ledgered ? { ...ledgered, skipped: tracing.skipped } : null;
   const uatFile = fileURLToPath(new URL('../docs/scorecards/uat.json', import.meta.url));
   const uat = existsSync(uatFile) ? JSON.parse(readFileSync(uatFile, 'utf8'))[card] : undefined;
-  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), tracing: fromLedger ?? tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });
+  const scorecard = buildScorecard({ card, threads, cards, prices: loadPrices(dir), catalogue: loadCatalogue(), tracing: fromLedger ?? tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });
   const markdown = renderScorecard(scorecard);
   if (flag === '--write') {
     const out = fileURLToPath(new URL(`../docs/scorecards/${card}.md`, import.meta.url));
