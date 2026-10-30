@@ -5,11 +5,11 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, commandEnv, costFrom,
+  DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, costFrom,
   lastSessionResult, ledger, machine,
   modelsFor, needsJudging, newRunRecord, noteSpend,
   normalizeCard, parseFlags, passing, previewKind, printed, pullNamesCard, recordFile, remediationPrompt,
-  replyFrom, runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, suspendedAsk,
+  replyFrom, runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk,
   thinkingForEffort, tick,
   uatComment, uatSection, verdictCovers, withoutColour,
 } from './run-card.mjs';
@@ -229,6 +229,40 @@ test('the build uses the Start screen picks and Shipping its own slot', () => {
 // A step that runs twice must not append its second round onto the first round's
 // log: the tail of that file is then the round before, and a line truncated mid
 // write in it reads as an answer it never gave.
+// JUL-290's remediation session streamed past 500MB and the runner died keeping it
+// all in one string. The log file keeps everything; the runner keeps the tail and
+// remembers any suspension it saw, wherever in the stream it happened.
+test('a session that streams for hundreds of megabytes is kept to its tail', () => {
+  const stream = streamTail(600);
+  stream.push(`${JSON.stringify({ type: 'tool_suspended', toolName: 'request_access', suspendPayload: { reason: 'Read the models file' } })}\n`);
+  for (let index = 0; index < 50; index += 1) stream.push(`${'x'.repeat(200)}\n`);
+  stream.push(`${JSON.stringify({ type: 'result', status: 'completed', text: 'judged', exitCode: 0 })}\n`);
+  assert.ok(stream.text().length <= 600);
+  assert.match(stream.text(), /"type":"result"/);
+  assert.deepEqual(stream.ask(), { toolName: 'request_access', reason: 'Read the models file' });
+});
+
+// The record has to survive the runner dying: a card picked up again keeps the
+// round that failed, or the finished record reads like a card that passed first time.
+test('a resumed run keeps the steps and rounds the earlier one wrote', () => {
+  const record = newRunRecord({ card: 'JUL-290', branch: 'feat/x', worktree: '/tmp/wt', models: modelsFor({}), pull: { number: 383 } });
+  const prior = {
+    ...record,
+    status: 'failed',
+    startedAt: '2026-10-30T21:52:32.615Z',
+    steps: [stepEntry('shipping', '/tmp/shipping.log'), { ...stepEntry('remediation', '/tmp/remediation.log'), status: 'failed' }],
+    rounds: { shipping: 1, remediation: 1 },
+    sessions: [{ step: 'shipping', model: 'x', usage: { inputTokens: 10 }, at: '2026-10-30T21:53:00.000Z' }],
+  };
+  const carried = carriedOver(record, prior);
+  assert.equal(carried.startedAt, '2026-10-30T21:52:32.615Z');
+  assert.deepEqual(carried.rounds, { shipping: 1, remediation: 1 });
+  assert.equal(carried.steps.length, 2);
+  assert.equal(carried.sessions.length, 1);
+  assert.ok(carried.resumedAt);
+  assert.deepEqual(carriedOver(record, null).steps, []);
+});
+
 test('a step that runs again writes its own log', async () => {
   const state = temporaryState();
   try {

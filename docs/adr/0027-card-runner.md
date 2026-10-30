@@ -44,7 +44,13 @@ moved anywhere else counts as a no and the run stops with his words on it.
 
 `stop <CARD>` marks a run stopped on purpose, which is what a killed process needs before the card
 can be started again. `--from <step>` picks a card up at a step, so an already-built card is not
-rebuilt to prove the rest of the path.
+rebuilt to prove the rest of the path. `remediation` is one of those steps: a card whose judge
+already said FAIL is remediated without paying the judge to repeat itself, and a run that starts
+anywhere after remediation trusts the verdict the judge left on the pull request.
+
+The verdict comment, not the session's closing text, is what the judge is read from. A session that
+posts its verdict and then breaks is a broken session; a session that ends with no verdict on the
+current head has judged nothing.
 
 ## What stays a person's job
 

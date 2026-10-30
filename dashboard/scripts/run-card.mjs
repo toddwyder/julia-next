@@ -95,6 +95,23 @@ export function newRunRecord({ card, branch, worktree, models, pull = null }) {
 
 export const stepEntry = (name, log) => ({ name, status: 'running', startedAt: now(), finishedAt: null, detail: null, log });
 
+// A card picked up again keeps what its earlier runs did: the steps, the rounds
+// of Shipping and remediation, and the spend. A run record that forgets the round
+// that failed reads like a card that passed first time.
+export function carriedOver(record, prior) {
+  if (!prior?.steps?.length) return record;
+  return {
+    ...record,
+    startedAt: prior.startedAt ?? record.startedAt,
+    resumedAt: now(),
+    steps: prior.steps,
+    rounds: prior.rounds ?? record.rounds,
+    sessions: prior.sessions ?? [],
+    verdict: prior.verdict ?? record.verdict,
+    pull: prior.pull ?? record.pull,
+  };
+}
+
 export function recordFile(card, env = process.env) {
   return join(runsFolder(env), `${runIdFor(card)}.json`);
 }
@@ -248,20 +265,46 @@ export function sessionArgs({ model, effort, title, timeoutMs }) {
   ];
 }
 
+function suspendedIn(line) {
+  if (!line.startsWith('{')) return null;
+  try {
+    const event = JSON.parse(line);
+    if (event?.type !== 'tool_suspended') return null;
+    return { toolName: event.toolName, reason: event.suspendPayload?.reason ?? event.suspendPayload?.kind ?? '' };
+  } catch {
+    return null;
+  }
+}
+
 export function suspendedAsk(text) {
   let ask = null;
-  for (const line of String(text ?? '').split('\n')) {
-    if (!line.startsWith('{')) continue;
-    try {
-      const event = JSON.parse(line);
-      if (event?.type === 'tool_suspended') {
-        ask = { toolName: event.toolName, reason: event.suspendPayload?.reason ?? event.suspendPayload?.kind ?? '' };
-      }
-    } catch {
-      // not a jsonl event
-    }
-  }
+  for (const line of String(text ?? '').split('\n')) ask = suspendedIn(line) ?? ask;
   return ask;
+}
+
+// A session streams its whole transcript as jsonl, which runs to hundreds of
+// megabytes on a long card, and Node's longest string is about 512MB: keeping the
+// stream in memory killed the machine mid-run on JUL-290 before it could read the
+// verdict. The log file on disk keeps every byte; this keeps the tail, which is
+// where the result line is, plus any suspension the session asked on the way.
+const KEPT_BYTES = 4 * 1024 * 1024;
+
+export function streamTail(limit = KEPT_BYTES) {
+  let kept = '';
+  let carry = '';
+  let ask = null;
+  return {
+    push(text) {
+      const chunk = String(text ?? '');
+      kept = (kept + chunk).slice(-limit);
+      carry += chunk;
+      const lines = carry.split('\n');
+      carry = lines.pop();
+      for (const line of lines) ask = suspendedIn(line) ?? ask;
+    },
+    text: () => kept,
+    ask: () => ask,
+  };
 }
 
 export function lastSessionResult(text) {
@@ -285,7 +328,7 @@ async function runSession({ name, prompt, cwd, model, effort, title, log, timeou
   const args = sessionArgs({ model, effort, title, timeoutMs });
   appendFileSync(log, `\n$ mastracode ${args.join(' ')}\n`);
   const child = spawn('mastracode', args, { cwd, env: process.env, stdio: ['pipe', 'pipe', 'pipe'] });
-  let stdout = '';
+  const stream = streamTail();
   let killed = false;
   const backstop = setTimeout(() => {
     killed = true;
@@ -293,7 +336,7 @@ async function runSession({ name, prompt, cwd, model, effort, title, log, timeou
   }, timeoutMs + 120_000);
   await new Promise((done, fail) => {
     child.stdout.on('data', chunk => {
-      stdout += chunk;
+      stream.push(chunk);
       appendFileSync(log, chunk);
     });
     child.stderr.on('data', chunk => appendFileSync(log, chunk));
@@ -308,9 +351,9 @@ async function runSession({ name, prompt, cwd, model, effort, title, log, timeou
     child.stdin.end(prompt);
   });
   if (killed) throw new Error(`${name} session was still running after ${Math.round(timeoutMs / 60000)} minutes and was stopped; its work is in ${cwd}, its log is ${log}`);
-  const result = lastSessionResult(stdout);
+  const result = lastSessionResult(stream.text());
   if (result?.finishReason === 'suspended') {
-    const ask = suspendedAsk(stdout);
+    const ask = stream.ask() ?? suspendedAsk(stream.text());
     throw new Error(`${name} session ended asking for something this run cannot approve (${ask?.toolName ?? 'a tool'}: ${ask?.reason || 'no reason given'}); it judged nothing, so the card is not at fault. Do not retry the card until the ask is answered inside the session's prompt; log ${log}`);
   }
   if (result?.status !== 'completed' || result.exitCode !== 0) {
@@ -1051,13 +1094,13 @@ export async function machine({ card, env = process.env, branch: wantedBranch, f
   const openPull = pullForCard(card);
   if (from !== 'build' && !openPull) throw new Error(`${card} has no open pull request, so there is nothing past the build to run`);
   const branch = wantedBranch ?? openPull?.headRefName ?? branchFor(card, issue.title);
-  const record = newRunRecord({
+  const record = carriedOver(newRunRecord({
     card,
     branch,
     worktree: worktree ? resolve(worktree) : join(env.JULIA_RUN_WORKTREES || join(stateRoot(env), 'worktrees'), runIdFor(card)),
     models: modelsFor(env),
     pull: openPull,
-  });
+  }), prior);
   record.pickedUpAt = from;
   record.skipped = STEPS.slice(0, STEPS.indexOf(from));
   const held = worktreeHolding(branch);
