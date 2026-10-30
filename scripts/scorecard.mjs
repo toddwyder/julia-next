@@ -136,6 +136,36 @@ export function threadProjectPath(dbPath, threadId) {
   }
 }
 
+// The session a notification belongs to. The hook payload cannot answer that on its
+// own: Mastra Code builds its hook manager with the literal "session-init" and only
+// replaces that id on thread_changed/thread_created, which `mastracode resume` never
+// emits, so a resumed session's stops named a thread nobody can reopen.
+export function threadExists(dbPath, threadId) {
+  try {
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      return Boolean(db.prepare('select 1 from mastra_threads where id = ?').get(threadId));
+    } finally {
+      db.close();
+    }
+  } catch {
+    return false;
+  }
+}
+
+export function newestThread(dbPath) {
+  try {
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      return db.prepare('select id from mastra_threads order by updatedAt desc limit 1').get()?.id;
+    } finally {
+      db.close();
+    }
+  } catch {
+    return undefined;
+  }
+}
+
 // ---- prices ------------------------------------------------------------------
 
 export function loadPrices(mastracodeDir) {
