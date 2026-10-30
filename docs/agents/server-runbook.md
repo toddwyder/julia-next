@@ -89,10 +89,6 @@ the holder's PID; it changes nothing, so the next run can clean the same session
 
 `status` prints the file, its size, the free space, and the row count of every table.
 
-The cost ledger at `~/.local/state/julia/trace-costs.json` was mined from this store before
-30 October. The scorecard still reads it for a card whose rows a cleanup has since deleted, and
-nothing writes it any more.
-
 ## GitHub boundaries
 
 Use ordinary signed-in GitHub access for authorized cards. Keep authentication material inside its trusted process. Evidence and notes belong on the card branch and pull request.

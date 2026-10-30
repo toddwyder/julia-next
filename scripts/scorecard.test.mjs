@@ -5,8 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { writeFileSync } from 'node:fs';
-import { buildScorecard, cardForThread, cardWindows, catalogueRates, findStops, ledgerTracing, priceThreadUsage, readPings, readThreads, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
+import { buildScorecard, cardForThread, cardWindows, catalogueRates, findStops, priceThreadUsage, readPings, readThreads, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
 import { stopComment } from './stop-ping.mjs';
 import { checkForToddGuard } from './linear-cli.mjs';
 import { appendFileSync } from 'node:fs';
@@ -233,43 +232,9 @@ test('rows with no token detail say unknown instead of claiming zero spend', () 
   assert.doesNotMatch(renderScorecard(priced), /Cost: \*\*\$0\.00\*\*/);
 });
 
-test('the ledger answers when the live trace store cannot be read', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'ledger-'));
-  const file = join(dir, 'trace-costs.json');
-  try {
-    assert.equal(ledgerTracing(['thread-1'], file), null, 'a missing ledger says nothing rather than zero');
-
-    const rows = [
-      { threadId: 'thread-1', at: ms('18:10'), entityName: 'Code Agent', provider: 'commandcode.chat', model: 'deepseek/deepseek-v4.1-flash', name: 'mastra_model_total_input_tokens', value: 1_000_000, estimatedCost: 0.15 },
-      { threadId: 'thread-1', at: ms('18:10'), entityName: 'Code Agent', provider: 'commandcode.chat', model: 'deepseek/deepseek-v4.1-flash', name: 'mastra_model_total_output_tokens', value: 20_000, estimatedCost: 0.012 },
-      { threadId: 'thread-9', at: ms('18:10'), entityName: 'Code Agent', provider: 'x', model: 'y', name: 'mastra_model_total_input_tokens', value: 1, estimatedCost: 9 },
-    ];
-    writeFileSync(file, JSON.stringify({ version: 1, updatedAt: T('19:00'), rows, requested: [{ threadId: 'thread-1', at: ms('18:10'), entityName: 'Code Agent' }] }));
-
-    const tracing = ledgerTracing(['thread-1', 'thread-2'], file);
-    assert.equal(tracing.metrics.length, 2, 'only the threads asked about');
-    assert.equal(tracing.ledgerMissing, 1);
-    assert.equal(tracing.skipped, null);
-
-    // The card renders the real number the store could not be read for.
-    const skipped = 'the trace store is 21 GB and only 20 GB is free to copy it';
-    const bare = { ...thread, usage: undefined };
-    const before = buildScorecard({ card: 'JUL-272', threads: [bare], prices, tracing: { metrics: [], requested: [], skipped }, pulls: [], pings: [], uat: undefined });
-    assert.match(renderScorecard(before), /Cost: \*\*unknown\*\*/);
-    assert.doesNotMatch(renderScorecard(before), /\$0\.16/);
-
-    const after = buildScorecard({ card: 'JUL-272', threads: [bare], prices, tracing, pulls: [], pings: [], uat: undefined });
-    assert.match(renderScorecard(after), /Cost: \*\*\$0\.16\*\*/);
-    assert.match(renderScorecard(after), /Cost source: the cost ledger written 2026-10-26 19:00 .*no rows for 1 of this card's threads/);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-// 30 October: JUL-284 read "no usage records" while the ledger held 678 rows for its
-// session, and JUL-283 read $0.04 for 65 million tokens because Mastra publishes no price
-// for CommandCode. Both are the scorecard's own doing, so both are checked here.
-test('a resumed session keeps the card the ledger gave it, priced from our own list', () => {
+// 30 October: JUL-283 read $0.04 for 65 million tokens because Mastra publishes no price
+// for CommandCode. That was the scorecard's own doing, so it is checked here.
+test('a traced row Mastra cannot price is priced from our own list', () => {
   const catalogue = { models: [{ provider: 'commandcode', name: 'deepseek/deepseek-v4.1-flash', inputPerMillion: 0.15, outputPerMillion: 0.6 }] };
   assert.deepEqual(catalogueRates(catalogue, 'commandcode.chat/deepseek/deepseek-v4.1-flash-1017-cm'), { input: 0.15, output: 0.6 });
   assert.equal(catalogueRates(catalogue, 'anthropic/claude-sonnet-5'), undefined, 'a provider our sweep never priced stays unpriced');
@@ -289,10 +254,9 @@ test('a resumed session keeps the card the ledger gave it, priced from our own l
   assert.equal(priced.usd.toFixed(2), (0.15 + 0.6).toFixed(2));
   assert.equal(priced.cacheReadUnpriced, 1_000_000);
 
-  const resumed = { id: 'thread-9', title: 'Shrinking trace store', events: threadEvents([user('10:00', 'Reply ok.')]) };
-  assert.deepEqual(cardWindows(resumed, resumed.events), [], 'a resumed thread names no card of its own');
+  const session = { id: 'thread-9', title: 'JUL-284 shrink the trace store', events: threadEvents([user('10:00', 'Card: JUL-284. Start.')]) };
   const card = buildScorecard({
-    card: 'JUL-284', threads: [resumed], prices: {}, catalogue, cards: new Map([['thread-9', 'JUL-284']]),
+    card: 'JUL-284', threads: [session], prices: {}, catalogue,
     tracing: { metrics: traced, requested: [{ threadId: 'thread-9', at: ms('10:05'), entityName: 'Code Agent', provider: null, model: null }], skipped: null },
     pulls: [], pings: [], uat: undefined,
   });

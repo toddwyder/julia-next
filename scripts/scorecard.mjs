@@ -263,45 +263,6 @@ export function traceCopyFits(size, room) {
   return size + TRACE_COPY_MARGIN <= room;
 }
 
-// A ledger mined from the trace store before 30 October holds the cost rows of 49
-// sessions, so a card whose store rows were deleted by a retro cleanup keeps its cost.
-export function ledgerFile(env = process.env) {
-  if (env.MASTRA_TRACE_LEDGER) return env.MASTRA_TRACE_LEDGER;
-  return join(env.XDG_STATE_HOME || join(homedir(), '.local', 'state'), 'julia', 'trace-costs.json');
-}
-
-// Reads the ledger instead of the store: no lock, no copy, no disk headroom.
-// Returns null when the ledger says nothing about these threads.
-export function ledgerTracing(threadIds, file = ledgerFile()) {
-  if (!existsSync(file) || !threadIds.length) return null;
-  const ledger = JSON.parse(readFileSync(file, 'utf8'));
-  const wanted = new Set(threadIds);
-  const metrics = (ledger.rows ?? []).filter(r => wanted.has(r.threadId));
-  if (!metrics.length) return null;
-  const covered = new Set(metrics.map(r => r.threadId));
-  return {
-    metrics,
-    requested: (ledger.requested ?? []).filter(r => wanted.has(r.threadId)),
-    skipped: null,
-    ledgerAt: ledger.updatedAt ?? null,
-    ledgerMissing: threadIds.filter(id => !covered.has(id)).length,
-  };
-}
-
-// The ledger records which card each session was on, which is the only record left once a
-// resumed thread's kickoff message is compacted away.
-export function ledgerCards(file = ledgerFile()) {
-  if (!existsSync(file)) return new Map();
-  try {
-    const ledger = JSON.parse(readFileSync(file, 'utf8'));
-    return new Map(Object.entries(ledger.sessions ?? {})
-      .map(([threadId, record]) => [threadId, record?.card])
-      .filter(([, card]) => Boolean(card)));
-  } catch {
-    return new Map();
-  }
-}
-
 async function readTracing(dir, file, threadIds) {
   if (!existsSync(file) || !threadIds.length) return { metrics: [], requested: [], skipped: null };
   const fileSize = statSync(file).size + (existsSync(file + '.wal') ? statSync(file + '.wal').size : 0);
@@ -311,7 +272,7 @@ async function readTracing(dir, file, threadIds) {
     return {
       metrics: [],
       requested: [],
-      skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it, so the cost ledger answers instead`,
+      skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it, so its cost is unknown`,
     };
   }
   const { DuckDBInstance } = createRequire(join(dir, 'package.json'))('@duckdb/node-api');
@@ -390,17 +351,8 @@ export function judgeStops(stops, uat) {
   });
 }
 
-// A resumed or compacted thread loses the kickoff message that named its card, and the
-// ledger's session record is then the only place that says which card it was on.
-function windowsFrom(thread, cards) {
-  const own = cardWindows(thread, thread.events);
-  const remembered = cards?.get(thread.id);
-  if (!remembered || own.some(w => w.card === remembered)) return own;
-  return [...own, { card: remembered, thread, start: 0, end: Number.MAX_SAFE_INTEGER }];
-}
-
-export function buildScorecard({ card, threads, prices, catalogue, cards, tracing, pulls, pings, uat }) {
-  const windows = threads.flatMap(t => windowsFrom(t, cards)).filter(w => w.card === card);
+export function buildScorecard({ card, threads, prices, catalogue, tracing, pulls, pings, uat }) {
+  const windows = threads.flatMap(t => cardWindows(t, t.events)).filter(w => w.card === card);
   // A pstack slice runs on its card's branch (feat/jul-276-…), so the branch name
   // may never mention the slice id; the search that found the PR already matched
   // the card, so a lone result is that card's PR.
@@ -459,8 +411,6 @@ export function buildScorecard({ card, threads, prices, catalogue, cards, tracin
   return {
     card, windows: windows.length, runs, stops, cost, pull, uat,
     tracingSkipped: tracing?.skipped,
-    ledgerAt: tracing?.ledgerAt ?? null,
-    ledgerMissing: tracing?.ledgerMissing ?? 0,
     usd: cost.reduce((a, c) => a + c.usd, 0),
     success: uat && windows.length ? counted.length === 0 : undefined,
     stopsBeforeUat: counted.length,
@@ -501,7 +451,6 @@ export function renderScorecard(s, generatedAt = new Date()) {
       : 'every row priced';
   lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${priced}.` : unknownCost);
   if (s.tracingSkipped && measured) lines.push(`- Tracing not read: ${s.tracingSkipped}. Rows below come from the thread's own usage records.`);
-  if (s.ledgerAt) lines.push(`- Cost source: the cost ledger written ${utc(Date.parse(s.ledgerAt))} from the trace store, ${s.tracingSkipped ? 'because the live trace store could not be read' : "because the store holds no rows for this card's sessions"}${s.ledgerMissing ? `; it has no rows for ${s.ledgerMissing} of this card's threads, so treat the total as a floor` : ''}.`);
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
@@ -571,20 +520,11 @@ async function main() {
   const dir = mastracodeDir();
   const data = appDataDir();
   const threads = readThreads(join(data, 'mastra.db'));
-  // The ledger's session record says which card each session was on, so a thread whose
-  // kickoff line was compacted away still counts as one of the card's sessions.
-  const cards = ledgerCards();
-  const named = threads.filter(t => cardWindows(t, t.events).some(w => w.card === card)).map(t => t.id);
-  const remembered = [...cards].filter(([, on]) => on === card).map(([id]) => id);
-  const ids = [...new Set([...named, ...remembered])];
+  const ids = threads.filter(t => cardWindows(t, t.events).some(w => w.card === card)).map(t => t.id);
   const tracing = await readTracing(dir, process.env.MASTRA_OBSERVABILITY_DB_PATH || join(data, 'observability.duckdb'), ids);
-  // A store too big to copy, or one whose rows a retro cleanup deleted, is the normal
-  // state now, so the ledger carries the cost.
-  const ledgered = tracing.metrics.length ? null : ledgerTracing(ids);
-  const fromLedger = ledgered ? { ...ledgered, skipped: tracing.skipped } : null;
   const uatFile = fileURLToPath(new URL('../docs/scorecards/uat.json', import.meta.url));
   const uat = existsSync(uatFile) ? JSON.parse(readFileSync(uatFile, 'utf8'))[card] : undefined;
-  const scorecard = buildScorecard({ card, threads, cards, prices: loadPrices(dir), catalogue: loadCatalogue(), tracing: fromLedger ?? tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });
+  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), catalogue: loadCatalogue(), tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });
   const markdown = renderScorecard(scorecard);
   if (flag === '--write') {
     const out = fileURLToPath(new URL(`../docs/scorecards/${card}.md`, import.meta.url));
