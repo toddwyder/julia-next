@@ -104,7 +104,9 @@ export function carriedOver(record, prior) {
     ...record,
     startedAt: prior.startedAt ?? record.startedAt,
     resumedAt: now(),
-    steps: prior.steps,
+    // A step still marked running is one the runner died inside; it did not
+    // finish, and leaving it running makes the record claim work that never ended.
+    steps: prior.steps.map(entry => (entry.status === 'running' ? { ...entry, status: 'failed', finishedAt: entry.finishedAt ?? now(), detail: entry.detail ?? 'the runner died during this step' } : entry)),
     rounds: prior.rounds ?? record.rounds,
     sessions: prior.sessions ?? [],
     verdict: prior.verdict ?? record.verdict,

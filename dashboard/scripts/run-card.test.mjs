@@ -258,6 +258,7 @@ test('a resumed run keeps the steps and rounds the earlier one wrote', () => {
   assert.equal(carried.startedAt, '2026-10-30T21:52:32.615Z');
   assert.deepEqual(carried.rounds, { shipping: 1, remediation: 1 });
   assert.equal(carried.steps.length, 2);
+  assert.equal(carried.steps[0].status, 'failed', 'a step the runner died inside did not finish');
   assert.equal(carried.sessions.length, 1);
   assert.ok(carried.resumedAt);
   assert.deepEqual(carriedOver(record, null).steps, []);
