@@ -635,9 +635,254 @@ async function uatStep({ record, issue, env, preview, log }) {
   await mustRun(process.execPath, [LINEAR_CLI, 'state', record.card, 'UAT'], { cwd: REPO_ROOT, log }, `moving ${record.card} to UAT`);
   await mustRun(process.execPath, [LINEAR_CLI, 'remind', record.card], { cwd: REPO_ROOT, log }, `reminding Todd about ${record.card}`);
   record.status = 'waiting';
+  record.waitingSince = now();
   record.waitingFor = `Todd's yes on ${preview.kind === 'dashboard' ? preview.cardPage : preview.address}`;
   saveRecord(record, env);
   return record.waitingFor;
+}
+
+// ---------------------------------------------------------------------------
+// landing: Todd's yes
+
+// The steps after his yes. They are their own list because a card that stopped at
+// UAT is carried on from the front of this list, not from the front of STEPS.
+export const LAND_STEPS = Object.freeze(['merge', 'live', 'complete', 'retro']);
+export const LIVE_JULIA = 'https://julia-mu-green.vercel.app';
+const LIVE_STATE = '/var/lib/julia-dashboard';
+
+// Only a reply after the hand-off counts, and only if it starts with yes or no;
+// everything else on the card is the machine talking to itself.
+export function replyFrom(comments, since) {
+  const cutoff = Date.parse(since ?? '') || 0;
+  for (const comment of comments ?? []) {
+    if ((Date.parse(comment.createdAt ?? '') || 0) <= cutoff) continue;
+    const word = /^\s*(yes|no)\b/i.exec(String(comment.body ?? ''));
+    if (word) return { decision: word[1].toLowerCase(), quote: String(comment.body).trim().slice(0, 500), at: comment.createdAt };
+  }
+  return { decision: 'none' };
+}
+
+// A card that leaves UAT without a comment still answered: Complete is a yes,
+// anywhere else is a no. Both are read the same way a comment would be.
+export function stateReply(state) {
+  const name = String(state ?? '').trim();
+  if (!name || name === 'UAT') return { decision: 'none' };
+  if (name === 'Complete') return { decision: 'yes', quote: 'moved to Complete', at: now() };
+  return { decision: 'no', quote: `moved from UAT to ${name}`, at: now() };
+}
+
+// The merge rule: a PASS covers the code it saw and nothing else.
+export function verdictCovers(verdict, head) {
+  return Boolean(verdict?.ok && head && verdict.head === head);
+}
+
+export function costFrom(markdown) {
+  return /^- Cost: \*\*(.+?)\*\*/m.exec(String(markdown ?? ''))?.[1] ?? 'unknown';
+}
+
+function readReply(record) {
+  const issue = readIssue(record.card);
+  const posted = JSON.parse(printed(process.execPath, [LINEAR_CLI, 'comments', record.card]));
+  const fromComment = replyFrom(posted?.comments ?? [], record.waitingSince);
+  if (fromComment.decision !== 'none') return fromComment;
+  return stateReply(issue.state?.name);
+}
+
+function servedCommit(env = process.env) {
+  try {
+    return JSON.parse(readFileSync(join(env.DASHBOARD_LIVE_STATE ?? LIVE_STATE, 'state', 'build.json'), 'utf8')).commit ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function liveCommit(address) {
+  const response = await fetch(new URL('/api/health', address), { signal: AbortSignal.timeout(10_000) });
+  const body = await response.json();
+  return body?.commit ?? null;
+}
+
+async function waitForLive({ kind, commit, address, log, timeoutMs = 20 * 60_000 }) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const served = kind === 'dashboard' ? servedCommit() : await liveCommit(address).catch(() => null);
+    appendFileSync(log, `live serves ${String(served).slice(0, 7)} (wanted ${String(commit).slice(0, 7)})\n`);
+    if (served && served === commit) return served;
+    await sleep(15_000);
+  }
+  throw new Error(`the live copy never came round to ${String(commit).slice(0, 7)}; nothing rolls back on its own, so this waits for a person`);
+}
+
+function retroPrompt({ card, issue, pull, merge, cost }) {
+  return `You are the retro session for Linear card ${card}: ${issue.title}
+
+It landed: pull request #${pull.number} merged to main as ${merge.commit}.
+The card's cost so far is ${cost}.
+
+${UNATTENDED}
+
+Read AGENTS.md, then the retro skill at .claude/skills/retro/SKILL.md and the
+poteto-mode skill, and run the retro on this card's own build.
+
+Put the fixes in one pull request on branch retro/${runIdFor(card)}:
+- one plain-English line per fix for Todd: the mistake it came from, what the
+  check does, and what it would now block;
+- if the card went through Remediation, a stop, a rubber stamp or a correction
+  from Todd, use the /correct skill on it and add those checks here too;
+- refresh the card's scorecard with: node scripts/scorecard.mjs ${card} --write
+
+Do not merge the pull request and do not move the card; the machine finishes
+the card and Todd reads the retro.`;
+}
+
+export async function land(record, env = process.env, answer = { quote: '' }) {
+  const { note, step } = ledger(record, env);
+  try {
+    console.log(`${record.card}: ${answer.decision === 'yes' ? 'yes from Todd' : 'landing'}`);
+    let pull = ghJson(['pr', 'view', String(record.pull.number), '--json', 'state,headRefOid,headRefName,title,body,comments,mergeCommit']);
+    if (pull.state !== 'MERGED' && !verdictCovers(record.verdict, pull.headRefOid)) {
+      // The code moved since Shipping passed, so the old PASS covers nothing here.
+      const again = await step('shipping', () => shippingStep({ record, issue: readIssue(record.card), env }));
+      record.verdict = { head: again.head, ok: passing(again.verdict), verdict: again.verdict?.verdict ?? 'FAIL', missing: again.verdict?.missing ?? [] };
+      saveRecord(record, env);
+      if (!passing(again.verdict)) {
+        throw new Error(`the code moved after Shipping passed and the fresh pass did not: ${(again.verdict?.missing ?? []).join('; ') || 'no verdict on the new head'}`);
+      }
+      pull = ghJson(['pr', 'view', String(record.pull.number), '--json', 'state,headRefOid,headRefName,title,body,comments,mergeCommit']);
+    }
+    if (pull.state === 'MERGED' && pull.mergeCommit?.oid) {
+      record.merge = { number: record.pull.number, commit: pull.mergeCommit.oid, at: now() };
+      saveRecord(record, env);
+    }
+
+    const merged = await step('merge', async () => {
+      if (record.merge?.commit) return `already merged at ${record.merge.commit.slice(0, 7)}`;
+      printed('gh', ['pr', 'merge', String(record.pull.number), '--squash', '--delete-branch']);
+      const after = ghJson(['pr', 'view', String(record.pull.number), '--json', 'state,mergeCommit']);
+      if (after.state !== 'MERGED' || !after.mergeCommit?.oid) throw new Error(`gh reports pull request #${record.pull.number} as ${after.state}, not merged`);
+      record.merge = { number: record.pull.number, commit: after.mergeCommit.oid, at: now() };
+      saveRecord(record, env);
+      return `merged #${record.pull.number} as ${after.mergeCommit.oid.slice(0, 7)}`;
+    });
+
+    await step('live', async entry => {
+      const kind = record.preview?.kind ?? 'dashboard';
+      const address = kind === 'dashboard' ? `http://${tailnetHost()}:4313` : LIVE_JULIA;
+      await waitForLive({ kind, commit: record.merge.commit, address, log: entry.log });
+      for (const command of smokeCommands({ kind, address, worktree: REPO_ROOT })) {
+        appendFileSync(entry.log, `\n$ ${command.command} ${command.args.join(' ')}\n`);
+        await mustRun(command.command, command.args, { cwd: command.cwd, log: entry.log, timeoutMs: 45 * 60_000 }, command.what);
+      }
+      return `the live copy at ${address} serves ${record.merge.commit.slice(0, 7)} and the suite passed there`;
+    });
+
+    await step('complete', async entry => {
+      const file = join(record.worktree, 'docs', 'scorecards', `${record.card}.md`);
+      if (!existsSync(file)) {
+        await mustRun(process.execPath, [join(REPO_ROOT, 'scripts', 'scorecard.mjs'), record.card, '--write'], { cwd: record.worktree, log: entry.log }, `the scorecard for ${record.card}`);
+      }
+      const cost = existsSync(file) ? costFrom(readFileSync(file, 'utf8')) : 'unknown';
+      record.cost = cost;
+      saveRecord(record, env);
+      const comment = join(runFolderFor(record.card, env), 'landed.md');
+      writeFileSync(comment, `${record.card} landed on main as ${record.merge.commit} (${merged}).
+
+Cost: ${cost}
+
+The live copy serves that commit and the regression suite passed there.`);
+      await mustRun(process.execPath, [LINEAR_CLI, 'comment', record.card, '--file', comment], { cwd: REPO_ROOT, log: entry.log }, `landing comment on ${record.card}`);
+      await mustRun(process.execPath, [LINEAR_CLI, 'state', record.card, 'Complete'], { cwd: REPO_ROOT, log: entry.log }, `moving ${record.card} to Complete`);
+      return `${record.card} is Complete at ${record.merge.commit.slice(0, 7)}, cost ${cost}`;
+    });
+
+    await step('retro', async entry => {
+      const cost = record.cost ?? 'unknown';
+      await runSession({
+        name: 'retro',
+        prompt: retroPrompt({ card: record.card, issue: readIssue(record.card), pull: record.pull, merge: record.merge, cost }),
+        cwd: record.worktree,
+        model: record.models.builder,
+        effort: record.models.effort,
+        title: `${record.card} retro`,
+        log: entry.log,
+        timeoutMs: 90 * 60_000,
+      });
+      return `retro pull request opened for ${record.card}`;
+    });
+
+    record.status = 'finished';
+    record.finishedAt = now();
+    record.waitingFor = null;
+    if (record.preview?.pid) {
+      try {
+        process.kill(record.preview.pid, 'SIGTERM');
+      } catch {
+        // the preview was already closed
+      }
+    }
+    record.previewClosed = Boolean(record.preview);
+    saveRecord(record, env);
+    console.log(`${record.card}: finished`);
+    return record;
+  } catch (error) {
+    record.status = 'failed';
+    record.stoppedBecause = error.message;
+    saveRecord(record, env);
+    console.error(`${record.card}: stopped at ${record.steps.at(-1)?.name ?? 'landing'} -- ${error.message}`);
+    note(`The run for ${record.card} stopped at ${record.steps.at(-1)?.name ?? 'landing'}: ${error.message}. Nothing rolls back on its own.`);
+    return record;
+  }
+}
+
+// One tick answers every card that is waiting: yes lands it, no sends it back to
+// the person who asked. Nothing happens twice, because each record is saved as it goes.
+export async function tick(env = process.env) {
+  const folder = runsFolder(env);
+  if (!existsSync(folder)) return [];
+  const waiting = readdirSync(folder)
+    .filter(name => name.endsWith('.json'))
+    .map(name => readJsonRecord(join(folder, name)).value)
+    .filter(record => record?.status === 'waiting');
+  const answered = [];
+  for (const record of waiting) {
+    let reply;
+    try {
+      reply = readReply(record);
+    } catch (error) {
+      console.error(`${record.card}: could not read the card -- ${error.message}`);
+      continue;
+    }
+    if (reply.decision === 'none') continue;
+    if (reply.decision === 'no') {
+      answered.push(await sendBack(record, env, reply));
+      continue;
+    }
+    answered.push(await land(record, env, reply));
+  }
+  return answered;
+}
+
+async function sendBack(record, env, reply) {
+  const file = join(runFolderFor(record.card, env), 'sent-back.md');
+  mkdirSync(runFolderFor(record.card, env), { recursive: true });
+  writeFileSync(file, `${record.card} goes back: ${reply.quote}
+
+Nothing merged. The build starts again from this note in the next run.`);
+  const posted = shell(process.execPath, [LINEAR_CLI, 'comment', record.card, '--file', file]);
+  if (posted.status !== 0) console.error(`could not comment on ${record.card}: ${String(posted.stderr).trim()}`);
+  return stopRun({ card: record.card, env, because: `Todd said no: ${reply.quote}` });
+}
+
+async function waitForAnswer({ record, env, timeoutMs }) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const reply = readReply(record);
+    if (reply.decision !== 'none') return reply;
+    record.checkedAt = now();
+    saveRecord(record, env);
+    await sleep(60_000);
+  }
+  throw new Error(`nobody answered on ${record.card} within ${Math.round(timeoutMs / 3600000)} hours; it stays in UAT and the run waits`);
 }
 
 // ---------------------------------------------------------------------------
@@ -665,7 +910,45 @@ export function modelsFor(env = process.env) {
   };
 }
 
-export async function machine({ card, env = process.env, branch: wantedBranch, from = 'build', worktree = null }) {
+// A run is written as it happens: one entry per step with the log beside it, and one
+// note the card gets when the run stops. Both halves of a card's life use this.
+function ledger(record, env) {
+  const folder = runFolderFor(record.card, env);
+  mkdirSync(folder, { recursive: true });
+
+  const note = message => {
+    const file = join(folder, 'stop.md');
+    writeFileSync(file, message);
+    const posted = shell(process.execPath, [LINEAR_CLI, 'comment', record.card, '--file', file]);
+    if (posted.status !== 0) console.error(`could not comment on ${record.card}: ${String(posted.stderr).trim()}`);
+  };
+
+  const step = async (name, work) => {
+    const entry = stepEntry(name, join(folder, `${name}.log`));
+    record.steps.push(entry);
+    saveRecord(record, env);
+    console.log(`${record.card}: ${name} started`);
+    try {
+      const detail = await work(entry);
+      entry.status = 'done';
+      entry.finishedAt = now();
+      entry.detail = typeof detail === 'string' ? detail : String(detail?.summary ?? 'done');
+      saveRecord(record, env);
+      console.log(`${record.card}: ${name} done -- ${entry.detail}`);
+      return detail;
+    } catch (error) {
+      entry.status = 'failed';
+      entry.finishedAt = now();
+      entry.detail = error.message;
+      saveRecord(record, env);
+      throw error;
+    }
+  };
+
+  return { folder, note, step };
+}
+
+export async function machine({ card, env = process.env, branch: wantedBranch, from = 'build', worktree = null, wait = true, waitMs = 72 * 60 * 60_000 }) {
   if (!STEPS.includes(from)) throw new Error(`--from must be one of ${STEPS.join(', ')}, not "${from}"`);
   const prior = readJsonRecord(recordFile(card, env)).value;
   if (prior && [...ACTIVE_RUN_STATUSES, 'waiting'].includes(prior.status)) {
@@ -691,34 +974,7 @@ export async function machine({ card, env = process.env, branch: wantedBranch, f
   saveRecord(record, env);
   console.log(`${card}: started on ${branch}`);
 
-  const note = message => {
-    const file = join(folder, 'stop.md');
-    writeFileSync(file, message);
-    const posted = shell(process.execPath, [LINEAR_CLI, 'comment', card, '--file', file]);
-    if (posted.status !== 0) console.error(`could not comment on ${card}: ${String(posted.stderr).trim()}`);
-  };
-
-  const step = async (name, work) => {
-    const entry = stepEntry(name, join(folder, `${name}.log`));
-    record.steps.push(entry);
-    saveRecord(record, env);
-    console.log(`${card}: ${name} started`);
-    try {
-      const detail = await work(entry);
-      entry.status = 'done';
-      entry.finishedAt = now();
-      entry.detail = typeof detail === 'string' ? detail : String(detail?.summary ?? 'done');
-      saveRecord(record, env);
-      console.log(`${card}: ${name} done -- ${entry.detail}`);
-      return detail;
-    } catch (error) {
-      entry.status = 'failed';
-      entry.finishedAt = now();
-      entry.detail = error.message;
-      saveRecord(record, env);
-      throw error;
-    }
-  };
+  const { note, step } = ledger(record, env);
 
   try {
     if (from === 'build') await step('build', () => buildStep({ record, issue, env }));
@@ -726,12 +982,16 @@ export async function machine({ card, env = process.env, branch: wantedBranch, f
 
     if (STEPS.indexOf(from) <= STEPS.indexOf('shipping')) {
       shipping = await step('shipping', () => shippingStep({ record, issue, env }));
+      record.verdict = { head: shipping.head, ok: passing(shipping.verdict), verdict: shipping.verdict?.verdict ?? 'FAIL', missing: shipping.verdict?.missing ?? [] };
+      saveRecord(record, env);
 
       if (!passing(shipping.verdict)) {
         record.rounds.remediation += 1;
         saveRecord(record, env);
         await step('remediation', () => buildStep({ record, issue, env, name: 'remediation', verdict: shipping.verdict }));
         shipping = await step('shipping', () => shippingStep({ record, issue, env }));
+        record.verdict = { head: shipping.head, ok: passing(shipping.verdict), verdict: shipping.verdict?.verdict ?? 'FAIL', missing: shipping.verdict?.missing ?? [] };
+        saveRecord(record, env);
         if (!passing(shipping.verdict)) {
           record.status = 'stopped';
           record.stoppedBecause = `Shipping failed twice on ${card}: ${shipping.verdict?.missing?.join('; ') ?? 'no verdict on the head'}`;
@@ -752,7 +1012,12 @@ export async function machine({ card, env = process.env, branch: wantedBranch, f
     await step('uat', entry => uatStep({ record, issue, env, preview, log: entry.log }));
 
     console.log(`${card}: waiting -- ${record.waitingFor}`);
-    return record;
+    if (!wait) return record;
+
+    // The card sits in UAT until Todd answers. The run holds the answer and lands
+    // it in the same process; a tick picks it up if this process is gone by then.
+    const answer = await waitForAnswer({ record, env, timeoutMs: waitMs });
+    return land(record, env, answer);
   } catch (error) {
     record.status = 'failed';
     record.stoppedBecause = error.message;
@@ -788,7 +1053,11 @@ export function parseFlags(argv) {
   const flags = {};
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (!['--state', '--branch', '--from', '--worktree', '--because'].includes(arg)) throw new Error(`unknown flag "${arg}"`);
+    if (arg === '--no-wait') {
+      flags.wait = false;
+      continue;
+    }
+    if (!['--state', '--branch', '--from', '--worktree', '--because', '--wait-hours'].includes(arg)) throw new Error(`unknown flag "${arg}"`);
     const value = argv[index + 1];
     if (!value) throw new Error(`${arg} needs a value`);
     flags[arg.slice(2)] = value;
@@ -799,21 +1068,37 @@ export function parseFlags(argv) {
 
 export async function main(argv = process.argv.slice(2)) {
   const [command, cardArg] = argv;
-  if (!cardArg || !['start', 'stop'].includes(command)) {
-    console.error('usage: run-card.mjs start <CARD> [--branch <name>] [--worktree <dir>] [--state <dir>] [--from <step>]');
+  if (!['start', 'stop', 'tick'].includes(command) || (command !== 'tick' && !cardArg)) {
+    console.error('usage: run-card.mjs start <CARD> [--branch <name>] [--worktree <dir>] [--state <dir>] [--from <step>] [--no-wait] [--wait-hours <n>]');
+    console.error('       run-card.mjs tick [--state <dir>]');
     console.error('       run-card.mjs stop <CARD> [--because <reason>] [--state <dir>]');
     process.exitCode = 2;
     return;
   }
-  const flags = parseFlags(argv.slice(2));
+  const flags = parseFlags(command === 'tick' ? argv.slice(1) : argv.slice(2));
   const env = { ...process.env, ...(flags.state ? { DASHBOARD_STATE_DIR: flags.state } : {}) };
   if (command === 'stop') {
-    const record = stopRun({ card: cardArg, env, because: flags.because });
+    const record = stopRun({ card: cardArg, env, because: flags['because'] });
     console.log(`${record.card}: stopped (${record.stoppedBecause})`);
     return;
   }
-  const record = await machine({ card: normalizeCard(cardArg), env, branch: flags.branch, from: flags.from, worktree: flags.worktree });
-  process.exitCode = record.status === 'waiting' ? 0 : 1;
+  if (command === 'tick') {
+    const answered = await tick(env);
+    console.log(answered.length ? `${answered.length} card(s) answered` : 'nothing to answer');
+    for (const record of answered) console.log(`${record.card}: ${record.status}`);
+    process.exitCode = answered.every(record => ['finished', 'stopped'].includes(record.status)) ? 0 : 1;
+    return;
+  }
+  const record = await machine({
+    card: normalizeCard(cardArg),
+    env,
+    branch: flags.branch,
+    from: flags.from,
+    worktree: flags.worktree,
+    wait: flags.wait !== false,
+    waitMs: flags['wait-hours'] ? Number(flags['wait-hours']) * 60 * 60_000 : undefined,
+  });
+  process.exitCode = ['waiting', 'finished'].includes(record.status) ? 0 : 1;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

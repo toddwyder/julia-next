@@ -5,12 +5,13 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  DASHBOARD_ROOT, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, commandEnv, lastSessionResult, machine,
+  DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, commandEnv, costFrom,
+  lastSessionResult, machine,
   modelsFor, newRunRecord,
   normalizeCard, parseFlags, passing, previewKind, printed, pullNamesCard, recordFile, remediationPrompt,
-  runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stepEntry, stopRun, suspendedAsk,
-  thinkingForEffort,
-  uatComment, uatSection, withoutColour,
+  replyFrom, runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, suspendedAsk,
+  thinkingForEffort, tick,
+  uatComment, uatSection, verdictCovers, withoutColour,
 } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
@@ -314,6 +315,59 @@ test('a run left behind by a killed process is stopped on purpose before it is s
     assert.equal(written.waitingFor, null);
     assert.equal(written.preview, null);
     assert.throws(() => stopRun({ card: 'JUL-999', env: state.env }), /has no run record/);
+  } finally {
+    state.clean();
+  }
+});
+
+// A card that lands is decided by exactly one signal: what Todd says after the
+// hand-off. Everything the machine wrote before that is its own voice.
+test('only a reply after the hand-off counts as Tods answer', () => {
+  const comments = [
+    { body: 'yes from before the hand-off', createdAt: '2026-10-30T10:00:00.000Z' },
+    { body: 'Build evidence: rows show', createdAt: '2026-10-30T21:00:00.000Z' },
+    { body: 'maybe later', createdAt: '2026-10-30T21:10:00.000Z' },
+    { body: 'Yes, that all holds.', createdAt: '2026-10-30T21:20:00.000Z' },
+  ];
+  assert.deepEqual(replyFrom(comments, '2026-10-30T20:00:00.000Z'), {
+    decision: 'yes',
+    quote: 'Yes, that all holds.',
+    at: '2026-10-30T21:20:00.000Z',
+  });
+  assert.equal(replyFrom([{ body: 'no, the warning is wrong', createdAt: '2026-10-30T21:20:00.000Z' }], '2026-10-30T20:00:00.000Z').decision, 'no');
+  assert.equal(replyFrom(comments.slice(0, 3), '2026-10-30T20:00:00.000Z').decision, 'none');
+  assert.equal(replyFrom([], null).decision, 'none');
+});
+
+test('a card moved out of UAT answered too, and Complete is a yes', () => {
+  assert.deepEqual(stateReply('UAT'), { decision: 'none' });
+  assert.equal(stateReply('Complete').decision, 'yes');
+  assert.equal(stateReply('Ready').decision, 'no');
+  assert.match(stateReply('Backlog').quote, /moved from UAT to Backlog/);
+});
+
+// The merge rule from docs/plans/path-forward.md: a PASS covers the head it saw.
+test('a passing verdict only covers the code it looked at', () => {
+  assert.equal(verdictCovers({ ok: true, head: 'f053465' }, 'f053465'), true);
+  assert.equal(verdictCovers({ ok: true, head: 'f053465' }, 'aabbccd'), false);
+  assert.equal(verdictCovers({ ok: false, head: 'f053465' }, 'f053465'), false);
+  assert.equal(verdictCovers(null, 'f053465'), false);
+});
+
+test('the cost a landed card carries is the one written on its scorecard', () => {
+  assert.equal(costFrom('- Cost: **$1.69** at published API prices, plus 101.95M cache-read tokens'), '$1.69');
+  assert.equal(costFrom('- Cost: **unknown**. Mastra kept no token detail for these runs.'), 'unknown');
+  assert.equal(costFrom(''), 'unknown');
+});
+
+test('landing happens in order and only after the yes', () => {
+  assert.deepEqual([...LAND_STEPS], ['merge', 'live', 'complete', 'retro']);
+});
+
+test('a tick with no runs to read does nothing', async () => {
+  const state = temporaryState();
+  try {
+    assert.deepEqual(await tick(state.env), []);
   } finally {
     state.clean();
   }
