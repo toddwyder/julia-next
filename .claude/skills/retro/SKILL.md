@@ -24,13 +24,13 @@ The user has asked for a **retrospective**. You are suggesting improvements to t
 
 4. Present these candidates to the user, in order of severity.
 
-5. Last, clean this session out of the trace store:
+5. Last, record where the trace store stands:
 
    ```sh
-   node scripts/trace-store.mjs clean <this session's id> --card JUL-<n>
+   node scripts/trace-store.mjs status
    ```
 
-   It keeps this session's `metric_events` rows, which are the cost the scorecard prices a card from, deletes its `span_events` and `log_events` rows, which are the prompt payloads, and checkpoints the file. Paste its JSON in the retro record. That is the only trace cleanup there is: no list of sessions, no census file, no sweep. If it answers `status: busy`, a session holds the store; say so and leave the cleanup to the next retro rather than killing anything.
+   Paste its JSON in the retro record. This session's prompt payloads need no deleting: every session writes its own file, and the launcher folds finished files into an archive beside them at the next launch, which keeps the cost rows the scorecard prices a card from and deletes the file that held the prompts. There is no list of sessions, no census file, no sweep, and nothing in the retro deletes anything.
 
 ## Reference
 

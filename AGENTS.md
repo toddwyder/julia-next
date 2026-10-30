@@ -28,7 +28,7 @@ Todd decides what Julia does for the household and gives UAT. Everything else is
 ## Finish
 A card is finished when its PR is merged to main (after Todd's UAT yes when the card changes something he uses), main CI is green on the merge commit, and the card is Complete in Linear with that commit in a comment.
 
-After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Its last step is `node scripts/trace-store.mjs clean <that session's id> --card JUL-<n>`, which keeps the slice's cost rows, deletes its prompt payloads, checkpoints the file, and comments on the card when the store is still over 15 GB. The next slice does not wait for that PR.
+After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Nothing in the retro touches the trace store: every session writes its own trace file, and the launcher folds finished files into the archive beside them at the next launch, so a slice's prompt payloads leave the disk without anyone remembering and its cost rows stay for the scorecard. `node scripts/trace-store.mjs status` answers the size question. The next slice does not wait for that PR.
 
 ## Enforced rules
 
@@ -37,6 +37,7 @@ After a slice merges, run the retro skill on that slice's session and put its fi
 | Skill names are unique across the installed catalogs. | `node scripts/check-skill-names.mjs` rejects duplicate frontmatter names. |
 | Current agent-read files point only at paths that exist. | `node scripts/check-agent-links.mjs` checks the entry points, pstack skills, and `ask-matt`. |
 | Every branch except `main` has an open pull request to `main`. | `node scripts/check-branch-pr.mjs` audits GitHub branches and open pull requests in CI. |
+| A pull request that names a card carries that card's scorecard with a measured cost. | `node scripts/check-branch-pr.mjs` fails the branch when the scorecard is missing, its cost is unknown, or its cost is short. |
 
 <!-- BEGIN:nextjs-agent-rules -->
 

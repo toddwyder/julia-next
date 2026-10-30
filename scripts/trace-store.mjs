@@ -1,43 +1,49 @@
 #!/usr/bin/env node
-// Keeps Mastra Code's trace store (observability.duckdb) small one slice at a time.
+// Keeps Mastra Code's trace store small by giving every session its own file.
 //
 //   node scripts/trace-store.mjs status
-//   node scripts/trace-store.mjs clean <session id> [--card JUL-284]
+//   node scripts/trace-store.mjs fold [--quiet]
 //
-// The last step of a slice's retro runs `clean` for the session that did the slice. It
-// keeps that session's `metric_events` rows — the per-call tokens and cost the scorecard
-// prices a card from — deletes its `span_events` and `log_events` rows, which carry the
-// prompt payloads and are nearly all of the file, and then checkpoints the store so DuckDB
-// folds the write-ahead log in and drops the blocks the delete freed. It takes any session
-// id: nothing here reads a list of sessions or a dated file, so a session loses its detail
-// when a retro has learned from it, and not before.
+// Mastra Code opens its trace store once at startup, and DuckDB admits one writer per
+// file. A session that starts while another holds observability.duckdb gets no tracing at
+// all, silently, for its whole life (`@mastra/code-sdk/dist/index.js:323`), so its cost
+// rows are never recorded and the card scored from it reads unknown. So the launcher
+// `scripts/mastracode` gives each launch its own file under the traces directory, and the
+// scorecard prices a card from all of them.
 //
-// A checkpoint rewrites blocks in place and truncates the tail, so holes in the middle of a
-// file stay until a dense copy is written and the room a cleanup gives back can be less than
-// the round added. When the file is still over ALARM_BYTES afterwards, `clean` comments on
-// the slice's card: the store size, and that the round was too big.
-import { existsSync, mkdirSync, statSync, statfsSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+// Each file then has to be cleared. `fold` copies a finished file's `metric_events` rows,
+// the per-call tokens and cost a scorecard prices from, into `archive.duckdb`, then deletes
+// the file. Deleting the file is what returns the disk: DuckDB keeps freed blocks inside
+// the file, so a delete in place gives back nothing. Measured on 30 October: 52,443 rows
+// deleted and checkpointed, 5,955,137,536 B before and after. A file a running session
+// still holds is left alone. The launcher folds on every launch, so no one has to remember
+// a cleanup step.
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, statfsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, totalmem } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DETAIL_TABLES = ['span_events', 'log_events'];
 const ALARM_BYTES = 15 * 1024 ** 3;
-const ALARM_CARD = 'JUL-276';
-const THREAD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ARCHIVE = 'archive.duckdb';
+const FOLDING = '.folding';
 
-export function storeFile(env = process.env) {
-  return env.MASTRA_OBSERVABILITY_DB_PATH || join(env.MASTRA_APP_DATA_DIR || join(homedir(), '.local', 'share', 'mastracode'), 'observability.duckdb');
+export function appDataDir(env = process.env) {
+  return env.MASTRA_APP_DATA_DIR || join(homedir(), '.local', 'share', 'mastracode');
 }
 
-function stateDir(env = process.env) {
-  return join(env.XDG_STATE_HOME || join(homedir(), '.local', 'state'), 'julia');
+export function tracesDir(env = process.env) {
+  return env.JULIA_TRACES_DIR || join(appDataDir(env), 'traces');
 }
 
-export function storeBytes(file) {
+// Before the launcher shipped, every session wrote to this one file. `fold` empties it the
+// same way, so the switch needs no cleanup step of its own.
+export function legacyStoreFile(env = process.env) {
+  return env.MASTRA_OBSERVABILITY_DB_PATH || join(appDataDir(env), 'observability.duckdb');
+}
+
+export function fileBytes(file) {
   const wal = `${file}.wal`;
   return (existsSync(file) ? statSync(file).size : 0) + (existsSync(wal) ? statSync(wal).size : 0);
 }
@@ -47,12 +53,13 @@ export function freeBytes(dir) {
   return Number(fs.bavail) * Number(fs.bsize);
 }
 
-// DuckDB refuses the second handle with "Could not set lock on file ... by user
-// ubuntu". That is the store being in use, not a fault, so it is its own answer.
+const gb = bytes => `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+
+// DuckDB refuses the second handle with "Could not set lock on file ... by user ubuntu".
+// That is a session holding the file, not a fault, so it is its own answer.
 export function lockOwnerFromError(message) {
   const pid = /Conflicting lock is held .*\(PID (\d+)\)/.exec(message);
-  if (!pid) return null;
-  return { pid: Number(pid[1]) };
+  return pid ? { pid: Number(pid[1]) } : null;
 }
 
 export function isLockedMessage(message) {
@@ -60,159 +67,203 @@ export function isLockedMessage(message) {
 }
 
 function duckdb() {
-  const dir = resolve(REPO, 'node_modules');
-  const candidates = [join(dir, '@duckdb', 'node-api'), join(homedir(), '.local', 'lib', 'mastracode-program', 'node_modules', '@duckdb', 'node-api')];
-  const found = candidates.find(p => existsSync(join(p, 'package.json')));
-  if (!found) throw new Error('no @duckdb/node-api package found to read the trace store');
+  const candidates = [
+    join(REPO, 'node_modules', '@duckdb', 'node-api'),
+    join(homedir(), '.local', 'lib', 'mastracode-program', 'node_modules', '@duckdb', 'node-api'),
+  ];
+  const found = candidates.find(candidate => existsSync(join(candidate, 'package.json')));
+  if (!found) throw new Error('no @duckdb/node-api package found to fold the trace files: run npm ci');
   return createRequire(join(found, 'package.json'))('@duckdb/node-api');
 }
 
 // DuckDB sizes its buffer pool at 85% of the machine's memory, which on this server is
-// 6 GB of 7 GB. The kernel killed a run that read every session at 6.15 GB, before it
-// deleted a row. A budget the machine can hold, with anything that does not fit spilling
-// to the temp directory beside the store, keeps a deep read of a big file from deciding
-// how much memory the process needs.
-export function openOptions(file, mode) {
+// 6 GB of 7 GB, and the kernel killed a run that read every session at 6.15 GB before it
+// deleted a row. A budget the machine can hold, with the rest spilling beside the file,
+// keeps a deep read from deciding how much memory the process needs.
+export function openOptions(file) {
   const limit = Math.min(2048, Math.max(256, Math.floor(totalmem() / 2 ** 20 / 3)));
-  return { ...(mode ? { access_mode: mode } : {}), memory_limit: `${limit}MB`, temp_directory: `${file}.tmp` };
+  return { memory_limit: `${limit}MB`, temp_directory: `${file}.tmp` };
 }
 
-export async function openStore(file, mode) {
-  const { DuckDBInstance } = duckdb();
+// Every file that can hold traces: the archive, each session's own file, and the single file
+// this replaced if it sits somewhere else.
+export function traceFiles(dir = tracesDir(), legacy = legacyStoreFile()) {
+  const names = existsSync(dir) ? readdirSync(dir) : [];
+  const files = names.filter(name => name.endsWith('.duckdb')).sort().map(name => join(dir, name));
+  if (existsSync(legacy) && resolve(dirname(legacy)) !== resolve(dir)) files.push(legacy);
+  return files;
+}
+
+// The work of a fold: a half-finished file left by an interrupted fold, then every session
+// file, then the single file this replaced. The archive is the destination, so it is not work.
+export function pendingFiles(dir = tracesDir(), legacy = legacyStoreFile()) {
+  const names = existsSync(dir) ? readdirSync(dir) : [];
+  const files = names
+    .filter(name => name.endsWith(FOLDING) || (name.endsWith('.duckdb') && name !== ARCHIVE))
+    .sort()
+    .map(name => join(dir, name));
+  if (existsSync(legacy) && resolve(dirname(legacy)) !== resolve(dir)) files.push(legacy);
+  return files;
+}
+
+async function tryAttach(connection, file, alias) {
   try {
-    const instance = await DuckDBInstance.create(file, openOptions(file, mode));
-    return { instance };
+    await connection.run(`attach '${file.replaceAll("'", "''")}' as ${alias}`);
+    return null;
   } catch (error) {
-    const owner = lockOwnerFromError(error.message);
-    if (owner || isLockedMessage(error.message)) return { busy: owner ?? {} };
+    if (isLockedMessage(error.message)) return lockOwnerFromError(error.message) ?? {};
     throw error;
   }
 }
 
-const gb = bytes => `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-
-export function alarmComment(answer) {
-  const deleted = DETAIL_TABLES.map(table => `${answer.deleted[table]} ${table} rows`).join(' and ');
-  return [
-    `The trace store is ${gb(answer.bytesAfter)} after the ${answer.card} cleanup, over the ${gb(ALARM_BYTES)} it is allowed to reach. The round was too big.`,
-    '',
-    `- Store: ${answer.store}`,
-    `- Kept ${answer.kept} \`metric_events\` rows and deleted ${deleted}, then checkpointed.`,
-    `- This round: ${gb(answer.bytesBefore)} → ${gb(answer.bytesAfter)}.`,
-    '- Nothing failed and nothing was left out: a checkpoint rewrites blocks in place, so the room a cleanup gives back can be less than the round added.',
-  ].join('\n');
-}
-
-// The wrapper runs its argument through `op run`, and the client is not executable in a
-// fresh checkout, so the client is named as a program for this same node.
-export function commentArgs(card, file) {
-  return [join(REPO, 'scripts', 'julia-agents.mjs'), '--', process.execPath, join(REPO, 'scripts', 'linear-cli.mjs'), 'comment', card, '--file', file];
-}
-
-// A comment on the card is how a size reaches Todd: it is the channel he reads, and a body
-// written to a file that was never posted notifies nobody, so the spawn's own answer says
-// whether it landed.
-function postCardComment(body, card) {
-  mkdirSync(stateDir(), { recursive: true });
-  const file = join(stateDir(), `trace-alarm-${new Date().toISOString().replace(/[:.]/g, '-')}.md`);
-  writeFileSync(file, body);
-  const run = spawnSync(process.execPath, commentArgs(card, file), { cwd: REPO, encoding: 'utf8', timeout: 120_000 });
-  return { posted: run.status === 0, card, file, said: `${run.stdout ?? ''}${run.stderr ?? ''}`.trim().split('\n').slice(-1)[0]?.slice(0, 200) ?? '' };
-}
-
-// One session's detail goes, its cost rows stay, and the file is checkpointed afterwards.
-// `post` is a seam: a test never posts to Linear.
-export async function cleanSession(thread, { store = storeFile(), card = ALARM_CARD, post = postCardComment, alarmBytes = ALARM_BYTES } = {}) {
-  if (!THREAD_ID.test(String(thread))) throw new Error(`"${thread}" is not a session id: clean needs the UUID of the session the slice ran in`);
-  if (!existsSync(store)) return { status: 'missing', store, thread };
-  const bytesBefore = storeBytes(store);
-  const opened = await openStore(store);
-  if (opened.busy) return { status: 'busy', ...opened.busy, store, thread, bytes: bytesBefore };
-  const kept = {};
-  const deleted = {};
+// The cost rows of one dead file go into the archive, then the file goes. A file is renamed
+// before its rows are copied so a copy that lands twice cannot be counted twice, and a
+// half-finished `.folding` file is picked up by the next fold.
+async function foldOne(connection, catalog, file) {
+  const key = basename(file).replace(FOLDING, '');
+  const probe = await tryAttach(connection, file, 'src');
+  if (probe) return { skipped: { file: key, pid: probe.pid ?? null } };
+  await connection.run('detach src');
+  const folding = file.endsWith(FOLDING) ? file : `${file}${FOLDING}`;
+  if (folding !== file) {
+    renameSync(file, folding);
+    if (existsSync(`${file}.wal`)) renameSync(`${file}.wal`, `${folding}.wal`);
+  }
+  const second = await tryAttach(connection, folding, 'src');
+  if (second) return { skipped: { file: key, pid: second.pid ?? null } };
   try {
-    const connection = await opened.instance.connect();
-    const id = `'${thread}'`;
-    const count = async table => Number((await connection.runAndReadAll(`select count(*) as n from ${table} where threadId = ${id}`)).getRowObjectsJson()[0].n);
-    kept.metric_events = await count('metric_events');
-    await connection.run('set threads = 1');
-    for (const table of DETAIL_TABLES) {
-      deleted[table] = await count(table);
-      await connection.run(`delete from ${table} where threadId = ${id}`);
-    }
-    await connection.run('checkpoint');
-  } finally {
-    opened.instance.closeSync?.();
+    const metrics = Number((await connection.runAndReadAll('select count(*) as n from src.metric_events')).getRowObjectsJson()[0].n);
+    await connection.run(`create table if not exists ${catalog}.metric_events as select * from src.metric_events limit 0`);
+    await connection.run(`alter table ${catalog}.metric_events add column if not exists source_file varchar`);
+    await connection.run(`delete from ${catalog}.metric_events where source_file = '${key}'`);
+    await connection.run(`insert into ${catalog}.metric_events by name select *, '${key}' as source_file from src.metric_events`);
+    await connection.run('detach src');
+    rmSync(folding, { force: true });
+    rmSync(`${folding}.wal`, { force: true });
+    return { folded: { file: key, metrics } };
+  } catch (error) {
+    // Leave the `.folding` file for the next fold, which replaces its rows rather than
+    // adding to them.
+    throw new Error(`could not fold ${key}: ${error.message}`);
   }
-  const answer = {
-    status: 'ok',
-    store,
-    thread,
-    card,
-    kept: kept.metric_events,
-    deleted,
-    bytesBefore,
-    bytesAfter: storeBytes(store),
-    freeAfter: freeBytes(dirname(store)),
-  };
-  if (!answer.kept) answer.note = 'this session left no metric_events rows, so nothing about its cost is kept by this cleanup';
-  if (answer.bytesAfter > alarmBytes) answer.comment = post(alarmComment(answer), card);
-  return answer;
 }
 
-export async function status() {
-  const file = storeFile();
-  const bytes = storeBytes(file);
-  const opened = await openStore(file, 'READ_ONLY');
-  const answer = { store: file, bytes, size: gb(bytes), free: gb(freeBytes(dirname(file))), busy: Boolean(opened.busy), holderPid: opened.busy?.pid ?? null };
-  if (!opened.busy) {
+export async function foldTraces({ dir = tracesDir(), legacy = legacyStoreFile() } = {}) {
+  const pending = pendingFiles(dir, legacy);
+  const diskBytes = () =>
+    [...traceFiles(dir, legacy), ...pending.filter(file => file.endsWith(FOLDING))]
+      .reduce((sum, file) => sum + fileBytes(file), 0);
+  const bytesBefore = diskBytes();
+  const folded = [];
+  const skipped = [];
+  let status = 'ok';
+  let pid = null;
+  if (pending.length) {
+    mkdirSync(dir, { recursive: true });
+    const archive = join(dir, ARCHIVE);
+    const archiveExisted = existsSync(archive);
+    const { DuckDBInstance } = duckdb();
+    let instance;
     try {
-      const connection = await opened.instance.connect();
-      const tables = (await connection.runAndReadAll('select table_name from duckdb_tables() order by table_name')).getRowObjectsJson().map(r => r.table_name);
-      const rows = {};
-      for (const table of tables) rows[table] = Number((await connection.runAndReadAll(`select count(*) as n from ${table}`)).getRowObjectsJson()[0].n);
-      answer.tables = rows;
-    } finally {
-      opened.instance.closeSync?.();
+      instance = await DuckDBInstance.create(archive, openOptions(archive));
+    } catch (error) {
+      const owner = lockOwnerFromError(error.message);
+      if (!owner && !isLockedMessage(error.message)) throw error;
+      status = 'busy';
+      pid = owner?.pid ?? null;
+    }
+    if (instance) {
+      try {
+        const connection = await instance.connect();
+        const catalog = (await connection.runAndReadAll('select current_database() as db')).getRowObjectsJson()[0].db;
+        await connection.run('set threads = 1');
+        for (const file of pending) {
+          const answer = await foldOne(connection, catalog, file);
+          if (answer.folded) folded.push(answer.folded);
+          else skipped.push(answer.skipped);
+        }
+        await connection.run('checkpoint');
+      } finally {
+        instance.closeSync?.();
+      }
+      // Opening the archive is what creates it, so a launch that only finds live files leaves
+      // an empty one behind. Nothing was folded, so it is not worth keeping.
+      if (!archiveExisted && !folded.length) {
+        rmSync(archive, { force: true });
+        rmSync(`${archive}.wal`, { force: true });
+      }
     }
   }
-  return answer;
+  const bytesAfter = diskBytes();
+  return {
+    status,
+    pid,
+    dir,
+    archive: join(dir, ARCHIVE),
+    folded,
+    skipped,
+    bytesBefore,
+    bytesAfter,
+    size: gb(bytesAfter),
+    free: gb(freeBytes(dir)),
+    overAlarm: bytesAfter > ALARM_BYTES,
+  };
+}
+
+// Read from the filesystem alone: a running session holds its file, and asking this
+// question must never be the reason a cleanup fails.
+export function status({ dir = tracesDir(), legacy = legacyStoreFile() } = {}) {
+  const files = traceFiles(dir, legacy).map(file => ({ name: basename(file), bytes: fileBytes(file) }));
+  const pending = pendingFiles(dir, legacy).map(file => basename(file));
+  const bytes = files.reduce((sum, file) => sum + file.bytes, 0);
+  return {
+    dir,
+    files,
+    pending,
+    bytes,
+    size: gb(bytes),
+    free: gb(freeBytes(dir)),
+    overAlarm: bytes > ALARM_BYTES,
+  };
 }
 
 function usage() {
-  return [
-    'usage: node scripts/trace-store.mjs status',
-    '       node scripts/trace-store.mjs clean <session id> [--card JUL-284]',
-  ].join('\n');
+  return ['usage: node scripts/trace-store.mjs status', '       node scripts/trace-store.mjs fold [--quiet]'].join('\n');
 }
 
-async function main(argv) {
+export function parseArgs(argv) {
   const [command, ...rest] = argv;
   const flags = {};
   const words = [];
   while (rest.length) {
     const arg = rest.shift();
-    if (arg.startsWith('--')) {
-      if (arg !== '--card') throw new Error(`${arg} is not an option.\n${usage()}`);
-      if (!rest.length) throw new Error('--card needs a card, such as JUL-284');
-      flags.card = rest.shift();
-    } else words.push(arg);
+    if (arg === '--quiet') flags.quiet = true;
+    else if (arg.startsWith('--')) throw new Error(`${arg} is not an option.\n${usage()}`);
+    else words.push(arg);
   }
+  return { command, flags, words };
+}
+
+async function main(argv) {
+  const { command, flags, words } = parseArgs(argv);
+  if (words.length) throw new Error(`${command} takes no arguments.\n${usage()}`);
   let answer;
-  if (command === 'status') answer = await status();
-  else if (command === 'clean') {
-    if (words.length !== 1) throw new Error('clean needs one session id');
-    answer = await cleanSession(words[0], flags.card ? { card: flags.card } : {});
-    const notes = [answer.note].filter(Boolean);
-    if (answer.status === 'busy') notes.push(`a Mastra Code session holds the trace store${answer.pid ? ` (PID ${answer.pid})` : ''}; nothing was changed`);
-    if (answer.status === 'ok') notes.push(`${gb(answer.bytesBefore)} → ${gb(answer.bytesAfter)} on disk`);
-    if (notes.length) answer.note = notes.join('; ');
-  } else {
+  if (command === 'status') answer = status();
+  else if (command === 'fold') answer = await foldTraces();
+  else {
     console.error(usage());
     return 2;
   }
+  if (flags.quiet) {
+    if (answer.overAlarm) console.error(`the trace files are ${answer.size} in ${answer.dir}, over the ${gb(ALARM_BYTES)} they are allowed to reach: a session is not being folded`);
+    return answer.overAlarm ? 1 : 0;
+  }
+  if (answer.status === 'busy') answer.note = `another fold holds ${answer.archive}${answer.pid ? ` (PID ${answer.pid})` : ''}; nothing was changed`;
+  if (answer.folded?.length) answer.note = `folded ${answer.folded.map(f => `${f.file} (${f.metrics} cost rows)`).join(', ')}`;
+  if (answer.skipped?.length) answer.note = [answer.note, `left ${answer.skipped.map(s => s.file).join(', ')} alone: a session still holds them`].filter(Boolean).join('; ');
+  if (answer.overAlarm) answer.note = [answer.note, `still over ${gb(ALARM_BYTES)}`].filter(Boolean).join('; ');
   console.log(JSON.stringify(answer, null, 2));
-  return 0;
+  return answer.overAlarm ? 1 : 0;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

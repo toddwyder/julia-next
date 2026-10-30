@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { sweep } from './sweep.mjs';
+import { sweep, findSdkPath } from './sweep.mjs';
 
 // Mastra Code lists the CommandCode models under two provider names. Every name an account
 // answers to must reach models.json, or the person choosing sees a short list and no error.
@@ -34,6 +34,21 @@ const swept = async () => {
     rmSync(directory, { recursive: true, force: true });
   }
 };
+
+// `mastracode` on PATH is the launcher, a script in this repo, so walking up from it lands in
+// the repo and finds no SDK. The sweep has to take the program directory it is told about.
+test('the sweep takes the SDK from the program directory, not from beside the launcher', () => {
+  const program = mkdtempSync(join(tmpdir(), 'julia-program-'));
+  try {
+    const sdk = join(program, 'node_modules', '@mastra', 'code-sdk', 'dist', 'index.js');
+    mkdirSync(join(program, 'node_modules', '@mastra', 'code-sdk', 'dist'), { recursive: true });
+    writeFileSync(sdk, 'export const nothing = true;\n');
+    assert.equal(findSdkPath({ MASTRACODE_PROGRAM_DIR: program }), sdk);
+    assert.equal(findSdkPath({ MASTRACODE_PROGRAM: program }), sdk);
+  } finally {
+    rmSync(program, { recursive: true, force: true });
+  }
+});
 
 test('every provider name an account answers to reaches the saved models', async () => {
   const saved = await swept();

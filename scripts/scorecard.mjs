@@ -6,11 +6,14 @@
 //   node scripts/scorecard.mjs JUL-273 --write    write docs/scorecards/JUL-273.md
 import { DatabaseSync } from 'node:sqlite';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statfsSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, statfsSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { launcherPath } from './install-launcher.mjs';
+
+import { legacyStoreFile, traceFiles, tracesDir } from './trace-store.mjs';
 
 const KICKOFF = /\b(?:Card:|Start|Run)\s+(JUL-\d+)\b/;
 const CACHE_WRITE_1H_FACTOR = 1.6; // Mastra prices 1-hour cache writes at 1.6x the 5-minute rate (2x vs 1.25x input).
@@ -247,11 +250,47 @@ export function cacheReadRate(tokens, rates) {
   return tokens * rates.cache_read;
 }
 
-// ---- tracing (observability.duckdb) ------------------------------------------
+// ---- tracing (one DuckDB file per session) -----------------------------------
 
-export function mastracodeDir() {
+// `mastracode` on PATH is the launcher, a plain script that runs the program, so where the
+// command sits says nothing about where the program is. The program directory is the one
+// whose package.json resolves the price list.
+export function mastracodeDir(env = process.env) {
+  const candidates = [env.MASTRACODE_PROGRAM_DIR, join(homedir(), '.local', 'lib', 'mastracode-program')].filter(Boolean);
+  const found = candidates.find(dir => existsSync(join(dir, 'package.json')));
+  if (found) return found;
   const bin = execFileSync('sh', ['-c', 'command -v mastracode'], { encoding: 'utf8' }).trim();
   return resolve(dirname(realpathSync(bin)), '..');
+}
+
+// The launcher is what gives each session its own trace file. A session started any other way
+// writes into the shared store, where a second session running at the same time records
+// nothing at all, and nothing on the machine notices. So a card says when it cannot come back
+// for sessions that started after the launcher was installed.
+export function launcherRecord(env = process.env) {
+  const link = launcherPath();
+  const ours = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'mastracode');
+  let target;
+  try {
+    target = realpathSync(link);
+  } catch {
+    return { since: null, problem: `${link} is not installed, so a session started another way records nothing` };
+  }
+  if (target !== ours) return { since: null, problem: `${link} runs ${target} rather than this repo's launcher, so a session started another way records nothing` };
+  try {
+    // The symlink's own mtime, not the script's: the launcher has been in place since then.
+    return { since: lstatSync(link).mtimeMs, problem: null };
+  } catch {
+    return { since: null, problem: `${link} cannot be read, so sessions started after it was installed cannot be checked` };
+  }
+}
+
+// Every file that can hold this machine's trace rows: the archive a fold builds, the live
+// files of sessions that have not been folded yet, and the single file that served every
+// session before the launcher split them. A half-folded file is left out, because its rows
+// are already in the archive.
+export function tracedFiles(env = process.env) {
+  return traceFiles(tracesDir(env), legacyStoreFile(env)).map(path => ({ path, name: basename(path) }));
 }
 
 // The trace store can be larger than the room left on disk — this machine's was
@@ -263,38 +302,54 @@ export function traceCopyFits(size, room) {
   return size + TRACE_COPY_MARGIN <= room;
 }
 
-async function readTracing(dir, file, threadIds) {
-  if (!existsSync(file) || !threadIds.length) return { metrics: [], requested: [], skipped: null };
-  const fileSize = statSync(file).size + (existsSync(file + '.wal') ? statSync(file + '.wal').size : 0);
-  const free = statfsSync(tmpdir());
-  const room = Number(free.bavail) * Number(free.bsize);
-  if (!traceCopyFits(fileSize, room)) {
-    return {
-      metrics: [],
-      requested: [],
-      skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it, so its cost is unknown`,
-    };
-  }
+export async function readTracing(dir, files, threadIds) {
+  if (!files.length || !threadIds.length) return { metrics: [], requested: [], skipped: null };
   const { DuckDBInstance } = createRequire(join(dir, 'package.json'))('@duckdb/node-api');
-  // A running Mastra Code holds the trace file's lock, so read a copy.
-  const copy = mkdtempSync(join(tmpdir(), 'scorecard-'));
-  copyFileSync(file, join(copy, 'o.duckdb'));
-  if (existsSync(file + '.wal')) copyFileSync(file + '.wal', join(copy, 'o.duckdb.wal'));
-  const instance = await DuckDBInstance.create(join(copy, 'o.duckdb'));
-  try {
-    const connection = await instance.connect();
-    const ids = threadIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',');
-    const rows = async sql => (await connection.runAndReadAll(sql)).getRowObjectsJson();
-    const metrics = await rows(`select threadId, epoch_ms(timestamp) as at, entityName, provider, model, name, value, estimatedCost
-      from metric_events where threadId in (${ids}) and name like 'mastra_model_%tokens'`);
-    const requested = await rows(`select threadId, epoch_ms(timestamp) as at, entityName, json_extract_string(attributes, '$.model') as model,
-      json_extract_string(attributes, '$.provider') as provider from span_events where threadId in (${ids}) and spanType = 'model_generation' and endedAt is null`);
-    return { metrics, requested, skipped: null };
-  } finally {
-    instance.closeSync?.();
-    rmSync(copy, { recursive: true, force: true });
+  const metrics = [];
+  const requested = [];
+  const missed = [];
+  const ids = threadIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',');
+  for (const file of files) {
+    const fileSize = statSync(file.path).size + (existsSync(`${file.path}.wal`) ? statSync(`${file.path}.wal`).size : 0);
+    const free = statfsSync(tmpdir());
+    const room = Number(free.bavail) * Number(free.bsize);
+    if (!traceCopyFits(fileSize, room)) {
+      missed.push(`${file.name} is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it`);
+      continue;
+    }
+    // A running Mastra Code holds its file's lock, so read a copy.
+    const copy = mkdtempSync(join(tmpdir(), 'scorecard-'));
+    try {
+      copyFileSync(file.path, join(copy, 'o.duckdb'));
+      if (existsSync(`${file.path}.wal`)) copyFileSync(`${file.path}.wal`, join(copy, 'o.duckdb.wal'));
+      const instance = await DuckDBInstance.create(join(copy, 'o.duckdb'));
+      try {
+        const connection = await instance.connect();
+        const rows = async sql => (await connection.runAndReadAll(sql)).getRowObjectsJson();
+        metrics.push(...await rows(`select threadId, epoch_ms(timestamp) as at, entityName, provider, model, name, value, estimatedCost
+          from metric_events where threadId in (${ids}) and name like 'mastra_model_%tokens'`));
+        // A folded file keeps the cost rows and nothing else, so it has no spans to ask
+        // which model answered. Only a session file does.
+        const [{ tables }] = await rows("select count(*) as tables from duckdb_tables() where table_name = 'span_events'");
+        if (Number(tables)) {
+          requested.push(...await rows(`select threadId, epoch_ms(timestamp) as at, entityName, json_extract_string(attributes, '$.model') as model,
+            json_extract_string(attributes, '$.provider') as provider from span_events where threadId in (${ids}) and spanType = 'model_generation' and endedAt is null`));
+        }
+      } finally {
+        instance.closeSync?.();
+      }
+    } catch (error) {
+      // A copy taken while its session writes can be unreadable. Say which file, and keep
+      // the cost the other files carry.
+      missed.push(`${file.name} could not be read (${error.message})`);
+    } finally {
+      rmSync(copy, { recursive: true, force: true });
+    }
   }
+  const skipped = missed.length ? `${missed.join('; ')}, so ${metrics.length ? 'part of this card’s cost is missing' : 'this card’s cost is unknown'}` : null;
+  return { metrics, requested, skipped };
 }
+
 
 // A traced row carries the parts of the bill but no price of its own, so the parts are
 // priced from a rate list, with the cache read priced only when that list has its rate.
@@ -360,6 +415,7 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
   const runs = [];
   let stops = [];
   const cost = [];
+  const untraced = [];
   for (const w of windows) {
     const { events, usage } = w.thread;
     const steps = events.steps.filter(s => inWindow(w, s.at));
@@ -371,6 +427,10 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
       stops.push({ ...stop, ping });
     }
     const traced = tracing.metrics.filter(m => m.threadId === w.thread.id && inWindow(w, Number(m.at)));
+    // A session that started after the launcher was in place and still recorded no trace rows
+    // lost them, so this card's cost is missing a session's worth. Sessions that ran before it
+    // are history, and the launcher cannot be blamed for them.
+    if (!traced.length && (steps.length || subagents.length) && tracing.launcher?.since != null && w.start >= tracing.launcher.since) untraced.push(w.thread.id);
     if (traced.some(m => m.entityName === 'Code Agent')) {
       for (const row of tracedCost(traced, model => ratesForModel(prices, catalogue, model))) {
         const asked = tracing.requested.find(r => r.threadId === w.thread.id && r.entityName === row.agent && inWindow(w, Number(r.at)));
@@ -408,9 +468,16 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
   }
   stops = judgeStops(stops.sort((a, b) => a.since - b.since), uat);
   const counted = stops.filter(s => s.counts);
+  // Everything that makes the printed cost smaller than what the card really spent, in the one
+  // string the renderer prints and the pull request check refuses.
+  const incomplete = [
+    ...(tracing.skipped ? [tracing.skipped] : []),
+    ...(tracing.launcher?.problem ? [tracing.launcher.problem] : []),
+    ...(untraced.length ? [`${untraced.length} session${untraced.length === 1 ? '' : 's'} of this card started after the launcher and recorded no trace rows`] : []),
+  ];
   return {
     card, windows: windows.length, runs, stops, cost, pull, uat,
-    tracingSkipped: tracing?.skipped,
+    tracingSkipped: incomplete.length ? incomplete.join('; ') : undefined,
     usd: cost.reduce((a, c) => a + c.usd, 0),
     success: uat && windows.length ? counted.length === 0 : undefined,
     stopsBeforeUat: counted.length,
@@ -438,7 +505,7 @@ export function renderScorecard(s, generatedAt = new Date()) {
   // than print $0.00 for a card that plainly cost something.
   const measured = s.cost.some(c => Object.keys(c.tokens ?? {}).length);
   const unknownCost = s.tracingSkipped
-    ? `- Cost: **unknown**. Mastra's trace store was not read: ${s.tracingSkipped}.`
+    ? `- Cost: **unknown**. ${s.tracingSkipped[0].toUpperCase()}${s.tracingSkipped.slice(1)}.`
     : s.cost.length
       ? '- Cost: **unknown**. Mastra kept no token detail for these runs.'
       : '- Cost: **unknown**. No usage records found for this card.';
@@ -450,7 +517,7 @@ export function renderScorecard(s, generatedAt = new Date()) {
       ? `plus ${tok(unpricedCache)} cache-read tokens no price list has a rate for, so the total is a floor`
       : 'every row priced';
   lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${priced}.` : unknownCost);
-  if (s.tracingSkipped && measured) lines.push(`- Tracing not read: ${s.tracingSkipped}. Rows below come from the thread's own usage records.`);
+  if (s.tracingSkipped && measured) lines.push(`- Cost incomplete: ${s.tracingSkipped}.`);
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
@@ -521,7 +588,7 @@ async function main() {
   const data = appDataDir();
   const threads = readThreads(join(data, 'mastra.db'));
   const ids = threads.filter(t => cardWindows(t, t.events).some(w => w.card === card)).map(t => t.id);
-  const tracing = await readTracing(dir, process.env.MASTRA_OBSERVABILITY_DB_PATH || join(data, 'observability.duckdb'), ids);
+  const tracing = { ...(await readTracing(dir, tracedFiles(), ids)), launcher: launcherRecord() };
   const uatFile = fileURLToPath(new URL('../docs/scorecards/uat.json', import.meta.url));
   const uat = existsSync(uatFile) ? JSON.parse(readFileSync(uatFile, 'utf8'))[card] : undefined;
   const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), catalogue: loadCatalogue(), tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });

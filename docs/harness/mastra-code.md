@@ -45,6 +45,7 @@ Because the root `AGENTS.md` wins over `.mastracode/AGENTS.md`, Julia names this
 | Cursor | Mastra Code |
 | --- | --- |
 | Transcripts in `~/.cursor/projects/<slug>/agent-transcripts/` | No per-session JSONL folder. Threads and messages persist in the LibSQL store at `~/.local/share/mastracode/mastra.db` (tables `mastra_threads` and `mastra_messages`). The path comes from `getAppDataDir()` and `getDatabasePath()` (`dist/utils/project.js:132-152`), and `getStorageConfig()` defaults to `file:<that path>` (`project.js:187-229`). Read or resume a session through `session.thread.listThreads` and `listMessages` (`@mastra/core dist/agent-controller/session.d.ts:148-160`). `MASTRA_APP_DATA_DIR` moves the whole store. |
+| `~/.cursor` session traces | One DuckDB file per session under `~/.local/share/mastracode/traces/<utc>-<pid>.duckdb`. The launcher `scripts/mastracode` installs as `~/.local/bin/mastracode` and sets `MASTRA_OBSERVABILITY_DB_PATH` per launch (`getObservabilityDatabasePath()`, `dist/utils/project.js:166`), because DuckDB admits one writer per file and a shared file leaves the second session's tracing off for its whole life (`dist/index.js:323`). Finished files are folded into `traces/archive.duckdb` and deleted at the next launch. `command -v mastracode` now names the launcher, not the program, so a script that needs the program passes `MASTRACODE_PROGRAM_DIR` or uses `~/.local/lib/mastracode-program`. `JULIA_TRACES_DIR` moves the trace directory. |
 | `~/.agents/pstack-models.md` | A plain file, not a rule the harness loads. The root `AGENTS.md` names it so sessions read it. |
 
 ## Shell environment
@@ -60,6 +61,20 @@ Two habits that go with this shell:
 
 - Reclaim a port by port or process group (`fuser -k 3114/tcp`, or `process.kill(-pid)`), never by command name. `pkill -f "node server.js"` also matches the shell running it and kills its own command, so the check you were about to run never starts.
 - Write each gate's output to a file and echo its exit code (`npm run lint > /tmp/lint.log 2>&1; echo $?`). Tool output is truncated to the tail, so a green last line can hide the first failing gate in a chain.
+
+`execute_command` runs `/bin/sh`, which on this host is dash, not bash. It has no `PIPESTATUS`, no `<( )` process substitution and no arrays: `echo "exit=${PIPESTATUS[0]}"` prints `Bad substitution` and the exit code it was meant to print is lost, and `cmp <(git show ...) file` fails before `cmp` runs. Check a pipeline through a file (`... | tail -5 > /tmp/out; echo $?`), and compare against a saved copy (`git show HEAD:file > /tmp/before; cmp /tmp/before file`).
+
+An edit tool that refuses a file it last read before another write ("File was modified externally", or an `assert old in s` guard in a hand-written patch failing) means the text moved, not that the patch is wrong. `view` the file again and re-apply; `sed -i` and python heredocs guess at the exact text and cost a round each time they miss (11 of 117 failed commands in the 30 October session were this).
+
+## CI on a branch
+
+A push that has a PR starts two runs on the same commit: one under `push` (group `CI-refs/heads/<branch>`) and one under `pull_request` (group `CI-<pr>`). They are separate concurrency groups, so `cancel-in-progress` does not dedupe them and both build at once. The `pull_request` run is the one the PR shows.
+
+The `web` job flakes on `next/font/google`, which fetches fonts during `npm run build` (`app/layout.jsx:3`): `Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'`, sometimes with `Error while looking up import map: next/font/google queries have exactly one entry`. On 30 October the `push` twin of a failing `pull_request` run passed on the same commit, so read the twin and run `npm run build` locally before treating the branch as broken.
+
+You cannot retry a run or edit a workflow with this token. `gh run rerun` and the API answer `403 Resource not accessible by personal access token` (no `actions: write`), and a push touching `.github/workflows` is rejected (no `workflow` scope). `gh pr close` followed by `gh pr reopen` starts a fresh `pull_request` run on the same unchanged commit, which is how PR #382 got a green `pull_request` run after its first one hit the font flake; an empty commit does the same and leaves noise in the history. `gh pr edit` also fails on this repo on its Projects-classic lookup: patch the body with `gh api -X PATCH repos/toddwyder/julia-next/pulls/<n> --input body.json`.
+
+After a squash merge the branch is not an ancestor of `main`, so `git branch -d` refuses. Confirm the trees match (`git diff --stat main <branch>` prints nothing) and delete with `-D`.
 
 ## Hooks
 

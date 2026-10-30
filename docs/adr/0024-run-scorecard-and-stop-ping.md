@@ -28,7 +28,7 @@ A comment posted with Todd's own `LINEAR_API_KEY` does not notify Todd, because 
 
 ## Consequences
 
-- Local tracing is on in Mastra Code's global settings on the server. Only one Mastra Code process can hold the trace file; a second one runs without tracing and says so at start.
+- Local tracing is on in Mastra Code's global settings on the server. DuckDB lets one process write a file, so the launcher gives each session its own file and a second session records its cost like the first. A session started another way can lose its rows, so a card whose sessions started after the launcher and left no rows prints `- Cost incomplete:` with the reason, and the branch check refuses that pull request.
 - Headless `mastracode --prompt` exits without flushing traces (`@mastra/code-sdk` `headless/cli.js` skips `getMastra().shutdown()`). Cards run in the TUI, which flushes.
 - Command Code models (DeepSeek V4.1 Flash) have no price in the bundled table. Their tokens are reported and marked unpriced.
 - Scorecards for cards before tracing are estimates and say which parts are missing.
