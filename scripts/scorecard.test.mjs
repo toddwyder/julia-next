@@ -247,8 +247,8 @@ test('a folded archive with no span rows still prices the cost rows it holds', a
 // The launcher is what gives each session its own trace file. A session started any other way
 // records nothing at all, and nothing else on the machine notices, so the card has to say so.
 test('a session that started after the launcher and recorded nothing makes the cost incomplete', () => {
-  const scorecard = since => buildScorecard({
-    card: 'JUL-273', threads: [thread], prices, tracing: { metrics: [], requested: [], launcher: since }, pulls: [], pings: [], uat: undefined,
+  const scorecard = (since, launcherServed = true) => buildScorecard({
+    card: 'JUL-273', threads: [thread], prices, tracing: { metrics: [], requested: [], launcher: since }, pulls: [], pings: [], uat: undefined, launcherServed,
   });
   const after = scorecard({ since: ms('18:30'), problem: null });
   assert.match(after.tracingSkipped, /^1 session of this card started after the launcher and recorded no trace rows$/);
@@ -261,6 +261,13 @@ test('a session that started after the launcher and recorded nothing makes the c
   const replaced = scorecard({ since: null, problem: 'the launcher runs something else' });
   assert.equal(replaced.tracingSkipped, 'the launcher runs something else');
   assert.match(renderScorecard(replaced), /^- Cost incomplete: the launcher runs something else\.$/m);
+
+  // A session already open when the launcher was installed never got a trace file from it,
+  // however late its thread began, so the card names it instead of calling the launcher at fault.
+  const older = scorecard({ since: ms('18:30'), problem: null }, false);
+  assert.equal(older.tracingSkipped, undefined, 'an unserved session is not a launcher loss');
+  assert.equal(older.unserved, 1);
+  assert.match(renderScorecard(older), /^- Not counted: 1 session of this card ran in a process that was already open when the launcher was installed, so it recorded no trace rows and its spend is not in this number\.$/m);
 });
 
 test('a card whose trace file was too large to copy says why its cost is unknown', () => {

@@ -406,8 +406,14 @@ export function judgeStops(stops, uat) {
   });
 }
 
-export function buildScorecard({ card, threads, prices, catalogue, tracing, pulls, pings, uat }) {
+export function buildScorecard({ card, threads, prices, catalogue, tracing, pulls, pings, uat, launcherServed }) {
   const windows = threads.flatMap(t => cardWindows(t, t.events)).filter(w => w.card === card);
+  // The launcher hands a session its own trace file by exporting this path before it starts,
+  // so a session without it was already open when the launcher was installed. Nothing can
+  // give that session rows after the fact, and restarting is the owner's call, so the card
+  // names it on its own line rather than counting it as a loss the launcher was responsible for.
+  const launcherSince = tracing.launcher?.since ?? null;
+  const unserved = launcherSince !== null && !(launcherServed ?? Boolean(process.env.MASTRA_OBSERVABILITY_DB_PATH));
   // A pstack slice runs on its card's branch (feat/jul-276-…), so the branch name
   // may never mention the slice id; the search that found the PR already matched
   // the card, so a lone result is that card's PR.
@@ -416,6 +422,7 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
   let stops = [];
   const cost = [];
   const untraced = [];
+  const unservedSessions = [];
   for (const w of windows) {
     const { events, usage } = w.thread;
     const steps = events.steps.filter(s => inWindow(w, s.at));
@@ -430,7 +437,9 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
     // A session that started after the launcher was in place and still recorded no trace rows
     // lost them, so this card's cost is missing a session's worth. Sessions that ran before it
     // are history, and the launcher cannot be blamed for them.
-    if (!traced.length && (steps.length || subagents.length) && tracing.launcher?.since != null && w.start >= tracing.launcher.since) untraced.push(w.thread.id);
+    if (!traced.length && (steps.length || subagents.length) && launcherSince !== null && w.start >= launcherSince) {
+      (unserved ? unservedSessions : untraced).push(w.thread.id);
+    }
     if (traced.some(m => m.entityName === 'Code Agent')) {
       for (const row of tracedCost(traced, model => ratesForModel(prices, catalogue, model))) {
         const asked = tracing.requested.find(r => r.threadId === w.thread.id && r.entityName === row.agent && inWindow(w, Number(r.at)));
@@ -478,6 +487,7 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
   return {
     card, windows: windows.length, runs, stops, cost, pull, uat,
     tracingSkipped: incomplete.length ? incomplete.join('; ') : undefined,
+    unserved: unservedSessions.length,
     usd: cost.reduce((a, c) => a + c.usd, 0),
     success: uat && windows.length ? counted.length === 0 : undefined,
     stopsBeforeUat: counted.length,
@@ -518,6 +528,11 @@ export function renderScorecard(s, generatedAt = new Date()) {
       : 'every row priced';
   lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${priced}.` : unknownCost);
   if (s.tracingSkipped && measured) lines.push(`- Cost incomplete: ${s.tracingSkipped}.`);
+  // Named, not hidden: a session that ran inside a process older than the launcher has no
+  // trace rows at all, so this number leaves its spend out.
+  if (measured && s.unserved) {
+    lines.push(`- Not counted: ${s.unserved} session${s.unserved === 1 ? '' : 's'} of this card ran in a process that was already open when the launcher was installed, so it recorded no trace rows and its spend is not in this number.`);
+  }
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
