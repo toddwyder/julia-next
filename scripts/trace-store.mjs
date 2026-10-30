@@ -7,7 +7,7 @@
 //   node scripts/trace-store.mjs mine <thread> [--card JUL-276] [--dry-run]
 //   node scripts/trace-store.mjs delete <thread> [--card JUL-276] [--dry-run]
 //   node scripts/trace-store.mjs compact [--dry-run]
-//   node scripts/trace-store.mjs sweep [--dry-run] [--wait-for-lock [--minutes 180]]
+//   node scripts/trace-store.mjs sweep [--complete JUL-276] [--approvals <file>] [--dry-run] [--wait-for-lock [--minutes 180]]
 //
 // Why this exists: DuckDB allows one process to hold the file, so a running
 // Mastra Code session blocks every other reader and the scorecard had no cost
@@ -69,6 +69,29 @@ export function retroExists(card, { retrosDir = retrosFolder() } = {}) {
   return Boolean(card) && existsSync(retroFile(card, { retrosDir }));
 }
 
+export function approvalsFile(env = process.env) {
+  return env.JULIA_NO_CARD_APPROVALS || join(retrosFolder(env), 'census-2026-10-29.md');
+}
+
+// The census doc carries Todd's approval of the sessions that never named a
+// card, so no retro can ever be written for them. Only ids written under that
+// heading count: an id quoted anywhere else in the file is not an approval.
+const APPROVAL_HEADING = /^#{2,6} Approved to delete without a retro\b.*$/m;
+const BARE_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+export function approvedWithoutRetro(file = approvalsFile()) {
+  if (!existsSync(file)) return new Set();
+  const text = readFileSync(file, 'utf8');
+  const heading = APPROVAL_HEADING.exec(text);
+  if (!heading) return new Set();
+  const rest = text.slice(heading.index + heading[0].length);
+  const next = /^#{1,6} /m.exec(rest);
+  const section = next ? rest.slice(0, next.index) : rest;
+  const ids = new Set((section.match(/`[^`\s]+`/g) ?? []).map(span => span.slice(1, -1)));
+  for (const id of section.match(BARE_ID) ?? []) ids.add(id);
+  return ids;
+}
+
 export function storeBytes(file) {
   const wal = `${file}.wal`;
   return (existsSync(file) ? statSync(file).size : 0) + (existsSync(wal) ? statSync(wal).size : 0);
@@ -126,14 +149,15 @@ export function recordSession(ledger, record) {
   };
 }
 
-export function deletionRefusal(thread, { ledger = readLedger(), retrosDir = retrosFolder(), card } = {}) {
+export function deletionRefusal(thread, { ledger = readLedger(), retrosDir = retrosFolder(), approvals = approvalsFile(), card } = {}) {
   const record = ledger.sessions?.[thread];
   if (!record) {
     return { code: 'not-mined', message: `refusing to delete thread ${thread}: it was never mined, so nothing about it is kept yet; run: node scripts/trace-store.mjs mine ${thread} --card <card>` };
   }
+  if (approvedWithoutRetro(approvals).has(thread)) return null;
   const wanted = card ?? record.card;
   if (!wanted) {
-    return { code: 'no-card', message: `refusing to delete thread ${thread}: the mined record names no card, so there is no retro to look for; mine it again with --card <card>` };
+    return { code: 'no-card', message: `refusing to delete thread ${thread}: the mined record names no card and the session is not on the approved list at ${approvals}, so nothing stands in for a retro` };
   }
   if (!retroExists(wanted, { retrosDir })) {
     return { code: 'no-retro', message: `refusing to delete thread ${thread}: ${wanted} has no retro at ${retroFile(wanted, { retrosDir })}; the payloads wait until the lesson is written` };
@@ -373,13 +397,16 @@ export async function mineSession(thread, { card, store = storeFile(), ledgerPat
 }
 
 // deletePayloads removes the rows that carry this session's tool inputs and
-// outputs. It refuses unless the session was mined and its card has a retro:
-// the numbers go first, the lesson goes first, then the payloads.
-export async function deletePayloads(thread, { card, store = storeFile(), ledgerPath = ledgerFile(), retrosDir = retrosFolder(), dryRun = false } = {}) {
+// outputs. It refuses unless the session was mined and something stands in for
+// the lesson: a retro for its card, or Todd's approval of the sessions that
+// never named a card. The numbers go first, the lesson goes first, then the
+// payloads.
+export async function deletePayloads(thread, { card, store = storeFile(), ledgerPath = ledgerFile(), retrosDir = retrosFolder(), approvals = approvalsFile(), dryRun = false } = {}) {
   const ledger = readLedger(ledgerPath);
-  const refusal = deletionRefusal(thread, { ledger, retrosDir, card });
+  const refusal = deletionRefusal(thread, { ledger, retrosDir, approvals, card });
   if (refusal) return { status: 'refused', thread, ...refusal };
   const mined = ledger.sessions[thread];
+  const approved = approvedWithoutRetro(approvals).has(thread);
   const bytesBefore = storeBytes(store);
   const opened = await openStore(store);
   if (opened.busy) return { status: 'busy', ...opened.busy, thread };
@@ -408,27 +435,31 @@ export async function deletePayloads(thread, { card, store = storeFile(), ledger
     status: dryRun ? 'dry-run' : 'ok',
     thread,
     card: mined?.card ?? card,
-    retro: retroFile(mined?.card ?? card, { retrosDir }),
+    approved,
+    retro: approved ? null : retroFile(mined?.card ?? card, { retrosDir }),
     deleted: counts,
     bytesBefore,
     bytesAfter: dryRun ? bytesBefore : storeBytes(store),
   };
 }
 
-// Sessions the sweep may clean: mined, has a retro, its card is Complete, and
-// nothing holds it back on purpose. An empty Complete list means no card is
-// known to be Complete, so nothing is clean — the safe reading of a missing
+// Sessions the sweep may clean: mined, nothing holds it back on purpose, and
+// either its card is Complete with a retro or Todd approved it as a session
+// that names no card. An empty Complete list means no card is known to be
+// Complete, so a card session is never clean — the safe reading of a missing
 // answer, since the alternative deletes every retro'd session.
-export function sweepPlan(ledger, { retrosDir = retrosFolder(), completeCards = [], keep = {}, dryRun = false } = {}) {
+export function sweepPlan(ledger, { retrosDir = retrosFolder(), approvals = approvalsFile(), completeCards = [], keep = {}, dryRun = false } = {}) {
   const complete = new Set(completeCards);
+  const approved = approvedWithoutRetro(approvals);
   const clean = [];
   const kept = [];
   for (const [thread, record] of Object.entries(ledger.sessions ?? {})) {
     const hasRetro = retroExists(record.card, { retrosDir });
     const cardComplete = complete.has(record.card);
     if (keep[thread]) kept.push({ thread, card: record.card, why: `kept on purpose: ${keep[thread]}` });
+    else if (approved.has(thread)) clean.push({ thread, card: record.card, approved: true });
     else if (hasRetro && cardComplete) clean.push({ thread, card: record.card });
-    else kept.push({ thread, card: record.card, why: cardComplete ? 'no retro record' : 'its card is not Complete' });
+    else kept.push({ thread, card: record.card, why: record.card ? (cardComplete ? 'no retro record' : 'its card is not Complete') : 'no card, no retro, not on the approved list' });
   }
   return { dryRun, clean, kept };
 }
@@ -533,11 +564,11 @@ export async function compactStore({ dryRun = false, store = storeFile() } = {})
   return { status: dryRun ? 'dry-run' : 'ok', ...entry };
 }
 
-export async function sweep({ dryRun = false, store = storeFile(), ledgerPath = ledgerFile(), retrosDir = retrosFolder(), completeCards = [], keep = {} } = {}) {
-  const plan = sweepPlan(readLedger(ledgerPath), { retrosDir, completeCards, keep, dryRun });
+export async function sweep({ dryRun = false, store = storeFile(), ledgerPath = ledgerFile(), retrosDir = retrosFolder(), approvals = approvalsFile(), completeCards = [], keep = {} } = {}) {
+  const plan = sweepPlan(readLedger(ledgerPath), { retrosDir, approvals, completeCards, keep, dryRun });
   const deleted = [];
   for (const item of plan.clean) {
-    const answer = await deletePayloads(item.thread, { store, ledgerPath, retrosDir, dryRun });
+    const answer = await deletePayloads(item.thread, { store, ledgerPath, retrosDir, approvals, dryRun });
     deleted.push({ thread: item.thread, card: item.card, status: answer.status, deleted: answer.deleted ?? null });
     if (answer.status === 'busy') return { status: 'busy', ...answer, store, plan, deleted };
   }
@@ -552,7 +583,7 @@ function usage() {
     '       node scripts/trace-store.mjs mine <thread> [--card JUL-276] [--dry-run]',
     '       node scripts/trace-store.mjs delete <thread> [--card JUL-276] [--dry-run]',
     '       node scripts/trace-store.mjs compact [--dry-run]',
-    '       node scripts/trace-store.mjs sweep [--complete JUL-1,JUL-2] [--dry-run] [--wait-for-lock [--minutes 180]]',
+    '       node scripts/trace-store.mjs sweep [--complete JUL-1,JUL-2] [--approvals <file>] [--dry-run] [--wait-for-lock [--minutes 180]]',
   ].join('\n');
 }
 
@@ -571,27 +602,30 @@ async function main(argv) {
     if (answer.status === 'busy') answer.note = 'a Mastra Code session holds the trace store; the ledger keeps the rows from the last run that could read it';
   } else if (command === 'mine' || command === 'delete') {
     if (!thread) throw new Error(`${command} needs a thread id`);
-    answer = command === 'mine' ? await mineSession(thread, { card: flag('--card'), dryRun }) : await deletePayloads(thread, { card: flag('--card'), dryRun });
+    answer = command === 'mine' ? await mineSession(thread, { card: flag('--card'), dryRun }) : await deletePayloads(thread, { card: flag('--card'), approvals: flag('--approvals') ?? approvalsFile(), dryRun });
   } else if (command === 'compact') {
     answer = await compactStore({ dryRun });
     if (answer.status === 'no-room') answer.note = `not enough room to compact: ${gb(answer.bytes)} store needs about ${gb(answer.needed)} free, ${gb(answer.room)} is free`;
     if (answer.status === 'ok') answer.note = `${mb(answer.bytesBefore)} → ${mb(answer.bytesAfter)} on disk`;
   } else if (command === 'sweep') {
     const completeCards = (flag('--complete') ?? '').split(',').map(s => s.trim()).filter(Boolean);
+    const approvals = flag('--approvals') ?? approvalsFile();
     const waitMinutes = Number(flag('--minutes') ?? (rest.includes('--wait-for-lock') ? 180 : 0));
     if (!Number.isFinite(waitMinutes) || waitMinutes < 0) throw new Error('--minutes needs a number (0 or more)');
     // A live session holds an exclusive lock for hours, so the sweep can be told to
     // wait for it rather than report busy and leave the store at 22.6 GB.
     const deadline = Date.now() + waitMinutes * 60_000;
     for (;;) {
-      answer = await sweep({ dryRun, completeCards });
+      answer = await sweep({ dryRun, completeCards, approvals });
       if (answer.status !== 'busy' || Date.now() >= deadline) break;
       await sleep(30_000);
     }
     if (answer.status === 'busy') answer.note = `a Mastra Code session holds the trace store${answer.pid ? ` (PID ${answer.pid})` : ''}; this run waited ${waitMinutes} min and changed nothing`;
     if (answer.compact?.status === 'no-room') answer.note = `not enough room to compact: ${gb(answer.compact.bytes)} store needs about ${gb(answer.compact.needed)} free, ${gb(answer.compact.room)} is free`;
     if (answer.compact?.status === 'ok') answer.note = `${mb(answer.compact.bytesBefore)} → ${mb(answer.compact.bytesAfter)} on disk`;
-    if (!completeCards.length) answer.note = 'no --complete list, so no card is known to be Complete and nothing was cleaned';
+    if (!completeCards.length) answer.note = 'no --complete list, so no card is known to be Complete and no card session was cleaned';
+    const approvedCount = answer.plan?.clean?.filter(item => item.approved).length ?? 0;
+    if (approvedCount) answer.note = `${approvedCount} session(s) cleaned because they name no card and are on the approved list at ${approvals}`;
   } else {
     console.error(usage());
     return 2;

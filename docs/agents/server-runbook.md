@@ -69,6 +69,7 @@ node scripts/trace-store.mjs ledger
 node scripts/trace-store.mjs mine <thread> --card JUL-276
 node scripts/trace-store.mjs delete <thread> --card JUL-276
 node scripts/trace-store.mjs sweep --complete JUL-284,JUL-283 --dry-run --wait-for-lock --minutes 180
+node scripts/trace-store.mjs delete <thread> --approvals docs/retros/census-2026-10-29.md
 ```
 
 `mine` writes that session's tokens, cost per model, which model each call asked for and which
@@ -77,9 +78,12 @@ which is the file `scripts/scorecard.mjs` reads when it cannot copy the store. T
 record compactions or handoffs, and `mine` says so in `notHeld` rather than inventing them.
 
 Nothing is deleted by age. `delete` removes the session's `span_events` and `log_events` rows only
-when that session has been mined and `docs/retros/<card>.md` exists, and it names the missing piece
-when it refuses. `sweep` does the same for every mined session whose card is in `--complete`, then
-compacts; with no `--complete` list no card is known to be Complete and nothing is cleaned. Mining
+when that session has been mined and either `docs/retros/<card>.md` exists or the session is listed
+under the approval heading in `--approvals` (default `docs/retros/census-2026-10-29.md`), and it
+names the missing piece when it refuses. The approval list exists because a session that never named
+a card can never open the retro gate. `sweep` does the same for every mined session whose card is in
+`--complete`, then compacts; with no `--complete` list no card is known to be Complete and nothing is
+cleaned, and a `keep` entry outranks both a retro and an approval. Mining
 copies that session's cost rows into the ledger before anything is deleted, so the scorecard still
 prices the card once its payloads are gone. `metric_events`, which carry the cost, are never deleted.
 

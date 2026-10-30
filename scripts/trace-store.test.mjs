@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  approvedWithoutRetro,
   compactStore,
   compactionFits,
   deletePayloads,
@@ -78,9 +79,10 @@ async function runChild(code) {
   });
 }
 
-const ENV = ['XDG_STATE_HOME', 'MASTRA_OBSERVABILITY_DB_PATH', 'MASTRA_TRACE_LEDGER', 'JULIA_RETROS_DIR'];
+const ENV = ['XDG_STATE_HOME', 'MASTRA_OBSERVABILITY_DB_PATH', 'MASTRA_TRACE_LEDGER', 'JULIA_RETROS_DIR', 'JULIA_NO_CARD_APPROVALS'];
+const APPROVAL_HEADING = '## Approved to delete without a retro: they name no card. Todd approved, 29 Oct 2026.';
 
-async function withStore(t, rows, { retros = [] } = {}) {
+async function withStore(t, rows, { retros = [], approved = [] } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'trace-store-'));
   const saved = Object.fromEntries(ENV.map(key => [key, process.env[key]]));
   t.after(() => {
@@ -93,8 +95,12 @@ async function withStore(t, rows, { retros = [] } = {}) {
   const retrosDir = join(dir, 'retros');
   mkdirSync(retrosDir, { recursive: true });
   for (const card of retros) writeFileSync(join(retrosDir, `${card}.md`), '# retro\n');
+  const approvals = join(dir, 'census.md');
+  const body = [APPROVAL_HEADING, '', ...approved.map(thread => `- \`${thread}\` 2026-10-26`), ''].join('\n');
+  writeFileSync(approvals, body);
   process.env.XDG_STATE_HOME = join(dir, 'state');
   process.env.JULIA_RETROS_DIR = retrosDir;
+  process.env.JULIA_NO_CARD_APPROVALS = approvals;
   const file = join(dir, 'observability.duckdb');
   const instance = await DuckDBInstance.create(file);
   const connection = await instance.connect();
@@ -102,7 +108,7 @@ async function withStore(t, rows, { retros = [] } = {}) {
   for (const row of rows) await connection.run(row);
   instance.closeSync();
   process.env.MASTRA_OBSERVABILITY_DB_PATH = file;
-  return { dir, file, retrosDir, ledger: join(dir, 'state', 'julia', 'trace-costs.json'), stops: join(dir, 'state', 'julia', 'stops.jsonl') };
+  return { dir, file, retrosDir, approvals, ledger: join(dir, 'state', 'julia', 'trace-costs.json'), stops: join(dir, 'state', 'julia', 'stops.jsonl') };
 }
 
 const countOf = async (file, table, where = 'true') => {
@@ -237,6 +243,55 @@ test('deleting the payloads of a mined session with no retro is refused', { skip
   assert.equal(await countOf(file, 'span_events'), 1, 'the payloads wait until the lesson is written');
 });
 
+test('a session that names no card is deleted only because Todd approved it', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { file, retrosDir, approvals } = await withStore(t, [span(at, 's1', 0.05), logRow(at, 'l1', 'boom')], { approved: ['thread-1'] });
+  await mineSession('thread-1', {});
+
+  const answer = await deletePayloads('thread-1', { retrosDir, approvals });
+
+  assert.equal(answer.status, 'ok');
+  assert.equal(answer.approved, true);
+  assert.equal(answer.retro, null, 'no retro is claimed for a session that never named a card');
+  assert.deepEqual(answer.deleted, { span_events: 1, log_events: 1 });
+  assert.equal(await countOf(file, 'span_events'), 0);
+});
+
+test('a mined session on neither the retro list nor the approved list is refused', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { file, retrosDir, approvals } = await withStore(t, [
+    span(at, 'a1', 0.05, 'thread-a'),
+    span(at, 'b1', 0.05, 'thread-b'),
+    span(at, 'c1', 0.05, 'thread-c'),
+  ], { approved: ['thread-b'] });
+  await mineSession('thread-a', { card: 'JUL-1' });
+  await mineSession('thread-b', {});
+  await mineSession('thread-c', {});
+
+  const noRetro = await deletePayloads('thread-a', { retrosDir, approvals });
+  assert.equal(noRetro.status, 'refused');
+  assert.equal(noRetro.code, 'no-retro');
+
+  const noCard = await deletePayloads('thread-c', { retrosDir, approvals });
+  assert.equal(noCard.status, 'refused');
+  assert.equal(noCard.code, 'no-card');
+  assert.match(noCard.message, /not on the approved list/);
+
+  assert.equal(await countOf(file, 'span_events'), 3, 'a session on neither list keeps every payload row');
+});
+
+test('only the ids written under the approval heading count', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'approvals-'));
+  const file = join(dir, 'census.md');
+  const approvedId = 'b934e198-2a7b-4c0e-9208-9022c1d79942';
+  const strayId = '13351dad-0d36-42f1-a43b-6e1d016cfa3e';
+  writeFileSync(file, `# census\n\n- \`${strayId}\` 2026-10-29\n\n${APPROVAL_HEADING}\n\n- \`${approvedId}\` 2026-10-21\n\n## Another list\n\n- \`${strayId}\` 2026-10-29\n`);
+
+  assert.deepEqual([...approvedWithoutRetro(file)], [approvedId], 'an id quoted outside the approved section is not an approval');
+  assert.equal(approvedWithoutRetro(join(dir, 'missing.md')).size, 0, 'no file means no approval, so every session still waits');
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test('a dry run says what would go and leaves every row in place', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
   const { file, retrosDir } = await withStore(t, [span(at, 's1', 0.05), logRow(at, 'l1', 'boom')], { retros: ['JUL-1'] });
@@ -313,6 +368,37 @@ test('a sweep cleans only sessions that were mined, have a retro and whose card 
   assert.equal(await countOf(file, 'span_events', "threadId = 'thread-c'"), 1, 'a session whose card has no retro keeps its payloads');
   assert.equal(await countOf(file, 'metric_events'), 3);
   assert.equal(Object.keys(readLedger(ledger).sessions).length, 3);
+});
+
+test('a sweep cleans an approved no-card session and keeps everything else held', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { file, retrosDir, ledger, approvals } = await withStore(t, [
+    span(at, 'a1', 0.05, 'thread-a'),
+    span(at, 'b1', 0.05, 'thread-b'),
+    span(at, 'c1', 0.05, 'thread-c'),
+    span(at, 'd1', 0.05, 'thread-d'),
+    metric(at, 'ka', 'mastra_model_total_input_tokens', 10, 0.01, 'thread-a'),
+    metric(at, 'kb', 'mastra_model_total_input_tokens', 20, 0.02, 'thread-b'),
+    metric(at, 'kc', 'mastra_model_total_input_tokens', 30, 0.03, 'thread-c'),
+    metric(at, 'kd', 'mastra_model_total_input_tokens', 40, 0.04, 'thread-d'),
+  ], { retros: ['JUL-1'], approved: ['thread-b'] });
+  await mineSession('thread-a', { card: 'JUL-276' });
+  await mineSession('thread-b', {});
+  await mineSession('thread-c', {});
+  await mineSession('thread-d', { card: 'JUL-1' });
+
+  const plan = sweepPlan(readLedger(ledger), { retrosDir, approvals, completeCards: ['JUL-1'], keep: { 'thread-d': 'its second half has no retro' } });
+  assert.deepEqual(plan.clean, [{ thread: 'thread-b', card: null, approved: true }]);
+  assert.deepEqual(plan.kept.map(entry => entry.why), ['its card is not Complete', 'no card, no retro, not on the approved list', 'kept on purpose: its second half has no retro']);
+
+  const answer = await sweep({ retrosDir, approvals, completeCards: ['JUL-1'], keep: { 'thread-d': 'its second half has no retro' } });
+  assert.equal(answer.status, 'ok');
+  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-b'"), 0, 'the approved no-card session loses its payloads');
+  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-a'"), 1, 'a JUL-276 session keeps its payloads while that card is open');
+  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-c'"), 1, 'a no-card session nobody approved keeps its payloads');
+  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-d'"), 1, 'a keep entry outranks a complete card with a retro');
+  assert.equal(await countOf(file, 'metric_events'), 4, 'every cost row stays');
+  assert.equal(Object.keys(readLedger(ledger).sessions).length, 4);
 });
 
 test('a sweep with no Complete list cleans nothing, and a keep entry outranks a retro', { skip: noDuckdb }, async (t) => {
