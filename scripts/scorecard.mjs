@@ -416,6 +416,7 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
   let stops = [];
   const cost = [];
   const untraced = [];
+  const untracedMainChat = [];
   for (const w of windows) {
     const { events, usage } = w.thread;
     const steps = events.steps.filter(s => inWindow(w, s.at));
@@ -431,7 +432,12 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
     // lost them, so this card's cost is missing a session's worth. Sessions that ran before it
     // are history, and the launcher cannot be blamed for them.
     if (!traced.length && (steps.length || subagents.length) && tracing.launcher?.since != null && w.start >= tracing.launcher.since) untraced.push(w.thread.id);
-    if (traced.some(m => m.entityName === 'Code Agent')) {
+    // Price from the session's trace rows whenever it wrote any. The alternative, the
+    // thread's own token totals, is stored in a binary format only Mastra reads back, so a
+    // program version that stops naming its main agent "Code Agent" used to make a whole
+    // session unpriced. Rows without that name still say what was spent.
+    if (traced.length && !traced.some(m => m.entityName === 'Code Agent')) untracedMainChat.push(w.thread.id);
+    if (traced.length) {
       for (const row of tracedCost(traced, model => ratesForModel(prices, catalogue, model))) {
         const asked = tracing.requested.find(r => r.threadId === w.thread.id && r.entityName === row.agent && inWindow(w, Number(r.at)));
         // A generation span that names no model leaves provider and model null; that is
@@ -478,6 +484,7 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
   return {
     card, windows: windows.length, runs, stops, cost, pull, uat,
     tracingSkipped: incomplete.length ? incomplete.join('; ') : undefined,
+    untracedMainChat,
     usd: cost.reduce((a, c) => a + c.usd, 0),
     success: uat && windows.length ? counted.length === 0 : undefined,
     stopsBeforeUat: counted.length,
@@ -511,12 +518,19 @@ export function renderScorecard(s, generatedAt = new Date()) {
       : '- Cost: **unknown**. No usage records found for this card.';
   const unpricedRows = s.cost.some(c => c.unpriced);
   const unpricedCache = s.cost.reduce((a, c) => a + (c.cacheReadUnpriced ?? 0), 0);
-  const priced = unpricedRows
+  const base = unpricedRows
     ? 'plus the unpriced rows below'
     : unpricedCache
-      ? `plus ${tok(unpricedCache)} cache-read tokens no price list has a rate for, so the total is a floor`
+      ? `plus ${tok(unpricedCache)} cache-read tokens no price list has a rate for`
       : 'every row priced';
-  lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${priced}.` : unknownCost);
+  // Trace rows can hold a session's subagents and memory agents while its main chat rows never
+  // land. The number is then real but short, and the line says so without the "Cost incomplete"
+  // wording that fails a card's pull request.
+  const untracedChat = s.untracedMainChat?.length;
+  const floor = untracedChat
+    ? `${base}, and the main chat's own calls were not traced for ${untracedChat} session${untracedChat === 1 ? '' : 's'}, so the total is a floor`
+    : unpricedRows ? base : unpricedCache ? `${base}, so the total is a floor` : base;
+  lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${floor}.` : unknownCost);
   if (s.tracingSkipped && measured) lines.push(`- Cost incomplete: ${s.tracingSkipped}.`);
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');

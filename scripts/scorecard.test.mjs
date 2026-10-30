@@ -103,6 +103,24 @@ test('traced cost sums only the two total metrics, so detail metrics are not cou
   assert.deepEqual([rowsOut[1].agent, rowsOut[1].unpriced, rowsOut[1].usd], ['Explore Subagent', true, 0]);
 });
 
+test('a session whose main chat rows never landed is priced from the rows it did write, and says the number is a floor', () => {
+  const at = String(ms('19:06'));
+  const metric = (name, value, estimatedCost) => ({ threadId: 'thread-1', at, entityName: 'Explore Subagent', provider: 'commandcode.chat', model: 'deepseek/deepseek-v4.1-flash', name, value, estimatedCost });
+  const tracing = {
+    metrics: [metric('mastra_model_total_input_tokens', 1_000_000, 0.2), metric('mastra_model_total_output_tokens', 10_000, 0.05)],
+    requested: [{ threadId: 'thread-1', at, entityName: 'Explore Subagent', provider: 'commandcode.chat', model: 'deepseek/deepseek-v4.1-flash' }],
+  };
+  const s = buildScorecard({ card: 'JUL-273', threads: [thread], prices, tracing, pulls: [], pings: [], uat: { yesAt: T('19:30'), said: 'Yes.' } });
+  assert.equal(s.cost[0].agent, 'Explore Subagent');
+  assert.equal(s.cost[0].requested, 'commandcode.chat/deepseek/deepseek-v4.1-flash');
+  assert.equal(s.usd.toFixed(2), '0.25');
+  assert.deepEqual(s.untracedMainChat, ['thread-1']);
+  const markdown = renderScorecard(s);
+  assert.match(markdown, /- Cost: \*\*\$0\.25\*\* at published API prices, .*so the total is a floor\./);
+  assert.doesNotMatch(markdown, /Cost incomplete/);
+  assert.doesNotMatch(markdown, /Cost: \*\*unknown\*\*/);
+});
+
 test('a card scorecard prices its share of the thread, lists its subagents and judges success against Todd\'s UAT yes', () => {
   const pulls = [{ number: 358, headRefName: 'feat/jul-273-x', createdAt: T('19:20'), mergedAt: T('19:40') }];
   const s = buildScorecard({ card: 'JUL-273', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls, pings: [], uat: { yesAt: T('19:30'), said: 'Yes.' } });
