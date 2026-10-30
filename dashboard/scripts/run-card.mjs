@@ -107,21 +107,33 @@ const latest = (record, name) => [...record.steps].reverse().find(step => step.n
 // ---------------------------------------------------------------------------
 // running commands
 
-function shell(command, args, { cwd = REPO_ROOT } = {}) {
-  return spawnSync(command, args, { cwd, encoding: 'utf8', env: process.env, maxBuffer: 64 * 1024 * 1024 });
+// CLICOLOR_FORCE is set in this agent shell, so `gh` paints its JSON and nothing can parse it.
+// Every command the machine runs is read by a program, never by a person, so colour is off.
+export function commandEnv(env = process.env) {
+  const clean = { ...env, NO_COLOR: '1', CLICOLOR: '0' };
+  delete clean.CLICOLOR_FORCE;
+  delete clean.GH_FORCE_TTY;
+  return clean;
 }
 
-function printed(command, args, options) {
+export const withoutColour = text => String(text ?? '').replace(/\u001b\[[0-9;]*m/g, '');
+
+function shell(command, args, { cwd = REPO_ROOT } = {}) {
+  return spawnSync(command, args, { cwd, encoding: 'utf8', env: commandEnv(), maxBuffer: 64 * 1024 * 1024 });
+}
+
+export function printed(command, args, options) {
   const result = shell(command, args, options);
-  if (result.code !== 0) {
+  // spawnSync reports the exit code as `status`; `code` belongs to execFileSync.
+  if (result.status !== 0) {
     const tail = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim().split('\n').slice(-2).join(' | ');
-    throw new Error(`${command} ${args.join(' ')} failed (exit ${result.code ?? result.signal}): ${tail}`);
+    throw new Error(`${command} ${args.join(' ')} failed (exit ${result.status ?? result.signal}): ${tail}`);
   }
   return result.stdout ?? '';
 }
 
 function ghJson(args) {
-  const text = printed('gh', args);
+  const text = withoutColour(printed('gh', args));
   try {
     return JSON.parse(text);
   } catch {
@@ -131,7 +143,7 @@ function ghJson(args) {
 
 function run(command, args, { cwd = REPO_ROOT, log = null, input = null, timeoutMs = 0 } = {}) {
   return new Promise((done, fail) => {
-    const child = spawn(command, args, { cwd, env: process.env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { cwd, env: commandEnv(), stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     const sink = chunk => {
@@ -204,7 +216,7 @@ export function worktreeHolding(branch) {
 // is being built), which no `git worktree add` from here can claim again. Reuse it by name.
 export function checkoutOn(path, branch) {
   const head = shell('git', ['-C', path, 'rev-parse', '--abbrev-ref', 'HEAD']);
-  return head.code === 0 && String(head.stdout).trim() === branch;
+  return head.status === 0 && String(head.stdout).trim() === branch;
 }
 
 export function ensureWorktree({ branch, path, base = 'origin/main' }) {
@@ -212,7 +224,7 @@ export function ensureWorktree({ branch, path, base = 'origin/main' }) {
   const held = worktreeHolding(branch);
   if (held) return held;
   mkdirSync(resolve(path, '..'), { recursive: true });
-  const exists = shell('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`]).code === 0;
+  const exists = shell('git', ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`]).status === 0;
   printed('git', exists ? ['worktree', 'add', path, branch] : ['worktree', 'add', '-b', branch, path, base]);
   return path;
 }
@@ -387,7 +399,7 @@ on its own.`;
 
 export function tailnetHost() {
   const result = shell('/usr/bin/env', ['bash', '-lc', 'tailscale ip -4 2>/dev/null | head -1']);
-  const address = result.code === 0 ? String(result.stdout).trim() : '';
+  const address = result.status === 0 ? String(result.stdout).trim() : '';
   return address || '127.0.0.1';
 }
 
@@ -647,7 +659,7 @@ export async function machine({ card, env = process.env, branch: wantedBranch, f
     const file = join(folder, 'stop.md');
     writeFileSync(file, message);
     const posted = shell(process.execPath, [LINEAR_CLI, 'comment', card, '--file', file]);
-    if (posted.code !== 0) console.error(`could not comment on ${card}: ${String(posted.stderr).trim()}`);
+    if (posted.status !== 0) console.error(`could not comment on ${card}: ${String(posted.stderr).trim()}`);
   };
 
   const step = async (name, work) => {

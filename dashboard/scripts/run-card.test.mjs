@@ -5,10 +5,10 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  DASHBOARD_ROOT, PREVIEW_PORT, STEPS, branchFor, lastSessionResult, machine, modelsFor, newRunRecord,
-  normalizeCard, parseFlags, passing, previewKind, pullNamesCard, recordFile, remediationPrompt,
+  DASHBOARD_ROOT, PREVIEW_PORT, STEPS, branchFor, commandEnv, lastSessionResult, machine, modelsFor, newRunRecord,
+  normalizeCard, parseFlags, passing, previewKind, printed, pullNamesCard, recordFile, remediationPrompt,
   runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stepEntry, thinkingForEffort,
-  uatComment, uatSection,
+  uatComment, uatSection, withoutColour,
 } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
@@ -244,6 +244,23 @@ test('a run started past the build needs a pull request to carry on from', async
   } finally {
     state.clean();
   }
+});
+
+// spawnSync reports its exit code as `status`. Reading `code` made every command look failed,
+// which stopped the machine before it could read its first card.
+test('a command that works is read, and one that fails says how', () => {
+  assert.match(printed('git', ['--version']), /git version/);
+  assert.throws(() => printed('git', ['rev-parse', '--verify', 'no-such-ref']), /failed \(exit 128\)/);
+});
+
+// This agent shell sets CLICOLOR_FORCE, which made `gh` paint its JSON and every read fail.
+test('commands run with colour off and their output has any left stripped', () => {
+  const env = commandEnv({ CLICOLOR_FORCE: '1', GH_FORCE_TTY: '1', PATH: '/bin' });
+  assert.equal(env.CLICOLOR_FORCE, undefined);
+  assert.equal(env.GH_FORCE_TTY, undefined);
+  assert.equal(env.NO_COLOR, '1');
+  assert.equal(env.PATH, '/bin');
+  assert.equal(withoutColour('\u001b[1;38m[\u001b[m'), '[');
 });
 
 test('the preview port is its own, off the live dashboard', () => {
