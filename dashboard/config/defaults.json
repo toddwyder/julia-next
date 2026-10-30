@@ -1,5 +1,5 @@
 {
   "mainSession": "openai/gpt-6.1-sol",
-  "shipping": "anthropic/claude-opus-5-5",
+  "shipping": "mastracode/commandcode/moonshotai/Kimi-K3.1-Pro",
   "effort": "large"
 }

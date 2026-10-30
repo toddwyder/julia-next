@@ -1,13 +1,15 @@
 // Everything this PR reads or writes lives under <DASHBOARD_STATE_DIR>/state:
 //
-//   runs/<id>.json   {id, status, startedAt}   status: starting | running | finished | failed
+//   runs/<id>.json   {id, status, startedAt, ...}   status: starting | running |
+//                    waiting (blocked on Todd) | finished | failed | stopped
+//                    (the process stopped it; the reason is in the file)
 //   build.json       {commit, ref, updatedAt, previous}   written by scripts/update.mjs
 //   watchdog.json    {consecutiveFailures, down, ...}     written by scripts/watchdog.mjs
 import { mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 export const DEFAULT_STATE_DIR = '/var/lib/julia-dashboard';
-export const RUN_STATUSES = Object.freeze(['starting', 'running', 'finished', 'failed']);
+export const RUN_STATUSES = Object.freeze(['starting', 'running', 'waiting', 'finished', 'failed', 'stopped']);
 export const ACTIVE_RUN_STATUSES = Object.freeze(['starting', 'running']);
 
 const trimSlash = value => value.replace(/\/+$/, '');

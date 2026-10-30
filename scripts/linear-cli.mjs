@@ -251,6 +251,92 @@ export async function setIssueState(identifier, stateName, opts) {
 }
 
 // ---------------------------------------------------------------------------
+// Reaching Todd (JUL-292)
+// ---------------------------------------------------------------------------
+//
+// A Linear comment notifies nobody who is not watching the card. The machine
+// parks a card in UAT and needs Todd to open it, so it leaves the same
+// issueReminder Linear's own UI leaves: written by scripts/stop-ping.mjs for a
+// stopped session, used here for a card waiting on UAT.
+//
+// The guard on comment bodies catches a `For Todd:` ask; a reminder carries no
+// body, so the card's own words do the asking.
+
+const REMINDER_MUTATION = `
+  mutation Remind($id: String!, $at: DateTime!) {
+    issueReminder(id: $id, reminderAt: $at) { success }
+  }
+`;
+
+export function reminderAtISO(minutes, now = new Date()) {
+  const at = new Date(now.getTime() + Number(minutes) * 60_000);
+  if (Number.isNaN(at.getTime())) throw new Error(`remind needs a whole number of minutes, not ${JSON.stringify(minutes)}`);
+  return at.toISOString();
+}
+
+export async function remind(identifier, { minutes = 1, now = new Date() } = {}, opts) {
+  const { issue } = await linearGraphQL(ISSUE_ID_QUERY, { id: identifier }, opts);
+  if (!issue?.id) throw new Error(`${identifier} has no issue to remind about`);
+  const data = await linearGraphQL(REMINDER_MUTATION, { id: issue.id, at: reminderAtISO(minutes, now) }, opts);
+  if (!data.issueReminder?.success) throw new Error(`issueReminder did not report success for ${identifier}`);
+  return { identifier, at: reminderAtISO(minutes, now) };
+}
+
+// ---------------------------------------------------------------------------
+// Making a sub-issue (JUL-291)
+// ---------------------------------------------------------------------------
+//
+// pstack slices a big card into ordered sub-issues that carry that slice's
+// done-means, and the parent completes only when its last sub-issue does. That
+// needs one thing this tool could not do: create a card under a parent. The
+// parent is named by identifier and resolved to its team here, so a caller
+// never has to hold a team id.
+
+const PARENT_ISSUE_QUERY = `
+  query ParentIssue($id: String!) {
+    issue(id: $id) { id identifier team { id } }
+  }
+`;
+
+const ISSUE_CREATE_MUTATION = `
+  mutation IssueCreate($input: IssueCreateInput!) {
+    issueCreate(input: $input) {
+      success
+      issue { identifier title url parent { identifier } }
+    }
+  }
+`;
+
+export function subIssueArgs(args) {
+  const options = { title: '', description: '' };
+  for (let index = 0; index < args.length; index += 2) {
+    const flag = args[index];
+    const value = args[index + 1];
+    if (!value) throw new Error('usage: linear-cli.mjs create-subissue <PARENT> --title <title> --file <description path>');
+    if (flag === '--title') options.title = value;
+    else if (flag === '--file') {
+      try {
+        options.description = readFileSync(value, 'utf8');
+      } catch (error) {
+        throw new Error(`create-subissue --file could not read ${value}: ${error.message}`);
+      }
+    } else throw new Error(`create-subissue does not take ${JSON.stringify(flag)}`);
+  }
+  if (!options.title.trim()) throw new Error('create-subissue needs --title <title>');
+  if (!options.description.trim()) throw new Error('create-subissue needs --file <description path>');
+  return options;
+}
+
+export async function createSubIssue(parentIdentifier, { title, description }, opts) {
+  const parent = (await linearGraphQL(PARENT_ISSUE_QUERY, { id: parentIdentifier }, opts)).issue;
+  if (!parent?.team?.id) throw new Error(`${parentIdentifier} has no team to file a sub-issue under`);
+  const input = { teamId: parent.team.id, parentId: parent.id, title, description };
+  const data = await linearGraphQL(ISSUE_CREATE_MUTATION, { input }, opts);
+  if (!data.issueCreate.success) throw new Error(`issueCreate did not report success under ${parentIdentifier}`);
+  return data.issueCreate.issue;
+}
+
+// ---------------------------------------------------------------------------
 // Reading the comment body off the command line (JUL-284 retro)
 // ---------------------------------------------------------------------------
 //
@@ -310,8 +396,17 @@ async function main() {
       if (!stateName) throw new Error('usage: linear-cli.mjs state <ID> <state name>');
       const issue = await setIssueState(identifier, stateName, { apiKey });
       console.log(JSON.stringify(issue, null, 2));
+    } else if (command === 'remind') {
+      const flag = rest[0];
+      const minutes = flag === '--minutes' ? rest[1] : '1';
+      if (flag && flag !== '--minutes') throw new Error('usage: linear-cli.mjs remind <ID> [--minutes <n>]');
+      const result = await remind(identifier, { minutes }, { apiKey });
+      console.log(`reminder on ${result.identifier} at ${result.at}`);
+    } else if (command === 'create-subissue') {
+      const issue = await createSubIssue(identifier, subIssueArgs(rest), { apiKey });
+      console.log(`${issue.identifier} filed under ${issue.parent?.identifier ?? identifier}: ${issue.url}`);
     } else {
-      console.error('usage: linear-cli.mjs list-ready | get-issue <ID> | comments <ID> | comment <ID> <body> | comment <ID> --file <path> | comment <ID> - | state <ID> <state name>');
+      console.error('usage: linear-cli.mjs list-ready | get-issue <ID> | comments <ID> | comment <ID> <body> | comment <ID> --file <path> | comment <ID> - | state <ID> <state name> | remind <ID> [--minutes <n>] | create-subissue <PARENT> --title <title> --file <path>');
       process.exitCode = 2;
     }
   } catch (error) {

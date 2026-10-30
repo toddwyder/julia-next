@@ -1,0 +1,240 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  DASHBOARD_ROOT, PREVIEW_PORT, branchFor, lastSessionResult, modelsFor, newRunRecord,
+  normalizeCard, parseFlags, passing, previewKind, pullNamesCard, recordFile, remediationPrompt,
+  runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stepEntry, thinkingForEffort,
+  uatComment, uatSection,
+} from './run-card.mjs';
+import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
+
+const temporaryState = () => {
+  const root = mkdtempSync(join(tmpdir(), 'jul-292-run-'));
+  return { root, env: { DASHBOARD_STATE_DIR: root }, clean: () => rmSync(root, { recursive: true, force: true }) };
+};
+
+test('a card is written the one way the board writes it', () => {
+  assert.equal(normalizeCard(' jul-290 '), 'JUL-290');
+  assert.equal(runIdFor('JUL-290'), 'jul-290');
+  for (const wrong of ['290', 'JUL', 'JUL-', 'feat/jul-290', '']) {
+    assert.throws(() => normalizeCard(wrong), /is not a card/);
+  }
+});
+
+// The branch has to carry the card number, because that is the last way
+// scripts/check-shipping-verdict.mjs finds the card a pull request belongs to.
+test('a new branch is named after the card and the first five words of its title', () => {
+  assert.equal(branchFor('JUL-290', 'Slice 4b: Account status on Start and the nearly-out warning'), 'feat/jul-290-slice-4b-account-status-on');
+  assert.equal(branchFor('JUL-9', 'Fix'), 'feat/jul-9-fix');
+  assert.equal(branchFor('JUL-9', '!!!'), 'feat/jul-9');
+});
+
+test('each Start screen effort is one thinking budget', () => {
+  assert.equal(thinkingForEffort('small'), 'low');
+  assert.equal(thinkingForEffort('medium'), 'medium');
+  assert.equal(thinkingForEffort('large'), 'high');
+  assert.equal(thinkingForEffort('unlimited'), 'max');
+  assert.equal(thinkingForEffort('something else'), 'high');
+});
+
+// A card's label and the files it ends up touching do not always agree, and the
+// address Todd opens is decided by the files: a dashboard card is proved on a
+// second copy of the dashboard, a Julia card on its Vercel preview.
+test('the diff decides which kind of preview a card gets', () => {
+  assert.equal(previewKind(['dashboard/app/start/[card]/page.jsx', 'README.md']), 'dashboard');
+  assert.equal(previewKind(['app/recipes/new/page.jsx', 'lib/recipes.js']), 'julia');
+  assert.throws(() => previewKind([]), /changes no files/);
+  assert.throws(() => previewKind(undefined), /changes no files/);
+});
+
+test('a pull request belongs to a card by its title or by its own Card line', () => {
+  assert.equal(pullNamesCard({ title: 'JUL-290 Account status', body: '' }, 'JUL-290'), true);
+  assert.equal(pullNamesCard({ title: 'Account status', body: 'Something.\n\nCard: JUL-290\n' }, 'JUL-290'), true);
+  assert.equal(pullNamesCard({ title: 'Account status', body: 'mentions JUL-290 in prose' }, 'JUL-290'), false);
+  // JUL-29 is not JUL-290.
+  assert.equal(pullNamesCard({ title: 'JUL-29 something', body: '' }, 'JUL-290'), false);
+});
+
+test('a run record starts running, carries every step it has taken, and is saved where the dashboard reads it', () => {
+  const state = temporaryState();
+  try {
+    const record = newRunRecord({
+      card: 'JUL-290',
+      branch: 'feat/jul-290-account-status',
+      worktree: '/tmp/jul-290',
+      models: { builder: 'openai/gpt-6.1-sol', shipping: 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro', effort: 'large' },
+    });
+    record.steps.push(stepEntry('build', join(state.root, 'build.log')));
+    record.steps.at(-1).status = 'done';
+    record.steps.at(-1).finishedAt = new Date().toISOString();
+    saveRecord(record, state.env);
+
+    assert.equal(recordFile('JUL-290', state.env), join(state.root, 'state', 'runs', 'jul-290.json'));
+    const saved = JSON.parse(readFileSync(recordFile('JUL-290', state.env), 'utf8'));
+    assert.equal(saved.id, 'jul-290');
+    assert.equal(saved.card, 'JUL-290');
+    assert.equal(saved.status, 'running');
+    assert.equal(saved.steps[0].name, 'build');
+    assert.equal(saved.steps[0].status, 'done');
+    assert.ok(saved.steps[0].finishedAt);
+    assert.deepEqual(saved.rounds, { shipping: 0, remediation: 0 });
+    assert.equal(saved.waitingFor, null);
+  } finally {
+    state.clean();
+  }
+});
+
+// The session is spawned headless through the launcher, which is the only place
+// a session gets a trace file; without one its cost never reaches the scorecard.
+test('a session is spawned with the model and effort the Start screen picked', () => {
+  const args = sessionArgs({ model: 'openai/gpt-6.1-sol', effort: 'medium', title: 'JUL-290 build', timeoutMs: 3 * 60 * 60_000 });
+  assert.deepEqual(args.slice(0, 2), ['--prompt', '-']);
+  assert.equal(args[args.indexOf('--model') + 1], 'openai/gpt-6.1-sol');
+  assert.equal(args[args.indexOf('--thinking-level') + 1], 'medium');
+  assert.equal(args[args.indexOf('--output') + 1], 'jsonl');
+  assert.equal(args[args.indexOf('--permission-mode') + 1], 'auto');
+  assert.equal(args[args.indexOf('--timeout') + 1], '10800');
+});
+
+test('the session result is the last result event, not the coloured progress lines', () => {
+  const text = [
+    '{"type":"thread_created","thread":{"id":"abc"}}',
+    'building the change',
+    '{"type":"result","status":"completed","exitCode":0,"threadId":"abc"}',
+    '\u001b[u4;0m',
+  ].join('\n');
+  assert.equal(lastSessionResult(text).status, 'completed');
+  assert.equal(lastSessionResult('no json here'), null);
+  assert.equal(lastSessionResult('{"type":"result","status":"running"'), null);
+});
+
+test('the shipping prompt hands over the card, the pull request and the two shapes to report in', () => {
+  const prompt = shippingPrompt({
+    card: 'JUL-290',
+    issue: { title: 'Account status on Start', description: '## Outcome\nRows on Start.\n\n## UAT steps\n1. Open the address.' },
+    pull: { number: 383, url: 'https://github.com/toddwyder/julia-next/pull/383', headRefName: 'feat/jul-290-account-status', headRefOid: 'f0534654aa' },
+    verifierModel: 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro',
+  });
+  assert.match(prompt, /You are Shipping for Linear card JUL-290/);
+  assert.match(prompt, /Rows on Start\./);
+  assert.match(prompt, /#383/);
+  assert.match(prompt, /"juliaShippingVerdict":1/);
+  assert.match(prompt, /"head":"f0534654aa"/);
+  assert.match(prompt, /Kimi-K3\.1-Pro/);
+  assert.match(prompt, /Do not fix anything, do not push, do not merge/);
+});
+
+test('the remediation prompt quotes what Shipping saw and keeps the merge out of its hands', () => {
+  const prompt = remediationPrompt({
+    card: 'JUL-290',
+    issue: { title: 'Account status on Start' },
+    pull: { number: 383, url: 'https://github.com/toddwyder/julia-next/pull/383', headRefName: 'feat/jul-290-account-status' },
+    verdict: { criteria: [{ criterion: 'The row shows the reset time', verdict: 'FAIL', note: 'the row shows no reset time' }] },
+  });
+  assert.match(prompt, /Bug fix playbook/);
+  assert.match(prompt, /The row shows the reset time: the row shows no reset time/);
+  assert.match(prompt, /Do not merge and do not move the card/);
+});
+
+// The verdict the machine acts on is the gate's own answer, so a card can never
+// land on a verdict the shipping-verdict check would refuse.
+test('the machine passes on exactly what the shipping gate would pass', () => {
+  const pull = { title: 'JUL-290 Account status', body: '', head: { sha: 'f0534654aa', ref: 'feat/jul-290-account-status' } };
+  const verdictFor = (verdict, head = 'f0534654aa') => ({
+    id: '1',
+    createdAt: '2026-10-30T10:00:00.000Z',
+    body: `seen\n\n\`\`\`json\n${JSON.stringify({
+      juliaShippingVerdict: 1, card: 'JUL-290', head, verdict,
+      builder: 'toddwyder', verifier: 'Kimi K3.1 Pro',
+      criteria: [{ criterion: 'Rows on Start', verdict, note: 'opened the Start screen' }],
+    })}\n\`\`\``,
+  });
+  assert.equal(passing(shippingVerdict({ pull, comments: [verdictFor('PASS')] })), true);
+  assert.equal(passing(shippingVerdict({ pull, comments: [verdictFor('FAIL')] })), false);
+  assert.equal(passing(shippingVerdict({ pull, comments: [verdictFor('PASS', 'older00')] })), false);
+  assert.equal(passing(shippingVerdict({ pull, comments: [] })), false);
+});
+
+test('Todd is handed the card page of a dashboard preview and the card steps in his own words', () => {
+  const issue = {
+    description: [
+      '## Outcome', 'Rows on Start.', '',
+      '## Accept the card when', '1. Rows appear.',
+      '', '## UAT steps', '1. Open the address.', '2. Look at the rows.', '',
+      '## Notes', 'not part of the steps',
+    ].join('\n'),
+  };
+  assert.equal(uatSection(issue.description), '1. Open the address.\n2. Look at the rows.');
+  const preview = { kind: 'dashboard', address: 'http://100.119.112.9:4314', cardPage: `http://100.119.112.9:4314/start/JUL-290` };
+  const comment = uatComment({ card: 'JUL-290', issue, preview });
+  assert.match(comment, /http:\/\/100\.119\.112\.9:4314\/start\/JUL-290/);
+  assert.match(comment, /1\. Open the address\./);
+  assert.doesNotMatch(comment, /not part of the steps/);
+  // The For Todd guard refuses a `For Todd:` line that asks for anything but an
+  // account-only action, money or a product decision. This comment asks for none
+  // of those words, and posts as plain prose.
+  assert.doesNotMatch(comment, /For Todd:/);
+});
+
+test('the regression suite runs on the preview address, never against the live one', () => {
+  const dashboard = smokeCommands({ kind: 'dashboard', address: 'http://100.119.112.9:4314', worktree: '/srv/card' });
+  assert.deepEqual(dashboard.map(entry => entry.args.join(' ')), [
+    'test',
+    'run lint',
+    'scripts/lanes.mjs --url http://100.119.112.9:4314',
+    'scripts/check-start-address.mjs http://100.119.112.9:4314',
+  ]);
+  assert.equal(dashboard[2].cwd, join('/srv/card', 'dashboard'));
+
+  const julia = smokeCommands({ kind: 'julia', address: 'https://julia-next-git-x.vercel.app', worktree: '/srv/card' });
+  assert.deepEqual(julia.map(entry => entry.what), [
+    'verify-julia launch --url https://julia-next-git-x.vercel.app',
+    'verify-julia doctor',
+    'verify-julia test',
+  ]);
+  assert.deepEqual(julia[0].args.slice(1), ['launch', '--url', 'https://julia-next-git-x.vercel.app']);
+  assert.deepEqual(julia[2].args.slice(1, 2), ['test']);
+  assert.ok(julia[2].args.length > 2, 'the whole spec suite runs, not one file');
+});
+
+// The models come from what the Start screen saved, so a run does what the
+// picks said; Shipping is its own slot and never the builder's model.
+test('the build uses the Start screen picks and Shipping its own slot', () => {
+  const state = temporaryState();
+  try {
+    mkdirSync(join(state.root, 'state'), { recursive: true });
+    writeFileSync(join(state.root, 'state', 'draft.json'), JSON.stringify({
+      version: 1, card: 'JUL-280', effort: 'medium',
+      groups: { building: { model: 'commandcode/deepseek/deepseek-v4.1-flash', roles: {} } },
+    }));
+    const models = modelsFor(state.env);
+    assert.equal(models.builder, 'commandcode/deepseek/deepseek-v4.1-flash');
+    assert.equal(models.effort, 'medium');
+    const defaults = JSON.parse(readFileSync(join(DASHBOARD_ROOT, 'config', 'defaults.json'), 'utf8'));
+    assert.equal(models.shipping, defaults.shipping);
+    assert.equal(defaults.shipping, 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro');
+    assert.notEqual(defaults.shipping.split('/')[0], defaults.mainSession.split('/')[0]);
+  } finally {
+    state.clean();
+  }
+});
+
+test('the flags a run is started with are only the ones it explains', () => {
+  assert.deepEqual(parseFlags(['--branch', 'feat/x', '--state', '/tmp/s']), { branch: 'feat/x', state: '/tmp/s' });
+  assert.throws(() => parseFlags(['--repo', '/tmp/r']), /unknown flag "--repo"/);
+  assert.throws(() => parseFlags(['--state']), /--state needs a value/);
+});
+
+test('the preview port is its own, off the live dashboard', () => {
+  assert.equal(PREVIEW_PORT, 4314);
+});
+
+test('run-card.mjs prints its usage and exits 2 when it is started wrong', () => {
+  const result = spawnSync(process.execPath, [join(DASHBOARD_ROOT, 'scripts', 'run-card.mjs')], { encoding: 'utf8' });
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /usage: run-card\.mjs start <CARD>/);
+});

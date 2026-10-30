@@ -23,13 +23,25 @@ test('the state folder and its records sit under DASHBOARD_STATE_DIR/state', () 
   assert.equal(watchdogRecordFile(env), '/var/lib/julia-dashboard/state/watchdog.json');
 });
 
-test('a run record needs an id, one of the four statuses and a parseable startedAt', () => {
+test('a run record needs an id, a known status and a parseable startedAt', () => {
   assert.equal(runRecordProblem(good), '');
   for (const status of RUN_STATUSES) assert.equal(runRecordProblem({ ...good, status }), '');
   assert.match(runRecordProblem({ ...good, id: '' }), /no id/);
   assert.match(runRecordProblem({ ...good, status: 'paused' }), /has status "paused"/);
   assert.match(runRecordProblem({ ...good, startedAt: 'yesterday' }), /unreadable startedAt/);
   assert.match(runRecordProblem(['run']), /not a JSON object/);
+});
+
+// A card waiting on Todd's UAT, and a card the process stopped, are both
+// finished as far as the machine is concerned. Neither is an active build, so a
+// waiting card does not hold the update timer off main.
+test('waiting and stopped are real statuses and neither is active', () => {
+  for (const status of ['waiting', 'stopped']) {
+    assert.equal(runRecordProblem({ ...good, status }), '');
+    assert.equal(isActiveRun({ run: { ...good, status } }), false);
+  }
+  assert.equal(isActiveRun({ run: { ...good, status: 'running' } }), true);
+  assert.equal(isActiveRun({ run: { ...good, status: 'starting' } }), true);
 });
 
 test('a broken run file is named, never thrown', () => {
