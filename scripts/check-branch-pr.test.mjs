@@ -60,3 +60,22 @@ test('a pull request that names no card, or is another branch, is not checked', 
   assert.equal(scorecardGaps({ pulls: [pull({ title: 'Fix the font flake' })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }).length, 1);
   assert.deepEqual(scorecardGaps({ pulls: [pull({ ref: 'other' })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }), []);
 });
+
+test('work that is not a card passes when the body says so and gives a reason', () => {
+  const body = 'Todd asked for this correction as its own pull request, with no card.\n\nNo card: a correction Todd asked for, not a card.\n';
+  assert.deepEqual(scorecardGaps({ pulls: [pull({ title: 'Require a verdict before green', body })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }), []);
+});
+
+test('a No card line with no reason does not pass', () => {
+  const body = 'No card:\n';
+  const gaps = scorecardGaps({ pulls: [pull({ title: 'Require a verdict before green', body })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') });
+  assert.equal(gaps.length, 1);
+  assert.match(gaps[0], /say "No card: <reason>" in the body/);
+});
+
+test('a pull request that names a card still needs that card\'s scorecard, whatever its body says', () => {
+  const body = 'No card: this is not a card.\n';
+  const gaps = scorecardGaps({ pulls: [pull({ body })], headRef: 'feat/jul-282', readFile: () => { throw new Error('ENOENT'); } });
+  assert.equal(gaps.length, 1);
+  assert.match(gaps[0], /names JUL-282 but docs\/scorecards\/JUL-282\.md is not on the branch/);
+});

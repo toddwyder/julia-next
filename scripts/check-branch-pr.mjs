@@ -17,12 +17,23 @@ export function branchesWithoutOpenPullRequests({ branches, pulls, repository })
 // smaller than the bill and says so on a `Cost incomplete` line. So a pull request that names
 // a card has to carry that card's scorecard, and the card's cost has to be a number somebody
 // could check.
+//
+// Work that is not a card, such as a correction Todd asks for as its own pull request, says so
+// on a lone `No card:` line of the body, the same place a pull request names its card. A line
+// with no reason does not count, because the reason is the thing a reader checks.
+const NO_CARD = /^[ \t]*no card[ \t]*:[ \t]*(\S.*)$/im;
+
+export function declaresNoCard(body) {
+  return NO_CARD.test(String(body ?? ''));
+}
+
 export function scorecardGaps({ pulls, headRef, readFile = path => readFileSync(path, 'utf8') }) {
   const gaps = [];
   for (const pull of pulls.filter(candidate => candidate.head?.ref === headRef)) {
     const cards = [...new Set(`${pull.title ?? ''}\n${pull.body ?? ''}`.match(/\bJUL-\d+\b/g) ?? [])];
     if (!cards.length) {
-      gaps.push(`PR #${pull.number} names no JUL card, so there is no scorecard to check: put the card in the title, as (JUL-123)`);
+      if (declaresNoCard(pull.body)) continue;
+      gaps.push(`PR #${pull.number} names no JUL card, so there is no scorecard to check: put the card in the title, as (JUL-123), or say "No card: <reason>" in the body when the work is not a card`);
       continue;
     }
     for (const card of cards) {

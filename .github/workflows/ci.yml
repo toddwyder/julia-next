@@ -68,18 +68,36 @@ jobs:
       - name: Build application
         run: npm run build
 
+  shipping-verdict:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - name: Require a shipping verdict on the card's current head
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-shipping-verdict.mjs
+
   checks:
-    needs: [repository-hygiene, package-tests, web]
+    needs: [repository-hygiene, package-tests, web, shipping-verdict]
     if: always()
     runs-on: ubuntu-22.04
     env:
       REPOSITORY_HYGIENE: ${{ needs.repository-hygiene.result }}
       PACKAGE_TESTS: ${{ needs.package-tests.result }}
       WEB: ${{ needs.web.result }}
+      SHIPPING_VERDICT: ${{ needs.shipping-verdict.result }}
     steps:
-      - name: Require every test environment to pass
+      - name: Require every job to pass
         run: |
           set -euo pipefail
           [[ "$REPOSITORY_HYGIENE" == success ]]
           [[ "$PACKAGE_TESTS" == success ]]
           [[ "$WEB" == success ]]
+          [[ "$SHIPPING_VERDICT" == success ]]
