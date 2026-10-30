@@ -216,6 +216,12 @@ than confirm it, giving a verdict on every acceptance criterion or naming the ev
 missing.
 _Avoid_: Second opinion, sign-off, approval
 
+**Shipping verdict**:
+The comment an agent that did not write the code leaves on a card pull request after running the
+change the way Todd uses it. It records PASS or FAIL on every acceptance criterion of the card and
+the head commit it ran. CI stays red without a PASS on the pull request's current head.
+_Avoid_: Approval, sign-off, code review
+
 **Plan**:
 The builder's written approach for one card, approved automatically and saved in the pull
 request. It always names the seams and the failing tests written first, and the lasting
