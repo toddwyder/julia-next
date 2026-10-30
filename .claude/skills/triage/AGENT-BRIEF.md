@@ -1,6 +1,6 @@
 # Writing a card
 
-A card is the contract an agent builds from. It has two parts. A short Outcome, and the acceptance criteria that describe what Todd sees. There is no limit on how many; pstack slices a large card when it plans the build. Triage writes this shape.
+A card is the contract an agent builds from. It has three parts: a short Outcome, the acceptance criteria that describe what Todd sees, and the UAT steps Todd will follow. There is no limit on how many; pstack slices a large card when it plans the build. Triage writes this shape.
 
 Run `node scripts/check-agent-brief.mjs <draft-file>` before showing Todd a draft. It refuses text copied from repository docs, criteria written as steps, implementation words and negations.
 
@@ -15,9 +15,14 @@ One or two sentences on the change Todd notices.
 
 - What Todd sees when the card is done.
 - Another thing Todd sees.
+
+## UAT steps
+
+1. Open this. You see that.
+2. Tap this. You see that.
 ```
 
-Those two sections are the whole card. Requirements, Contracts, Proof and Out of scope are retired. A constraint that matters to Todd, including how something must be proven, becomes a criterion.
+Those three sections are the whole card. Requirements, Contracts, Proof and Out of scope are retired. A constraint that matters to Todd, including how something must be proven, becomes a criterion.
 
 ## The Outcome
 
@@ -34,6 +39,13 @@ Those two sections are the whole card. Requirements, Contracts, Proof and Out of
 - State what happens. "The machine refuses a review from the builder's company" reads positive and stays.
 - Each criterion stands alone. Its own evidence can settle it.
 - Stay durable. Name types and behavior, not paths or line numbers.
+
+## The UAT steps
+
+- Numbered, in the order Todd does them, each one action and what he sees.
+- Only what a household member does: open, tap, type, read. Todd gets the preview address at UAT, so a step says "Open the preview".
+- Cover every criterion Todd can try. A card that changes nothing Todd uses has no UAT steps section.
+- Settle them with Todd at "settled": the builder and Prove It Works aim at exactly these.
 
 ## Writing the proof
 
@@ -52,6 +64,11 @@ The control page starts a saved card and shows its progress.
 
 - The page lists every Ready card.
 - Start begins one build for the chosen card.
+
+## UAT steps
+
+1. Open the preview. You see every Ready card.
+2. Tap Start on one card. Its build begins.
 ```
 
 ## Bad card
