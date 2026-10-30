@@ -1,5 +1,5 @@
 export const PROBLEMS = Object.freeze(Object.fromEntries([
-  'no-credential', 'sign-in-expired', 'refused', 'unreachable', 'shape-changed', 'not-published',
+  'no-credential', 'sign-in-expired', 'refused', 'unreachable', 'shape-changed', 'not-published', 'key-refused',
 ].map(code => [code, code])));
 
 export class ProblemError extends Error {
@@ -26,10 +26,12 @@ export function levelOf({ used, allowance }, signal) {
   return 'plenty';
 }
 
+// A reset the provider did not send keeps the row readable: the number is the point, and the
+// view says the reset time was not given. Only a reset we cannot parse is a shape change.
 function windowRow(key, label, used, allowance, unit, resetsAt, signal) {
   if (!number(used) || !number(allowance) || allowance === 0) return unreadable(key, label);
-  if (resetsAt !== null && !date(resetsAt)) return unreadable(key, label, 'shape-changed');
-  return { key, label, kind: 'window', used, allowance, unit, resetsAt,
+  if (resetsAt !== null && resetsAt !== undefined && !date(resetsAt)) return unreadable(key, label, 'shape-changed');
+  return { key, label, kind: 'window', used, allowance, unit, resetsAt: resetsAt ?? null,
     level: levelOf({ used, allowance }, signal) };
 }
 
@@ -77,11 +79,11 @@ const endpoints = {
     'https://api.commandcode.ai/alpha/usage/summary', 'https://api.commandcode.ai/alpha/billing/subscriptions'],
 };
 
-async function readEndpoint(url, headers, fetchImpl) {
+async function readEndpoint(url, headers, fetchImpl, authProblem = 'sign-in-expired') {
   let response;
   try { response = await fetchImpl(url, { headers, cache: 'no-store', signal: AbortSignal.timeout(8000) }); }
   catch { throw new ProblemError('unreachable'); }
-  if (!response.ok) throw new ProblemError(response.status === 401 ? 'sign-in-expired' : 'refused', response.status);
+  if (!response.ok) throw new ProblemError(response.status === 401 || response.status === 403 ? authProblem : 'refused', response.status);
   try { return await response.json(); }
   catch (error) { throw new ProblemError(error?.name === 'SyntaxError' ? 'shape-changed' : 'unreachable'); }
 }
@@ -92,9 +94,10 @@ export async function readAccountStatus({ accounts, getHeaders, fetchImpl = fetc
     try {
       if (!endpoints[id]) throw new ProblemError('shape-changed');
       const headers = await getHeaders(id);
+      const authProblem = id === 'commandcode' ? 'key-refused' : 'sign-in-expired';
       let rows;
       if (id === 'commandcode') {
-        const results = await Promise.allSettled(endpoints[id].map(url => readEndpoint(url, headers, fetchImpl)));
+        const results = await Promise.allSettled(endpoints[id].map(url => readEndpoint(url, headers, fetchImpl, authProblem)));
         if (results.every(result => result.status === 'rejected')) throw results[0].reason;
         const [credits, summary, subscription] = results.map(result => result.value);
         rows = parseCommandCode({ credits, summary, subscription }, { readAt });
@@ -102,7 +105,7 @@ export async function readAccountStatus({ accounts, getHeaders, fetchImpl = fetc
         if (monthFailure) rows[0] = failed('commandcode:month', 'This month', monthFailure.reason);
         if (results[0].status === 'rejected') rows[1] = failed('commandcode:credit', 'Bought credit', results[0].reason);
       } else {
-        const payload = await readEndpoint(endpoints[id][0], headers, fetchImpl);
+        const payload = await readEndpoint(endpoints[id][0], headers, fetchImpl, authProblem);
         rows = (id === 'claude' ? parseAnthropic : parseChatgpt)(payload, { readAt });
       }
       if (!rows.length) rows = [unreadable(id, name)];

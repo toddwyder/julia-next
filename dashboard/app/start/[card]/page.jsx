@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { connection } from 'next/server';
@@ -16,16 +17,22 @@ import styles from './start.module.css';
 const { groups: GROUPS } = ROLES;
 const DRAFT_FILE = () => join(stateFolder(), 'draft.json');
 const runFile = promisify(execFile);
-const usageScriptPath = join(process.cwd(), 'scripts', 'usage.mjs');
+// The service starts Next with the checkout root as the working directory, while `npm start`
+// runs from the dashboard folder, so the runner is found from either.
+const usageScriptPath = ['', 'dashboard']
+  .map(part => join(process.cwd(), part, 'scripts', 'usage.mjs'))
+  .find(existsSync);
 
 async function readStatus() {
   try {
+    if (!usageScriptPath) throw new Error('scripts/usage.mjs is not beside the working directory');
     const { stdout } = await runFile(process.execPath, [usageScriptPath], { timeout: 15000 });
     const status = JSON.parse(stdout);
     if (status.error || !Array.isArray(status.accounts) || status.accounts.length !== ACCOUNTS.accounts.length) throw new Error('Invalid account status.');
     status.accounts.forEach(account => accountView(account));
     return status;
-  } catch {
+  } catch (error) {
+    console.error(`julia-dashboard: account status could not be read. ${error.message}`);
     const readAt = new Date().toISOString();
     return { readAt, accounts: ACCOUNTS.accounts.map(({ id, name }) => ({
       id, name, readAt, rows: [{ key: id, label: name, kind: 'unreadable', problem: 'unreachable' }],

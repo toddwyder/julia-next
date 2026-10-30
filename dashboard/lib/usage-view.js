@@ -2,7 +2,8 @@ const rank = { plenty: 0, 'nearly-out': 1, out: 2 };
 
 function problemText(row, name) {
   switch (row.problem) {
-    case 'no-credential': return `The server has no sign-in for ${name}.`;
+    case 'no-credential': return `The server has no sign-in or key for ${name}. Todd needs to add it.`;
+    case 'key-refused': return `${name} refused its key. Todd needs to replace it.`;
     case 'sign-in-expired': return `${name} needs a new sign-in. Sign in again in Mastra Code.`;
     case 'refused': return Number.isInteger(row.status)
       ? `${name} answered with an error (HTTP ${row.status}).` : `${name} answered with an error.`;

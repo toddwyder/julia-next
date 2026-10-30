@@ -48,6 +48,15 @@ test('reads CommandCode as a month row against used plus remaining, and a separa
   assert.deepEqual(credit, { key: 'commandcode:credit', label: 'Bought credit', kind: 'balance', remaining: 4.2975948488, unit: 'usd', level: 'plenty' });
 });
 
+test('keeps the month number when the reset is missing', () => {
+  const data = commandcode();
+  delete data.subscription.data.currentPeriodEnd;
+  const [month] = parseCommandCode(data, { readAt });
+  assert.equal(month.kind, 'window');
+  assert.equal(month.resetsAt, null);
+  assert.ok(Math.abs(month.used - 23.950986015200005) < 0.00000001);
+});
+
 test('marks a row nearly out from the provider\'s own signal before the 90 percent fallback', () => {
   assert.equal(parseAnthropic(fixture('anthropic'), { readAt })[1].level, 'nearly-out');
   assert.equal(levelOf({ used: 90, allowance: 100 }), 'nearly-out');
@@ -73,8 +82,9 @@ test('keeps the other accounts when one provider refuses', async () => {
 
 test('turns a 401 into the sign-in problem, not a zero', async () => {
   const result = await read(() => reply({}, 401));
+  assert.deepEqual(result.map(account => account.rows[0].problem), ['sign-in-expired', 'sign-in-expired', 'key-refused']);
   assert.ok(result.every(account => account.rows.length === 1 && account.rows[0].kind === 'unreadable'
-    && account.rows[0].problem === 'sign-in-expired' && !('used' in account.rows[0])));
+    && !('used' in account.rows[0])));
 });
 
 test('reports a missing window number as not published instead of zero', () => {

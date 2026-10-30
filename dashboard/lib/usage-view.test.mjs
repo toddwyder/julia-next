@@ -43,6 +43,7 @@ test('says nearly used up without claiming it is used up', () => {
   account.rows[1].resetsAt = null;
   const view = accountView(account);
   assert.equal(view.level, 'nearly-out');
+  assert.equal(view.rows[1].text, 'This week: 80 of 100 used, so 20 left. The provider gave no reset time.');
   assert.equal(view.warning.text, 'Claude subscription is nearly used up. The provider gave no reset time.');
   assert.ok(!view.warning.text.includes(' is used up'));
 });
@@ -50,12 +51,13 @@ test('says nearly used up without claiming it is used up', () => {
 test('has one sentence per problem and never a dash', () => {
   const account = claude();
   const expected = [
-    'The server has no sign-in for Claude subscription.',
+    'The server has no sign-in or key for Claude subscription. Todd needs to add it.',
     'Claude subscription needs a new sign-in. Sign in again in Mastra Code.',
     'Claude subscription answered with an error (HTTP 403).',
     'Claude subscription could not be reached.',
     'Claude subscription answered in a shape this screen does not read.',
     'Claude subscription does not publish this number.',
+    'Claude subscription refused its key. Todd needs to replace it.',
   ];
   Object.keys(PROBLEMS).forEach((problem, index) => {
     account.rows = [{ key: 'claude', label: account.name, kind: 'unreadable', problem, ...(problem === 'refused' ? { status: 403 } : {}) }];
