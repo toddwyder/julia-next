@@ -244,6 +244,22 @@ export function sessionArgs({ model, effort, title, timeoutMs }) {
   ];
 }
 
+export function suspendedAsk(text) {
+  let ask = null;
+  for (const line of String(text ?? '').split('\n')) {
+    if (!line.startsWith('{')) continue;
+    try {
+      const event = JSON.parse(line);
+      if (event?.type === 'tool_suspended') {
+        ask = { toolName: event.toolName, reason: event.suspendPayload?.reason ?? event.suspendPayload?.kind ?? '' };
+      }
+    } catch {
+      // not a jsonl event
+    }
+  }
+  return ask;
+}
+
 export function lastSessionResult(text) {
   const lines = String(text ?? '').split('\n');
   for (let index = lines.length - 1; index >= 0; index -= 1) {
@@ -289,11 +305,25 @@ async function runSession({ name, prompt, cwd, model, effort, title, log, timeou
   });
   if (killed) throw new Error(`${name} session was still running after ${Math.round(timeoutMs / 60000)} minutes and was stopped; its work is in ${cwd}, its log is ${log}`);
   const result = lastSessionResult(stdout);
+  if (result?.finishReason === 'suspended') {
+    const ask = suspendedAsk(stdout);
+    throw new Error(`${name} session ended asking for something this run cannot approve (${ask?.toolName ?? 'a tool'}: ${ask?.reason || 'no reason given'}); it judged nothing, so the card is not at fault. Do not retry the card until the ask is answered inside the session's prompt; log ${log}`);
+  }
   if (result?.status !== 'completed' || result.exitCode !== 0) {
     throw new Error(`${name} session did not finish (${result?.status ?? 'no result event'}, exit ${result?.exitCode ?? '?'}); log ${log}`);
   }
+  if (!String(result.text ?? '').trim()) {
+    throw new Error(`${name} session ended without saying what it did, so it cannot be read as a result; its work is in ${cwd}, its log is ${log}`);
+  }
   return result;
 }
+
+// A session that asks for approval ends its turn instead of asking: nothing can
+// answer it, so every prompt says the run is unattended before it starts.
+export const UNATTENDED = `This run is unattended. No question and no approval can be
+answered, and asking for one ends the run with nothing judged. Do not call
+request_access or submit_plan, and stay inside the checkout you are in. The model
+and effort are already chosen for you, so skip the model files AGENTS.md points at.`;
 
 // ---------------------------------------------------------------------------
 // prompts
@@ -307,6 +337,8 @@ its UAT steps are what Todd will do on the preview.
 ---
 ${issue.description ?? '(the card has no description)'}
 ---
+
+${UNATTENDED}
 
 Read AGENTS.md at the repository root first, then docs/plans/path-forward.md.
 Activate the poteto-mode skill and follow it as written, using the playbook its
@@ -343,6 +375,8 @@ The card, in full:
 ---
 ${issue.description ?? '(the card has no description)'}
 ---
+
+${UNATTENDED}
 
 The change is pull request #${pull.number} on ${pull.headRefName}, head ${pull.headRefOid}:
 ${pull.url}
@@ -382,6 +416,8 @@ Shipping judged pull request #${pull.number} (${pull.url}) and these criteria
 failed:
 
 ${reasons || '- the verdict listed none; read the pull request comments for what Shipping saw'}
+
+${UNATTENDED}
 
 Read AGENTS.md, then docs/plans/path-forward.md. Activate the poteto-mode skill
 and follow its Bug fix playbook: find the cause Shipping's reason points at, fix
@@ -729,11 +765,30 @@ export async function machine({ card, env = process.env, branch: wantedBranch, f
 
 // ---------------------------------------------------------------------------
 
+export function stopRun({ card, env = process.env, because = 'stopped by hand' }) {
+  const file = recordFile(normalizeCard(card), env);
+  const { value: record, error } = readJsonRecord(file);
+  if (error || !record) throw new Error(`${normalizeCard(card)} has no run record at ${file}`);
+  if (record.preview?.pid) {
+    try {
+      process.kill(record.preview.pid, 'SIGTERM');
+    } catch {
+      // the preview was already closed
+    }
+  }
+  record.status = 'stopped';
+  record.stoppedBecause = because;
+  record.waitingFor = null;
+  record.preview = null;
+  saveRecord(record, env);
+  return record;
+}
+
 export function parseFlags(argv) {
   const flags = {};
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (!['--state', '--branch', '--from', '--worktree'].includes(arg)) throw new Error(`unknown flag "${arg}"`);
+    if (!['--state', '--branch', '--from', '--worktree', '--because'].includes(arg)) throw new Error(`unknown flag "${arg}"`);
     const value = argv[index + 1];
     if (!value) throw new Error(`${arg} needs a value`);
     flags[arg.slice(2)] = value;
@@ -744,13 +799,19 @@ export function parseFlags(argv) {
 
 export async function main(argv = process.argv.slice(2)) {
   const [command, cardArg] = argv;
-  if (command !== 'start' || !cardArg) {
+  if (!cardArg || !['start', 'stop'].includes(command)) {
     console.error('usage: run-card.mjs start <CARD> [--branch <name>] [--worktree <dir>] [--state <dir>] [--from <step>]');
+    console.error('       run-card.mjs stop <CARD> [--because <reason>] [--state <dir>]');
     process.exitCode = 2;
     return;
   }
   const flags = parseFlags(argv.slice(2));
   const env = { ...process.env, ...(flags.state ? { DASHBOARD_STATE_DIR: flags.state } : {}) };
+  if (command === 'stop') {
+    const record = stopRun({ card: cardArg, env, because: flags.because });
+    console.log(`${record.card}: stopped (${record.stoppedBecause})`);
+    return;
+  }
   const record = await machine({ card: normalizeCard(cardArg), env, branch: flags.branch, from: flags.from, worktree: flags.worktree });
   process.exitCode = record.status === 'waiting' ? 0 : 1;
 }

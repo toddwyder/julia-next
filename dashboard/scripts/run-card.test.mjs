@@ -5,9 +5,11 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  DASHBOARD_ROOT, PREVIEW_PORT, STEPS, branchFor, commandEnv, lastSessionResult, machine, modelsFor, newRunRecord,
+  DASHBOARD_ROOT, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, commandEnv, lastSessionResult, machine,
+  modelsFor, newRunRecord,
   normalizeCard, parseFlags, passing, previewKind, printed, pullNamesCard, recordFile, remediationPrompt,
-  runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stepEntry, thinkingForEffort,
+  runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stepEntry, stopRun, suspendedAsk,
+  thinkingForEffort,
   uatComment, uatSection, withoutColour,
 } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
@@ -265,6 +267,56 @@ test('commands run with colour off and their output has any left stripped', () =
 
 test('the preview port is its own, off the live dashboard', () => {
   assert.equal(PREVIEW_PORT, 4314);
+});
+
+// JUL-290's first Shipping turn asked for access to ~/.agents, which ends a headless
+// turn instead of asking anyone. That has to read as a broken session, not a failed card.
+test('a session that asks for something nobody can approve is found, not read as a verdict', () => {
+  const log = [
+    '{"type":"message_start"}',
+    '{"type":"tool_suspended","toolName":"request_access","suspendPayload":{"kind":"sandbox_access","reason":"Read the models file"}}',
+    '{"type":"result","status":"completed","finishReason":"suspended","text":""}',
+  ].join('\n');
+  assert.deepEqual(suspendedAsk(log), { toolName: 'request_access', reason: 'Read the models file' });
+  assert.equal(suspendedAsk('{"type":"result","status":"completed"}'), null);
+  assert.equal(suspendedAsk('not json at all'), null);
+});
+
+// The three prompts are the only place a session can learn that nobody will answer it.
+test('every prompt says the run is unattended before the session starts to work', () => {
+  const card = { card: 'JUL-290', issue: { title: 'Account status', description: '## Outcome\nrows' } };
+  const pull = { number: 383, url: 'https://github.com/toddwyder/julia-next/pull/383', headRefName: 'feat/jul-290', headRefOid: 'f053465' };
+  for (const prompt of [
+    buildPrompt({ ...card, branch: pull.headRefName, pull }),
+    shippingPrompt({ ...card, pull, verifierModel: 'moonshotai/Kimi-K3.1-Pro' }),
+    remediationPrompt({ ...card, pull, verdict: { criteria: [{ criterion: 'rows', verdict: 'FAIL', note: 'missing' }] } }),
+  ]) {
+    assert.match(prompt, /unattended/);
+    assert.match(prompt, /request_access/);
+    assert.ok(prompt.includes(UNATTENDED));
+  }
+});
+
+test('a run left behind by a killed process is stopped on purpose before it is started again', () => {
+  const state = temporaryState();
+  try {
+    const record = newRunRecord({ card: 'JUL-290', branch: 'feat/jul-290-account-status', worktree: '/tmp/jul-290' });
+    record.status = 'waiting';
+    record.waitingFor = "Todd's yes on http://100.119.112.9:4314/start/JUL-290";
+    record.preview = { kind: 'dashboard', address: 'http://100.119.112.9:4314' };
+    saveRecord(record, state.env);
+
+    const stopped = stopRun({ card: 'JUL-290', env: state.env });
+    const written = JSON.parse(readFileSync(recordFile('JUL-290', state.env), 'utf8'));
+    assert.equal(stopped.status, 'stopped');
+    assert.equal(written.status, 'stopped');
+    assert.equal(written.stoppedBecause, 'stopped by hand');
+    assert.equal(written.waitingFor, null);
+    assert.equal(written.preview, null);
+    assert.throws(() => stopRun({ card: 'JUL-999', env: state.env }), /has no run record/);
+  } finally {
+    state.clean();
+  }
 });
 
 test('run-card.mjs prints its usage and exits 2 when it is started wrong', () => {
