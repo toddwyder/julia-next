@@ -17,6 +17,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { appendFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
+import { createServer } from 'node:net';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { ACTIVE_RUN_STATUSES, readJsonRecord, runsFolder, stateRoot, writeJsonRecord } from '../lib/state.js';
@@ -505,20 +506,40 @@ async function waitForDashboard(address, log, timeoutMs = 180_000) {
   throw new Error(`the preview on ${address} never answered /api/health; see ${log}`);
 }
 
+// A card can sit in UAT on its preview while the next card builds, so the preview takes the
+// first port from 4314 up that nothing answers on. One port, one card's state folder: two
+// cards sharing a preview would overwrite each other's drafts.
+export function portFree(port) {
+  return new Promise(resolve => {
+    const probe = createServer();
+    probe.once('error', () => resolve(false));
+    probe.once('listening', () => probe.close(() => resolve(true)));
+    probe.listen(port, '0.0.0.0');
+  });
+}
+
+export async function freePort(start = PREVIEW_PORT, tries = 20) {
+  for (let port = start; port < start + tries; port += 1) {
+    if (await portFree(port)) return port;
+  }
+  throw new Error(`no free preview port in ${start} to ${start + tries - 1}`);
+}
+
 async function dashboardPreview({ worktree, card, log, env = process.env }) {
   const dashboard = join(worktree, 'dashboard');
   if (!existsSync(join(dashboard, 'node_modules'))) {
     await mustRun('npm', ['ci'], { cwd: dashboard, log }, 'npm ci for the preview build');
   }
   await mustRun('npm', ['run', 'build'], { cwd: dashboard, log }, 'npm run build for the preview');
-  const address = `http://${tailnetHost()}:${PREVIEW_PORT}`;
+  const port = await freePort();
+  const address = `http://${tailnetHost()}:${port}`;
   const child = spawn('node', ['server.js'], {
     cwd: dashboard,
     env: {
       ...process.env,
       DASHBOARD_HOST: '0.0.0.0',
-      DASHBOARD_PORT: String(PREVIEW_PORT),
-      DASHBOARD_STATE_DIR: join(stateRoot(env), 'preview-state'),
+      DASHBOARD_PORT: String(port),
+      DASHBOARD_STATE_DIR: join(stateRoot(env), `preview-state-${port}`),
     },
     detached: true,
     stdio: ['ignore', 'ignore', 'pipe'],
@@ -527,7 +548,7 @@ async function dashboardPreview({ worktree, card, log, env = process.env }) {
   child.unref();
   appendFileSync(log, `preview pid ${child.pid} at ${address}\n`);
   await waitForDashboard(address, log);
-  return { kind: 'dashboard', address, port: PREVIEW_PORT, pid: child.pid, cardPage: `${address}/start/${card}` };
+  return { kind: 'dashboard', address, port, pid: child.pid, cardPage: `${address}/start/${card}` };
 }
 
 export async function vercelPreview({ repo, sha, log, timeoutMs = 20 * 60_000 }) {

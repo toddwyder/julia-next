@@ -4,21 +4,26 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, costFrom,
-  lastSessionResult, ledger, machine,
-  modelsFor, needsJudging, newRunRecord, refreshSpend, sessionsInLog,
-  normalizeCard, parseFlags, passing, previewKind, printed, pullNamesCard, recordFile, remediationPrompt,
-  replyFrom, runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk,
-  thinkingForEffort, tick,
-  uatComment, uatSection, verdictCovers, withoutColour,
-} from './run-card.mjs';
+import { createServer } from 'node:net';
+import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, costFrom, freePort, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshSpend, remediationPrompt, replyFrom, runIdFor, saveRecord, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
 const temporaryState = () => {
   const root = mkdtempSync(join(tmpdir(), 'jul-292-run-'));
   return { root, env: { DASHBOARD_STATE_DIR: root }, clean: () => rmSync(root, { recursive: true, force: true }) };
 };
+
+test('a preview takes a port nothing answers on, so a waiting card does not hold the next one', async () => {
+  const taken = createServer();
+  await new Promise(resolve => taken.listen(0, '0.0.0.0', resolve));
+  const port = taken.address().port;
+  try {
+    assert.equal(await portFree(port), false);
+    assert.ok((await freePort(port, 20)) > port);
+  } finally {
+    await new Promise(resolve => taken.close(resolve));
+  }
+});
 
 test('a card is written the one way the board writes it', () => {
   assert.equal(normalizeCard(' jul-290 '), 'JUL-290');
