@@ -67,6 +67,14 @@ Mastra Code loads hooks from the session's project directory and from the user-l
 
 `node scripts/install-hooks.mjs` writes the user-level entry: a `Notification` hook that runs `stop-ping.mjs --global`, which exits silently where the project already wires the ping. It keeps every other global hook and is safe to re-run after an upgrade. Verify it from a session opened outside the repository, then read `~/.local/state/julia/stops.jsonl` to see whether the stop was recorded.
 
+## A reset, a retry, and a retry that never comes back
+
+`api.commandcode.ai` cuts long generations mid-stream, so the AI SDK reports `AI_APICallError: Failed to process successful response` for an HTTP 200 that had already started. A server-side patch, `~/.local/share/mastracode/patches/apply-retry-fix.py`, re-applied by a `SessionStart` hook, makes `@mastra/core` look for a retry policy in the error's cause chain before the generic fallback. The reset then matches the transient-connection policy, whose budget is `MASTRACODE_TRANSIENT_CONNECTION_MAX_RETRIES = 10` (`@mastra/code-sdk/dist/index.js:80-140`), instead of the one-retry default. `emitTransientRetry` is the only place that carries `retryAttempt` and `maxRetries`, so `retry 1/10` on screen means that policy was chosen.
+
+That retry runs inside the same turn: `canRetryError` (`@mastra/core/dist/agent-Blan8B5o.js:31813`) returns `callBail: false` and re-runs the step, so a retried attempt that never answers leaves the turn open with nothing to show. Nothing bounds it. The custom provider is built as `createOpenAICompatible({ name, baseURL, apiKey, headers })` (`@mastra/code-sdk/dist/agents/mastracode-gateway.js:291`), which uses the global `fetch` and passes no signal. Measured on this host: a 20 MB POST to a peer that never read sat for the full 20 s until our own `AbortSignal` fired (`TimeoutError`, undici code 23).
+
+On 29 October that shape cost 100 minutes. The turn stopped after a memory save at 23:39:18.597, the last span written for the thread, and the next recorded message is the human's at 01:18:36; one `retry 1/10` notice was all the screen showed. Tracing for the process stopped nine minutes later (23:47:27), so the store cannot show what happened after that. The patch fixes which policy matches, not the missing deadline: the durable answer is a deadline per API call upstream, plus the runner's own turn timeout (PR 6 of `docs/plans/jul-276-start-screen.md`). A cut-stream repro cannot stand in for it, because headless `mastracode -p` ends the turn about 6 s after a silent stream instead of hanging.
+
 ## Unproven
 
 - Setting reasoning effort per subagent. Mastra Code 1.14.0 exposes no field for it at the tool or subagent-definition level; only the session `thinkingLevel` exists.
