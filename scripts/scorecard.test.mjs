@@ -138,6 +138,36 @@ test('a session the machine ran is priced from the usage its run kept, and the n
   assert.match(rows[1].basis, /no published price/);
 });
 
+// The runner prices a session from the log it wrote, which carries the cache read each
+// step was charged for. Charging that at the input rate overstates the bill, so a session
+// with the split is priced on it and the row says where the number came from.
+test('a session priced from its own log pays the cache rate for what it read from cache', () => {
+  const record = { sessions: [
+    { step: 'shipping', model: 'anthropic/claude-opus-5-5', usage: { promptTokens: 1_000_000, completionTokens: 50_000, cachedInputTokens: 900_000, reasoningTokens: 10_000 }, threadId: 'session-2' },
+  ] };
+  const [row] = runCostRows(record, prices, { models: [] });
+  assert.deepEqual(row.tokens, { input: 100_000, cacheRead: 900_000, cacheWrite: 0, output: 50_000 });
+  assert.equal(row.usd.toFixed(2), '1.58');
+  assert.match(row.basis, /from the log it wrote/);
+});
+
+test('a session the machine priced is not also counted as a cost that went missing', () => {
+  const tracing = { metrics: [], requested: [], launcher: { since: 0 } };
+  const loose = buildScorecard({ card: 'JUL-273', threads: [thread], prices, tracing, pulls: [], pings: [], uat: undefined });
+  assert.match(renderScorecard(loose), /1 session of this card started after the launcher and recorded no trace rows/);
+  const priced = buildScorecard({
+    card: 'JUL-273',
+    threads: [thread],
+    prices,
+    tracing,
+    pulls: [],
+    pings: [],
+    uat: undefined,
+    run: { status: 'running', startedAt: T('19:00'), steps: [{ name: 'shipping' }], sessions: [{ step: 'shipping', model: 'anthropic/claude-opus-5-5', threadId: 'thread-1', usage: { promptTokens: 1000, completionTokens: 10, cachedInputTokens: 0 } }] },
+  });
+  assert.doesNotMatch(renderScorecard(priced), /recorded no trace rows/);
+});
+
 test('a slice built inside its parent card chat is priced from that thread when it is named', () => {
   const s = buildScorecard({ card: 'JUL-292', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls: [], pings: [], uat: undefined, namedThread: 'thread-1' });
   assert.equal(s.windows, 1);

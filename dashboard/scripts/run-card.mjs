@@ -14,8 +14,9 @@
 // reaches the scorecard), the Julia app through the verify-julia skill. Each
 // session's prompt is written next to its log, so a stopped card can be read back.
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { createInterface } from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { ACTIVE_RUN_STATUSES, readJsonRecord, runsFolder, stateRoot, writeJsonRecord } from '../lib/state.js';
@@ -598,20 +599,73 @@ Open the address, follow those steps, and reply here with yes if it holds. A yes
 lands it and it finishes with its retro; a no sends it back with your note.`;
 }
 
-// A headless session writes no trace metric rows, so the scorecard cannot see what
-// it spent. The session itself reports its token usage, so the run keeps it: this is
-// the only record of a machine-run card's cost.
-export function noteSpend(record, env, { step, model, result }) {
-  record.sessions ??= [];
-  record.sessions.push({
-    step,
-    model,
-    at: now(),
-    threadId: result?.threadId ?? null,
-    usage: result?.usage ?? null,
-  });
+// A card under the machine is built by headless sessions, and a headless session
+// writes no trace metric rows, so the scorecard cannot see what it spent any other
+// way. The session's own log is the record: every model step writes a
+// `usage_update` line with the tokens it was charged for, and every session opens
+// with a `thread_created` line naming its thread. Reading those back prices a
+// session whose result line was cut off mid-write, which is what happened to
+// JUL-290's judge: it judged and posted its verdict, then died before the last line
+// of its log was finished.
+export async function sessionsInLog(path) {
+  const sessions = [];
+  let current = null;
+  const blank = () => ({ promptTokens: 0, completionTokens: 0, cachedInputTokens: 0, reasoningTokens: 0 });
+  const lines = createInterface({ input: createReadStream(path, { encoding: 'utf8' }), crlfDelay: Infinity });
+  for await (const line of lines) {
+    if (!line.startsWith('{') || !line.includes('"type"')) continue;
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      // a line the writer never finished, and progress lines that are not JSON
+      continue;
+    }
+    if (event?.type === 'thread_created') {
+      current = { threadId: event.thread?.id ?? null, at: event.thread?.createdAt ?? null, usage: blank() };
+      sessions.push(current);
+      continue;
+    }
+    if (event?.type !== 'usage_update') continue;
+    current ??= (sessions.push({ threadId: null, at: null, usage: blank() }), sessions.at(-1));
+    const usage = event.usage ?? {};
+    current.usage.promptTokens += usage.promptTokens ?? 0;
+    current.usage.completionTokens += usage.completionTokens ?? 0;
+    current.usage.cachedInputTokens += usage.cachedInputTokens ?? 0;
+    current.usage.reasoningTokens += usage.reasoningTokens ?? 0;
+  }
+  return sessions.filter(session => session.usage.promptTokens || session.usage.completionTokens);
+}
+
+const MODEL_FOR_STEP = Object.freeze({ build: 'builder', remediation: 'builder', retro: 'builder', shipping: 'shipping' });
+
+// The spend is derived from the logs, not accumulated as the run goes, so it
+// survives a runner that dies mid-session: the log is already on disk and the next
+// `start`, `tick` or `spend` prices it. A log whose byte count has not changed
+// since it was last read is not read again.
+export async function refreshSpend(record, env = process.env) {
+  const before = record.sessions ?? [];
+  const known = new Map();
+  for (const session of before) {
+    if (!session?.log) continue;
+    known.set(session.log, [...(known.get(session.log) ?? []), session]);
+  }
+  const sessions = before.filter(session => !session?.log);
+  for (const entry of record.steps ?? []) {
+    const log = entry?.log;
+    if (!log || !existsSync(log)) continue;
+    const size = statSync(log).size;
+    const seen = known.get(log);
+    if (seen?.[0]?.logBytes === size) {
+      sessions.push(...seen);
+      continue;
+    }
+    const model = record.models?.[MODEL_FOR_STEP[entry.name] ?? 'builder'] ?? null;
+    for (const session of await sessionsInLog(log)) sessions.push({ step: entry.name, model, log, logBytes: size, ...session });
+  }
+  record.sessions = sessions;
   saveRecord(record, env);
-  return record.sessions.at(-1);
+  return record.sessions;
 }
 
 export function passing(verdict) {
@@ -630,7 +684,7 @@ async function buildStep({ record, issue, env, name = 'build', verdict = null })
   const pull = pullForCard(record.card);
   record.worktree = ensureWorktree({ branch: record.branch, path: record.worktree });
   saveRecord(record, env);
-  const result = await runSession({
+  await runSession({
     name,
     prompt: name === 'remediation'
       ? remediationPrompt({ card: record.card, issue, pull: record.pull ?? pull, verdict })
@@ -642,7 +696,9 @@ async function buildStep({ record, issue, env, name = 'build', verdict = null })
     log: step.log,
     timeoutMs: 3 * 60 * 60_000,
   });
-  noteSpend(record, env, { step: name, model: record.models.builder, result });
+  // The log already holds what the session spent, so the record is priced from
+  // it even when the session ends badly.
+  await refreshSpend(record, env);
   const opened = pullForCard(record.card);
   if (!opened) throw new Error(`the build session finished with no pull request naming ${record.card} on ${record.branch}; see ${step.log}`);
   record.pull = opened;
@@ -655,7 +711,7 @@ async function shippingStep({ record, issue, env }) {
   record.rounds.shipping += 1;
   saveRecord(record, env);
   try {
-    const result = await runSession({
+    await runSession({
       name: 'shipping',
       prompt: shippingPrompt({ card: record.card, issue, pull: record.pull, verifierModel: record.models.shipping }),
       cwd: record.worktree,
@@ -665,7 +721,6 @@ async function shippingStep({ record, issue, env }) {
       log: step.log,
       timeoutMs: 90 * 60_000,
     });
-    noteSpend(record, env, { step: 'shipping', model: record.models.shipping, result });
   } catch (error) {
     // A judge that posted its verdict and then broke has still judged, and the
     // verdict comment is what the gate reads. Only a session that left nothing
@@ -675,6 +730,8 @@ async function shippingStep({ record, issue, env }) {
     appendFileSync(step.log, `session broke after it posted its verdict: ${error.message}\n`);
     console.log(`${record.card}: shipping session broke after posting ${posted.verdict.verdict}; reading the verdict from the pull request`);
     return posted;
+  } finally {
+    await refreshSpend(record, env);
   }
   return pullVerdict(record, step.startedAt);
 }
@@ -930,7 +987,7 @@ The live copy serves that commit and the regression suite passed there.`);
 
     await step('retro', async entry => {
       const cost = record.cost ?? 'unknown';
-      const result = await runSession({
+      await runSession({
         name: 'retro',
         prompt: retroPrompt({ card: record.card, issue: readIssue(record.card), pull: record.pull, merge: record.merge, cost }),
         cwd: record.worktree,
@@ -940,7 +997,7 @@ The live copy serves that commit and the regression suite passed there.`);
         log: entry.log,
         timeoutMs: 90 * 60_000,
       });
-      noteSpend(record, env, { step: 'retro', model: record.models.builder, result });
+      await refreshSpend(record, env);
       return `retro pull request opened for ${record.card}`;
     });
 
@@ -1187,10 +1244,11 @@ export function parseFlags(argv) {
 
 export async function main(argv = process.argv.slice(2)) {
   const [command, cardArg] = argv;
-  if (!['start', 'stop', 'tick'].includes(command) || (command !== 'tick' && !cardArg)) {
+  if (!['start', 'stop', 'tick', 'spend'].includes(command) || (command !== 'tick' && !cardArg)) {
     console.error('usage: run-card.mjs start <CARD> [--branch <name>] [--worktree <dir>] [--state <dir>] [--from <step>] [--no-wait] [--wait-hours <n>]');
     console.error('       run-card.mjs tick [--state <dir>]');
     console.error('       run-card.mjs stop <CARD> [--because <reason>] [--state <dir>]');
+    console.error('       run-card.mjs spend <CARD> [--state <dir>]');
     process.exitCode = 2;
     return;
   }
@@ -1199,6 +1257,18 @@ export async function main(argv = process.argv.slice(2)) {
   if (command === 'stop') {
     const record = stopRun({ card: cardArg, env, because: flags['because'] });
     console.log(`${record.card}: stopped (${record.stoppedBecause})`);
+    return;
+  }
+  if (command === 'spend') {
+    const card = normalizeCard(cardArg);
+    const { value: record, error } = readJsonRecord(recordFile(card, env));
+    if (error || !record) throw new Error(`${card} has no run record at ${recordFile(card, env)}`);
+    const sessions = await refreshSpend(record, env);
+    console.log(`${card}: ${sessions.length} session(s) priced from their own logs`);
+    for (const session of sessions) {
+      const { promptTokens = 0, completionTokens = 0, cachedInputTokens = 0 } = session.usage ?? {};
+      console.log(`  ${session.step} on ${session.model ?? 'an unrecorded model'}: ${promptTokens} in (${cachedInputTokens} cached), ${completionTokens} out`);
+    }
     return;
   }
   if (command === 'tick') {

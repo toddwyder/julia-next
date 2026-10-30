@@ -269,16 +269,24 @@ export function readRunRecord(card, env = process.env) {
 
 // A card the machine ran is built by headless sessions, and a headless session writes no
 // trace metric rows at all (measured: JUL-292, a `--output jsonl` session left its trace
-// file empty of metrics). The run record keeps each session's own reported usage, so the
-// scorecard prices those rows instead. A session reports one input count and no cache
-// read/write split, so all of its input is charged at the input rate: the number is the
-// most that session can have cost, never less.
+// file empty of metrics). The run prices each session from the log that session wrote: the
+// log's `usage_update` lines carry every model step's own tokens, cache read included, so
+// the figure is what the session was charged rather than an estimate. A session recorded
+// without that split (an older record, or a result line read instead of the log) is
+// charged all its input at the input rate, and the row says the number is the most it can
+// have cost.
 export function runCostRows(record, prices, catalogue) {
   const rows = [];
   for (const session of record?.sessions ?? []) {
     const usage = session?.usage;
-    if (!Number.isFinite(usage?.inputTokens) || !Number.isFinite(usage?.outputTokens)) continue;
-    const priced = priceThreadUsage({ promptTokens: usage.inputTokens, completionTokens: usage.outputTokens }, ratesForModel(prices, catalogue, session.model));
+    const promptTokens = Number.isFinite(usage?.promptTokens) ? usage.promptTokens : usage?.inputTokens;
+    const completionTokens = Number.isFinite(usage?.completionTokens) ? usage.completionTokens : usage?.outputTokens;
+    if (!Number.isFinite(promptTokens) || !Number.isFinite(completionTokens)) continue;
+    const split = Number.isFinite(usage?.cachedInputTokens);
+    const priced = priceThreadUsage({ promptTokens, completionTokens, cachedInputTokens: split ? usage.cachedInputTokens : 0 }, ratesForModel(prices, catalogue, session.model));
+    const basis = !priced.parts
+      ? 'session usage from the run; no published price'
+      : split ? 'session usage from the run, from the log it wrote' : 'session usage from the run; all input at the input rate, so at most';
     rows.push({
       agent: `Machine ${session.step ?? 'session'}`,
       requested: session.model ?? 'not recorded',
@@ -288,7 +296,7 @@ export function runCostRows(record, prices, catalogue) {
       parts: priced.parts,
       unpriced: !priced.parts,
       cacheReadUnpriced: priced.cacheReadUnpriced ?? 0,
-      basis: priced.parts ? 'session usage from the run; all input at the input rate, so at most' : 'session usage from the run; no published price',
+      basis,
       thread: session.threadId ?? undefined,
       at: session.at,
     });
@@ -474,6 +482,7 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
   const cost = [];
   const untraced = [];
   const untracedMainChat = [];
+  const runThreads = new Set((run?.sessions ?? []).map(session => session?.threadId).filter(Boolean));
   for (const w of windows) {
     const { events, usage } = w.thread;
     const steps = events.steps.filter(s => inWindow(w, s.at));
@@ -488,7 +497,9 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
     // A session that started after the launcher was in place and still recorded no trace rows
     // lost them, so this card's cost is missing a session's worth. Sessions that ran before it
     // are history, and the launcher cannot be blamed for them.
-    if (!traced.length && (steps.length || subagents.length) && tracing.launcher?.since != null && w.start >= tracing.launcher.since) untraced.push(w.thread.id);
+    // A session the machine ran keeps its own usage in the run, and that is priced below,
+    // so it is not a session whose cost went missing.
+    if (!traced.length && !runThreads.has(w.thread.id) && (steps.length || subagents.length) && tracing.launcher?.since != null && w.start >= tracing.launcher.since) untraced.push(w.thread.id);
     // Price from the session's trace rows whenever it wrote any. The alternative, the
     // thread's own token totals, is stored in a binary format only Mastra reads back, so a
     // program version that stops naming its main agent "Code Agent" used to make a whole

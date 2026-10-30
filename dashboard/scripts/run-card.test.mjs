@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, costFrom,
   lastSessionResult, ledger, machine,
-  modelsFor, needsJudging, newRunRecord, noteSpend,
+  modelsFor, needsJudging, newRunRecord, refreshSpend, sessionsInLog,
   normalizeCard, parseFlags, passing, previewKind, printed, pullNamesCard, recordFile, remediationPrompt,
   replyFrom, runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk,
   thinkingForEffort, tick,
@@ -359,25 +359,50 @@ test('every prompt says the run is unattended before the session starts to work'
   }
 });
 
-test('what a session spent is kept with the run, because nothing else records it', () => {
+test('a session is priced from the log it wrote, even when its last line never finished', async () => {
   const state = temporaryState();
   try {
-    const record = newRunRecord({ card: 'JUL-290', branch: 'feat/jul-290-account-status', worktree: '/tmp/jul-290' });
+    const log = join(state.root, 'shipping.log');
+    const line = event => `${JSON.stringify(event)}\n`;
+    writeFileSync(log, [
+      '$ mastracode --prompt - --output jsonl\n',
+      line({ type: 'thread_created', thread: { id: 'thread-a', createdAt: '2026-10-30T22:00:00.000Z' } }),
+      line({ type: 'usage_update', usage: { promptTokens: 1000, completionTokens: 10, cachedInputTokens: 900, reasoningTokens: 2 } }),
+      line({ type: 'usage_update', usage: { promptTokens: 2000, completionTokens: 20, cachedInputTokens: 1900, reasoningTokens: 3 } }),
+      line({ type: 'thread_created', thread: { id: 'thread-b', createdAt: '2026-10-30T22:30:00.000Z' } }),
+      line({ type: 'usage_update', usage: { promptTokens: 500, completionTokens: 5, cachedInputTokens: 0, reasoningTokens: 0 } }),
+      '{"type":"result","status":"completed","text":"the judge judged and then the wri',
+    ].join(''));
+
+    const sessions = await sessionsInLog(log);
+    assert.equal(sessions.length, 2);
+    assert.equal(sessions[0].threadId, 'thread-a');
+    assert.deepEqual(sessions[0].usage, { promptTokens: 3000, completionTokens: 30, cachedInputTokens: 2800, reasoningTokens: 5 });
+    assert.equal(sessions[1].threadId, 'thread-b');
+
+    const record = newRunRecord({
+      card: 'JUL-290',
+      branch: 'feat/jul-290-account-status',
+      worktree: '/tmp/jul-290',
+      models: { builder: 'commandcode/deepseek/deepseek-v4.1-flash', shipping: 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro', effort: 'medium' },
+    });
+    record.steps.push({ ...stepEntry('shipping', log), status: 'failed' });
     saveRecord(record, state.env);
 
-    noteSpend(record, state.env, {
-      step: 'build',
-      model: 'commandcode/deepseek/deepseek-v4.1-flash',
-      result: { threadId: 'thread-9', usage: { inputTokens: 1000, outputTokens: 20, totalTokens: 1020 } },
-    });
+    const first = await refreshSpend(record, state.env);
+    assert.equal(first.length, 2);
+    assert.equal(first[0].step, 'shipping');
+    assert.equal(first[0].model, record.models.shipping);
+    assert.equal(first[0].log, log);
 
-    const written = JSON.parse(readFileSync(recordFile('JUL-290', state.env), 'utf8'));
-    assert.equal(written.sessions.length, 1);
-    assert.equal(written.sessions[0].step, 'build');
-    assert.equal(written.sessions[0].model, 'commandcode/deepseek/deepseek-v4.1-flash');
-    assert.equal(written.sessions[0].threadId, 'thread-9');
-    assert.deepEqual(written.sessions[0].usage, { inputTokens: 1000, outputTokens: 20, totalTokens: 1020 });
-    assert.match(written.sessions[0].at, /^\d{4}-\d{2}-\d{2}T/);
+    // A log that has not grown is not read a second time, and does not double the spend.
+    assert.equal((await refreshSpend(record, state.env)).length, 2);
+
+    appendFileSync(log, `\n${JSON.stringify({ type: 'thread_created', thread: { id: 'thread-c', createdAt: '2026-10-30T23:00:00.000Z' } })}\n${JSON.stringify({ type: 'usage_update', usage: { promptTokens: 7, completionTokens: 1, cachedInputTokens: 0, reasoningTokens: 0 } })}\n`);
+    const grown = await refreshSpend(record, state.env);
+    assert.equal(grown.length, 3);
+    assert.equal(grown[2].threadId, 'thread-c');
+    assert.equal(JSON.parse(readFileSync(recordFile('JUL-290', state.env), 'utf8')).sessions.length, 3);
   } finally {
     state.clean();
   }

@@ -65,9 +65,11 @@ current head has judged nothing.
 
 - A card's cost on its own card comes from `scripts/scorecard.mjs`. A headless session writes no
   token metric rows (measured: a `--output jsonl` session left its trace file with none), so the
-  run keeps each session's own reported usage and the scorecard prices those rows from the run
-  record. A session reports one input count and no cache split, so its input is charged at the
-  input rate and the scorecard says the number is at most what the session cost.
+  run prices each session from the log that session wrote: every model step logs its own
+  `usage_update`, cache read included, and that survives a runner that dies or a last line that
+  never finished. The scorecard prices those rows and stops listing a session the run has priced as
+  a cost that goes missing. `run-card spend <CARD>` rebuilds the same numbers from the logs on disk,
+  which is the repair for a record whose session lines were lost.
 - The dashboard shows a machine run in the shape it already knows (`starting`, `running`, `waiting`,
   `finished`, `failed`, `stopped`) without a reader change, because the record keeps the fields
   `/api/health` and the update gate read.
