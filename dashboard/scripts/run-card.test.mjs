@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import {
   DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, commandEnv, costFrom,
   lastSessionResult, machine,
-  modelsFor, newRunRecord,
+  modelsFor, newRunRecord, noteSpend,
   normalizeCard, parseFlags, passing, previewKind, printed, pullNamesCard, recordFile, remediationPrompt,
   replyFrom, runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, suspendedAsk,
   thinkingForEffort, tick,
@@ -295,6 +295,30 @@ test('every prompt says the run is unattended before the session starts to work'
     assert.match(prompt, /unattended/);
     assert.match(prompt, /request_access/);
     assert.ok(prompt.includes(UNATTENDED));
+  }
+});
+
+test('what a session spent is kept with the run, because nothing else records it', () => {
+  const state = temporaryState();
+  try {
+    const record = newRunRecord({ card: 'JUL-290', branch: 'feat/jul-290-account-status', worktree: '/tmp/jul-290' });
+    saveRecord(record, state.env);
+
+    noteSpend(record, state.env, {
+      step: 'build',
+      model: 'commandcode/deepseek/deepseek-v4.1-flash',
+      result: { threadId: 'thread-9', usage: { inputTokens: 1000, outputTokens: 20, totalTokens: 1020 } },
+    });
+
+    const written = JSON.parse(readFileSync(recordFile('JUL-290', state.env), 'utf8'));
+    assert.equal(written.sessions.length, 1);
+    assert.equal(written.sessions[0].step, 'build');
+    assert.equal(written.sessions[0].model, 'commandcode/deepseek/deepseek-v4.1-flash');
+    assert.equal(written.sessions[0].threadId, 'thread-9');
+    assert.deepEqual(written.sessions[0].usage, { inputTokens: 1000, outputTokens: 20, totalTokens: 1020 });
+    assert.match(written.sessions[0].at, /^\d{4}-\d{2}-\d{2}T/);
+  } finally {
+    state.clean();
   }
 });
 

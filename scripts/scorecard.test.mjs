@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { buildScorecard, cardForThread, cardWindows, catalogueRates, findStops, priceThreadUsage, readPings, readThreads, readTracing, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
+import { buildScorecard, cardForThread, cardWindows, catalogueRates, findStops, priceThreadUsage, readPings, readRunRecord, readThreads, readTracing, renderScorecard, runCostRows, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
 import { stopComment } from './stop-ping.mjs';
 import { checkForToddGuard } from './linear-cli.mjs';
 import { appendFileSync } from 'node:fs';
@@ -119,6 +119,66 @@ test('a session whose main chat rows never landed is priced from the rows it did
   assert.match(markdown, /- Cost: \*\*\$0\.25\*\* at published API prices, .*so the total is a floor\./);
   assert.doesNotMatch(markdown, /Cost incomplete/);
   assert.doesNotMatch(markdown, /Cost: \*\*unknown\*\*/);
+});
+
+test('a session the machine ran is priced from the usage its run kept, and the number is at most', () => {
+  const record = { sessions: [
+    { step: 'build', model: 'anthropic/claude-opus-5-5', usage: { inputTokens: 1_000_000, outputTokens: 50_000, totalTokens: 1_050_000 }, threadId: 'session-1' },
+    { step: 'shipping', model: 'nobody/unknown-model', usage: { inputTokens: 1000, outputTokens: 100 } },
+    { step: 'broken', model: 'anthropic/claude-opus-5-5', usage: null },
+  ] };
+  const rows = runCostRows(record, prices, { models: [] });
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].agent, 'Machine build');
+  assert.deepEqual(rows[0].tokens, { input: 1_000_000, cacheRead: 0, cacheWrite: 0, output: 50_000 });
+  assert.equal(rows[0].usd.toFixed(2), '5.00');
+  assert.equal(rows[0].unpriced, false);
+  assert.match(rows[0].basis, /at the input rate, so at most/);
+  assert.equal(rows[1].unpriced, true);
+  assert.match(rows[1].basis, /no published price/);
+});
+
+test('a slice built inside its parent card chat is priced from that thread when it is named', () => {
+  const s = buildScorecard({ card: 'JUL-292', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls: [], pings: [], uat: undefined, namedThread: 'thread-1' });
+  assert.equal(s.windows, 1);
+  assert.equal(s.namedThread, 'thread-1');
+  assert.equal(s.cost[0].agent, 'Code Agent (main chat)');
+  assert.equal(s.cost[0].basis, 'thread total');
+  assert.match(renderScorecard(s), /- Priced from thread `thread-1`, named on the command line because its opening message names another card\./);
+  const unnamed = buildScorecard({ card: 'JUL-292', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls: [], pings: [], uat: undefined });
+  assert.equal(unnamed.windows, 0);
+});
+
+test('a card only the machine ran still shows what it cost and which run it was', () => {
+  const run = {
+    status: 'waiting',
+    startedAt: T('20:00'),
+    steps: [{ name: 'build' }, { name: 'shipping' }],
+    sessions: [{ step: 'build', model: 'anthropic/claude-opus-5-5', usage: { inputTokens: 1_000_000, outputTokens: 50_000 } }],
+  };
+  const s = buildScorecard({ card: 'JUL-290', threads: [], prices, tracing: { metrics: [], requested: [] }, pulls: [], pings: [], uat: { yesAt: T('21:30'), said: 'Yes.' }, run });
+  assert.equal(s.windows, 0);
+  assert.equal(s.usd.toFixed(2), '5.00');
+  assert.equal(s.success, true);
+  assert.deepEqual(s.machine, { status: 'waiting', startedAt: T('20:00'), steps: 2, sessions: 1 });
+  const markdown = renderScorecard(s);
+  assert.match(markdown, /- Success: \*\*yes\*\*/);
+  assert.match(markdown, /- Cost: \*\*\$5\.00\*\* at published API prices/);
+  assert.match(markdown, /- Machine run: waiting since 2026-10-26 20:00, 2 steps recorded, 1 session whose own usage the run kept\./);
+  assert.doesNotMatch(markdown, /Cost: \*\*unknown\*\*/);
+});
+
+test('the run record is read where the dashboard keeps it, and a card without one is not an error', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'jul-292-scorecard-'));
+  try {
+    mkdirSync(join(dir, 'state', 'runs'), { recursive: true });
+    writeFileSync(join(dir, 'state', 'runs', 'jul-290.json'), JSON.stringify({ card: 'JUL-290', status: 'waiting' }));
+    assert.equal(readRunRecord('JUL-290', { DASHBOARD_STATE_DIR: dir }).status, 'waiting');
+    assert.equal(readRunRecord('jul-290', { DASHBOARD_STATE_DIR: dir }).card, 'JUL-290');
+    assert.equal(readRunRecord('JUL-999', { DASHBOARD_STATE_DIR: dir }), null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('a card scorecard prices its share of the thread, lists its subagents and judges success against Todd\'s UAT yes', () => {

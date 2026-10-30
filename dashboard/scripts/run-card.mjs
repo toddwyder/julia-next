@@ -83,6 +83,7 @@ export function newRunRecord({ card, branch, worktree, models, pull = null }) {
     pull,
     preview: null,
     steps: [],
+    sessions: [],
     rounds: { shipping: 0, remediation: 0 },
     waitingFor: null,
     stoppedBecause: null,
@@ -549,6 +550,22 @@ Open the address, follow those steps, and reply here with yes if it holds. A yes
 lands it and it finishes with its retro; a no sends it back with your note.`;
 }
 
+// A headless session writes no trace metric rows, so the scorecard cannot see what
+// it spent. The session itself reports its token usage, so the run keeps it: this is
+// the only record of a machine-run card's cost.
+export function noteSpend(record, env, { step, model, result }) {
+  record.sessions ??= [];
+  record.sessions.push({
+    step,
+    model,
+    at: now(),
+    threadId: result?.threadId ?? null,
+    usage: result?.usage ?? null,
+  });
+  saveRecord(record, env);
+  return record.sessions.at(-1);
+}
+
 export function passing(verdict) {
   return verdict?.ok === true;
 }
@@ -565,7 +582,7 @@ async function buildStep({ record, issue, env, name = 'build', verdict = null })
   const pull = pullForCard(record.card);
   record.worktree = ensureWorktree({ branch: record.branch, path: record.worktree });
   saveRecord(record, env);
-  await runSession({
+  const result = await runSession({
     name,
     prompt: name === 'remediation'
       ? remediationPrompt({ card: record.card, issue, pull: record.pull ?? pull, verdict })
@@ -577,6 +594,7 @@ async function buildStep({ record, issue, env, name = 'build', verdict = null })
     log: step.log,
     timeoutMs: 3 * 60 * 60_000,
   });
+  noteSpend(record, env, { step: name, model: record.models.builder, result });
   const opened = pullForCard(record.card);
   if (!opened) throw new Error(`the build session finished with no pull request naming ${record.card} on ${record.branch}; see ${step.log}`);
   record.pull = opened;
@@ -588,7 +606,7 @@ async function shippingStep({ record, issue, env }) {
   const step = latest(record, 'shipping');
   record.rounds.shipping += 1;
   saveRecord(record, env);
-  await runSession({
+  const result = await runSession({
     name: 'shipping',
     prompt: shippingPrompt({ card: record.card, issue, pull: record.pull, verifierModel: record.models.shipping }),
     cwd: record.worktree,
@@ -598,6 +616,7 @@ async function shippingStep({ record, issue, env }) {
     log: step.log,
     timeoutMs: 90 * 60_000,
   });
+  noteSpend(record, env, { step: 'shipping', model: record.models.shipping, result });
   const pulled = ghJson(['pr', 'view', String(record.pull.number), '--json', 'headRefOid,headRefName,title,body,comments']);
   const verdict = shippingVerdict({
     pull: { head: { sha: pulled.headRefOid, ref: pulled.headRefName }, title: pulled.title, body: pulled.body },
@@ -797,7 +816,7 @@ The live copy serves that commit and the regression suite passed there.`);
 
     await step('retro', async entry => {
       const cost = record.cost ?? 'unknown';
-      await runSession({
+      const result = await runSession({
         name: 'retro',
         prompt: retroPrompt({ card: record.card, issue: readIssue(record.card), pull: record.pull, merge: record.merge, cost }),
         cwd: record.worktree,
@@ -807,6 +826,7 @@ The live copy serves that commit and the regression suite passed there.`);
         log: entry.log,
         timeoutMs: 90 * 60_000,
       });
+      noteSpend(record, env, { step: 'retro', model: record.models.builder, result });
       return `retro pull request opened for ${record.card}`;
     });
 

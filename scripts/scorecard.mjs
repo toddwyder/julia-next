@@ -250,6 +250,52 @@ export function cacheReadRate(tokens, rates) {
   return tokens * rates.cache_read;
 }
 
+// ---- a machine run's own sessions -------------------------------------------
+
+// The runner keeps its records where the dashboard keeps its state, so the scorecard
+// reads them from the same place the dashboard serves them from.
+export function runRecordFile(card, env = process.env) {
+  const root = env.DASHBOARD_STATE_DIR || '/var/lib/julia-dashboard';
+  return join(root, 'state', 'runs', `${String(card).toLowerCase()}.json`);
+}
+
+export function readRunRecord(card, env = process.env) {
+  try {
+    return JSON.parse(readFileSync(runRecordFile(card, env), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+// A card the machine ran is built by headless sessions, and a headless session writes no
+// trace metric rows at all (measured: JUL-292, a `--output jsonl` session left its trace
+// file empty of metrics). The run record keeps each session's own reported usage, so the
+// scorecard prices those rows instead. A session reports one input count and no cache
+// read/write split, so all of its input is charged at the input rate: the number is the
+// most that session can have cost, never less.
+export function runCostRows(record, prices, catalogue) {
+  const rows = [];
+  for (const session of record?.sessions ?? []) {
+    const usage = session?.usage;
+    if (!Number.isFinite(usage?.inputTokens) || !Number.isFinite(usage?.outputTokens)) continue;
+    const priced = priceThreadUsage({ promptTokens: usage.inputTokens, completionTokens: usage.outputTokens }, ratesForModel(prices, catalogue, session.model));
+    rows.push({
+      agent: `Machine ${session.step ?? 'session'}`,
+      requested: session.model ?? 'not recorded',
+      answered: session.model ?? 'not recorded',
+      tokens: priced.tokens,
+      usd: priced.usd ?? 0,
+      parts: priced.parts,
+      unpriced: !priced.parts,
+      cacheReadUnpriced: priced.cacheReadUnpriced ?? 0,
+      basis: priced.parts ? 'session usage from the run; all input at the input rate, so at most' : 'session usage from the run; no published price',
+      thread: session.threadId ?? undefined,
+      at: session.at,
+    });
+  }
+  return rows;
+}
+
 // ---- tracing (one DuckDB file per session) -----------------------------------
 
 // `mastracode` on PATH is the launcher, a plain script that runs the program, so where the
@@ -406,8 +452,19 @@ export function judgeStops(stops, uat) {
   });
 }
 
-export function buildScorecard({ card, threads, prices, catalogue, tracing, pulls, pings, uat }) {
-  const windows = threads.flatMap(t => cardWindows(t, t.events)).filter(w => w.card === card);
+// A session that opened by naming the parent card (a pstack slice is built in the parent's
+// chat) prices to the slice only when the scorecard is told which thread built it.
+export function buildScorecard({ card, threads, prices, catalogue, tracing, pulls, pings, uat, run = null, namedThread = null }) {
+  const named = threads.find(t => t.id === namedThread);
+  const windows = threads
+    .flatMap(t => {
+      const own = cardWindows(t, t.events);
+      // The whole thread is this card's work, so it is one window even when the chat named
+      // several cards on the way.
+      if (named && t.id === named.id) return [{ thread: t, card, start: own[0]?.start ?? t.events.activity[0] ?? t.events.steps[0]?.at ?? 0, end: Infinity }];
+      return own;
+    })
+    .filter(w => w.card === card);
   // A pstack slice runs on its card's branch (feat/jul-276-…), so the branch name
   // may never mention the slice id; the search that found the PR already matched
   // the card, so a lone result is that card's PR.
@@ -472,6 +529,9 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
       cost.push({ agent: `Subagent ${modelId.split(' on ')[0]} x${calls.length}`, requested: calls[0].modelId, answered: 'not recorded before tracing', tokens: {}, usd: 0, unpriced: true, basis: 'usage not recorded before tracing' });
     }
   }
+  // A card the machine ran reports its own sessions; they are priced here because they are
+  // the only record of what those headless sessions spent.
+  cost.push(...runCostRows(run, prices, catalogue));
   stops = judgeStops(stops.sort((a, b) => a.since - b.since), uat);
   const counted = stops.filter(s => s.counts);
   // Everything that makes the printed cost smaller than what the card really spent, in the one
@@ -483,10 +543,12 @@ export function buildScorecard({ card, threads, prices, catalogue, tracing, pull
   ];
   return {
     card, windows: windows.length, runs, stops, cost, pull, uat,
+    machine: run ? { status: run.status, startedAt: run.startedAt, steps: (run.steps ?? []).length, sessions: (run.sessions ?? []).length } : null,
+    namedThread: named?.id ?? null,
     tracingSkipped: incomplete.length ? incomplete.join('; ') : undefined,
     untracedMainChat,
     usd: cost.reduce((a, c) => a + c.usd, 0),
-    success: uat && windows.length ? counted.length === 0 : undefined,
+    success: uat && (windows.length || (run?.sessions ?? []).length) ? counted.length === 0 : undefined,
     stopsBeforeUat: counted.length,
   };
 }
@@ -505,7 +567,8 @@ export function renderScorecard(s, generatedAt = new Date()) {
   lines.push(`Generated ${utc(generatedAt.getTime())} UTC by \`node scripts/scorecard.mjs ${s.card} --write\` from Mastra Code's records (see docs/adr/0024-run-scorecard-and-stop-ping.md).`, '');
   lines.push('## Result', '');
   const pr = s.pull ? `PR #${s.pull.number}, opened ${utc(Date.parse(s.pull.createdAt))}` : 'no PR yet';
-  const verdict = !s.windows ? 'not decided yet (no matching run records)' : s.success === undefined ? 'not decided yet (no UAT yes recorded)' : s.success ? 'yes' : 'no';
+  const recorded = s.windows || s.machine;
+  const verdict = !recorded ? 'not decided yet (no matching run records)' : s.success === undefined ? 'not decided yet (no UAT yes recorded)' : s.success ? 'yes' : 'no';
   const uat = s.uat ? `${utc(Date.parse(s.uat.yesAt))} ("${cell(s.uat.said)}")` : 'not recorded';
   lines.push(`- Success: **${verdict}**. Stops before Todd's UAT yes: ${s.stopsBeforeUat}. Todd's UAT yes: ${uat}.`);
   // Rows with no token detail cannot add up to a number, so say unknown rather
@@ -532,6 +595,7 @@ export function renderScorecard(s, generatedAt = new Date()) {
     : unpricedRows ? base : unpricedCache ? `${base}, so the total is a floor` : base;
   lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${floor}.` : unknownCost);
   if (s.tracingSkipped && measured) lines.push(`- Cost incomplete: ${s.tracingSkipped}.`);
+  if (s.namedThread) lines.push(`- Priced from thread \`${s.namedThread.slice(0, 8)}\`, named on the command line because its opening message names another card.`);
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
@@ -560,7 +624,12 @@ export function renderScorecard(s, generatedAt = new Date()) {
   for (const r of s.runs) {
     lines.push(`- Thread \`${r.thread.slice(0, 8)}\` "${r.title}": ${utc(r.start)} to ${utc(r.end)}, ${r.steps} main-chat model steps, ${r.subagents.length} subagent calls${r.subagents.length ? ` (${Object.entries(Object.groupBy(r.subagents, x => `${x.agentType} on ${x.modelId}`)).map(([k, v]) => `${v.length}x ${k}`).join(', ')})` : ''}.`);
   }
-  const main = s.cost.find(c => c.parts);
+  if (s.machine) {
+    const { status, startedAt, steps, sessions } = s.machine;
+    lines.push(`- Machine run: ${status} since ${utc(Date.parse(startedAt))}, ${steps} step${steps === 1 ? '' : 's'} recorded, ${sessions} session${sessions === 1 ? '' : 's'} whose own usage the run kept.`);
+  }
+  if (!s.runs.length && !s.machine) lines.push('None.');
+  const main = s.cost.find(c => c.parts && c.agent === 'Code Agent (main chat)');
   if (main) {
     const p = main.parts;
     const cacheRead = p.cacheRead == null
@@ -592,20 +661,30 @@ function readPulls(card) {
 }
 
 async function main() {
-  const [card, flag] = process.argv.slice(2);
-  if (!/^JUL-\d+$/.test(card ?? '')) {
-    console.error('usage: node scripts/scorecard.mjs JUL-<n> [--write]');
+  const args = process.argv.slice(2);
+  const card = args.find(a => /^JUL-\d+$/.test(a));
+  const flag = args.includes('--write') ? '--write' : undefined;
+  const at = args.indexOf('--thread');
+  const thread = at === -1 ? null : args[at + 1];
+  if (!card || (at !== -1 && !thread)) {
+    console.error('usage: node scripts/scorecard.mjs JUL-<n> [--write] [--thread <id>]');
     process.exitCode = 2;
     return;
   }
   const dir = mastracodeDir();
   const data = appDataDir();
-  const threads = readThreads(join(data, 'mastra.db'));
-  const ids = threads.filter(t => cardWindows(t, t.events).some(w => w.card === card)).map(t => t.id);
+  const all = readThreads(join(data, 'mastra.db'));
+  const threads = thread ? all.filter(t => t.id === thread || t.id.startsWith(thread)) : all;
+  if (thread && !threads.length) {
+    console.error(`no thread ${thread} in ${join(data, 'mastra.db')}`);
+    process.exitCode = 2;
+    return;
+  }
+  const ids = (thread ? threads : threads.filter(t => cardWindows(t, t.events).some(w => w.card === card))).map(t => t.id);
   const tracing = { ...(await readTracing(dir, tracedFiles(), ids)), launcher: launcherRecord() };
   const uatFile = fileURLToPath(new URL('../docs/scorecards/uat.json', import.meta.url));
   const uat = existsSync(uatFile) ? JSON.parse(readFileSync(uatFile, 'utf8'))[card] : undefined;
-  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), catalogue: loadCatalogue(), tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });
+  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), catalogue: loadCatalogue(), tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat, run: readRunRecord(card), namedThread: threads.length === 1 && thread ? threads[0].id : null });
   const markdown = renderScorecard(scorecard);
   if (flag === '--write') {
     const out = fileURLToPath(new URL(`../docs/scorecards/${card}.md`, import.meta.url));
