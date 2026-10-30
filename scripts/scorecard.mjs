@@ -176,9 +176,23 @@ export function loadPrices(mastracodeDir) {
   return JSON.parse(readFileSync(join(dirname(file), 'dist', 'metrics', 'pricing-data.json'), 'utf8'));
 }
 
+// A model id can carry a gateway in front of the provider (`mastracode/commandcode/…`), so
+// where the provider ends is not always the first slash. Measured: Kimi K3.1 Pro was requested
+// as `mastracode/commandcode/moonshotai/Kimi-K3.1-Pro` and read as provider `mastracode`, which
+// no price list knows, so every shipping session on the card came out unpriced.
+function modelSplits(model) {
+  const parts = String(model).split('/');
+  const splits = [];
+  for (let i = 1; i < parts.length; i += 1) splits.push([parts.slice(0, i).join('/'), parts.slice(i).join('/')]);
+  return splits;
+}
+
 export function ratesFor(prices, model) {
-  const [provider, ...rest] = model.split('/');
-  return prices[provider.split('.')[0]]?.models?.[rest.join('/')]?.cost;
+  for (const [provider, name] of modelSplits(model)) {
+    const cost = prices[provider.split('.')[0]]?.models?.[name]?.cost;
+    if (cost) return cost;
+  }
+  return undefined;
 }
 
 // Mastra's table has no entry for a provider we added ourselves. CommandCode is served
@@ -204,17 +218,19 @@ const accountName = provider => String(provider).split('.')[0].replace(/^mastrac
 const bareName = name => String(name).replace(/-\d{4,}(-[a-z]{1,3})?$/i, '');
 
 export function catalogueRates(catalogue, model) {
-  const [provider, ...rest] = String(model).split('/');
-  const name = rest.join('/');
-  const account = accountName(provider);
-  const rows = (catalogue?.models ?? []).filter(row => accountName(row.provider) === account);
-  const found = rows.find(row => row.name === name)
-    ?? rows.find(row => bareName(row.name) === bareName(name))
-    ?? rows.find(row => row.name === bareName(name));
-  if (!found) return undefined;
-  if (found.free) return { input: 0, output: 0 };
-  if (!Number.isFinite(found.inputPerMillion) || !Number.isFinite(found.outputPerMillion)) return undefined;
-  return { input: found.inputPerMillion, output: found.outputPerMillion };
+  const all = catalogue?.models ?? [];
+  for (const [provider, name] of modelSplits(model)) {
+    const account = accountName(provider);
+    const rows = all.filter(row => accountName(row.provider) === account);
+    const found = rows.find(row => row.name === name)
+      ?? rows.find(row => bareName(row.name) === bareName(name))
+      ?? rows.find(row => row.name === bareName(name));
+    if (!found) continue;
+    if (found.free) return { input: 0, output: 0 };
+    if (!Number.isFinite(found.inputPerMillion) || !Number.isFinite(found.outputPerMillion)) continue;
+    return { input: found.inputPerMillion, output: found.outputPerMillion };
+  }
+  return undefined;
 }
 
 export function ratesForModel(prices, catalogue, model) {

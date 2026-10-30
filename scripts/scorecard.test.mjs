@@ -151,6 +151,23 @@ test('a session priced from its own log pays the cache rate for what it read fro
   assert.match(row.basis, /from the log it wrote/);
 });
 
+// The machine's shipping model is requested with a gateway in front of the provider, so the
+// first slash is not the provider boundary. Read as provider `mastracode` it matched no price
+// list and every shipping session on the card came out unpriced.
+test('a model named with a gateway in front is priced from the provider behind it', () => {
+  const catalogue = { models: [
+    { provider: 'mastracode/commandcode', name: 'moonshotai/Kimi-K3.1-Pro', inputPerMillion: 2, outputPerMillion: 10, free: false },
+  ] };
+  const rates = catalogueRates(catalogue, 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro');
+  assert.deepEqual(rates, { input: 2, output: 10 });
+  assert.deepEqual(catalogueRates(catalogue, 'commandcode/moonshotai/Kimi-K3.1-Pro'), { input: 2, output: 10 });
+  assert.equal(catalogueRates(catalogue, 'mastracode/commandcode/moonshotai/Kimi-K9'), undefined);
+  const record = { sessions: [{ step: 'shipping', model: 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro', usage: { promptTokens: 1_000_000, completionTokens: 100_000, cachedInputTokens: 0 } }] };
+  const [row] = runCostRows(record, {}, catalogue);
+  assert.equal(row.unpriced, false);
+  assert.equal(row.usd.toFixed(2), '3.00');
+});
+
 test('a session the machine priced is not also counted as a cost that went missing', () => {
   const tracing = { metrics: [], requested: [], launcher: { since: 0 } };
   const loose = buildScorecard({ card: 'JUL-273', threads: [thread], prices, tracing, pulls: [], pings: [], uat: undefined });
