@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { buildScorecard, cardForThread, hostingSession, cardWindows, catalogueRates, findStops, priceThreadUsage, readPings, readThreads, readTracing, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
+import { buildScorecard, cardForThread, hostingSession, launcherRecord, cardWindows, catalogueRates, findStops, priceThreadUsage, readPings, readThreads, readTracing, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
 import { stopComment } from './stop-ping.mjs';
 import { checkForToddGuard } from './linear-cli.mjs';
 import { appendFileSync } from 'node:fs';
@@ -303,6 +303,39 @@ test('the hosting session is found by walking the process ancestry through /proc
     assert.equal(hostingSession({ pid: 300, procRoot: dir }), null);
     // A process that exited leaves no /proc entry, which is not a crash.
     assert.equal(hostingSession({ pid: 400, procRoot: dir }), null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a launcher is recognised from another checkout of this repo, and only when it is the same launcher', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'launcher-'));
+  const home = join(dir, 'home');
+  const ours = join(dir, 'julia-mastra', 'scripts', 'mastracode');
+  const other = join(dir, 'julia-builder', 'scripts', 'mastracode');
+  const link = join(home, '.local', 'bin', 'mastracode');
+  mkdirSync(dirname(link), { recursive: true });
+  mkdirSync(dirname(ours), { recursive: true });
+  mkdirSync(dirname(other), { recursive: true });
+  writeFileSync(ours, '#!/bin/sh\nexec mastracode-program "$@"\n');
+  try {
+    // This machine keeps a second checkout of the repo and points ~/.local/bin/mastracode at it.
+    // That launcher hands each session its own trace file exactly as this checkout's does.
+    writeFileSync(other, '#!/bin/sh\nexec mastracode-program "$@"\n');
+    symlinkSync(other, link);
+    const served = launcherRecord({ home, ours });
+    assert.equal(served.problem, null);
+    assert.equal(typeof served.since, 'number');
+
+    // A different script at the same address is not this launcher, so nothing gets excused.
+    writeFileSync(other, '#!/bin/sh\nexec mastracode "$@"\n');
+    const different = launcherRecord({ home, ours });
+    assert.equal(different.since, null);
+    assert.match(different.problem, /runs .*julia-builder.*, which is not this repo's launcher/);
+
+    // No launcher at all is still a problem.
+    rmSync(link);
+    assert.match(launcherRecord({ home, ours }).problem, /is not installed/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

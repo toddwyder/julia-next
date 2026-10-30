@@ -298,16 +298,27 @@ export function mastracodeDir(env = process.env) {
 // writes into the shared store, where a second session running at the same time records
 // nothing at all, and nothing on the machine notices. So a card says when it cannot come back
 // for sessions that started after the launcher was installed.
-export function launcherRecord(env = process.env) {
-  const link = launcherPath();
-  const ours = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'mastracode');
+//
+// This machine keeps a second checkout of the repo and points the link at that one
+// (/home/ubuntu/julia-builder/scripts/mastracode on 30 October), so the link's address says
+// nothing about what a session gets. What the launcher does is in the script it runs, and that
+// script is what gets compared: the same launcher from another checkout hands out the same
+// trace files, and any other script is still a session with no file of its own.
+export function launcherRecord({ home = homedir(), ours = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'mastracode') } = {}) {
+  const link = launcherPath(home);
   let target;
   try {
     target = realpathSync(link);
   } catch {
     return { since: null, problem: `${link} is not installed, so a session started another way records nothing` };
   }
-  if (target !== ours) return { since: null, problem: `${link} runs ${target} rather than this repo's launcher, so a session started another way records nothing` };
+  if (target !== ours) {
+    let same = false;
+    try {
+      same = readFileSync(target).equals(readFileSync(ours));
+    } catch { /* a launcher that cannot be read is not this one */ }
+    if (!same) return { since: null, problem: `${link} runs ${target}, which is not this repo's launcher, so a session started another way records nothing` };
+  }
   try {
     // The symlink's own mtime, not the script's: the launcher has been in place since then.
     return { since: lstatSync(link).mtimeMs, problem: null };
