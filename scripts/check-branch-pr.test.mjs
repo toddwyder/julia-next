@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { branchesWithoutOpenPullRequests } from './check-branch-pr.mjs';
+import { branchesWithoutOpenPullRequests, scorecardGaps } from './check-branch-pr.mjs';
 
 const repository = 'toddwyder/julia-next';
 
@@ -19,4 +19,37 @@ test('closed, cross-repository and non-main pull requests do not satisfy the pol
     { state: 'open', base: { ref: 'release' }, head: { ref: 'wrong-base', repo: { full_name: repository } } },
   ];
   assert.deepEqual(branchesWithoutOpenPullRequests({ branches, pulls, repository }), ['closed', 'fork', 'wrong-base']);
+});
+
+const scorecard = (cost) => `# JUL-282\n\n- Cost: ${cost} at published API prices, every row priced.\n`;
+
+function pull({ number = 7, title = 'Do a thing (JUL-282)', body = '', ref = 'feat/jul-282' } = {}) {
+  return { number, title, body, head: { ref } };
+}
+
+test('a card pull request passes with a scorecard that shows a cost', () => {
+  const gaps = scorecardGaps({
+    pulls: [pull()],
+    headRef: 'feat/jul-282',
+    readFile: path => { assert.equal(path, 'docs/scorecards/JUL-282.md'); return scorecard('**$1.69**'); },
+  });
+  assert.deepEqual(gaps, []);
+});
+
+test('a scorecard whose cost could not be measured fails the pull request', () => {
+  const gaps = scorecardGaps({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => scorecard('**unknown**') });
+  assert.equal(gaps.length, 1);
+  assert.match(gaps[0], /docs\/scorecards\/JUL-282\.md with cost "unknown"/);
+  assert.match(gaps[0], /node scripts\/scorecard\.mjs JUL-282 --write/, 'the gap says what to run');
+});
+
+test('a card pull request with no scorecard on the branch fails', () => {
+  const gaps = scorecardGaps({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => { throw new Error('ENOENT'); } });
+  assert.equal(gaps.length, 1);
+  assert.match(gaps[0], /is not on the branch/);
+});
+
+test('a pull request that names no card, or is another branch, is not checked', () => {
+  assert.equal(scorecardGaps({ pulls: [pull({ title: 'Fix the font flake' })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }).length, 1);
+  assert.deepEqual(scorecardGaps({ pulls: [pull({ ref: 'other' })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }), []);
 });

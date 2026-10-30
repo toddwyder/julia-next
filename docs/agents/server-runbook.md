@@ -58,44 +58,61 @@ in which case the next timer run does the work.
 
 ## Mastra Code's trace store
 
-Mastra Code writes every span and token metric to `~/.local/share/mastracode/observability.duckdb`.
-Full prompt payloads in `span_events` are nearly all of it, and on 29 October the file reached
-22.6 GB. One command cleans it, and the last step of a slice's retro is the only thing that runs it.
+Mastra Code opens its trace store once, at startup, and DuckDB lets one process write a file. A
+session that starts while another holds `observability.duckdb` gets no tracing at all, silently, for
+its whole life (`@mastra/code-sdk/dist/index.js:323`), so its tokens and cost are never recorded and
+the card priced from it reads unknown. Pstack runs sessions in parallel, so this happened on the
+first slice of 30 October and nothing said so.
+
+The launcher at `~/.local/bin/mastracode` (`scripts/mastracode`, installed by
+`node scripts/install-launcher.mjs`) is the one place every session starts from. It gives the launch
+its own file under `~/.local/share/mastracode/traces/<utc stamp>-<pid>.duckdb` through
+`MASTRA_OBSERVABILITY_DB_PATH`, so parallel sessions never share a lock, and before starting it folds
+whatever earlier sessions left behind. `JULIA_TRACES_DIR` moves the directory; `MASTRA_APP_DATA_DIR`
+moves it with the rest of the data.
 
 ```sh
 node scripts/trace-store.mjs status
-node scripts/trace-store.mjs clean <session id> [--card JUL-284]
+node scripts/trace-store.mjs fold [--quiet]
 ```
 
-`clean` takes one session id, the session the slice ran in, and does three things: it keeps that
-session's `metric_events` rows, which carry the per-call tokens and cost the scorecard prices a card
-from; it deletes the session's `span_events` and `log_events` rows, which hold the prompts; and it
-checkpoints the file, so DuckDB folds the write-ahead log in and drops the blocks the delete freed.
-Nothing deletes on a timer, by age, or from a list of sessions: a session loses its detail when a
-retro has learned from it. The output is JSON with the row counts, the file size before and after,
-and the free space after, and the retro pastes it.
+`fold` copies each finished file's `metric_events` rows, the per-call tokens and cost a scorecard
+prices from, into `traces/archive.duckdb`, then deletes the file. `archive.duckdb` holds cost rows
+and nothing else: no prompt payloads, no spans. A file a running session still holds cannot be
+attached, so it is skipped and its PID reported. Folding the same file name twice replaces its rows
+instead of adding a second copy, so an interrupted fold is safe to re-run; a file left as
+`<name>.folding` is picked up by the next fold. The single store the launcher replaced,
+`~/.local/share/mastracode/observability.duckdb`, is folded and deleted the same way, so the 5.6 GB
+it occupies leaves the disk on the first launch after this ships.
 
-A checkpoint rewrites blocks in place and truncates only the tail, so holes in the middle of a big
-file stay. A cleanup can give back less than the round added, so when the file is over 15 GB after
-one, `clean` comments on the slice's card (`--card`, JUL-276 by default) with the store size and
-the fact that the round was too big. That comment is the alarm, so a `clean` run whose comment
-failed says so in its JSON.
+Deleting a file is what returns the disk. A delete inside a file gives nothing back even after a
+`CHECKPOINT`: on 30 October 52,443 rows were deleted and checkpointed and the file was 5,955,137,536
+B before and after, with 99.9% of it freed blocks the next writes would reuse.
+
+Nothing has to be remembered: no session id, no card, no timer, no list. The scorecard prices a
+card from every file in that directory, the archive included, and the archive is only as big as
+the cost rows.
+
+`fold` prints one JSON answer and exits 0. When the traces directory is over 15 GB after a fold it
+prints a loud warning and exits 1: at that size a round was too big and Todd needs to know.
 
 DuckDB's default memory limit is 85% of the machine, which on this 7 GB server is 6 GB, and on
-30 October the kernel killed a run at 6.15 GB before it deleted a row. The store is therefore
-opened with a budget of a third of the machine, at most 2 GB, spilling to a temp directory beside
-it. A session that holds the store's exclusive lock makes `clean` exit 0 with `status: busy` and
-the holder's PID; it changes nothing, so the next run can clean the same session again.
+30 October the kernel killed a run at 6.15 GB before it deleted a row. `fold` opens each file with a
+budget of a third of the machine, at most 2 GB, spilling to a temp directory beside it. It reads one
+small table per file, so a 5.6 GB file folds in seconds.
 
-`status` prints the file, its size, the free space, and the row count of every table.
+`status` asks the filesystem and opens nothing, so it answers while a session holds a file. It
+prints the directory, every file with its size, which files a fold would take, the total, the free
+space, and whether that total is over the 15 GB alarm.
 
-Reading the store by hand takes the client out of the repo, because it is a dev dependency here and the installed program also carries one:
+Reading a trace file by hand takes the client out of the repo, because it is a dev dependency here
+and the installed program also carries one:
 
 ```sh
 node -e "const {createRequire}=require('node:module');const r=createRequire('/home/ubuntu/julia-mastra/package.json');const {DuckDBInstance}=r('@duckdb/node-api');..."
 ```
 
-Four facts that cost failed runs on 30 October: `connection.runAndReadAll(sql).getRowsJS()` returns rows as arrays, not objects (`getRowObjectsJson` does not exist on the reader); values come back as `BigInt`, so `Number()` them before arithmetic; `duckdb_tables().estimated_size` is a row count, not bytes, so measure payloads with `sum(length(cast(column as varchar)))`; and `octet_length` is not implemented for `VARCHAR` here, so cast first.
+Four facts that cost failed runs on 30 October: `connection.runAndReadAll(sql).getRowsJS()` returns rows as arrays, not objects (`getRowObjectsJson` does not exist on the reader); values come back as `BigInt`, so `Number()` them before arithmetic; `duckdb_tables().estimated_size` is a row count, not bytes, so measure payloads with `sum(length(cast(column as varchar)))`; and `octet_length` is not implemented for `VARCHAR` here, so cast first. A connection holds a file's lock until it is closed, so close the connection and then the instance.
 
 ## GitHub boundaries
 

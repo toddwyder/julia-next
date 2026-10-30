@@ -193,7 +193,7 @@ test('the trace store is only copied when there is room left on the disk', () =>
   assert.equal(traceCopyFits(19.6 * gb, 20 * gb), false);
 });
 
-test('a card whose trace store was too large to copy says why its cost is unknown', () => {
+test('a card whose trace file was too large to copy says why its cost is unknown', () => {
   const skipped = 'the trace store is 21 GB and only 20 GB is free to copy it';
   const scorecard = buildScorecard({
     card: 'JUL-283',
@@ -205,7 +205,7 @@ test('a card whose trace store was too large to copy says why its cost is unknow
     uat: undefined,
   });
   assert.equal(scorecard.tracingSkipped, skipped);
-  assert.match(renderScorecard(scorecard), /Mastra's trace store was not read: the trace store is 21 GB and only 20 GB is free to copy it/);
+  assert.match(renderScorecard(scorecard), /Mastra's trace files were not read: the trace store is 21 GB and only 20 GB is free to copy it/);
 });
 
 test('a card with no trace store at all still says no usage records were found', () => {
