@@ -31,6 +31,9 @@ const VERIFY_JULIA = join(REPO_ROOT, '.agents/skills/verify-julia/verify-julia.m
 // is the only place the two vocabularies meet.
 export const THINKING_FOR_EFFORT = Object.freeze({ small: 'low', medium: 'medium', large: 'high', unlimited: 'max' });
 export const PREVIEW_PORT = 4314;
+// The order the machine works in. A card already built and pulled can be picked up at any
+// of these with --from, which is how a card that stopped earlier is carried on.
+export const STEPS = Object.freeze(['build', 'shipping', 'preview', 'smoke', 'uat']);
 const CARD_PATTERN = /^JUL-\d+$/;
 
 const now = () => new Date().toISOString();
@@ -606,13 +609,15 @@ export function modelsFor(env = process.env) {
   };
 }
 
-export async function machine({ card, env = process.env, branch: wantedBranch }) {
+export async function machine({ card, env = process.env, branch: wantedBranch, from = 'build' }) {
+  if (!STEPS.includes(from)) throw new Error(`--from must be one of ${STEPS.join(', ')}, not "${from}"`);
   const prior = readJsonRecord(recordFile(card, env)).value;
   if (prior && [...ACTIVE_RUN_STATUSES, 'waiting'].includes(prior.status)) {
     throw new Error(`${card} already has a run ${prior.status} since ${prior.startedAt}; finish or stop that one first (${recordFile(card, env)})`);
   }
   const issue = readIssue(card);
   const openPull = pullForCard(card);
+  if (from !== 'build' && !openPull) throw new Error(`${card} has no open pull request, so there is nothing past the build to run`);
   const branch = wantedBranch ?? openPull?.headRefName ?? branchFor(card, issue.title);
   const record = newRunRecord({
     card,
@@ -621,6 +626,10 @@ export async function machine({ card, env = process.env, branch: wantedBranch })
     models: modelsFor(env),
     pull: openPull,
   });
+  record.pickedUpAt = from;
+  record.skipped = STEPS.slice(0, STEPS.indexOf(from));
+  const held = worktreeHolding(branch);
+  if (held) record.worktree = held;
   const folder = runFolderFor(card, env);
   mkdirSync(folder, { recursive: true });
   saveRecord(record, env);
@@ -656,21 +665,25 @@ export async function machine({ card, env = process.env, branch: wantedBranch })
   };
 
   try {
-    await step('build', () => buildStep({ record, issue, env }));
-    let shipping = await step('shipping', () => shippingStep({ record, issue, env }));
+    if (from === 'build') await step('build', () => buildStep({ record, issue, env }));
+    let shipping = null;
 
-    if (!passing(shipping.verdict)) {
-      record.rounds.remediation += 1;
-      saveRecord(record, env);
-      await step('remediation', () => buildStep({ record, issue, env, name: 'remediation', verdict: shipping.verdict }));
+    if (STEPS.indexOf(from) <= STEPS.indexOf('shipping')) {
       shipping = await step('shipping', () => shippingStep({ record, issue, env }));
+
       if (!passing(shipping.verdict)) {
-        record.status = 'stopped';
-        record.stoppedBecause = `Shipping failed twice on ${card}: ${shipping.verdict?.missing?.join('; ') ?? 'no verdict on the head'}`;
+        record.rounds.remediation += 1;
         saveRecord(record, env);
-        console.error(`${card}: ${record.stoppedBecause}`);
-        note(`Stopped: ${record.stoppedBecause}. Nothing merges. Next step is diagnosis: what the process got wrong and what would stop it coming back.`);
-        return record;
+        await step('remediation', () => buildStep({ record, issue, env, name: 'remediation', verdict: shipping.verdict }));
+        shipping = await step('shipping', () => shippingStep({ record, issue, env }));
+        if (!passing(shipping.verdict)) {
+          record.status = 'stopped';
+          record.stoppedBecause = `Shipping failed twice on ${card}: ${shipping.verdict?.missing?.join('; ') ?? 'no verdict on the head'}`;
+          saveRecord(record, env);
+          console.error(`${card}: ${record.stoppedBecause}`);
+          note(`Stopped: ${record.stoppedBecause}. Nothing merges. Next step is diagnosis: what the process got wrong and what would stop it coming back.`);
+          return record;
+        }
       }
     }
 
@@ -700,7 +713,7 @@ export function parseFlags(argv) {
   const flags = {};
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg !== '--state' && arg !== '--branch') throw new Error(`unknown flag "${arg}"`);
+    if (arg !== '--state' && arg !== '--branch' && arg !== '--from') throw new Error(`unknown flag "${arg}"`);
     const value = argv[index + 1];
     if (!value) throw new Error(`${arg} needs a value`);
     flags[arg.slice(2)] = value;
@@ -712,13 +725,13 @@ export function parseFlags(argv) {
 export async function main(argv = process.argv.slice(2)) {
   const [command, cardArg] = argv;
   if (command !== 'start' || !cardArg) {
-    console.error('usage: run-card.mjs start <CARD> [--branch <name>] [--state <dir>]');
+    console.error('usage: run-card.mjs start <CARD> [--branch <name>] [--state <dir>] [--from <step>]');
     process.exitCode = 2;
     return;
   }
   const flags = parseFlags(argv.slice(2));
   const env = { ...process.env, ...(flags.state ? { DASHBOARD_STATE_DIR: flags.state } : {}) };
-  const record = await machine({ card: normalizeCard(cardArg), env, branch: flags.branch });
+  const record = await machine({ card: normalizeCard(cardArg), env, branch: flags.branch, from: flags.from });
   process.exitCode = record.status === 'waiting' ? 0 : 1;
 }
 

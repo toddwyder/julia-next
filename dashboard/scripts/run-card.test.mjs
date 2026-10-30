@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  DASHBOARD_ROOT, PREVIEW_PORT, branchFor, lastSessionResult, modelsFor, newRunRecord,
+  DASHBOARD_ROOT, PREVIEW_PORT, STEPS, branchFor, lastSessionResult, machine, modelsFor, newRunRecord,
   normalizeCard, parseFlags, passing, previewKind, pullNamesCard, recordFile, remediationPrompt,
   runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stepEntry, thinkingForEffort,
   uatComment, uatSection,
@@ -225,8 +225,25 @@ test('the build uses the Start screen picks and Shipping its own slot', () => {
 
 test('the flags a run is started with are only the ones it explains', () => {
   assert.deepEqual(parseFlags(['--branch', 'feat/x', '--state', '/tmp/s']), { branch: 'feat/x', state: '/tmp/s' });
+  assert.deepEqual(parseFlags(['--from', 'preview']), { from: 'preview' });
   assert.throws(() => parseFlags(['--repo', '/tmp/r']), /unknown flag "--repo"/);
   assert.throws(() => parseFlags(['--state']), /--state needs a value/);
+});
+
+// A card that already has its pull request is carried on from the step it stopped at,
+// which is how the machine proves itself on a card that a person built.
+test('a card is picked up at the step it is told to start from', () => {
+  assert.deepEqual([...STEPS], ['build', 'shipping', 'preview', 'smoke', 'uat']);
+});
+
+test('a run started past the build needs a pull request to carry on from', async () => {
+  const state = temporaryState();
+  try {
+    // The step name is checked before anything else, so this never leaves the machine.
+    await assert.rejects(machine({ card: 'JUL-290', env: state.env, from: 'merge' }), /--from must be one of build, shipping, preview, smoke, uat/);
+  } finally {
+    state.clean();
+  }
 });
 
 test('the preview port is its own, off the live dashboard', () => {
