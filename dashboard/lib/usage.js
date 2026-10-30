@@ -69,14 +69,33 @@ function spendRow(key, label, used, left, unit, resetsAt, signal) {
     level: signal === 'out' || left === 0 ? 'out' : signal === 'nearly-out' ? 'nearly-out' : 'plenty' };
 }
 
+// CommandCode stops a plan at two rolling caps, one over 5 hours and one over a week, and those
+// caps are the only base it publishes. It sends them in credits, the unit its own limits doc names,
+// not in dollars: the same 14-credit cap is worth up to $20 on a $100 model and $14 on a $70 one.
+function creditWindow(key, label, limit, purchased) {
+  if (!limit || typeof limit !== 'object') return unreadable(key, label);
+  const resetsAt = Number.isFinite(limit.resetAt) && Number.isFinite(new Date(limit.resetAt).getTime())
+    ? new Date(limit.resetAt).toISOString() : null;
+  const row = windowRow(key, label, limit.used, limit.cap, 'credit', resetsAt, limit.exceeded === true ? 'out' : undefined);
+  // A spent window stops the month's included credit, not the bought credit: the provider spends
+  // bought credit first and lets the request through, so a grant holding some is not used up.
+  return row.kind === 'window' && row.level === 'out' && number(purchased) && purchased > 0
+    ? { ...row, level: 'nearly-out', note: 'Your bought credit still works.' }
+    : row;
+}
+
 export function parseCommandCode({ credits, summary, subscription }, { readAt } = {}) {
-  const balance = credits?.credits?.purchasedCredits;
+  const plan = credits?.credits;
+  const purchased = plan?.purchasedCredits;
+  const month = spendRow('commandcode:month', 'This month', summary?.totalMonthlyCredits, plan?.monthlyCredits, 'usd',
+    subscription?.data?.currentPeriodEnd,
+    plan?.belowThreshold === true ? 'nearly-out' : undefined);
   return [
-    spendRow('commandcode:month', 'This month', summary?.totalMonthlyCredits, credits?.credits?.monthlyCredits, 'usd',
-      subscription?.data?.currentPeriodEnd,
-      credits?.credits?.belowThreshold === true ? 'nearly-out' : undefined),
-    number(balance)
-      ? { key: 'commandcode:credit', label: 'Bought credit', kind: 'balance', remaining: balance, unit: 'usd', level: 'plenty' }
+    month.kind === 'spend' ? { ...month, note: "CommandCode does not publish the month's total credit." } : month,
+    creditWindow('commandcode:hours', 'Last 5 hours', credits?.windowLimits?.fiveHour, purchased),
+    creditWindow('commandcode:week', 'This week', credits?.windowLimits?.weekly, purchased),
+    number(purchased)
+      ? { key: 'commandcode:credit', label: 'Bought credit', kind: 'balance', remaining: purchased, unit: 'usd', level: 'plenty' }
       : unreadable('commandcode:credit', 'Bought credit'),
   ];
 }
@@ -87,6 +106,8 @@ const endpoints = {
   commandcode: ['https://api.commandcode.ai/alpha/billing/credits',
     'https://api.commandcode.ai/alpha/usage/summary', 'https://api.commandcode.ai/alpha/billing/subscriptions'],
 };
+
+const creditsKeys = new Set(['commandcode:hours', 'commandcode:week', 'commandcode:credit']);
 
 async function readEndpoint(url, headers, fetchImpl, authProblem = 'sign-in-expired') {
   let response;
@@ -110,9 +131,14 @@ export async function readAccountStatus({ accounts, getHeaders, fetchImpl = fetc
         if (results.every(result => result.status === 'rejected')) throw results[0].reason;
         const [credits, summary, subscription] = results.map(result => result.value);
         rows = parseCommandCode({ credits, summary, subscription }, { readAt });
-        const monthFailure = results.find(result => result.status === 'rejected');
-        if (monthFailure) rows[0] = failed('commandcode:month', 'This month', monthFailure.reason);
-        if (results[0].status === 'rejected') rows[1] = failed('commandcode:credit', 'Bought credit', results[0].reason);
+        // One reply failing names the rows it feeds and leaves the rest readable: the month comes
+        // from usage/summary, the two window caps and the bought-credit balance from billing/credits.
+        if (results[1].status === 'rejected') {
+          rows = rows.map(row => row.key === 'commandcode:month' ? failed('commandcode:month', 'This month', results[1].reason) : row);
+        }
+        if (results[0].status === 'rejected') {
+          rows = rows.map(row => creditsKeys.has(row.key) ? failed(row.key, row.label, results[0].reason) : row);
+        }
       } else {
         const payload = await readEndpoint(endpoints[id][0], headers, fetchImpl, authProblem);
         rows = (id === 'claude' ? parseAnthropic : parseChatgpt)(payload, { readAt });

@@ -62,7 +62,7 @@ test('does not call the grant used up while bought credit still works', () => {
   noCredit.credits.credits.purchasedCredits = 0;
   const rows = commandCodeRows(noCredit);
   assert.equal(rowAt(rows, 'commandcode:hours').level, 'out');
-  assert.doesNotMatch(rowAt(rows, 'commandcode:hours').note, /bought credit still works/);
+  assert.equal(rowAt(rows, 'commandcode:hours').note, undefined);
 });
 
 test('keeps a window with no cap on screen and says the number is missing', () => {

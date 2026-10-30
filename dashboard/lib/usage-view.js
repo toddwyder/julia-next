@@ -16,7 +16,8 @@ function problemText(row, name) {
 
 export function accountView(account, { timeZone = 'UTC', locale = 'en-GB' } = {}) {
   const day = value => new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone }).format(new Date(value));
-  const amount = (value, unit) => unit === 'usd' ? `$${value.toFixed(2)}` : String(Math.round(value));
+  const amount = (value, unit) => unit === 'usd' ? `$${value.toFixed(2)}`
+    : unit === 'credit' ? value.toFixed(2) : String(Math.round(value));
   const rows = account.rows.map(row => {
     let text;
     switch (row.kind) {
@@ -27,16 +28,18 @@ export function accountView(account, { timeZone = 'UTC', locale = 'en-GB' } = {}
         : 'The provider gave no reset time.'}`; break;
       case 'window': {
         const left = amount(Math.max(0, row.allowance - row.used), row.unit);
+        const unitWord = row.unit === 'credit' ? ' credits' : '';
+        const compared = `${amount(row.used, row.unit)} of ${amount(row.allowance, row.unit)}${unitWord} used, so ${left} left.`;
         text = row.used === 0 && row.resetsAt === null
-          ? `${row.label}: nothing used yet, so ${left} left. This window starts with your first request.`
-          : `${row.label}: ${amount(row.used, row.unit)} of ${amount(row.allowance, row.unit)} used, so ${left} left. ${row.resetsAt
+          ? `${row.label}: nothing used yet, so ${left}${unitWord} left. This window starts with your first request.`
+          : `${row.label}: ${compared} ${row.resetsAt
             ? `${row.unit === 'usd' ? 'Renews' : 'Resets'} ${day(row.resetsAt)}.`
             : 'The provider gave no reset time.'}`;
         break;
       }
       default: throw new Error('Unknown account row kind.');
     }
-    return { key: row.key, text, level: row.level ?? 'plenty' };
+    return { key: row.key, text: row.note ? `${text} ${row.note}` : text, level: row.level ?? 'plenty' };
   });
   const level = rows.reduce((worst, row) => rank[row.level] > rank[worst] ? row.level : worst, 'plenty');
   let warning = null;
