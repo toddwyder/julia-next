@@ -234,7 +234,7 @@ test('the CLI passes on an event that carries no pull request', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'shipping-verdict-'));
   const event = join(directory, 'event.json');
   writeFileSync(event, JSON.stringify({ ref: 'refs/heads/main' }));
-  const result = await runCli({ GITHUB_EVENT_PATH: event, GITHUB_REPOSITORY: 'toddwyder/julia-next', GITHUB_TOKEN: 'unused' });
+  const result = await runCli({ GITHUB_EVENT_PATH: event, GITHUB_REF: 'refs/heads/main', GITHUB_REPOSITORY: 'toddwyder/julia-next', GITHUB_TOKEN: 'unused' });
   assert.equal(result.status, 0);
   assert.match(result.output, /PASS: this event carries no pull request, so there is no card to gate/);
 });
