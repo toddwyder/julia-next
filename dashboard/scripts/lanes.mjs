@@ -1,4 +1,4 @@
-// Twelve live lanes: the Start screen controls, a slow-start guard, and the account rows. Each lane
+// Thirteen live lanes: the Start screen controls, a slow-start guard, and the account rows. Each lane
 // boots its own server and state folder, then clicks every control the way a person does on a phone
 // or desktop.
 // Run one lane: node scripts/lanes.mjs 3
@@ -54,6 +54,9 @@ function staleBuildReason() {
 
 const baseFor = number => `http://127.0.0.1:${PORT_BASE + number}`;
 const stateFor = number => join(LANES, `lane-${number}`);
+// Lane 13 proves the screen when a key is missing, so its server must not be handed the keys the
+// agent launcher supplies.
+const NO_KEY_LANES = new Set([13]);
 const modelName = value => value.replace(/\s+/g, ' ').replace(/^[▸▾]\s*/, '').replace(/\s*(?:↓\$|Free\b).*$/, '').trim();
 
 async function healthy(base) {
@@ -73,12 +76,21 @@ async function startServer(number) {
   copyFileSync(MODELS, join(state, 'state/models.json'));
   if (await healthy(base)) throw new Error(`port ${PORT_BASE + number} already serving`);
 
-  const child = spawn('node', ['../scripts/julia-agents.mjs', '--', 'node', 'server.js'], {
-    cwd: ROOT,
-    detached: true,
-    stdio: 'ignore',
-    env: { ...process.env, DASHBOARD_HOST: '127.0.0.1', DASHBOARD_PORT: String(PORT_BASE + number), DASHBOARD_STATE_DIR: state },
-  });
+  const env = { ...process.env, DASHBOARD_HOST: '127.0.0.1', DASHBOARD_PORT: String(PORT_BASE + number), DASHBOARD_STATE_DIR: state };
+  let child;
+  if (NO_KEY_LANES.has(number)) {
+    // A person who never added the key, not a person whose key was refused: the key is gone from
+    // the environment the screen's sweep runs in, and the launcher is what would put it back.
+    delete env.COMMANDCODE_API_KEY;
+    child = spawn('node', ['server.js'], { cwd: ROOT, detached: true, stdio: 'ignore', env });
+  } else {
+    child = spawn('node', ['../scripts/julia-agents.mjs', '--', 'node', 'server.js'], {
+      cwd: ROOT,
+      detached: true,
+      stdio: 'ignore',
+      env,
+    });
+  }
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (await healthy(base)) return { child, base, state };
     await sleep(250);
@@ -336,6 +348,29 @@ lane(12, 'read every account number beside what it is measured against', 'phone'
   return `${headings.length} accounts, every spent figure beside its base: ${measured.join(' | ')}`;
 });
 
+lane(13, "say a number can't be read when its key is missing", 'phone', async page => {
+  const section = page.locator('section[aria-labelledby="accounts-heading"]');
+  await section.waitFor();
+  const items = await section.locator('li').evaluateAll(nodes => nodes.map(node => ({
+    name: node.querySelector('h3')?.innerText.trim(),
+    lines: [...node.querySelectorAll('p')].map(line => line.innerText.trim()).filter(Boolean),
+  })));
+  const grant = items.find(item => item.name === 'CommandCode grant');
+  assert.ok(grant, `the grant row should be on screen, saw ${items.map(item => item.name)}`);
+  assert.ok(grant.lines.some(line => line.includes("can't be read")),
+    `a row with no key must use the card's words, saw ${grant.lines.join(' | ')}`);
+  assert.ok(grant.lines.some(line => /no sign-in or key for CommandCode grant/.test(line) && /Todd needs to add it/.test(line)),
+    `a row with no key must name the missing key, saw ${grant.lines.join(' | ')}`);
+  const everyLine = items.flatMap(item => item.lines).join(' | ');
+  assert.ok(!/No number/.test(everyLine), `the old wording is back on the screen: ${everyLine}`);
+  const others = items.filter(item => item.name !== 'CommandCode grant');
+  assert.ok(!others.some(item => item.lines.some(line => line.includes("can't be read"))),
+    `only the account with no key should be unreadable, saw ${everyLine}`);
+  const readable = others.flatMap(item => item.lines).filter(line => /^[^:]+: /.test(line));
+  assert.ok(readable.length >= 2, `the accounts with keys should still show their numbers, saw ${everyLine}`);
+  return `the grant row with no key: ${grant.lines.join(' | ')}`;
+});
+
 const args = process.argv.slice(2);
 const urlIndex = args.indexOf('--url');
 const target = urlIndex === -1 ? null : args[urlIndex + 1];
@@ -352,6 +387,10 @@ async function openLane(number) {
 
 async function run(number, title, kind, body) {
   if (only && Number(only) !== number) return;
+  if (target && NO_KEY_LANES.has(number)) {
+    console.log(`lane ${number} SKIP  ${title}\n        this lane needs a server it can boot without the key`);
+    return;
+  }
   const { child, base, state } = await openLane(number);
   const browser = await chromium.launch();
   const context = await browser.newContext(contextOptions(kind));

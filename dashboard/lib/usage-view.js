@@ -21,7 +21,7 @@ export function accountView(account, { timeZone = 'UTC', locale = 'en-GB' } = {}
   const rows = account.rows.map(row => {
     let text;
     switch (row.kind) {
-      case 'unreadable': text = `No number. ${problemText(row, account.name)}`; break;
+      case 'unreadable': text = `This number can't be read. ${problemText(row, account.name)}`; break;
       case 'balance': text = `${row.label}: ${amount(row.remaining, row.unit)} left. It does not expire.`; break;
       case 'spend': text = `${row.label}: ${amount(row.used, row.unit)} used. ${amount(row.left, row.unit)} of credit left. ${row.resetsAt
         ? `Renews ${day(row.resetsAt)}.`
