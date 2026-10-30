@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, commandEnv, costFrom,
-  lastSessionResult, machine,
+  lastSessionResult, ledger, machine,
   modelsFor, newRunRecord, noteSpend,
   normalizeCard, parseFlags, passing, previewKind, printed, pullNamesCard, recordFile, remediationPrompt,
   replyFrom, runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, suspendedAsk,
@@ -226,6 +226,24 @@ test('the build uses the Start screen picks and Shipping its own slot', () => {
   }
 });
 
+// A step that runs twice must not append its second round onto the first round's
+// log: the tail of that file is then the round before, and a line truncated mid
+// write in it reads as an answer it never gave.
+test('a step that runs again writes its own log', async () => {
+  const state = temporaryState();
+  try {
+    const record = newRunRecord({ card: 'JUL-290', branch: 'feat/x', worktree: '/tmp/wt', models: modelsFor(state.env), pull: { number: 383 } });
+    const { step } = ledger(record, state.env);
+    await step('shipping', async () => 'first round');
+    await step('shipping', async () => 'second round');
+    assert.match(record.steps[0].log, /shipping\.log$/);
+    assert.match(record.steps[1].log, /shipping-2\.log$/);
+    assert.notEqual(record.steps[0].log, record.steps[1].log);
+  } finally {
+    state.clean();
+  }
+});
+
 test('the flags a run is started with are only the ones it explains', () => {
   assert.deepEqual(parseFlags(['--branch', 'feat/x', '--state', '/tmp/s']), { branch: 'feat/x', state: '/tmp/s' });
   assert.deepEqual(parseFlags(['--from', 'preview', '--worktree', '/home/ubuntu/julia-mastra']), { from: 'preview', worktree: '/home/ubuntu/julia-mastra' });
@@ -236,14 +254,14 @@ test('the flags a run is started with are only the ones it explains', () => {
 // A card that already has its pull request is carried on from the step it stopped at,
 // which is how the machine proves itself on a card that a person built.
 test('a card is picked up at the step it is told to start from', () => {
-  assert.deepEqual([...STEPS], ['build', 'shipping', 'preview', 'smoke', 'uat']);
+  assert.deepEqual([...STEPS], ['build', 'shipping', 'remediation', 'preview', 'smoke', 'uat']);
 });
 
 test('a run started past the build needs a pull request to carry on from', async () => {
   const state = temporaryState();
   try {
     // The step name is checked before anything else, so this never leaves the machine.
-    await assert.rejects(machine({ card: 'JUL-290', env: state.env, from: 'merge' }), /--from must be one of build, shipping, preview, smoke, uat/);
+    await assert.rejects(machine({ card: 'JUL-290', env: state.env, from: 'merge' }), /--from must be one of build, shipping, remediation, preview, smoke, uat/);
   } finally {
     state.clean();
   }

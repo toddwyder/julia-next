@@ -33,7 +33,7 @@ export const THINKING_FOR_EFFORT = Object.freeze({ small: 'low', medium: 'medium
 export const PREVIEW_PORT = 4314;
 // The order the machine works in. A card already built and pulled can be picked up at any
 // of these with --from, which is how a card that stopped earlier is carried on.
-export const STEPS = Object.freeze(['build', 'shipping', 'preview', 'smoke', 'uat']);
+export const STEPS = Object.freeze(['build', 'shipping', 'remediation', 'preview', 'smoke', 'uat']);
 const CARD_PATTERN = /^JUL-\d+$/;
 
 const now = () => new Date().toISOString();
@@ -606,23 +606,89 @@ async function shippingStep({ record, issue, env }) {
   const step = latest(record, 'shipping');
   record.rounds.shipping += 1;
   saveRecord(record, env);
-  const result = await runSession({
-    name: 'shipping',
-    prompt: shippingPrompt({ card: record.card, issue, pull: record.pull, verifierModel: record.models.shipping }),
-    cwd: record.worktree,
-    model: record.models.shipping,
-    effort: 'large',
-    title: `${record.card} shipping`,
-    log: step.log,
-    timeoutMs: 90 * 60_000,
-  });
-  noteSpend(record, env, { step: 'shipping', model: record.models.shipping, result });
+  try {
+    const result = await runSession({
+      name: 'shipping',
+      prompt: shippingPrompt({ card: record.card, issue, pull: record.pull, verifierModel: record.models.shipping }),
+      cwd: record.worktree,
+      model: record.models.shipping,
+      effort: 'large',
+      title: `${record.card} shipping`,
+      log: step.log,
+      timeoutMs: 90 * 60_000,
+    });
+    noteSpend(record, env, { step: 'shipping', model: record.models.shipping, result });
+  } catch (error) {
+    // A judge that posted its verdict and then broke has still judged, and the
+    // verdict comment is what the gate reads. Only a session that left nothing
+    // behind is a broken session.
+    const posted = pullVerdict(record, step.startedAt);
+    if (!posted.verdict.verdict) throw error;
+    appendFileSync(step.log, `session broke after it posted its verdict: ${error.message}\n`);
+    console.log(`${record.card}: shipping session broke after posting ${posted.verdict.verdict}; reading the verdict from the pull request`);
+    return posted;
+  }
+  return pullVerdict(record, step.startedAt);
+}
+
+// Only a verdict posted during this session counts. One left over from an
+// earlier round would otherwise be read as this round's answer, and a judge
+// that broke before judging would look like a judge that failed the card.
+function pullVerdict(record, since) {
   const pulled = ghJson(['pr', 'view', String(record.pull.number), '--json', 'headRefOid,headRefName,title,body,comments']);
+  const cutoff = since ? Date.parse(since) : 0;
+  const comments = (pulled.comments ?? []).filter(comment => !cutoff || Date.parse(comment.createdAt) >= cutoff);
   const verdict = shippingVerdict({
     pull: { head: { sha: pulled.headRefOid, ref: pulled.headRefName }, title: pulled.title, body: pulled.body },
-    comments: (pulled.comments ?? []).map((comment, index) => ({ id: String(index), body: comment.body, createdAt: comment.createdAt })),
+    comments: comments.map((comment, index) => ({ id: String(index), body: comment.body, createdAt: comment.createdAt })),
   });
   return { verdict, head: pulled.headRefOid };
+}
+
+// The card is judged by a second fresh session, never the one that wrote the
+// code. One failing verdict buys one remediation round and a fresh Shipping; a
+// second failure stops the card so a person looks at the cause instead of the
+// machine paying for another attempt.
+async function judged({ record, issue, env, step, note, from }) {
+  const keep = shipping => {
+    record.verdict = {
+      head: shipping.head,
+      ok: passing(shipping.verdict),
+      verdict: shipping.verdict?.verdict ?? 'FAIL',
+      missing: shipping.verdict?.missing ?? [],
+    };
+    saveRecord(record, env);
+    return shipping;
+  };
+  const remediate = async verdict => {
+    record.rounds.remediation += 1;
+    saveRecord(record, env);
+    await step('remediation', () => buildStep({ record, issue, env, name: 'remediation', verdict }));
+  };
+
+  if (from === 'remediation') {
+    // Picking the card up after a judge that already said FAIL: that verdict is
+    // the answer, so the judge is not paid for a second time to repeat it.
+    const posted = pullVerdict(record);
+    if (!posted.verdict.verdict) throw new Error(`${record.card} has no shipping verdict on pull request #${record.pull.number}, so there is nothing for remediation to fix`);
+    if (passing(posted.verdict)) throw new Error(`${record.card} already passed Shipping on pull request #${record.pull.number}; start this run at the preview step instead`);
+    keep(posted);
+    await remediate(posted.verdict);
+  } else {
+    const first = keep(await step('shipping', () => shippingStep({ record, issue, env })));
+    if (passing(first.verdict)) return first;
+    await remediate(first.verdict);
+  }
+
+  const second = keep(await step('shipping', () => shippingStep({ record, issue, env })));
+  if (passing(second.verdict)) return second;
+
+  record.status = 'stopped';
+  record.stoppedBecause = `Shipping failed twice on ${record.card}: ${second.verdict?.missing?.join('; ') ?? 'no verdict on the head'}`;
+  saveRecord(record, env);
+  console.error(`${record.card}: ${record.stoppedBecause}`);
+  note(`Stopped: ${record.stoppedBecause}. Nothing merges. Next step is diagnosis: what the process got wrong and what would stop it coming back.`);
+  return null;
 }
 
 async function previewStep({ record, env, log }) {
@@ -932,7 +998,7 @@ export function modelsFor(env = process.env) {
 
 // A run is written as it happens: one entry per step with the log beside it, and one
 // note the card gets when the run stops. Both halves of a card's life use this.
-function ledger(record, env) {
+export function ledger(record, env) {
   const folder = runFolderFor(record.card, env);
   mkdirSync(folder, { recursive: true });
 
@@ -944,7 +1010,11 @@ function ledger(record, env) {
   };
 
   const step = async (name, work) => {
-    const entry = stepEntry(name, join(folder, `${name}.log`));
+    // A step that runs again gets its own log. Appending a second round to the
+    // first one's file makes a 100MB log whose tail is not the round you asked
+    // about, and a truncated line in it can be read as the round's answer.
+    const attempt = record.steps.filter(entry => entry.name === name).length + 1;
+    const entry = stepEntry(name, join(folder, attempt === 1 ? `${name}.log` : `${name}-${attempt}.log`));
     record.steps.push(entry);
     saveRecord(record, env);
     console.log(`${record.card}: ${name} started`);
@@ -998,29 +1068,10 @@ export async function machine({ card, env = process.env, branch: wantedBranch, f
 
   try {
     if (from === 'build') await step('build', () => buildStep({ record, issue, env }));
-    let shipping = null;
 
     if (STEPS.indexOf(from) <= STEPS.indexOf('shipping')) {
-      shipping = await step('shipping', () => shippingStep({ record, issue, env }));
-      record.verdict = { head: shipping.head, ok: passing(shipping.verdict), verdict: shipping.verdict?.verdict ?? 'FAIL', missing: shipping.verdict?.missing ?? [] };
-      saveRecord(record, env);
-
-      if (!passing(shipping.verdict)) {
-        record.rounds.remediation += 1;
-        saveRecord(record, env);
-        await step('remediation', () => buildStep({ record, issue, env, name: 'remediation', verdict: shipping.verdict }));
-        shipping = await step('shipping', () => shippingStep({ record, issue, env }));
-        record.verdict = { head: shipping.head, ok: passing(shipping.verdict), verdict: shipping.verdict?.verdict ?? 'FAIL', missing: shipping.verdict?.missing ?? [] };
-        saveRecord(record, env);
-        if (!passing(shipping.verdict)) {
-          record.status = 'stopped';
-          record.stoppedBecause = `Shipping failed twice on ${card}: ${shipping.verdict?.missing?.join('; ') ?? 'no verdict on the head'}`;
-          saveRecord(record, env);
-          console.error(`${card}: ${record.stoppedBecause}`);
-          note(`Stopped: ${record.stoppedBecause}. Nothing merges. Next step is diagnosis: what the process got wrong and what would stop it coming back.`);
-          return record;
-        }
-      }
+      const shipped = await judged({ record, issue, env, step, note, from });
+      if (!shipped) return record;
     }
 
     record.pull = ghJson(['pr', 'view', String(record.pull.number), '--json', 'number,headRefName,headRefOid,title,body,url,state']);
