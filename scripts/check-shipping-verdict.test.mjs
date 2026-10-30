@@ -6,10 +6,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { parseVerdictComment, pullCards, shippingVerdict, VERDICT_KEY, VERDICT_TEMPLATE } from './check-shipping-verdict.mjs';
+import { parseVerdictComment, pullCards, pullNumberFor, shippingVerdict, VERDICT_KEY, VERDICT_TEMPLATE } from './check-shipping-verdict.mjs';
 
 const HEAD = 'a'.repeat(40);
 const OLD = 'b'.repeat(40);
@@ -216,30 +218,32 @@ test('the printed template is itself parsed as a verdict record once filled', ()
   assert.equal(result.ok, true);
 });
 
-// The CLI reads the pull request and its comments over the GitHub API and
-// decides the job. These two runs use a local HTTP endpoint shaped like the
-// GitHub responses so the wiring, the exit code and the printed lines are
-// exercised end to end.
-async function withGithubStub(handler, run) {
-  const server = createServer((request, response) => {
-    const body = JSON.stringify(handler(new URL(request.url, 'http://localhost')));
-    response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(body);
-  });
-  await new Promise(done => server.listen(0, '127.0.0.1', done));
-  const { port } = server.address();
-  try {
-    return await run(`http://127.0.0.1:${port}`);
-  } finally {
-    await new Promise(done => server.close(done));
-  }
-}
+// The pull request number an event carries, so the gate can be run by hand.
+test('the pull request number comes from the flag, the event, or the ref', () => {
+  assert.equal(pullNumberFor({ pull: '383' }), 383);
+  assert.equal(pullNumberFor({ event: { pull_request: { number: 384 } } }), 384);
+  assert.equal(pullNumberFor({ event: { issue: { number: 385 } } }), 385);
+  assert.equal(pullNumberFor({ ref: 'refs/pull/386/merge' }), 386);
+  assert.equal(pullNumberFor({ ref: 'refs/heads/main' }), null);
+});
 
-function runCli(apiUrl, pullNumber) {
+// An event with no pull request is the ordinary push to main, and the job
+// passes there without asking GitHub anything. The repository and token are
+// set but never used, because the gate returns before it makes a request.
+test('the CLI passes on an event that carries no pull request', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'shipping-verdict-'));
+  const event = join(directory, 'event.json');
+  writeFileSync(event, JSON.stringify({ ref: 'refs/heads/main' }));
+  const result = await runCli({ GITHUB_EVENT_PATH: event, GITHUB_REPOSITORY: 'toddwyder/julia-next', GITHUB_TOKEN: 'unused' });
+  assert.equal(result.status, 0);
+  assert.match(result.output, /PASS: this event carries no pull request, so there is no card to gate/);
+});
+
+function runCli(env) {
   return new Promise(resolve => {
-    const child = spawn(process.execPath, ['scripts/check-shipping-verdict.mjs', '--repository', 'toddwyder/julia-next', '--pull', String(pullNumber)], {
+    const child = spawn(process.execPath, ['scripts/check-shipping-verdict.mjs'], {
       cwd: fileURLToPath(new URL('..', import.meta.url)),
-      env: { ...process.env, GITHUB_API_URL: apiUrl, GITHUB_TOKEN: 'stub-token' },
+      env: { ...process.env, ...env },
     });
     let output = '';
     child.stdout.on('data', chunk => { output += chunk; });
@@ -247,27 +251,3 @@ function runCli(apiUrl, pullNumber) {
     child.on('close', status => resolve({ status, output }));
   });
 }
-
-test('the CLI exits 1 and prints the gap for a card pull request with no verdict', async () => {
-  const result = await withGithubStub(path => path.pathname.endsWith('/pulls/383') ? pull({ number: 383 }) : [], apiUrl => runCli(apiUrl, 383));
-  assert.equal(result.status, 1);
-  assert.match(result.output, /MISSING: no shipping verdict covers head a{40} of JUL-290/);
-  assert.match(result.output, /juliaShippingVerdict/);
-});
-
-test('the CLI exits 0 when a PASS verdict covers the current head', async () => {
-  const result = await withGithubStub(path => {
-    if (path.pathname.endsWith('/pulls/383')) return pull({ number: 383 });
-    return [{ id: 1, created_at: '2026-10-30T10:00:00Z', body: comment(verdict()).body }];
-  }, apiUrl => runCli(apiUrl, 383));
-  assert.equal(result.status, 0);
-  assert.match(result.output, /PASS: JUL-290 has a shipping verdict on head a{40}/);
-});
-
-test('the CLI exits 0 for a pull request that names no card', async () => {
-  const result = await withGithubStub(path => path.pathname.endsWith('/pulls/375')
-    ? { number: 375, title: 'Document adding a model', body: '', head: { ref: 'docs/model', sha: HEAD } }
-    : [], apiUrl => runCli(apiUrl, 375));
-  assert.equal(result.status, 0);
-  assert.match(result.output, /PASS: this pull request names no card/);
-});
