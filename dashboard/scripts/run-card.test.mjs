@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import {
   DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, commandEnv, costFrom,
   lastSessionResult, ledger, machine,
-  modelsFor, newRunRecord, noteSpend,
+  modelsFor, needsJudging, newRunRecord, noteSpend,
   normalizeCard, parseFlags, passing, previewKind, printed, pullNamesCard, recordFile, remediationPrompt,
   replyFrom, runIdFor, saveRecord, sessionArgs, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, suspendedAsk,
   thinkingForEffort, tick,
@@ -255,6 +255,14 @@ test('the flags a run is started with are only the ones it explains', () => {
 // which is how the machine proves itself on a card that a person built.
 test('a card is picked up at the step it is told to start from', () => {
   assert.deepEqual([...STEPS], ['build', 'shipping', 'remediation', 'preview', 'smoke', 'uat']);
+});
+
+// A run that starts at remediation is a card whose judge already said FAIL, so it
+// must still go through Shipping after remediation. A run that starts after the
+// judge trusts the verdict already on the pull request.
+test('every step before the preview goes through the judge, and the ones after it do not', () => {
+  for (const from of ['build', 'shipping', 'remediation']) assert.equal(needsJudging(from), true, from);
+  for (const from of ['preview', 'smoke', 'uat']) assert.equal(needsJudging(from), false, from);
 });
 
 test('a run started past the build needs a pull request to carry on from', async () => {

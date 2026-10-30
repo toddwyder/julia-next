@@ -34,6 +34,9 @@ export const PREVIEW_PORT = 4314;
 // The order the machine works in. A card already built and pulled can be picked up at any
 // of these with --from, which is how a card that stopped earlier is carried on.
 export const STEPS = Object.freeze(['build', 'shipping', 'remediation', 'preview', 'smoke', 'uat']);
+// A run starting at or before remediation has not been judged yet, so it must go
+// through the judge. Starting after it trusts the verdict the judge already left.
+export const needsJudging = from => STEPS.indexOf(from) <= STEPS.indexOf('remediation');
 const CARD_PATTERN = /^JUL-\d+$/;
 
 const now = () => new Date().toISOString();
@@ -1069,7 +1072,7 @@ export async function machine({ card, env = process.env, branch: wantedBranch, f
   try {
     if (from === 'build') await step('build', () => buildStep({ record, issue, env }));
 
-    if (STEPS.indexOf(from) <= STEPS.indexOf('shipping')) {
+    if (needsJudging(from)) {
       const shipped = await judged({ record, issue, env, step, note, from });
       if (!shipped) return record;
     }
