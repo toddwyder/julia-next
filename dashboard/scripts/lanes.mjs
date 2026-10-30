@@ -1,5 +1,6 @@
-// Ten live lanes plus a slow-start guard for the Start screen controls. Each lane boots its own
-// server and state folder, then clicks every control the way a person does on a phone or desktop.
+// Twelve live lanes: the Start screen controls, a slow-start guard, and the account rows. Each lane
+// boots its own server and state folder, then clicks every control the way a person does on a phone
+// or desktop.
 // Run one lane: node scripts/lanes.mjs 3
 // Drive an address that is already running (the one handed to Todd): node scripts/lanes.mjs --url http://host:4313
 //
@@ -315,6 +316,24 @@ lane(11, 'show a clear wait instead of dropping early taps', 'phone', async page
   const result = await effortTap(page, 'Large');
   assert.equal(result.summary, 'Large', 'the first tap after ready should land');
   return 'before the page was ready the controls were off with a plain wait cue; the first tap after that selected Large';
+});
+
+lane(12, 'read every account number beside what it is measured against', 'phone', async page => {
+  const section = page.locator('section[aria-labelledby="accounts-heading"]');
+  await section.waitFor();
+  const headings = (await section.locator('h3').allInnerTexts()).map(text => text.trim());
+  assert.ok(headings.includes('CommandCode grant'), `the grant should have a heading, saw ${headings}`);
+  const lines = (await section.locator('li p').allInnerTexts()).map(text => text.trim()).filter(Boolean);
+  // A measurement line is "label: the numbers". A warning has no label, and the read-at line is not a row.
+  const measured = lines.filter(line => /^[^:]+: /.test(line));
+  assert.ok(measured.length >= 6, `expected a line per account number, saw ${measured.length}: ${lines.join(' | ')}`);
+  // Anything spent must be measured against a figure, or the row must say the provider publishes none.
+  const spent = measured.filter(line => /[\d.]\s+(?:credits?\s+)?used/.test(line));
+  const floating = spent.filter(line => !/\bof [\d.,]+/.test(line) && !/does not publish/.test(line));
+  assert.deepEqual(floating, [], `a number with no base to measure it against: ${floating.join(' | ')}`);
+  const grant = measured.filter(line => line.startsWith('Last 5 hours:') || line.startsWith('This week:'));
+  assert.ok(grant.some(line => /\bof [\d.,]+ credits? used/.test(line) && line.includes('Resets')), `the grant should show a window against its cap: ${grant.join(' | ')}`);
+  return `${headings.length} accounts, every spent figure beside its base: ${measured.join(' | ')}`;
 });
 
 const args = process.argv.slice(2);
