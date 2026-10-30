@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { cleanSession, openStore } from './trace-store.mjs';
+import { cleanSession, openStore, parseArgs } from './trace-store.mjs';
 
 const REPO = new URL('..', import.meta.url).pathname;
 const duckdbDir = [
@@ -83,4 +83,15 @@ test('a retro cleanup deletes its slice detail and keeps its metric rows', { ski
   assert.equal(await rowsFor(file, 'metric_events', OTHER).then(rows => rows.length), 1, 'another session keeps its cost row');
 
   await assert.rejects(cleanSession('not-a-session', { store: file }), /is not a session id/);
+});
+
+// `clean <id>` with no `--card` once read its own session id as the flag's value and
+// refused the call, so the command is read in one place the test can call.
+test('clean reads a session id and an optional card, and refuses anything else', () => {
+  assert.deepEqual(parseArgs(['clean', SLICE]), { command: 'clean', words: [SLICE], flags: {} }, 'a session id needs no other flag');
+  assert.deepEqual(parseArgs(['clean', SLICE, '--card', 'JUL-284']), { command: 'clean', words: [SLICE], flags: { card: 'JUL-284' } });
+  assert.deepEqual(parseArgs(['status']), { command: 'status', words: [], flags: {} });
+  assert.equal(parseArgs(['clean', SLICE, SLICE]).words.length, 2, 'two session ids reach main, which refuses them');
+  assert.throws(() => parseArgs(['clean', SLICE, '--nope']), /--nope is not an option/);
+  assert.throws(() => parseArgs(['clean', SLICE, '--card']), /--card needs a card/);
 });

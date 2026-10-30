@@ -89,6 +89,14 @@ the holder's PID; it changes nothing, so the next run can clean the same session
 
 `status` prints the file, its size, the free space, and the row count of every table.
 
+Reading the store by hand takes the client out of the repo, because it is a dev dependency here and the installed program also carries one:
+
+```sh
+node -e "const {createRequire}=require('node:module');const r=createRequire('/home/ubuntu/julia-mastra/package.json');const {DuckDBInstance}=r('@duckdb/node-api');..."
+```
+
+Four facts that cost failed runs on 30 October: `connection.runAndReadAll(sql).getRowsJS()` returns rows as arrays, not objects (`getRowObjectsJson` does not exist on the reader); values come back as `BigInt`, so `Number()` them before arithmetic; `duckdb_tables().estimated_size` is a row count, not bytes, so measure payloads with `sum(length(cast(column as varchar)))`; and `octet_length` is not implemented for `VARCHAR` here, so cast first.
+
 ## GitHub boundaries
 
 Use ordinary signed-in GitHub access for authorized cards. Keep authentication material inside its trusted process. Evidence and notes belong on the card branch and pull request.

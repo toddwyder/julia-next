@@ -186,7 +186,9 @@ function usage() {
   ].join('\n');
 }
 
-async function main(argv) {
+// `clean <id>` with no `--card` shipped reading its own session id as a flag value and
+// refusing the call, so the shape of the command is read in one place a test can call.
+export function parseArgs(argv) {
   const [command, ...rest] = argv;
   const flags = {};
   const words = [];
@@ -198,6 +200,11 @@ async function main(argv) {
       flags.card = rest.shift();
     } else words.push(arg);
   }
+  return { command, flags, words };
+}
+
+async function main(argv) {
+  const { command, flags, words } = parseArgs(argv);
   let answer;
   if (command === 'status') answer = await status();
   else if (command === 'clean') {
