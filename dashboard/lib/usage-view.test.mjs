@@ -1,23 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { accountView } from './usage-view.js';
-import { PROBLEMS, parseAnthropic, parseChatgpt, parseCommandCode } from './usage.js';
+import { PROBLEMS } from './usage.js';
 
-const fixture = name => JSON.parse(readFileSync(new URL(`./fixtures/usage-${name}.json`, import.meta.url), 'utf8'));
 const readAt = '2026-10-30T14:05:08.353Z';
-const claude = () => ({ id: 'claude', name: 'Claude subscription', readAt, rows: parseAnthropic(fixture('anthropic'), { readAt }) });
-const chatgpt = () => ({ id: 'chatgpt', name: 'ChatGPT plan', readAt, rows: parseChatgpt(fixture('chatgpt'), { readAt }) });
-const commandcode = () => ({ id: 'commandcode', name: 'CommandCode grant', readAt, rows: parseCommandCode({
-  credits: fixture('commandcode-credits'), summary: fixture('commandcode-summary'), subscription: fixture('commandcode-subscription'),
-}, { readAt }) });
+const windowRow = (key, label, used, allowance, resetsAt, level = 'plenty') =>
+  ({ key, label, kind: 'window', used, allowance, unit: 'percent', resetsAt, level });
+const claude = () => ({
+  id: 'claude', name: 'Claude subscription', readAt,
+  rows: [
+    windowRow('claude:hours', 'Last 5 hours', 0, 100, null),
+    windowRow('claude:week', 'This week', 80, 100, '2026-10-31T05:00:00.000Z', 'nearly-out'),
+  ],
+});
+const commandcode = () => ({
+  id: 'commandcode', name: 'CommandCode grant', readAt,
+  rows: [
+    { key: 'commandcode:month', label: 'This month', kind: 'spend', used: 23.950986015200005, left: 46.1741631996,
+      unit: 'usd', resetsAt: '2026-11-22T14:01:24.000Z', level: 'plenty' },
+    { key: 'commandcode:credit', label: 'Bought credit', kind: 'balance', remaining: 4.2975948488, unit: 'usd', level: 'plenty' },
+  ],
+});
 
 test('writes use, quota, what is left and the reset day on one line', () => {
   const view = accountView(claude());
   assert.equal(view.rows[1].text, 'This week: 80 of 100 used, so 20 left. Resets 31 Oct.');
   assert.equal(view.rows[0].text, 'Last 5 hours: nothing used yet, so 100 left. This window starts with your first request.');
   assert.equal(view.readAtText, 'on 30 Oct at 14:05 UTC');
-  assert.equal(accountView(commandcode()).rows[0].text, 'This month: $23.95 of $70.13 used, so $46.17 left. Renews 22 Nov.');
+});
+
+test('writes a spend row with the provider numbers and no worked-out allowance', () => {
+  assert.equal(accountView(commandcode()).rows[0].text, 'This month: $23.95 used. $46.17 of credit left. Renews 22 Nov.');
 });
 
 test('writes a balance row with no quota', () => {
@@ -29,13 +42,14 @@ test('names the account and the free-up day in the warning', () => {
 });
 
 test('uses the soonest reset among the exhausted rows', () => {
-  const account = chatgpt();
-  account.rows.forEach(row => { row.level = 'out'; row.used = 100; });
-  assert.equal(accountView(account).warning.text, 'ChatGPT plan is used up until 30 Oct.');
+  const account = claude();
+  account.rows.forEach(row => { row.level = 'out'; row.resetsAt = '2026-11-04T00:00:00.000Z'; });
+  account.rows[0].resetsAt = '2026-10-30T18:00:00.000Z';
+  assert.equal(accountView(account).warning.text, 'Claude subscription is used up until 30 Oct.');
   account.rows.reverse();
-  assert.equal(accountView(account).warning.text, 'ChatGPT plan is used up until 30 Oct.');
-  account.rows.find(row => row.key === 'chatgpt:hours').level = 'nearly-out';
-  assert.equal(accountView(account).warning.text, 'ChatGPT plan is used up until 4 Nov.');
+  assert.equal(accountView(account).warning.text, 'Claude subscription is used up until 30 Oct.');
+  account.rows.find(row => row.key === 'claude:hours').level = 'nearly-out';
+  assert.equal(accountView(account).warning.text, 'Claude subscription is used up until 4 Nov.');
 });
 
 test('says nearly used up without claiming it is used up', () => {
@@ -69,6 +83,16 @@ test('has one sentence per problem and never a dash', () => {
 });
 
 test('raises no warning for a comfortable account', () => {
-  assert.equal(accountView(chatgpt()).warning, null);
+  const comfortable = claude();
+  comfortable.rows[1].level = 'plenty';
+  assert.equal(accountView(comfortable).warning, null);
   assert.equal(accountView(commandcode()).level, 'plenty');
+});
+
+test('warns when the provider says the month is running out', () => {
+  const account = commandcode();
+  account.rows[0].level = 'nearly-out';
+  assert.equal(accountView(account).warning.text, 'CommandCode grant is nearly used up. It frees up on 22 Nov.');
+  account.rows[0].level = 'out';
+  assert.equal(accountView(account).warning.text, 'CommandCode grant is used up until 22 Nov.');
 });

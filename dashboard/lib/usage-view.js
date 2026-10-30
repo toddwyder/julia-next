@@ -22,6 +22,9 @@ export function accountView(account, { timeZone = 'UTC', locale = 'en-GB' } = {}
     switch (row.kind) {
       case 'unreadable': text = `No number. ${problemText(row, account.name)}`; break;
       case 'balance': text = `${row.label}: ${amount(row.remaining, row.unit)} left. It does not expire.`; break;
+      case 'spend': text = `${row.label}: ${amount(row.used, row.unit)} used. ${amount(row.left, row.unit)} of credit left. ${row.resetsAt
+        ? `Renews ${day(row.resetsAt)}.`
+        : 'The provider gave no reset time.'}`; break;
       case 'window': {
         const left = amount(Math.max(0, row.allowance - row.used), row.unit);
         text = row.used === 0 && row.resetsAt === null

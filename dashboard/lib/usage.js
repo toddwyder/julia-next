@@ -48,24 +48,33 @@ export function parseChatgpt(payload, { readAt } = {}) {
   if (!payload?.rate_limit || typeof payload.rate_limit !== 'object') throw new ProblemError('shape-changed');
   const limits = payload.rate_limit;
   const windows = [limits.primary_window, limits.secondary_window];
-  return [[18000, 'hours', 'Last 5 hours'], [604800, 'week', 'This week']].flatMap(([seconds, suffix, label]) => {
+  return [[18000, 'hours', 'Last 5 hours'], [604800, 'week', 'This week']].map(([seconds, suffix, label]) => {
     const window = windows.find(item => item?.limit_window_seconds === seconds);
-    if (!window && windows.includes(null)) return [];
-    const reset = number(window?.reset_at) && Number.isFinite(new Date(window.reset_at * 1000).getTime())
+    // A window the provider leaves out is a number nobody published, so the row stays on screen
+    // and says so. Dropping it would hide a limit the account may still be bound by.
+    if (!window) return unreadable(`chatgpt:${suffix}`, label);
+    const reset = number(window.reset_at) && Number.isFinite(new Date(window.reset_at * 1000).getTime())
       ? new Date(window.reset_at * 1000).toISOString() : undefined;
-    return [windowRow(`chatgpt:${suffix}`, label, window?.used_percent, 100, 'percent', reset,
-      limits.limit_reached === true ? 'out' : undefined)];
+    return windowRow(`chatgpt:${suffix}`, label, window.used_percent, 100, 'percent', reset,
+      limits.limit_reached === true ? 'out' : undefined);
   });
 }
 
+// CommandCode publishes what the month has used and what is left, but it publishes no monthly
+// allowance, so this row shows the two provider numbers and never a total we worked out ourselves.
+function spendRow(key, label, used, left, unit, resetsAt, signal) {
+  if (!number(used) || !number(left)) return unreadable(key, label);
+  if (resetsAt !== null && resetsAt !== undefined && !date(resetsAt)) return unreadable(key, label, 'shape-changed');
+  return { key, label, kind: 'spend', used, left, unit, resetsAt: resetsAt ?? null,
+    level: signal === 'out' || left === 0 ? 'out' : signal === 'nearly-out' ? 'nearly-out' : 'plenty' };
+}
+
 export function parseCommandCode({ credits, summary, subscription }, { readAt } = {}) {
-  const used = summary?.totalMonthlyCredits;
-  const remaining = credits?.credits?.monthlyCredits;
-  // monthlyCredits is the remaining allowance: it falls as usage is billed, so the cap is used plus remaining.
-  const allowance = number(used) && number(remaining) ? used + remaining : undefined;
   const balance = credits?.credits?.purchasedCredits;
   return [
-    windowRow('commandcode:month', 'This month', used, allowance, 'usd', subscription?.data?.currentPeriodEnd),
+    spendRow('commandcode:month', 'This month', summary?.totalMonthlyCredits, credits?.credits?.monthlyCredits, 'usd',
+      subscription?.data?.currentPeriodEnd,
+      credits?.credits?.belowThreshold === true ? 'nearly-out' : undefined),
     number(balance)
       ? { key: 'commandcode:credit', label: 'Bought credit', kind: 'balance', remaining: balance, unit: 'usd', level: 'plenty' }
       : unreadable('commandcode:credit', 'Bought credit'),
