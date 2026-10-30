@@ -20,16 +20,19 @@ Working document. Each line is a decision Todd agreed in conversation.
 - **Advisor** (Claude today): checks evidence against what Todd actually uses, helps Todd think, keeps retro notes. Instructions to the planner agent are fixed one-liners.
 
 ## Flow of a card
+Revised 30 Oct 2026; the details are in [30 October decisions](#30-october-decisions-todd-the-connected-path).
+
 | Step | What happens | Who |
 |---|---|---|
-| Idea | Talk it through with `wayfinder` (big work), `grill-with-docs` (sharpen a plan; writes glossary/ADRs) or `triage` (writes the card and agent brief); `/recall` first to catch up on past attempts | Todd + planner agent |
+| Idea | Talk it through with `wayfinder` (big work), `grill-with-docs` (sharpen a plan; writes glossary/ADRs) or `triage` (writes the card, including its UAT steps); `/recall` first to catch up on past attempts | Todd + planner agent |
 | Settle | Todd reads the card and says "settled"; it moves to Ready | Todd |
-| Build | Start runs one pstack session: build, review code (`/interrogate`), prove, open PR, inside the cap; live checklist on the dashboard | Machine |
-| Evidence review | Independent check that the evidence proves each criterion | Machine (different-company model) |
-| Staging | Regression suite and card checks on the preview | Machine |
-| UAT | Only if the card changes something Todd uses directly | Todd |
-| Merge | Automatic once every gate passes; live check after; card Complete | Machine |
-| Retro | Machine runs `/correct` after merge, plus our own retros; one PR of fixes; merges after Todd approves the lessons | Machine + advisor + Todd |
+| Build | One pstack session builds, reviews code (`/interrogate`) and runs Prove It Works against the card's UAT steps, then opens the PR | Machine |
+| Shipping | Independent per-criterion verdict on the Prove It Works evidence; a FAIL goes to Remediation | Machine (Shipping model) |
+| Preview | The candidate runs where Todd can try it | Machine |
+| Smoke test | The whole regression suite runs on the preview | Machine |
+| UAT | Todd follows the card's UAT steps on the preview | Todd |
+| Merge | Shipping merges after Todd's yes; live check; card Complete | Machine |
+| Retro | Retro on every card; `/correct` when the card went wrong; metrics recorded; clean-up | Machine |
 
 ## Pre-plan retired (11:17)
 - Retired as a skill: its parts are covered by `wayfinder` / `grill-with-docs` / `triage` at the Idea step, by pstack at build (`how`, `architect`, prototype, prove-it-works, formal verification), and by learning tests in CI.
@@ -134,3 +137,19 @@ The clean-up is built by the planner agent in a fresh session. From card 5 on, t
 ## 27 October decisions (Todd)
 
 - **Todd sees it work.** From now on every piece of work is started and watched from the dashboard, and its proof is something Todd can see working on a screen he uses, without reading code. Work with nothing for Todd to see happens only as an exception Todd approves (Todd, 27 Oct 2026).
+
+## 30 October decisions (Todd): the connected path
+
+These override earlier lines in this file where they differ. Every step below starts by itself: a started card runs to UAT without stopping (Todd, 30 Oct 2026).
+
+- **Shipping** is the independent review (the old "evidence review"). A fresh Mastra Code session that never sees the builder's chat receives the card and the Prove It Works evidence, runs the change the way Todd would, and gives PASS or FAIL on every criterion with the evidence it checked. Its model is the Shipping pick on the Start screen, Kimi K3.1 Pro by default, from a different company than the builder's. Claude models stay off the machine.
+- **Remediation.** A first Shipping FAIL moves the card to Remediation; the fix starts by itself through poteto-mode's Bug fix playbook with Shipping's reasons, then a fresh Shipping runs. A second FAIL runs the Investigation playbook for the root cause, covering both the fault in the work and the fault in the process, and the card stops.
+- **Preview.** Julia cards: the PR's Vercel preview. Dashboard and machine cards: a second copy of the dashboard running the candidate on the server at its own Tailscale port; the live dashboard on 4313 stays on main.
+- **Smoke test.** The whole regression suite reruns on the preview: the `verify-julia` checks for Julia, `dashboard/scripts/lanes.mjs` for the dashboard. A failure goes back to the build.
+- **UAT steps live on the card**, in a third section after the criteria, written by triage and settled with the card, so the builder and Prove It Works aim at exactly what Todd will try. At UAT Todd gets a Linear notification carrying the preview address.
+- **Merge.** Shipping merges only after Todd's yes, and only while its PASS still covers the current code (the Shipping playbook's patch-id rule); changed code goes back through Shipping.
+- **Live check.** The live address serves the merged commit and the regression suite passes there. Pass: the card moves to Complete. Fail: the card stops and Todd is notified; nothing rolls back by itself.
+- **After merge.** The retro skill runs on every card; `/correct` runs whenever the card went through Remediation, a stop, a rubber stamp or a correction from Todd. `/reflect` is retired. The card's cost, tokens, time, rounds and stops are recorded for Decision support. Clean-up stops the preview copy, deletes the branch and clears the trace detail after the retro; cost rows stay.
+- **Every stop is diagnosed.** Each stop, failure, blocker or rubber stamp gets its cause: why it happened, what the process got wrong, and what keeps it from returning. The fix goes through pstack as high in [the inverse pyramid](../principles/inverse-pyramid.md) as it will go.
+- **Advisor.** The advisor sees a card only with a PASS and its evidence, after a second FAIL, or when the builder is blocked. It checks each PASS for a rubber stamp; a rubber stamp counts as a FAIL. A blocker's fix goes through pstack as a card.
+- **Every change has a card**, corrections included.
