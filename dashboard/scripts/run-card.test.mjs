@@ -5,13 +5,21 @@ import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFile
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
-import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, costFrom, freePort, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshSpend, remediationPrompt, replyFrom, runIdFor, saveRecord, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
+import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, costFrom, freePort, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshSpend, remediationPrompt, replyFrom, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
 const temporaryState = () => {
   const root = mkdtempSync(join(tmpdir(), 'jul-292-run-'));
   return { root, env: { DASHBOARD_STATE_DIR: root }, clean: () => rmSync(root, { recursive: true, force: true }) };
 };
+
+test('a FAIL on a card that already failed is the second one, whether or not this process saw it', () => {
+  assert.equal(secondJudge({ rounds: { shipping: 0 } }), false);
+  assert.equal(secondJudge({ rounds: { shipping: 1 } }), true);
+  assert.equal(secondJudge({ rounds: { shipping: 2 } }), true);
+  assert.equal(secondJudge({}), false);
+  assert.equal(secondJudge(null), false);
+});
 
 test('a preview takes a port nothing answers on, so a waiting card does not hold the next one', async () => {
   const taken = createServer();

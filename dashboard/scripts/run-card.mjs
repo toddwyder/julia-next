@@ -801,18 +801,35 @@ async function judged({ record, issue, env, step, note, from }) {
     keep(posted);
     await remediate(posted.verdict);
   } else {
+    const before = record.rounds.shipping;
     const first = keep(await step('shipping', () => shippingStep({ record, issue, env })));
     if (passing(first.verdict)) return first;
+    if (before >= 1) return stopTwice(record, first, env, note);
     await remediate(first.verdict);
   }
 
   const second = keep(await step('shipping', () => shippingStep({ record, issue, env })));
   if (passing(second.verdict)) return second;
+  return stopTwice(record, second, env, note);
+}
 
+// The card stops on its second FAIL, and the count is the card's, not the process's: a run
+// picked up after a FAIL has already had its remediation and its fresh judge, so fixing and
+// judging once more would be an attempt the card never allowed.
+export function secondJudge(record) {
+  return (record?.rounds?.shipping ?? 0) >= 1;
+}
+
+function stopTwice(record, shipping, env, note) {
   record.status = 'stopped';
-  record.stoppedBecause = `Shipping failed twice on ${record.card}: ${second.verdict?.missing?.join('; ') ?? 'no verdict on the head'}`;
+  record.stoppedBecause = `Shipping failed twice on ${record.card}: ${shipping.verdict?.missing?.join('; ') ?? 'no verdict on the head'}`;
   saveRecord(record, env);
   console.error(`${record.card}: ${record.stoppedBecause}`);
+  try {
+    printed(process.execPath, [LINEAR_CLI, 'remind', record.card]);
+  } catch (error) {
+    console.error(`${record.card}: could not raise a reminder -- ${error.message}`);
+  }
   note(`Stopped: ${record.stoppedBecause}. Nothing merges. Next step is diagnosis: what the process got wrong and what would stop it coming back.`);
   return null;
 }
