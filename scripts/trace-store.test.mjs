@@ -39,9 +39,15 @@ const duckdbDir = [
   join(REPO, 'node_modules', '@duckdb', 'node-api'),
   join(process.env.HOME ?? '', '.local', 'lib', 'mastracode-program', 'node_modules', '@duckdb', 'node-api'),
 ].find(dir => existsSync(join(dir, 'package.json')));
-// The DuckDB client is a dev dependency here, so CI opens a real store too. The
-// skip stays for a machine that never ran `npm ci`: the pure rules still run.
-const noDuckdb = duckdbDir ? false : 'no @duckdb/node-api on this machine, so there is no store to open';
+// The DuckDB client is a dev dependency here, so CI opens a real store too. On a
+// machine that never ran `npm ci`, the pure rules still run. In CI a missing
+// client fails the file instead: a green run that skipped every store test is how
+// the deletion guards went unchecked while an unreviewed script did the deleting.
+const duckdbMissing = 'no @duckdb/node-api on this machine, so there is no store to open';
+if (!duckdbDir && process.env.CI) {
+  throw new Error(`the trace-store tests cannot skip in CI: ${duckdbMissing}; run npm ci so @duckdb/node-api is installed`);
+}
+const noDuckdb = duckdbDir ? false : duckdbMissing;
 const { DuckDBInstance } = duckdbDir ? createRequire(join(duckdbDir, 'package.json'))('@duckdb/node-api') : {};
 
 // The five tables Mastra Code's observability store creates, cut down to the
@@ -199,24 +205,25 @@ test('merging a second export keeps one row per bucket and keeps the mined sessi
 
 test('a mining pass saves the session numbers and says what the store does not hold', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
+  const one = session(1);
   const minedAt = '2026-10-29T20:00:00.000Z';
   const { file, ledger, stops } = await withStore(t, [
-    span(at, 's1', 0.05),
-    modelSpan(at, 'm1', 'gpt-6.1-sol', 'openai.responses'),
-    toolSpan(at, 't1', 'view'),
-    toolSpan(at, 't2', 'view'),
-    toolSpan(at, 't3', 'execute_command'),
-    modelMetric(at, 'k1', 'mastra_model_total_input_tokens', 1000, 0.5),
-    modelMetric(at, 'k2', 'mastra_model_input_cache_read_tokens', 800, 0.08),
-    modelMetric(at, 'k3', 'mastra_model_total_output_tokens', 200, 0.02),
-    metric(at, 'd1', 'mastra_model_duration_ms', 32000, null),
-    metric(at, 'd2', 'mastra_tool_duration_ms', 137, null),
-    logRow(at, 'l1', 'Workspace not found'),
-  ]);
+    span(at, 's1', 0.05, one),
+    modelSpan(at, 'm1', 'gpt-6.1-sol', 'openai.responses', one),
+    toolSpan(at, 't1', 'view', one),
+    toolSpan(at, 't2', 'view', one),
+    toolSpan(at, 't3', 'execute_command', one),
+    modelMetric(at, 'k1', 'mastra_model_total_input_tokens', 1000, 0.5, one),
+    modelMetric(at, 'k2', 'mastra_model_input_cache_read_tokens', 800, 0.08, one),
+    modelMetric(at, 'k3', 'mastra_model_total_output_tokens', 200, 0.02, one),
+    metric(at, 'd1', 'mastra_model_duration_ms', 32000, null, one),
+    metric(at, 'd2', 'mastra_tool_duration_ms', 137, null, one),
+    logRow(at, 'l1', 'Workspace not found', one),
+  ], { cards: { [one]: 'JUL-1' } });
   mkdirSync(join(stops, '..'), { recursive: true });
-  writeFileSync(stops, `${JSON.stringify({ at, thread: 'thread-1', card: 'JUL-1', reason: 'ask_question' })}\n`);
+  writeFileSync(stops, `${JSON.stringify({ at, thread: one, card: 'JUL-1', reason: 'ask_question' })}\n`);
 
-  const answer = await mineSession('thread-1', { card: 'JUL-1', stops, minedAt });
+  const answer = await mineSession(one, { stops, minedAt });
 
   assert.equal(answer.status, 'ok');
   const { record } = answer;
@@ -242,8 +249,8 @@ test('a mining pass saves the session numbers and says what the store does not h
   assert.equal(record.modelChanges.count, 0);
 
   const saved = readLedger(ledger);
-  assert.equal(saved.sessions['thread-1'].card, 'JUL-1');
-  assert.equal(saved.sessions['thread-1'].minedAt, minedAt);
+  assert.equal(saved.sessions[one].card, 'JUL-1');
+  assert.equal(saved.sessions[one].minedAt, minedAt);
 });
 
 test('one pass mines every session through one read-only connection', { skip: noDuckdb }, async (t) => {
@@ -269,19 +276,57 @@ test('one pass mines every session through one read-only connection', { skip: no
   assert.equal(saved.sessions[c].totals.calls, 0);
 });
 
+test('mining drops a card the census no longer gives', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const one = session(1);
+  const { ledger } = await withStore(t, [span(at, 's1', 0.05, one)], { cards: { [one]: 'JUL-1' } });
+
+  await mineSession(one, {});
+  assert.equal(readLedger(ledger).sessions[one].card, 'JUL-1', 'the census names this session, so the card is kept');
+
+  const dir = mkdtempSync(join(tmpdir(), 'stale-card-'));
+  const census = join(dir, 'census.md');
+  writeFileSync(census, censusDoc({ complete: ['JUL-1'] }));
+
+  const answer = await mineSession(one, { census });
+
+  assert.equal(answer.record.card, null, 'a card left in the ledger by an older census must not outlive it');
+  assert.equal(readLedger(ledger).sessions[one].card, null, 'the ledger is rewritten without the stale card');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('a card only the ledger remembers does not delete a session', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'stale-plan-'));
+  const retrosDir = join(dir, 'retros');
+  mkdirSync(retrosDir, { recursive: true });
+  writeFileSync(join(retrosDir, 'JUL-1.md'), '# JUL-1\n\nThe lesson is written.\n');
+  const census = join(dir, 'census.md');
+  const one = session(1);
+  writeFileSync(census, censusDoc({ complete: ['JUL-1'] }));
+
+  const ledger = { version: 2, sessions: { [one]: { thread: one, card: 'JUL-1', minedAt: '2026-10-29T20:00:00.000Z' } } };
+  const plan = sweepPlan(ledger, { retrosDir, census });
+
+  assert.deepEqual(plan.clean, [], 'JUL-1 is Complete and has a retro, but the census gives this session no card');
+  assert.equal(plan.kept.length, 1);
+  assert.match(plan.kept[0].why, /no card/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test('a session whose payload rows were already mined keeps its numbers when the rows go', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file, ledger } = await withStore(t, [span(at, 's1', 0.05), modelSpan(at, 'm1', 'gpt-6.1-sol', 'openai.responses'), modelMetric(at, 'k1', 'mastra_model_total_input_tokens', 1000, 0.5), logRow(at, 'l1', 'boom')], { retros: ['JUL-1'] });
-  await mineSession('thread-1', { card: 'JUL-1' });
+  const one = session(1);
+  const { file, ledger } = await withStore(t, [span(at, 's1', 0.05, one), modelSpan(at, 'm1', 'gpt-6.1-sol', 'openai.responses', one), modelMetric(at, 'k1', 'mastra_model_total_input_tokens', 1000, 0.5, one), logRow(at, 'l1', 'boom', one)], { retros: ['JUL-1'], cards: { [one]: 'JUL-1' } });
+  await mineSession(one, {});
 
-  const answer = await deletePayloads('thread-1', {});
+  const answer = await deletePayloads(one, {});
 
   assert.equal(answer.status, 'ok');
   assert.deepEqual(answer.deleted, { span_events: 2, log_events: 1 });
   assert.equal(await countOf(file, 'span_events'), 0);
   assert.equal(await countOf(file, 'log_events'), 0);
   assert.equal(await countOf(file, 'metric_events'), 1, 'the cost row stays: it is the reason the payloads could go');
-  assert.equal(readLedger(ledger).sessions['thread-1'].totals.tokens, 1000);
+  assert.equal(readLedger(ledger).sessions[one].totals.tokens, 1000);
 });
 
 test('deleting the payloads of a session that was never mined is refused', { skip: noDuckdb }, async (t) => {
@@ -293,15 +338,17 @@ test('deleting the payloads of a session that was never mined is refused', { ski
   assert.equal(answer.status, 'refused');
   assert.equal(answer.code, 'not-mined');
   assert.match(answer.message, /never mined/);
+  assert.doesNotMatch(answer.message, /--card/, 'nothing tells a person to hand a session a card that the census does not give it');
   assert.equal(await countOf(file, 'span_events'), 1, 'nothing is deleted without the numbers being kept');
 });
 
 test('deleting the payloads of a mined session with no retro is refused', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file } = await withStore(t, [span(at, 's1', 0.05)]);
-  await mineSession('thread-1', { card: 'JUL-1' });
+  const one = session(1);
+  const { file } = await withStore(t, [span(at, 's1', 0.05, one)], { cards: { [one]: 'JUL-1' } });
+  await mineSession(one, {});
 
-  const answer = await deletePayloads('thread-1', {});
+  const answer = await deletePayloads(one, {});
 
   assert.equal(answer.status, 'refused');
   assert.equal(answer.code, 'no-retro');
@@ -325,10 +372,11 @@ test('a session that names no card is deleted only because Todd approved it', { 
 
 test('an approval never stands in for the retro of a card the session itself named', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file } = await withStore(t, [span(at, 's1', 0.05)], { approved: ['thread-1'] });
-  await mineSession('thread-1', { card: 'JUL-1' });
+  const one = session(1);
+  const { file } = await withStore(t, [span(at, 's1', 0.05, one)], { approved: [one], cards: { [one]: 'JUL-1' } });
+  await mineSession(one, {});
 
-  const answer = await deletePayloads('thread-1', {});
+  const answer = await deletePayloads(one, {});
 
   assert.equal(answer.status, 'refused');
   assert.equal(answer.code, 'no-retro', 'the approval covers sessions with no card, not a card whose lesson is unwritten');
@@ -349,20 +397,21 @@ test('a card handed to the delete cannot open the gate', { skip: noDuckdb }, asy
 
 test('a mined session on neither the retro list nor the approved list is refused', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
+  const [a, b, c] = [1, 2, 3].map(session);
   const { file } = await withStore(t, [
-    span(at, 'a1', 0.05, 'thread-a'),
-    span(at, 'b1', 0.05, 'thread-b'),
-    span(at, 'c1', 0.05, 'thread-c'),
-  ], { approved: ['thread-b'] });
-  await mineSession('thread-a', { card: 'JUL-1' });
-  await mineSession('thread-b', {});
-  await mineSession('thread-c', {});
+    span(at, 'a1', 0.05, a),
+    span(at, 'b1', 0.05, b),
+    span(at, 'c1', 0.05, c),
+  ], { approved: [b], cards: { [a]: 'JUL-1' } });
+  await mineSession(a, {});
+  await mineSession(b, {});
+  await mineSession(c, {});
 
-  const noRetro = await deletePayloads('thread-a', {});
+  const noRetro = await deletePayloads(a, {});
   assert.equal(noRetro.status, 'refused');
   assert.equal(noRetro.code, 'no-retro');
 
-  const noCard = await deletePayloads('thread-c', {});
+  const noCard = await deletePayloads(c, {});
   assert.equal(noCard.status, 'refused');
   assert.equal(noCard.code, 'no-card');
   assert.match(noCard.message, /not on the approved list/);
@@ -431,10 +480,11 @@ test('the census doc gives the sweep every fact it needs', () => {
 
 test('a dry run says what would go and leaves every row in place', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file } = await withStore(t, [span(at, 's1', 0.05), logRow(at, 'l1', 'boom')], { retros: ['JUL-1'] });
-  await mineSession('thread-1', { card: 'JUL-1' });
+  const one = session(1);
+  const { file } = await withStore(t, [span(at, 's1', 0.05, one), logRow(at, 'l1', 'boom', one)], { retros: ['JUL-1'], cards: { [one]: 'JUL-1' } });
+  await mineSession(one, {});
 
-  const answer = await deletePayloads('thread-1', { dryRun: true });
+  const answer = await deletePayloads(one, { dryRun: true });
 
   assert.equal(answer.status, 'dry-run');
   assert.deepEqual(answer.deleted, { span_events: 1, log_events: 1 });
@@ -443,18 +493,19 @@ test('a dry run says what would go and leaves every row in place', { skip: noDuc
 });
 
 test('compaction gives back the room a deleted payload was using, and deletes nothing else', { skip: noDuckdb }, async (t) => {
+  const [a, b] = [1, 2].map(session);
   const { file, ledger } = await withStore(t, [
-    span(daysAgo(20), 'old-1', 2, 'thread-a'),
-    span(daysAgo(20), 'old-2', 2, 'thread-a'),
-    span(daysAgo(1), 'new-1', 0.01, 'thread-b'),
-    logRow(daysAgo(20), 'log-old', 'old', 'thread-a'),
-    logRow(daysAgo(1), 'log-new', 'new', 'thread-b'),
-    metric(daysAgo(20), 'metric-old', 'mastra_model_total_input_tokens', 1000, 0.5, 'thread-a'),
-  ], { retros: ['JUL-1'] });
-  await mineSession('thread-a', { card: 'JUL-1' });
+    span(daysAgo(20), 'old-1', 2, a),
+    span(daysAgo(20), 'old-2', 2, a),
+    span(daysAgo(1), 'new-1', 0.01, b),
+    logRow(daysAgo(20), 'log-old', 'old', a),
+    logRow(daysAgo(1), 'log-new', 'new', b),
+    metric(daysAgo(20), 'metric-old', 'mastra_model_total_input_tokens', 1000, 0.5, a),
+  ], { retros: ['JUL-1'], cards: { [a]: 'JUL-1' } });
+  await mineSession(a, {});
   const beforeDelete = storeBytes(file);
 
-  const deleted = await deletePayloads('thread-a', {});
+  const deleted = await deletePayloads(a, {});
   assert.deepEqual(deleted.deleted, { span_events: 2, log_events: 1 });
   const afterDelete = storeBytes(file);
   assert.ok(afterDelete >= beforeDelete * 0.9, 'a delete marks the rows dead; the file does not shrink by itself');
@@ -473,8 +524,8 @@ test('compaction gives back the room a deleted payload was using, and deletes no
   const report = JSON.parse(readFileSync(answer.report, 'utf8'));
   assert.equal(report.runs.at(-1).bytesAfter, answer.bytesAfter);
   const ledgerAfter = readLedger(ledger);
-  assert.equal(ledgerAfter.sessions['thread-a'].card, 'JUL-1');
-  const priced = ledgerAfter.rows.filter(row => row.threadId === 'thread-a' && row.name === 'mastra_model_total_input_tokens');
+  assert.equal(ledgerAfter.sessions[a].card, 'JUL-1');
+  const priced = ledgerAfter.rows.filter(row => row.threadId === a && row.name === 'mastra_model_total_input_tokens');
   assert.equal(priced.length, 1, 'mining keeps the cost row the scorecard prices from, so the ledger can price the card without the payloads');
   assert.equal(priced[0].estimatedCost, 0.5);
 });

@@ -66,7 +66,7 @@ that deletes payloads and compacts the file.
 ```sh
 node scripts/trace-store.mjs status
 node scripts/trace-store.mjs ledger
-node scripts/trace-store.mjs mine <thread> --card JUL-276
+node scripts/trace-store.mjs mine <thread>
 node scripts/trace-store.mjs sweep --dry-run
 node scripts/trace-store.mjs sweep --wait-for-lock --minutes 180
 ```
@@ -74,7 +74,10 @@ node scripts/trace-store.mjs sweep --wait-for-lock --minutes 180
 `mine` writes that session's tokens, cost per model, which model each call asked for and which
 answered, time per stage, tool-call counts and stops into `~/.local/state/julia/trace-costs.json`,
 which is the file `scripts/scorecard.mjs` reads when it cannot copy the store. The store does not
-record compactions or handoffs, and `mine` says so in `notHeld` rather than inventing them.
+record compactions or handoffs, and `mine` says so in `notHeld` rather than inventing them. A
+session's card comes from the census doc and nowhere else: there is no flag that tells a session
+which card it was on, and a card left in the ledger by an older run is dropped the next time the
+session is mined.
 
 `sweep` reads every session in `~/.local/share/mastracode/mastra.db`, mines each one, then deletes a
 session's `span_events` and `log_events` rows only when the session has been mined, is not held, and
@@ -83,9 +86,10 @@ names no card at all and is approved there. Every fact comes from `docs/retros/c
 (`--census` overrides): the `Cards with a session` table, the `Complete cards with no session` list,
 the `Approved to delete without a retro` bullets and the `Held back on purpose` bullets. A hold
 outranks a retro and a Complete card; an approval never stands in for a card the session itself
-named; a card passed on the command line never opens the gate. `--dry-run` mines, prints the plan and
-posts nothing. A real run posts its numbers and the reason each session was kept on JUL-276. Mining
-copies that session's cost rows into the ledger before anything is deleted, so the scorecard still
+named; a card passed on the command line never opens the gate, and `sweep` has no `--complete` flag
+because the census doc is the only place a Complete card is read from. `--dry-run` mines, prints the
+plan and posts nothing. A real run posts its numbers and the reason each session was kept on
+JUL-276. Mining copies that session's cost rows into the ledger before anything is deleted, so the scorecard still
 prices the card once its payloads are gone. `metric_events`, which carry the cost, are never deleted.
 
 A running session holds DuckDB's exclusive lock, so every command exits 0 with `status: busy` and a
