@@ -22,7 +22,7 @@
 // Deleting by age is gone: a session is deleted because it was learned from, not
 // because it is old. Any run that finds the store held reports that and exits 0,
 // so a run during a session is not an alarm.
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { homedir, totalmem } from 'node:os';
@@ -294,6 +294,19 @@ export function copyOptions(file, room) {
     threads: '1',
     preserve_insertion_order: 'false',
     max_temp_directory_size: `${Math.max(64, Math.min(512, Math.floor(room / 2 ** 20 / 4)))}MB`,
+  };
+}
+
+// Writing the kept rows means reading 9.45 GB of JSON text out of the store and
+// writing 5.7 GB of it back. The copy budget above is only half a gigabyte of
+// spill, which is right for copying whole tables and too small for that read, so
+// this one may spill a quarter of the free room, up to 4 GB.
+export function keepOptions(file, room) {
+  return {
+    ...openOptions(file),
+    threads: '1',
+    preserve_insertion_order: 'false',
+    max_temp_directory_size: `${Math.max(256, Math.min(4096, Math.floor(room / 2 ** 20 / 4)))}MB`,
   };
 }
 
@@ -837,11 +850,209 @@ export function sweepComment(answer) {
 
 // The comment goes up through the wrapper that unlocks the Linear key, not by
 // importing the client here: this module runs on the server without the env file.
-function postSweepComment(body) {
-  const file = join(dirname(reportFile()), `trace-sweep-${new Date().toISOString().replace(/[:.]/g, '-')}.md`);
+function postSweepComment(body, kind = 'trace-sweep') {
+  const file = join(dirname(reportFile()), `${kind}-${new Date().toISOString().replace(/[:.]/g, '-')}.md`);
   writeFileSync(file, body);
   const answer = spawnSync(process.execPath, [join(REPO, 'scripts', 'julia-agents.mjs'), '--', join(REPO, 'scripts', 'linear-cli.mjs'), 'comment', SWEEP_CARD, '--file', file], { cwd: REPO, encoding: 'utf8', timeout: 120_000 });
   return { card: SWEEP_CARD, file, exit: answer.status, output: `${answer.stdout ?? ''}${answer.stderr ?? ''}`.trim().slice(-400) };
+}
+
+// A card's cost and one session's detail are all that have to outlive the store.
+// `keep` writes exactly that to a file beside it, reading the live store and
+// never writing to it, so the numbers in the new file can be checked against the
+// old one before anything is renamed.
+export const KEEP_THREAD = '13351dad-0d36-42f1-a43b-6e1d016cfa3e';
+
+// The cost rows, one session's prompts and logs, and the two small tables that
+// record scores and feedback. They are a few hundred rows, so keeping all of them
+// costs nothing and throwing them away would lose what a retro reads.
+const KEEP_TABLES = [
+  { table: 'metric_events', thread: false },
+  { table: 'span_events', thread: true },
+  { table: 'log_events', thread: true },
+  { table: 'score_events', thread: false },
+  { table: 'feedback_events', thread: false },
+];
+
+export function keepFile(store = storeFile()) {
+  return `${store.replace(/\.duckdb$/, '')}.keep.duckdb`;
+}
+
+async function tableRows(connection, from, where) {
+  const rows = (await connection.runAndReadAll(`select count(*) as n from ${from}${where ?? ''}`)).getRowObjectsJson();
+  return Number(rows[0]?.n ?? 0);
+}
+
+// The name DuckDB gives the file's own database is not 'main', so a caller that
+// wants the file it opened passes no name and gets every table in it.
+async function presentTables(connection, db) {
+  const rows = await connection.runAndReadAll(`select table_name from duckdb_tables()${db ? ` where database_name = ${sqlText(db)}` : ''}`);
+  return new Set(rows.getRowObjectsJson().map(row => row.table_name));
+}
+
+async function keptRows(connection, db, thread, tables) {
+  const counts = {};
+  for (const { table, thread: only } of tables) {
+    counts[table] = await tableRows(connection, `${db}.${table}`, only ? ` where threadId = ${sqlText(thread)}` : '');
+  }
+  return counts;
+}
+
+async function countsOf(file) {
+  const { DuckDBInstance } = duckdb();
+  const instance = await DuckDBInstance.create(file, openOptions(file, 'READ_ONLY'));
+  try {
+    const connection = await instance.connect();
+    // A store from before a table existed is counted for the tables it has,
+    // rather than failing on a table the file never held.
+    const present = await presentTables(connection);
+    const counts = {};
+    for (const { table } of KEEP_TABLES) if (present.has(table)) counts[table] = await tableRows(connection, `main.${table}`);
+    return { counts };
+  } finally {
+    instance.closeSync?.();
+  }
+}
+
+export async function keepStore({ store = storeFile(), target = keepFile(store), thread = KEEP_THREAD, dryRun = false } = {}) {
+  const room = freeBytes(dirname(target));
+  const { DuckDBInstance } = duckdb();
+  removeQuietly(target);
+  removeQuietly(`${target}.wal`);
+  let wanted;
+  const instance = await DuckDBInstance.create(dryRun ? ':memory:' : target, keepOptions(target, room));
+  try {
+    const connection = await instance.connect();
+    try {
+      await connection.run(`attach ${sqlText(store)} as src (read_only)`);
+    } catch (error) {
+      const owner = lockOwnerFromError(error.message);
+      if (owner || isLockedMessage(error.message)) return { status: 'busy', ...(owner ?? {}), store, target, note: 'a Mastra Code session holds the trace store; nothing was written' };
+      throw error;
+    }
+    const present = await presentTables(connection, 'src');
+    const tables = KEEP_TABLES.filter(({ table }) => present.has(table));
+    wanted = await keptRows(connection, 'src', thread, tables);
+    const answer = { store, target, thread, counts: wanted, room };
+    // The kept session carries most of the payloads: 5.6 GB of the 9.45 GB of
+    // span text left in the store on 30 October. Under 8 GB free the write would
+    // fill the disk before it finished, so it is refused rather than started.
+    if (room < 8 * 1024 ** 3) return { status: 'no-room', ...answer, note: `about 8 GB is needed for the kept rows and ${gb(room)} is free` };
+    if (dryRun) return { status: 'ok', dryRun: true, ...answer, note: `dry run: ${wanted.span_events} span and ${wanted.log_events} log rows for ${thread}, ${wanted.metric_events} cost rows; nothing was written` };
+    for (const { table, thread: only } of tables) {
+      await connection.run(`create table ${table} as select * from src.${table}${only ? ` where threadId = ${sqlText(thread)}` : ''}`);
+    }
+    await connection.run('detach src');
+  } finally {
+    instance.closeSync?.();
+  }
+  // The rows of a new store sit in its write-ahead log until something folds them
+  // into the file, and a swap copies the file. Fold them here, or the store put in
+  // place would be short of the rows it was checked against.
+  const folded = await openStore(target);
+  if (folded.busy) return { status: 'busy', ...folded.busy, store, target };
+  try {
+    const connection = await folded.instance.connect();
+    await connection.run('set threads = 1');
+    await connection.run('checkpoint');
+  } finally {
+    folded.instance.closeSync?.();
+  }
+  removeQuietly(`${target}.wal`);
+  const check = await countsOf(target);
+  const wrong = Object.keys(wanted).filter(name => check.counts[name] !== wanted[name]);
+  const answer = {
+    status: wrong.length ? 'mismatch' : 'ok',
+    store,
+    target,
+    thread,
+    bytes: storeBytes(target),
+    counts: check.counts,
+    expected: wanted,
+    freeAfter: freeBytes(dirname(target)),
+  };
+  answer.note = wrong.length
+    ? `the new file does not hold what the live store does: ${wrong.map(name => `${name} ${check.counts[name]} of ${wanted[name]}`).join(', ')}`
+    : `${mb(answer.bytes)} holds ${check.counts.metric_events} cost rows and ${check.counts.span_events} span rows of ${thread.slice(0, 8)}; every count matches the live store`;
+  appendReport({ at: new Date().toISOString(), command: 'keep', store, target, bytes: answer.bytes, counts: check.counts });
+  return answer;
+}
+
+// Renames the live store aside, puts the kept rows in its place, and checks the
+// counts again from a fresh read. A rename costs no disk, and the parked file is
+// only deleted once a person has seen Mastra work from the new one.
+export async function swapStore({ store = storeFile(), keep = keepFile(store), waitMinutes = 0, dryRun = false } = {}) {
+  if (!existsSync(keep)) return { status: 'no-keep', store, keep, note: 'there is no file of kept rows: run keep first, or nothing is saved' };
+  // A keep file with a write-ahead log beside it is a file whose rows are not all
+  // in it yet. Copying that would leave the new store short of rows it was told
+  // it had, so the swap stops and rebuilds nothing.
+  if (existsSync(`${keep}.wal`)) return { status: 'keep-open', store, keep, note: `${keep} still has a write-ahead log beside it; run keep again` };
+  const { counts: wanted } = await countsOf(keep);
+  const parked = `${store}.old`;
+  // A parked file is a decision someone has not made yet: renaming over it would
+  // destroy the only copy of the sessions the new file does not keep.
+  if (existsSync(parked)) return { status: 'parked', store, keep, old: parked, note: `a previous store is parked at ${parked}: delete it once Mastra is known to work, then run swap again` };
+  const deadline = Date.now() + waitMinutes * 60_000;
+  for (;;) {
+    const probe = await openStore(store, 'READ_ONLY');
+    if (!probe.busy) {
+      probe.instance.closeSync?.();
+      break;
+    }
+    if (Date.now() >= deadline) return { status: 'busy', ...probe.busy, store, keep, note: `a Mastra Code session holds the trace store${probe.busy.pid ? ` (PID ${probe.busy.pid})` : ''}; this run waited ${waitMinutes} min and changed nothing` };
+    await sleep(30_000);
+  }
+  const bytesBefore = storeBytes(store);
+  const freeBefore = freeBytes(dirname(store));
+  if (dryRun) return { status: 'ok', dryRun: true, store, keep, old: parked, bytesBefore, freeBefore, counts: wanted, note: `dry run: ${mb(bytesBefore)} would be renamed to ${parked} and ${mb(storeBytes(keep))} put in its place` };
+  renameSync(store, parked);
+  for (const side of ['.wal', '.wal.checkpoint']) {
+    if (existsSync(`${store}${side}`)) renameSync(`${store}${side}`, `${parked}${side}`);
+  }
+  copyFileSync(keep, store);
+  removeQuietly(`${store}.wal`);
+  removeQuietly(`${store}.wal.checkpoint`);
+  const check = await countsOf(store);
+  const wrong = Object.keys(wanted).filter(name => check.counts[name] !== wanted[name]);
+  if (wrong.length) {
+    // Put the old file back rather than leave a store that holds less than the
+    // person was told it would.
+    removeQuietly(store);
+    renameSync(parked, store);
+    for (const side of ['.wal', '.wal.checkpoint']) {
+      if (existsSync(`${parked}${side}`)) renameSync(`${parked}${side}`, `${store}${side}`);
+    }
+    return { status: 'mismatch', store, keep, old: parked, expected: wanted, counts: check.counts, note: `the new store did not hold the same rows (${wrong.join(', ')}), so the old one was put back` };
+  }
+  const answer = {
+    status: 'ok',
+    store,
+    keep,
+    old: parked,
+    bytesBefore,
+    bytesAfter: storeBytes(store),
+    freeBefore,
+    freeAfter: freeBytes(dirname(store)),
+    counts: check.counts,
+  };
+  answer.note = `store went from ${mb(bytesBefore)} to ${mb(answer.bytesAfter)}; ${gb(answer.freeAfter)} free; the old file is at ${parked} until Mastra is known to work`;
+  appendReport({ at: new Date().toISOString(), command: 'swap', ...answer });
+  return answer;
+}
+
+// What a swap posts: the numbers Todd reads without the terminal, and what his
+// next step is.
+export function swapComment(answer) {
+  return [
+    `Trace store swapped: ${mb(answer.bytesBefore)} → ${mb(answer.bytesAfter)}.`,
+    '',
+    `- Store: \`${answer.store}\``,
+    `- Disk: ${gb(answer.freeBefore)} free before, ${gb(answer.freeAfter)} free after`,
+    `- Kept exactly what the live store held: ${KEEP_TABLES.map(({ table }) => `${table} ${answer.counts[table]}`).join(', ')}`,
+    `- The session kept in full is \`${KEEP_THREAD}\` (JUL-284), the only one without a retro record yet.`,
+    `- The old file is parked at \`${answer.old}\` and nothing was deleted: it can be deleted once Mastra Code is seen working from the new store.`,
+    '',
+  ].join('\n');
 }
 
 function usage() {
@@ -851,6 +1062,8 @@ function usage() {
     '       node scripts/trace-store.mjs mine <thread> [--dry-run]',
     '       node scripts/trace-store.mjs repair [--dry-run]',
     '       node scripts/trace-store.mjs sweep [--dry-run] [--census <file>] [--no-comment] [--wait-for-lock [--minutes 180]]',
+    '       node scripts/trace-store.mjs keep [--dry-run]',
+    '       node scripts/trace-store.mjs swap [--dry-run] [--no-comment] [--wait-for-lock [--minutes 720]]',
   ].join('\n');
 }
 
@@ -904,6 +1117,15 @@ async function main(argv) {
     if (!dryRun && answer.plan && !answer.deleted.length) answer.note = 'nothing was clean to delete, so nothing was deleted and nothing was compacted';
     if (dryRun && !answer.plan) answer.note = `dry run: nothing was mined, because ${answer.status}`;
     if (!dryRun && answer.plan && !rest.includes('--no-comment')) answer.comment = postSweepComment(sweepComment(answer));
+  } else if (command === 'keep') {
+    // Writes the kept rows beside the store and checks every count against the
+    // live file. It reads only: the live store is not renamed or written here.
+    answer = await keepStore({ dryRun });
+  } else if (command === 'swap') {
+    const waitMinutes = Number(flag('--minutes') ?? (rest.includes('--wait-for-lock') ? 720 : 0));
+    if (!Number.isFinite(waitMinutes) || waitMinutes < 0) throw new Error('--minutes needs a number (0 or more)');
+    answer = await swapStore({ waitMinutes, dryRun });
+    if (answer.status === 'ok' && !dryRun && !rest.includes('--no-comment')) answer.comment = postSweepComment(swapComment(answer), 'trace-swap');
   } else {
     console.error(usage());
     return 2;

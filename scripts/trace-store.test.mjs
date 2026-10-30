@@ -26,6 +26,8 @@ import {
   openStore,
   readCensus,
   checkpointStore,
+  keepFile,
+  keepStore,
   readLedger,
   retroExists,
   retroFile,
@@ -34,6 +36,7 @@ import {
   storeBytes,
   sweep,
   sweepComment,
+  swapStore,
   sweepPlan,
 } from './trace-store.mjs';
 
@@ -897,4 +900,51 @@ test('the guard order is mined first, held second, card third, retro last', () =
   assert.equal(guard.code, 'held', 'a hold outranks the retro that is already written');
   assert.match(guard.message, /half of it has no retro/);
   rmSync(dir, { recursive: true, force: true });
+});
+
+// The store is 30.9 GB of mostly prompts. What has to outlive it is the cost rows
+// and the detail of the one session no retro has read yet, so `keep` copies those
+// and `swap` puts them in place with the old file parked beside them.
+const KEPT = '13351dad-0d36-42f1-a43b-6e1d016cfa3e';
+const OTHER = 'aaaaaaaa-1111-4222-8333-444444444444';
+const keepRows = () => [
+  span(daysAgo(2), 'a1', 1, KEPT),
+  span(daysAgo(2), 'b1', 1, OTHER),
+  logRow(daysAgo(2), 'l1', 'kept', KEPT),
+  logRow(daysAgo(2), 'l2', 'dropped', OTHER),
+  metric(daysAgo(2), 'm1', 'mastra_model_total_input_tokens', 10, 0.1, KEPT),
+  metric(daysAgo(2), 'm2', 'mastra_model_total_input_tokens', 20, 0.2, OTHER),
+];
+
+test('keep writes every cost row and one session detail, and nothing else', async t => {
+  const { file } = await withStore(t, keepRows());
+  const answer = await keepStore();
+  assert.equal(answer.status, 'ok', answer.note);
+  assert.equal(answer.target, keepFile(file));
+  assert.deepEqual(answer.counts, { metric_events: 2, span_events: 1, log_events: 1 });
+  assert.equal(await countOf(answer.target, 'span_events', `threadId = '${OTHER}'`), 0, 'another session prompts are not copied');
+  assert.equal(await countOf(answer.target, 'metric_events'), 2, 'every cost row is kept, whichever session made it');
+  assert.equal(await countOf(file, 'span_events'), 2, 'the live store is read, never written');
+});
+
+test('swap puts the kept rows in place and parks the old file', async t => {
+  const { file } = await withStore(t, keepRows());
+  await keepStore();
+  const answer = await swapStore();
+  assert.equal(answer.status, 'ok', answer.note);
+  assert.equal(answer.counts.span_events, 1);
+  assert.ok(existsSync(answer.old), 'the old file stays until Mastra is seen working from the new one');
+  assert.equal(await countOf(file, 'span_events'), 1);
+  assert.equal(await countOf(file, 'log_events'), 1);
+  assert.equal(await countOf(file, 'metric_events'), 2, 'the scorecard still has every cost row');
+});
+
+test('swap will not rename over a store an earlier swap parked', async t => {
+  const { file } = await withStore(t, keepRows());
+  await keepStore();
+  writeFileSync(`${file}.old`, 'a store someone still needs');
+  const answer = await swapStore();
+  assert.equal(answer.status, 'parked');
+  assert.equal(await countOf(file, 'span_events'), 2, 'the live store is untouched');
+  assert.equal(readFileSync(`${file}.old`, 'utf8'), 'a store someone still needs');
 });
