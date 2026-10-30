@@ -208,7 +208,7 @@ test('a prose PASS in a comment does not count as a verdict', () => {
 });
 
 test('the printed template is itself parsed as a verdict record once filled', () => {
-  const filled = VERDICT_TEMPLATE.replace('JUL-000', 'JUL-290').replace('<head commit>', HEAD)
+  const filled = VERDICT_TEMPLATE.replace('<card>', 'JUL-290').replace('<head commit>', HEAD)
     .replace('"<model>","verifier":"<model>"', '"sol","verifier":"deepseek"')
     .replace("<the card's words>", AC).replace('<what the verifier saw>', 'ran the app');
   const record = parseVerdictComment(`\`\`\`json\n${filled}\n\`\`\``);

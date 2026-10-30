@@ -44,7 +44,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const VERDICT_KEY = 'juliaShippingVerdict';
-export const VERDICT_TEMPLATE = `{"${VERDICT_KEY}":1,"card":"JUL-000","head":"<head commit>","verdict":"PASS","builder":"<model>","verifier":"<model>","criteria":[{"criterion":"<the card's words>","verdict":"PASS","note":"<what the verifier saw>"}]}`;
+export const VERDICT_TEMPLATE = `{"${VERDICT_KEY}":1,"card":"<card>","head":"<head commit>","verdict":"PASS","builder":"<model>","verifier":"<model>","criteria":[{"criterion":"<the card's words>","verdict":"PASS","note":"<what the verifier saw>"}]}`;
 
 const CARD = /\bJUL-\d+\b/gi;
 const CARD_LINE = /^[ \t]*card[ \t]*:[ \t]*(JUL-\d+)[ \t]*$/gim;

@@ -30,7 +30,7 @@ JUL-276's acceptance criteria. Engineering pull requests name no card and pass w
 The verdict is a comment on the pull request holding one fenced json block:
 
 ```json
-{"juliaShippingVerdict":1,"card":"JUL-000","head":"<head commit>","verdict":"PASS","builder":"<model>","verifier":"<model>","criteria":[{"criterion":"<the card's words>","verdict":"PASS","note":"<what the verifier saw>"}]}
+{"juliaShippingVerdict":1,"card":"<card>","head":"<head commit>","verdict":"PASS","builder":"<model>","verifier":"<model>","criteria":[{"criterion":"<the card's words>","verdict":"PASS","note":"<what the verifier saw>"}]}
 ```
 
 The verifier is an agent that did not write the code. It runs the change the way Todd uses it, the
