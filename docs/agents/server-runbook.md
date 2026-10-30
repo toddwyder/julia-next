@@ -59,82 +59,39 @@ in which case the next timer run does the work.
 ## Mastra Code's trace store
 
 Mastra Code writes every span and token metric to `~/.local/share/mastracode/observability.duckdb`.
-By 29 October it reached 22.6 GB, and full prompt payloads in `span_events` were most of it.
-`scripts/trace-store.mjs` mines the numbers out of a session, and its `sweep` is the one command
-that deletes payloads and compacts the file.
+Full prompt payloads in `span_events` are nearly all of it, and on 29 October the file reached
+22.6 GB. One command cleans it, and the last step of a slice's retro is the only thing that runs it.
 
 ```sh
 node scripts/trace-store.mjs status
-node scripts/trace-store.mjs ledger
-node scripts/trace-store.mjs mine <thread>
-node scripts/trace-store.mjs sweep --dry-run
-node scripts/trace-store.mjs sweep --wait-for-lock --minutes 180
-node scripts/trace-store.mjs repair
-node scripts/trace-store.mjs keep
-node scripts/trace-store.mjs swap --wait-for-lock --minutes 720
+node scripts/trace-store.mjs clean <session id> [--card JUL-284]
 ```
 
-`mine` writes that session's tokens, cost per model, which model each call asked for and which
-answered, time per stage, tool-call counts and stops into `~/.local/state/julia/trace-costs.json`,
-which is the file `scripts/scorecard.mjs` reads when it cannot copy the store. The store does not
-record compactions or handoffs, and `mine` says so in `notHeld` rather than inventing them. A
-session's card comes from the census doc and nowhere else: there is no flag that tells a session
-which card it was on, and a card left in the ledger by an older run is dropped the next time the
-session is mined.
+`clean` takes one session id, the session the slice ran in, and does three things: it keeps that
+session's `metric_events` rows, which carry the per-call tokens and cost the scorecard prices a card
+from; it deletes the session's `span_events` and `log_events` rows, which hold the prompts; and it
+checkpoints the file, so DuckDB folds the write-ahead log in and drops the blocks the delete freed.
+Nothing deletes on a timer, by age, or from a list of sessions: a session loses its detail when a
+retro has learned from it. The output is JSON with the row counts, the file size before and after,
+and the free space after, and the retro pastes it.
 
-`sweep` reads every session in `~/.local/share/mastracode/mastra.db`, mines each one, then deletes a
-session's `span_events` and `log_events` rows only when the session has been mined, is not held, and
-either its own card has a `docs/retros/<card>.md` and is listed as Complete in the census doc, or it
-names no card at all and is approved there. Every fact comes from `docs/retros/census-2026-10-29.md`
-(`--census` overrides): the `Cards with a session` table, the `Complete cards with no session` list,
-the `Approved to delete without a retro` bullets and the `Held back on purpose` bullets. A hold
-outranks a retro and a Complete card; an approval never stands in for a card the session itself
-named; a card passed on the command line never opens the gate, and `sweep` has no `--complete` flag
-because the census doc is the only place a Complete card is read from. `--dry-run` mines, prints the
-plan and posts nothing. A real run posts its numbers and the reason each session was kept on
-JUL-276. Mining copies that session's cost rows into the ledger before anything is deleted, so the scorecard still
-prices the card once its payloads are gone. `metric_events`, which carry the cost, are never deleted.
+A checkpoint rewrites blocks in place and truncates only the tail, so holes in the middle of a big
+file stay. A cleanup can give back less than the round added, so when the file is over 15 GB after
+one, `clean` comments on the slice's card (`--card`, JUL-276 by default) with the store size and
+the fact that the round was too big. That comment is the alarm, so a `clean` run whose comment
+failed says so in its JSON.
 
-A running session holds DuckDB's exclusive lock, so every command exits 0 with `status: busy` and a
-PID instead of failing, and `--wait-for-lock --minutes N` polls until the lock frees. Compaction
-refuses to start when it would not fit in the free space. Sizes before and after land in
-`~/.local/state/julia/trace-store-report.json`; read that file rather than guessing whether the
-store is under control.
+DuckDB's default memory limit is 85% of the machine, which on this 7 GB server is 6 GB, and on
+30 October the kernel killed a run at 6.15 GB before it deleted a row. The store is therefore
+opened with a budget of a third of the machine, at most 2 GB, spilling to a temp directory beside
+it. A session that holds the store's exclusive lock makes `clean` exit 0 with `status: busy` and
+the holder's PID; it changes nothing, so the next run can clean the same session again.
 
-`repair` checkpoints the store in place and deletes no rows: it folds the write-ahead log into the
-file and gives back the room a delete freed, without a second copy. It is the one command to run when
-the store cannot be opened for writing. A sweep killed inside its copy leaves a half-written
-checkpoint WAL beside the store, and the next writable open refuses the file with
-`checkpoint WAL cannot contain a checkpoint marker` — reading still works, so `status` looks healthy.
-Run `repair` first, then the sweep. A finished copy removes the recovery files beside the store, so
-the new file opens for writing.
+`status` prints the file, its size, the free space, and the row count of every table.
 
-Both ways of giving space back need room of their own: on 30 October a checkpoint of the 22.6 GB
-store wanted about 12 GB of spill, and a copy wants a second copy of the store on the same disk.
-DuckDB stops with an error rather than filling the disk, and `repair` reports that error instead of
-changing anything. Clear space elsewhere first: `npm cache clean --force` alone gave back 3.9 GB.
-
-The store is opened with a memory budget of a third of the machine, at most 2 GB, spilling to a temp
-directory beside it. DuckDB's own default is 85% of memory, which on this 7 GB server is 6 GB, and on
-30 October the kernel killed a sweep at 6.15 GB the moment it started writing. For the same reason
-one open serves every session a sweep cleans: an open per session cost 3.1 GB of caches across 42 of
-them. The copy that compacts the file gets a budget of its own: one thread, insertion order off, and
-512 MB of spill, because on 30 October a copy tried to offload 13.2 GiB beside 15 GB of free disk and
-died. A copy that cannot run now says so on the card and leaves the store alone instead of filling
-the disk or dying after the deletes succeeded.
-
-`keep` and `swap` replace the store with a small one when rewriting it in place is not worth the
-room. `keep` writes `observability.keep.duckdb` beside the store: every `metric_events` row, which
-carries the cost; the `span_events` and `log_events` detail of one session, named by `KEEP_THREAD`;
-and the small `score_events` and `feedback_events` tables. It checks every count against a fresh
-read of the live store and refuses to start below 8 GB free. `swap` polls the lock, renames the
-store and its write-ahead log to `observability.duckdb.old`, copies the kept rows into place, checks
-the counts again, and puts `.old` back if they do not match. Nothing is deleted: `.old` and the keep
-file stay until a session is seen running from the new store, and `swap` refuses to run while an
-earlier `.old` is still parked. On 30 October this took the store from 29.5 GB to 5.7 GB in one
-step, after two attempts to rewrite it in place had each spent about 5 GB and still left 19.5 GiB
-of free blocks mid-file that only a dense copy reclaims. The keep file duplicates the new store, so
-delete it once the new one is proven; `.old` is the only remaining copy of the sessions it dropped.
+The cost ledger at `~/.local/state/julia/trace-costs.json` was mined from this store before
+30 October. The scorecard still reads it for a card whose rows a cleanup has since deleted, and
+nothing writes it any more.
 
 ## GitHub boundaries
 

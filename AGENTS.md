@@ -28,7 +28,7 @@ Todd decides what Julia does for the household and gives UAT. Everything else is
 ## Finish
 A card is finished when its PR is merged to main (after Todd's UAT yes when the card changes something he uses), main CI is green on the merge commit, and the card is Complete in Linear with that commit in a comment.
 
-After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. The next slice does not wait for that PR.
+After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Its last step is `node scripts/trace-store.mjs clean <that session's id> --card JUL-<n>`, which keeps the slice's cost rows, deletes its prompt payloads, checkpoints the file, and comments on the card when the store is still over 15 GB. The next slice does not wait for that PR.
 
 ## Enforced rules
 

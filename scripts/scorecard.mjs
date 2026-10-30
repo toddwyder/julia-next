@@ -227,14 +227,24 @@ export function priceThreadUsage(usage, rates) {
   const fresh = usage.promptTokens - cacheRead - write1h - write5m;
   const tokens = { input: fresh, cacheRead, cacheWrite: write5m + write1h, output: usage.completionTokens };
   if (!rates) return { tokens };
+  const cacheReadUsd = cacheReadRate(cacheRead, rates);
   const parts = {
     input: fresh * rates.input,
-    cacheRead: cacheRead * (rates.cache_read ?? rates.input),
     cacheWrite: write5m * (rates.cache_write ?? rates.input) + write1h * (rates.cache_write ?? rates.input) * CACHE_WRITE_1H_FACTOR,
     output: usage.completionTokens * rates.output,
   };
+  if (cacheReadUsd !== null) parts.cacheRead = cacheReadUsd;
   for (const key of Object.keys(parts)) parts[key] /= 1e6;
-  return { tokens, parts, usd: Object.values(parts).reduce((a, b) => a + b, 0) };
+  return { tokens, parts, usd: Object.values(parts).reduce((a, b) => a + b, 0), cacheReadUnpriced: cacheReadUsd === null ? cacheRead : 0 };
+}
+
+// A cache read is priced at the model's own cache-read rate. Both price lists leave that
+// rate out for some models, and charging those tokens at the input rate guessed $8.94 for
+// 59 million tokens a card actually paid about $1.67 for, so a missing rate stays unpriced
+// and the token count is shown instead of a guess.
+export function cacheReadRate(tokens, rates) {
+  if (!Number.isFinite(rates?.cache_read)) return null;
+  return tokens * rates.cache_read;
 }
 
 // ---- tracing (observability.duckdb) ------------------------------------------
@@ -253,8 +263,8 @@ export function traceCopyFits(size, room) {
   return size + TRACE_COPY_MARGIN <= room;
 }
 
-// scripts/trace-store.mjs writes this small ledger of the cost rows while no
-// session holds the trace store, so a card keeps its cost after pruning.
+// A ledger mined from the trace store before 30 October holds the cost rows of 49
+// sessions, so a card whose store rows were deleted by a retro cleanup keeps its cost.
 export function ledgerFile(env = process.env) {
   if (env.MASTRA_TRACE_LEDGER) return env.MASTRA_TRACE_LEDGER;
   return join(env.XDG_STATE_HOME || join(homedir(), '.local', 'state'), 'julia', 'trace-costs.json');
@@ -278,8 +288,8 @@ export function ledgerTracing(threadIds, file = ledgerFile()) {
   };
 }
 
-// The ledger records which card the census gave each session, which is the only record left
-// once a resumed thread's kickoff message is compacted away.
+// The ledger records which card each session was on, which is the only record left once a
+// resumed thread's kickoff message is compacted away.
 export function ledgerCards(file = ledgerFile()) {
   if (!existsSync(file)) return new Map();
   try {
@@ -301,7 +311,7 @@ async function readTracing(dir, file, threadIds) {
     return {
       metrics: [],
       requested: [],
-      skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it; \`node scripts/trace-store.mjs sweep\` mines each session and compacts it`,
+      skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it, so the cost ledger answers instead`,
     };
   }
   const { DuckDBInstance } = createRequire(join(dir, 'package.json'))('@duckdb/node-api');
@@ -326,17 +336,18 @@ async function readTracing(dir, file, threadIds) {
 }
 
 // A traced row carries the parts of the bill but no price of its own, so the parts are
-// priced with the rule priceThreadUsage uses: a cache read or write with no rate of its
-// own is charged at the input rate.
+// priced from a rate list, with the cache read priced only when that list has its rate.
 export function priceTracedTokens(tokens, rates) {
   const fresh = Number(tokens.input_text ?? 0);
   const cacheRead = Number(tokens.input_cache_read ?? 0);
   const cacheWrite = Number(tokens.input_cache_write ?? 0);
   const output = Number(tokens.total_output ?? 0);
-  return (fresh * rates.input
-    + cacheRead * (rates.cache_read ?? rates.input)
+  const cacheReadUsd = cacheReadRate(cacheRead, rates);
+  const usd = (fresh * rates.input
+    + (cacheReadUsd ?? 0)
     + cacheWrite * (rates.cache_write ?? rates.input)
     + output * rates.output) / 1e6;
+  return { usd, cacheReadUnpriced: cacheReadUsd === null ? cacheRead : 0 };
 }
 
 // Sums Mastra's own cost estimate. Only the two total metrics carry the whole
@@ -358,7 +369,8 @@ export function tracedCost(metrics, ratesForRow) {
     if (!row.unpriced) return row;
     const rates = ratesForRow?.(row.answered);
     if (!rates) return row;
-    return { ...row, usd: priceTracedTokens(row.tokens, rates), unpriced: false, pricedFrom: 'our price list' };
+    const priced = priceTracedTokens(row.tokens, rates);
+    return { ...row, usd: priced.usd, unpriced: false, pricedFrom: 'our price list', cacheReadUnpriced: priced.cacheReadUnpriced };
   });
 }
 
@@ -379,7 +391,7 @@ export function judgeStops(stops, uat) {
 }
 
 // A resumed or compacted thread loses the kickoff message that named its card, and the
-// ledger's census record is then the only place that says which card it was on.
+// ledger's session record is then the only place that says which card it was on.
 function windowsFrom(thread, cards) {
   const own = cardWindows(thread, thread.events);
   const remembered = cards?.get(thread.id);
@@ -413,7 +425,8 @@ export function buildScorecard({ card, threads, prices, catalogue, cards, tracin
         // A generation span that names no model leaves provider and model null; that is
         // not a model called "null/null".
         const named = asked?.provider && asked?.model ? `${asked.provider}/${asked.model}` : 'not recorded';
-        cost.push({ ...row, requested: named, basis: row.unpriced ? 'traced; no published price' : (row.pricedFrom ?? 'traced, Mastra estimate') });
+        const basis = row.unpriced ? 'traced; no published price' : (row.pricedFrom ?? 'traced, Mastra estimate');
+        cost.push({ ...row, requested: named, basis: row.cacheReadUnpriced ? `${basis}; cache read unpriced` : basis });
       }
       continue;
     }
@@ -432,7 +445,8 @@ export function buildScorecard({ card, threads, prices, catalogue, cards, tracin
       usd: priced?.usd ? priced.usd * share : 0,
       parts: priced?.parts ? Object.fromEntries(Object.entries(priced.parts).map(([k, v]) => [k, v * share])) : undefined,
       unpriced: !priced?.parts,
-      basis: `${share === 1 ? 'thread total' : `${(share * 100).toFixed(0)}% of thread total (${steps.length} of ${allSteps} model steps)`}${priced && !priced.parts ? '; no published price' : ''}`,
+      cacheReadUnpriced: priced?.cacheReadUnpriced ?? 0,
+      basis: `${share === 1 ? 'thread total' : `${(share * 100).toFixed(0)}% of thread total (${steps.length} of ${allSteps} model steps)`}${priced && !priced.parts ? '; no published price' : ''}${priced?.cacheReadUnpriced ? '; cache read unpriced' : ''}`,
       averageContext: usage ? Math.round(usage.promptTokens / allSteps) : undefined,
       steps: steps.length,
     });
@@ -478,15 +492,23 @@ export function renderScorecard(s, generatedAt = new Date()) {
     : s.cost.length
       ? '- Cost: **unknown**. Mastra kept no token detail for these runs.'
       : '- Cost: **unknown**. No usage records found for this card.';
-  lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.` : unknownCost);
+  const unpricedRows = s.cost.some(c => c.unpriced);
+  const unpricedCache = s.cost.reduce((a, c) => a + (c.cacheReadUnpriced ?? 0), 0);
+  const priced = unpricedRows
+    ? 'plus the unpriced rows below'
+    : unpricedCache
+      ? `plus ${tok(unpricedCache)} cache-read tokens no price list has a rate for, so the total is a floor`
+      : 'every row priced';
+  lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${priced}.` : unknownCost);
   if (s.tracingSkipped && measured) lines.push(`- Tracing not read: ${s.tracingSkipped}. Rows below come from the thread's own usage records.`);
-  if (s.ledgerAt) lines.push(`- Cost source: the cost ledger written ${utc(Date.parse(s.ledgerAt))} by scripts/trace-store.mjs, ${s.tracingSkipped ? 'because the live trace store could not be read' : "because the store holds no rows for this card's sessions"}${s.ledgerMissing ? `; it has no rows for ${s.ledgerMissing} of this card's threads, so treat the total as a floor` : ''}.`);
+  if (s.ledgerAt) lines.push(`- Cost source: the cost ledger written ${utc(Date.parse(s.ledgerAt))} from the trace store, ${s.tracingSkipped ? 'because the live trace store could not be read' : "because the store holds no rows for this card's sessions"}${s.ledgerMissing ? `; it has no rows for ${s.ledgerMissing} of this card's threads, so treat the total as a floor` : ''}.`);
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
   for (const c of s.cost) {
     const t = c.tokens;
-    lines.push(`| ${cell(c.agent)} | ${cell(c.requested)} | ${cell(c.answered)} | ${tok(t.input ?? t.input_text)} | ${tok(t.cacheRead ?? t.input_cache_read)} | ${tok(t.cacheWrite ?? t.input_cache_write)} | ${tok(t.output ?? t.total_output)} | ${c.unpriced ? 'unpriced' : usd(c.usd)} | ${cell(c.basis)} |`);
+    const money = c.unpriced ? 'unpriced' : `${usd(c.usd)}${c.cacheReadUnpriced ? ' + cache read unpriced' : ''}`;
+    lines.push(`| ${cell(c.agent)} | ${cell(c.requested)} | ${cell(c.answered)} | ${tok(t.input ?? t.input_text)} | ${tok(t.cacheRead ?? t.input_cache_read)} | ${tok(t.cacheWrite ?? t.input_cache_write)} | ${tok(t.output ?? t.total_output)} | ${money} | ${cell(c.basis)} |`);
   }
   lines.push('', '## Stops', '');
   if (!s.stops.length) lines.push('None.');
@@ -511,8 +533,11 @@ export function renderScorecard(s, generatedAt = new Date()) {
   const main = s.cost.find(c => c.parts);
   if (main) {
     const p = main.parts;
+    const cacheRead = p.cacheRead == null
+      ? `cache reads unpriced (${tok(main.tokens.cacheRead)} tokens, no rate for this model)`
+      : `cache reads ${usd(p.cacheRead)} (${tok(main.tokens.cacheRead)} tokens)`;
     lines.push('', '## Explain the number', '');
-    lines.push(`The main chat cost ${usd(main.usd)}: cache reads ${usd(p.cacheRead)} (${tok(main.tokens.cacheRead)} tokens), cache writes ${usd(p.cacheWrite)} (${tok(main.tokens.cacheWrite)}), output ${usd(p.output)} (${tok(main.tokens.output)}), fresh input ${usd(p.input)} (${tok(main.tokens.input)}).`);
+    lines.push(`The main chat cost ${usd(main.usd)}: ${cacheRead}, cache writes ${usd(p.cacheWrite)} (${tok(main.tokens.cacheWrite)}), output ${usd(p.output)} (${tok(main.tokens.output)}), fresh input ${usd(p.input)} (${tok(main.tokens.input)}).`);
     lines.push(`It made ${main.steps} model steps and each step re-read about ${tok(main.averageContext)} tokens of context, so cost grows with steps times context size, not with the size of the change.`);
   }
   return lines.join('\n') + '\n';
@@ -546,15 +571,15 @@ async function main() {
   const dir = mastracodeDir();
   const data = appDataDir();
   const threads = readThreads(join(data, 'mastra.db'));
-  // The ledger's census record says which card each session was on, so a thread whose
+  // The ledger's session record says which card each session was on, so a thread whose
   // kickoff line was compacted away still counts as one of the card's sessions.
   const cards = ledgerCards();
   const named = threads.filter(t => cardWindows(t, t.events).some(w => w.card === card)).map(t => t.id);
   const remembered = [...cards].filter(([, on]) => on === card).map(([id]) => id);
   const ids = [...new Set([...named, ...remembered])];
   const tracing = await readTracing(dir, process.env.MASTRA_OBSERVABILITY_DB_PATH || join(data, 'observability.duckdb'), ids);
-  // A store too big to copy, or one that no longer holds this card's sessions, is the
-  // normal state now, so the ledger written by scripts/trace-store.mjs carries the cost.
+  // A store too big to copy, or one whose rows a retro cleanup deleted, is the normal
+  // state now, so the ledger carries the cost.
   const ledgered = tracing.metrics.length ? null : ledgerTracing(ids);
   const fromLedger = ledgered ? { ...ledgered, skipped: tracing.skipped } : null;
   const uatFile = fileURLToPath(new URL('../docs/scorecards/uat.json', import.meta.url));

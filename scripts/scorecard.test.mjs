@@ -269,7 +269,7 @@ test('the ledger answers when the live trace store cannot be read', () => {
 // 30 October: JUL-284 read "no usage records" while the ledger held 678 rows for its
 // session, and JUL-283 read $0.04 for 65 million tokens because Mastra publishes no price
 // for CommandCode. Both are the scorecard's own doing, so both are checked here.
-test('a resumed session keeps the card the census gave it, priced from our own list', () => {
+test('a resumed session keeps the card the ledger gave it, priced from our own list', () => {
   const catalogue = { models: [{ provider: 'commandcode', name: 'deepseek/deepseek-v4.1-flash', inputPerMillion: 0.15, outputPerMillion: 0.6 }] };
   assert.deepEqual(catalogueRates(catalogue, 'commandcode.chat/deepseek/deepseek-v4.1-flash-1017-cm'), { input: 0.15, output: 0.6 });
   assert.equal(catalogueRates(catalogue, 'anthropic/claude-sonnet-5'), undefined, 'a provider our sweep never priced stays unpriced');
@@ -283,9 +283,11 @@ test('a resumed session keeps the card the census gave it, priced from our own l
     { ...line('mastra_model_total_output_tokens'), value: 1_000_000 },
   ];
   const [priced] = tracedCost(traced, model => catalogueRates(catalogue, model));
-  // A cache read with no rate of its own is charged at the input rate, as priceThreadUsage does.
+  // Our list carries no cache-read rate for this model, so those tokens stay unpriced
+  // rather than being charged at the input rate: the guess made 59 million tokens cost $8.94.
   assert.equal(priced.unpriced, false);
-  assert.equal(priced.usd.toFixed(2), (0.15 + 0.15 + 0.6).toFixed(2));
+  assert.equal(priced.usd.toFixed(2), (0.15 + 0.6).toFixed(2));
+  assert.equal(priced.cacheReadUnpriced, 1_000_000);
 
   const resumed = { id: 'thread-9', title: 'Shrinking trace store', events: threadEvents([user('10:00', 'Reply ok.')]) };
   assert.deepEqual(cardWindows(resumed, resumed.events), [], 'a resumed thread names no card of its own');
@@ -295,7 +297,7 @@ test('a resumed session keeps the card the census gave it, priced from our own l
     pulls: [], pings: [], uat: undefined,
   });
   assert.equal(card.windows, 1);
-  assert.equal(card.usd.toFixed(2), (0.15 + 0.15 + 0.6).toFixed(2));
-  assert.equal(card.cost[0].basis, 'our price list');
+  assert.equal(card.usd.toFixed(2), (0.15 + 0.6).toFixed(2));
+  assert.equal(card.cost[0].basis, 'our price list; cache read unpriced');
   assert.equal(card.cost[0].requested, 'not recorded', 'a span that names no model is not a model called null/null');
 });
