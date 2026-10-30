@@ -56,6 +56,39 @@ names the merge commit and `/api/health` reports `ok`. The update service writes
 it is free to update, and `code: active-run` with the run it waited for when a build is in flight,
 in which case the next timer run does the work.
 
+## Mastra Code's trace store
+
+Mastra Code writes every span and token metric to `~/.local/share/mastracode/observability.duckdb`.
+Full prompt payloads in `span_events` are nearly all of it, and on 29 October the file reached
+22.6 GB. One command cleans it, and the last step of a slice's retro is the only thing that runs it.
+
+```sh
+node scripts/trace-store.mjs status
+node scripts/trace-store.mjs clean <session id> [--card JUL-284]
+```
+
+`clean` takes one session id, the session the slice ran in, and does three things: it keeps that
+session's `metric_events` rows, which carry the per-call tokens and cost the scorecard prices a card
+from; it deletes the session's `span_events` and `log_events` rows, which hold the prompts; and it
+checkpoints the file, so DuckDB folds the write-ahead log in and drops the blocks the delete freed.
+Nothing deletes on a timer, by age, or from a list of sessions: a session loses its detail when a
+retro has learned from it. The output is JSON with the row counts, the file size before and after,
+and the free space after, and the retro pastes it.
+
+A checkpoint rewrites blocks in place and truncates only the tail, so holes in the middle of a big
+file stay. A cleanup can give back less than the round added, so when the file is over 15 GB after
+one, `clean` comments on the slice's card (`--card`, JUL-276 by default) with the store size and
+the fact that the round was too big. That comment is the alarm, so a `clean` run whose comment
+failed says so in its JSON.
+
+DuckDB's default memory limit is 85% of the machine, which on this 7 GB server is 6 GB, and on
+30 October the kernel killed a run at 6.15 GB before it deleted a row. The store is therefore
+opened with a budget of a third of the machine, at most 2 GB, spilling to a temp directory beside
+it. A session that holds the store's exclusive lock makes `clean` exit 0 with `status: busy` and
+the holder's PID; it changes nothing, so the next run can clean the same session again.
+
+`status` prints the file, its size, the free space, and the row count of every table.
+
 ## GitHub boundaries
 
 Use ordinary signed-in GitHub access for authorized cards. Keep authentication material inside its trusted process. Evidence and notes belong on the card branch and pull request.

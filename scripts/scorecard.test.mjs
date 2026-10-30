@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-import { buildScorecard, cardForThread, cardWindows, findStops, priceThreadUsage, readPings, readThreads, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
+import { buildScorecard, cardForThread, cardWindows, catalogueRates, findStops, priceThreadUsage, readPings, readThreads, renderScorecard, threadEvents, threadProjectPath, traceCopyFits, tracedCost } from './scorecard.mjs';
 import { stopComment } from './stop-ping.mjs';
 import { checkForToddGuard } from './linear-cli.mjs';
 import { appendFileSync } from 'node:fs';
@@ -230,4 +230,38 @@ test('rows with no token detail say unknown instead of claiming zero spend', () 
   const priced = { ...scorecard, cost: [{ agent: 'Code Agent (main chat)', requested: 'commandcode/…', answered: 'not recorded', tokens: {}, usd: 0, unpriced: true, basis: 'thread total' }] };
   assert.match(renderScorecard(priced), /Cost: \*\*unknown\*\*\. Mastra kept no token detail for these runs\./);
   assert.doesNotMatch(renderScorecard(priced), /Cost: \*\*\$0\.00\*\*/);
+});
+
+// 30 October: JUL-283 read $0.04 for 65 million tokens because Mastra publishes no price
+// for CommandCode. That was the scorecard's own doing, so it is checked here.
+test('a traced row Mastra cannot price is priced from our own list', () => {
+  const catalogue = { models: [{ provider: 'commandcode', name: 'deepseek/deepseek-v4.1-flash', inputPerMillion: 0.15, outputPerMillion: 0.6 }] };
+  assert.deepEqual(catalogueRates(catalogue, 'commandcode.chat/deepseek/deepseek-v4.1-flash-1017-cm'), { input: 0.15, output: 0.6 });
+  assert.equal(catalogueRates(catalogue, 'anthropic/claude-sonnet-5'), undefined, 'a provider our sweep never priced stays unpriced');
+
+  const line = name => ({ threadId: 'thread-9', at: ms('10:05'), entityName: 'Code Agent', provider: 'commandcode.chat', model: 'deepseek/deepseek-v4.1-flash-1017-cm', name, value: 0, estimatedCost: null });
+  const traced = [
+    line('mastra_model_total_input_tokens'),
+    line('mastra_model_total_output_tokens'),
+    { ...line('mastra_model_input_text_tokens'), value: 1_000_000 },
+    { ...line('mastra_model_input_cache_read_tokens'), value: 1_000_000 },
+    { ...line('mastra_model_total_output_tokens'), value: 1_000_000 },
+  ];
+  const [priced] = tracedCost(traced, model => catalogueRates(catalogue, model));
+  // Our list carries no cache-read rate for this model, so those tokens stay unpriced
+  // rather than being charged at the input rate: the guess made 59 million tokens cost $8.94.
+  assert.equal(priced.unpriced, false);
+  assert.equal(priced.usd.toFixed(2), (0.15 + 0.6).toFixed(2));
+  assert.equal(priced.cacheReadUnpriced, 1_000_000);
+
+  const session = { id: 'thread-9', title: 'JUL-284 shrink the trace store', events: threadEvents([user('10:00', 'Card: JUL-284. Start.')]) };
+  const card = buildScorecard({
+    card: 'JUL-284', threads: [session], prices: {}, catalogue,
+    tracing: { metrics: traced, requested: [{ threadId: 'thread-9', at: ms('10:05'), entityName: 'Code Agent', provider: null, model: null }], skipped: null },
+    pulls: [], pings: [], uat: undefined,
+  });
+  assert.equal(card.windows, 1);
+  assert.equal(card.usd.toFixed(2), (0.15 + 0.6).toFixed(2));
+  assert.equal(card.cost[0].basis, 'our price list; cache read unpriced');
+  assert.equal(card.cost[0].requested, 'not recorded', 'a span that names no model is not a model called null/null');
 });

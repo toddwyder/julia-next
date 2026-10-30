@@ -136,6 +136,36 @@ export function threadProjectPath(dbPath, threadId) {
   }
 }
 
+// The session a notification belongs to. The hook payload cannot answer that on its
+// own: Mastra Code builds its hook manager with the literal "session-init" and only
+// replaces that id on thread_changed/thread_created, which `mastracode resume` never
+// emits, so a resumed session's stops named a thread nobody can reopen.
+export function threadExists(dbPath, threadId) {
+  try {
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      return Boolean(db.prepare('select 1 from mastra_threads where id = ?').get(threadId));
+    } finally {
+      db.close();
+    }
+  } catch {
+    return false;
+  }
+}
+
+export function newestThread(dbPath) {
+  try {
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      return db.prepare('select id from mastra_threads order by updatedAt desc limit 1').get()?.id;
+    } finally {
+      db.close();
+    }
+  } catch {
+    return undefined;
+  }
+}
+
 // ---- prices ------------------------------------------------------------------
 
 export function loadPrices(mastracodeDir) {
@@ -148,6 +178,46 @@ export function ratesFor(prices, model) {
   return prices[provider.split('.')[0]]?.models?.[rest.join('/')]?.cost;
 }
 
+// Mastra's table has no entry for a provider we added ourselves. CommandCode is served
+// through the gateway, so every CommandCode row reached the card as "unpriced" and a card
+// that spent 65 million tokens read $0.04 — only the Anthropic observer rows counted. The
+// start screen's sweep already reads each account's published page, so its catalogue prices
+// what Mastra cannot.
+export function loadCatalogue(env = process.env) {
+  const file = env.JULIA_MODEL_CATALOGUE
+    || join(env.DASHBOARD_STATE_DIR || '/var/lib/julia-dashboard', 'state', 'models.json');
+  if (!existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+// One account answers to several provider names (`commandcode`, `mastracode/commandcode`,
+// `commandcode.chat`), and a model id can carry a suffix the catalogue lists without:
+// `deepseek/deepseek-v4.1-flash-1017-cm` is the catalogue's `deepseek/deepseek-v4.1-flash`.
+const accountName = provider => String(provider).split('.')[0].replace(/^mastracode\//, '');
+const bareName = name => String(name).replace(/-\d{4,}(-[a-z]{1,3})?$/i, '');
+
+export function catalogueRates(catalogue, model) {
+  const [provider, ...rest] = String(model).split('/');
+  const name = rest.join('/');
+  const account = accountName(provider);
+  const rows = (catalogue?.models ?? []).filter(row => accountName(row.provider) === account);
+  const found = rows.find(row => row.name === name)
+    ?? rows.find(row => bareName(row.name) === bareName(name))
+    ?? rows.find(row => row.name === bareName(name));
+  if (!found) return undefined;
+  if (found.free) return { input: 0, output: 0 };
+  if (!Number.isFinite(found.inputPerMillion) || !Number.isFinite(found.outputPerMillion)) return undefined;
+  return { input: found.inputPerMillion, output: found.outputPerMillion };
+}
+
+export function ratesForModel(prices, catalogue, model) {
+  return ratesFor(prices, model) ?? catalogueRates(catalogue, model);
+}
+
 // Prices a Mastra Code thread `tokenUsage` (AI SDK totals: promptTokens includes cache reads and writes).
 // Without rates it still splits the tokens, so unpriced usage is reported in tokens.
 export function priceThreadUsage(usage, rates) {
@@ -157,14 +227,24 @@ export function priceThreadUsage(usage, rates) {
   const fresh = usage.promptTokens - cacheRead - write1h - write5m;
   const tokens = { input: fresh, cacheRead, cacheWrite: write5m + write1h, output: usage.completionTokens };
   if (!rates) return { tokens };
+  const cacheReadUsd = cacheReadRate(cacheRead, rates);
   const parts = {
     input: fresh * rates.input,
-    cacheRead: cacheRead * (rates.cache_read ?? rates.input),
     cacheWrite: write5m * (rates.cache_write ?? rates.input) + write1h * (rates.cache_write ?? rates.input) * CACHE_WRITE_1H_FACTOR,
     output: usage.completionTokens * rates.output,
   };
+  if (cacheReadUsd !== null) parts.cacheRead = cacheReadUsd;
   for (const key of Object.keys(parts)) parts[key] /= 1e6;
-  return { tokens, parts, usd: Object.values(parts).reduce((a, b) => a + b, 0) };
+  return { tokens, parts, usd: Object.values(parts).reduce((a, b) => a + b, 0), cacheReadUnpriced: cacheReadUsd === null ? cacheRead : 0 };
+}
+
+// A cache read is priced at the model's own cache-read rate. Both price lists leave that
+// rate out for some models, and charging those tokens at the input rate guessed $8.94 for
+// 59 million tokens a card actually paid about $1.67 for, so a missing rate stays unpriced
+// and the token count is shown instead of a guess.
+export function cacheReadRate(tokens, rates) {
+  if (!Number.isFinite(rates?.cache_read)) return null;
+  return tokens * rates.cache_read;
 }
 
 // ---- tracing (observability.duckdb) ------------------------------------------
@@ -189,7 +269,11 @@ async function readTracing(dir, file, threadIds) {
   const free = statfsSync(tmpdir());
   const room = Number(free.bavail) * Number(free.bsize);
   if (!traceCopyFits(fileSize, room)) {
-    return { metrics: [], requested: [], skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it` };
+    return {
+      metrics: [],
+      requested: [],
+      skipped: `the trace store is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it, so its cost is unknown`,
+    };
   }
   const { DuckDBInstance } = createRequire(join(dir, 'package.json'))('@duckdb/node-api');
   // A running Mastra Code holds the trace file's lock, so read a copy.
@@ -212,9 +296,24 @@ async function readTracing(dir, file, threadIds) {
   }
 }
 
+// A traced row carries the parts of the bill but no price of its own, so the parts are
+// priced from a rate list, with the cache read priced only when that list has its rate.
+export function priceTracedTokens(tokens, rates) {
+  const fresh = Number(tokens.input_text ?? 0);
+  const cacheRead = Number(tokens.input_cache_read ?? 0);
+  const cacheWrite = Number(tokens.input_cache_write ?? 0);
+  const output = Number(tokens.total_output ?? 0);
+  const cacheReadUsd = cacheReadRate(cacheRead, rates);
+  const usd = (fresh * rates.input
+    + (cacheReadUsd ?? 0)
+    + cacheWrite * (rates.cache_write ?? rates.input)
+    + output * rates.output) / 1e6;
+  return { usd, cacheReadUnpriced: cacheReadUsd === null ? cacheRead : 0 };
+}
+
 // Sums Mastra's own cost estimate. Only the two total metrics carry the whole
 // cost; the input/cache/output detail metrics repeat parts of it.
-export function tracedCost(metrics) {
+export function tracedCost(metrics, ratesForRow) {
   const byAgent = new Map();
   for (const m of metrics) {
     const key = `${m.entityName}\u0000${m.provider}/${m.model}`;
@@ -227,7 +326,13 @@ export function tracedCost(metrics) {
     }
     byAgent.set(key, row);
   }
-  return [...byAgent.values()];
+  return [...byAgent.values()].map(row => {
+    if (!row.unpriced) return row;
+    const rates = ratesForRow?.(row.answered);
+    if (!rates) return row;
+    const priced = priceTracedTokens(row.tokens, rates);
+    return { ...row, usd: priced.usd, unpriced: false, pricedFrom: 'our price list', cacheReadUnpriced: priced.cacheReadUnpriced };
+  });
 }
 
 // ---- scorecard ---------------------------------------------------------------
@@ -246,7 +351,7 @@ export function judgeStops(stops, uat) {
   });
 }
 
-export function buildScorecard({ card, threads, prices, tracing, pulls, pings, uat }) {
+export function buildScorecard({ card, threads, prices, catalogue, tracing, pulls, pings, uat }) {
   const windows = threads.flatMap(t => cardWindows(t, t.events)).filter(w => w.card === card);
   // A pstack slice runs on its card's branch (feat/jul-276-…), so the branch name
   // may never mention the slice id; the search that found the PR already matched
@@ -267,9 +372,13 @@ export function buildScorecard({ card, threads, prices, tracing, pulls, pings, u
     }
     const traced = tracing.metrics.filter(m => m.threadId === w.thread.id && inWindow(w, Number(m.at)));
     if (traced.some(m => m.entityName === 'Code Agent')) {
-      for (const row of tracedCost(traced)) {
+      for (const row of tracedCost(traced, model => ratesForModel(prices, catalogue, model))) {
         const asked = tracing.requested.find(r => r.threadId === w.thread.id && r.entityName === row.agent && inWindow(w, Number(r.at)));
-        cost.push({ ...row, requested: asked ? `${asked.provider}/${asked.model}` : 'not recorded', basis: row.unpriced ? 'traced; no published price' : 'traced, Mastra estimate' });
+        // A generation span that names no model leaves provider and model null; that is
+        // not a model called "null/null".
+        const named = asked?.provider && asked?.model ? `${asked.provider}/${asked.model}` : 'not recorded';
+        const basis = row.unpriced ? 'traced; no published price' : (row.pricedFrom ?? 'traced, Mastra estimate');
+        cost.push({ ...row, requested: named, basis: row.cacheReadUnpriced ? `${basis}; cache read unpriced` : basis });
       }
       continue;
     }
@@ -277,7 +386,7 @@ export function buildScorecard({ card, threads, prices, tracing, pulls, pings, u
     const models = [...new Set(events.steps.map(s => s.model))];
     const allSteps = events.steps.length;
     const share = steps.length / allSteps;
-    const rates = models.length === 1 ? ratesFor(prices, models[0]) : undefined;
+    const rates = models.length === 1 ? ratesForModel(prices, catalogue, models[0]) : undefined;
     const priced = usage ? priceThreadUsage(usage, rates) : undefined;
     const scale = n => Math.round(n * share);
     cost.push({
@@ -288,7 +397,8 @@ export function buildScorecard({ card, threads, prices, tracing, pulls, pings, u
       usd: priced?.usd ? priced.usd * share : 0,
       parts: priced?.parts ? Object.fromEntries(Object.entries(priced.parts).map(([k, v]) => [k, v * share])) : undefined,
       unpriced: !priced?.parts,
-      basis: `${share === 1 ? 'thread total' : `${(share * 100).toFixed(0)}% of thread total (${steps.length} of ${allSteps} model steps)`}${priced && !priced.parts ? '; no published price' : ''}`,
+      cacheReadUnpriced: priced?.cacheReadUnpriced ?? 0,
+      basis: `${share === 1 ? 'thread total' : `${(share * 100).toFixed(0)}% of thread total (${steps.length} of ${allSteps} model steps)`}${priced && !priced.parts ? '; no published price' : ''}${priced?.cacheReadUnpriced ? '; cache read unpriced' : ''}`,
       averageContext: usage ? Math.round(usage.promptTokens / allSteps) : undefined,
       steps: steps.length,
     });
@@ -332,14 +442,22 @@ export function renderScorecard(s, generatedAt = new Date()) {
     : s.cost.length
       ? '- Cost: **unknown**. Mastra kept no token detail for these runs.'
       : '- Cost: **unknown**. No usage records found for this card.';
-  lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${s.cost.some(c => c.unpriced) ? 'plus the unpriced rows below' : 'every row priced'}.` : unknownCost);
+  const unpricedRows = s.cost.some(c => c.unpriced);
+  const unpricedCache = s.cost.reduce((a, c) => a + (c.cacheReadUnpriced ?? 0), 0);
+  const priced = unpricedRows
+    ? 'plus the unpriced rows below'
+    : unpricedCache
+      ? `plus ${tok(unpricedCache)} cache-read tokens no price list has a rate for, so the total is a floor`
+      : 'every row priced';
+  lines.push(measured ? `- Cost: **${usd(s.usd)}** at published API prices, ${priced}.` : unknownCost);
   if (s.tracingSkipped && measured) lines.push(`- Tracing not read: ${s.tracingSkipped}. Rows below come from the thread's own usage records.`);
   lines.push(`- Stops: ${s.stops.length}, waiting ${minutes(s.stops.reduce((a, x) => a + x.resumed - x.since, 0))} in total. ${pr}${s.pull?.mergedAt ? `, merged ${utc(Date.parse(s.pull.mergedAt))}` : ''}.`, '');
   lines.push('## Cost by agent and model', '');
   lines.push('| Agent | Model requested | Model answered | Fresh input | Cache read | Cache write | Output | Cost | Basis |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- |');
   for (const c of s.cost) {
     const t = c.tokens;
-    lines.push(`| ${cell(c.agent)} | ${cell(c.requested)} | ${cell(c.answered)} | ${tok(t.input ?? t.input_text)} | ${tok(t.cacheRead ?? t.input_cache_read)} | ${tok(t.cacheWrite ?? t.input_cache_write)} | ${tok(t.output ?? t.total_output)} | ${c.unpriced ? 'unpriced' : usd(c.usd)} | ${cell(c.basis)} |`);
+    const money = c.unpriced ? 'unpriced' : `${usd(c.usd)}${c.cacheReadUnpriced ? ' + cache read unpriced' : ''}`;
+    lines.push(`| ${cell(c.agent)} | ${cell(c.requested)} | ${cell(c.answered)} | ${tok(t.input ?? t.input_text)} | ${tok(t.cacheRead ?? t.input_cache_read)} | ${tok(t.cacheWrite ?? t.input_cache_write)} | ${tok(t.output ?? t.total_output)} | ${money} | ${cell(c.basis)} |`);
   }
   lines.push('', '## Stops', '');
   if (!s.stops.length) lines.push('None.');
@@ -364,8 +482,11 @@ export function renderScorecard(s, generatedAt = new Date()) {
   const main = s.cost.find(c => c.parts);
   if (main) {
     const p = main.parts;
+    const cacheRead = p.cacheRead == null
+      ? `cache reads unpriced (${tok(main.tokens.cacheRead)} tokens, no rate for this model)`
+      : `cache reads ${usd(p.cacheRead)} (${tok(main.tokens.cacheRead)} tokens)`;
     lines.push('', '## Explain the number', '');
-    lines.push(`The main chat cost ${usd(main.usd)}: cache reads ${usd(p.cacheRead)} (${tok(main.tokens.cacheRead)} tokens), cache writes ${usd(p.cacheWrite)} (${tok(main.tokens.cacheWrite)}), output ${usd(p.output)} (${tok(main.tokens.output)}), fresh input ${usd(p.input)} (${tok(main.tokens.input)}).`);
+    lines.push(`The main chat cost ${usd(main.usd)}: ${cacheRead}, cache writes ${usd(p.cacheWrite)} (${tok(main.tokens.cacheWrite)}), output ${usd(p.output)} (${tok(main.tokens.output)}), fresh input ${usd(p.input)} (${tok(main.tokens.input)}).`);
     lines.push(`It made ${main.steps} model steps and each step re-read about ${tok(main.averageContext)} tokens of context, so cost grows with steps times context size, not with the size of the change.`);
   }
   return lines.join('\n') + '\n';
@@ -403,7 +524,7 @@ async function main() {
   const tracing = await readTracing(dir, process.env.MASTRA_OBSERVABILITY_DB_PATH || join(data, 'observability.duckdb'), ids);
   const uatFile = fileURLToPath(new URL('../docs/scorecards/uat.json', import.meta.url));
   const uat = existsSync(uatFile) ? JSON.parse(readFileSync(uatFile, 'utf8'))[card] : undefined;
-  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });
+  const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), catalogue: loadCatalogue(), tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });
   const markdown = renderScorecard(scorecard);
   if (flag === '--write') {
     const out = fileURLToPath(new URL(`../docs/scorecards/${card}.md`, import.meta.url));

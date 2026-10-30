@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { linearGraphQL, getIssue, postComment, postCommentToIssueId, checkForToddGuard, findStateId, setIssueState } from './linear-cli.mjs';
+import { linearGraphQL, getIssue, postComment, postCommentToIssueId, checkForToddGuard, findStateId, setIssueState, commentBodyFromArgs } from './linear-cli.mjs';
 
 function fakeFetch(responses) {
   let call = 0;
@@ -319,4 +322,38 @@ test('delivery specification fetch includes complete comment evidence and refuse
   assert.match(query, /comments\(first: 250\)/);
   assert.equal(issue.comments.nodes[0].body, 'PM-approved clarification');
   await assert.rejects(getIssue('JUL-202', { apiKey: 'fixture', includeComments: true, fetchImpl: fakeFetch([{ body: { data: { issue: { comments: { nodes: [], pageInfo: { hasNextPage: true } } } } } }]) }), /incomplete/);
+});
+
+// JUL-284 retro: two merge comments arrived as the literal text of a file path
+// (`/tmp/c276.md`, `/tmp/c284.md`). These pin the three ways that now fails
+// loudly instead of posting eleven characters.
+test('comment --file posts the file contents, not the path', () => {
+  const body = commentBodyFromArgs(['--file', '/tmp/c276.md'], { readFileImpl: () => '# real body\nsecond line' });
+  assert.equal(body, '# real body\nsecond line');
+});
+
+test('comment - reads the body from stdin', () => {
+  let fdRead;
+  const body = commentBodyFromArgs(['-'], { readFileImpl: (fd) => { fdRead = fd; return 'from stdin'; } });
+  assert.equal(body, 'from stdin');
+  assert.equal(fdRead, 0);
+});
+
+test('comment refuses a body that is the path of an existing file, and says what to run instead', () => {
+  assert.throws(() => commentBodyFromArgs(['/tmp/c284.md'], { fileExists: () => true }), /that is the path of an existing file.*--file \/tmp\/c284\.md/s);
+});
+
+test('comment refuses a real existing path on this machine, and still posts a plain body', () => {
+  const path = join(tmpdir(), `linear-cli-body-${process.pid}.md`);
+  writeFileSync(path, 'written first, posted second');
+  try {
+    assert.throws(() => commentBodyFromArgs([path]), /refusing to post/);
+    assert.equal(commentBodyFromArgs([path, 'is', 'a', 'sentence']), `${path} is a sentence`);
+  } finally {
+    rmSync(path, { force: true });
+  }
+});
+
+test('comment --file without a path is a usage error', () => {
+  assert.throws(() => commentBodyFromArgs(['--file']), /usage: linear-cli\.mjs comment <ID> --file <path>/);
 });

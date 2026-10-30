@@ -24,6 +24,7 @@
     "react-dom": "^19.3.0"
   },
   "devDependencies": {
+    "@duckdb/node-api": "1.5.2-r.2",
     "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
     "@firebase/rules-unit-testing": "6.0.0",
     "@playwright/test": "1.63.0",

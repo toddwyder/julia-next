@@ -10,10 +10,14 @@ Julia uses pstack (adopted 22 October 2026). pstack builds and proves. This file
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
 - Every card's PR includes its scorecard, built with `node scripts/scorecard.mjs JUL-<n> --write`, and every stop pings Todd; the rest is in [docs/adr/0024-run-scorecard-and-stop-ping.md](docs/adr/0024-run-scorecard-and-stop-ping.md). Money never stops a card.
 - Framework facts come from the installed packages and their version-matched official docs.
-- Commit and push as you go; publish with gh using the ordinary signed-in GitHub access.
+- Commit and push as you go, and open the pull request in the same step: `check-branch-pr` fails any branch that is pushed without one. Publish with gh using the ordinary signed-in GitHub access.
 
 ## Todd
 Todd decides what Julia does for the household and gives UAT. Everything else is yours: decide it and record it in the decision log. When a step truly needs his own account, show that nothing else can do it, reduce it to one approval he clicks, and keep working while it is pending.
+
+- A turn ends finished or blocked on a named decision he can answer from the message; never on a progress line.
+- An approval with conditions is one open item per condition, quoted as he wrote it, closed only with evidence.
+- Telling him means a channel that reaches him; a tracker comment notifies nobody until you read back what his end shows.
 
 ## Server
 - Agents run as ubuntu with admin rights; Todd accepts the risks.
@@ -23,6 +27,8 @@ Todd decides what Julia does for the household and gives UAT. Everything else is
 
 ## Finish
 A card is finished when its PR is merged to main (after Todd's UAT yes when the card changes something he uses), main CI is green on the merge commit, and the card is Complete in Linear with that commit in a comment.
+
+After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Its last step is `node scripts/trace-store.mjs clean <that session's id> --card JUL-<n>`, which keeps the slice's cost rows, deletes its prompt payloads, checkpoints the file, and comments on the card when the store is still over 15 GB. The next slice does not wait for that PR.
 
 ## Enforced rules
 

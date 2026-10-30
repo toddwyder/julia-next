@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { appDataDir, cardForThread, stopsFile, threadProjectPath } from './scorecard.mjs';
+import { appDataDir, cardForThread, newestThread, stopsFile, threadExists, threadProjectPath } from './scorecard.mjs';
 import { linearGraphQL, postComment } from './linear-cli.mjs';
 
 const TODD_PROFILE = 'https://linear.app/julia-next/profiles/toddwyder';
@@ -119,6 +119,42 @@ export function projectWiresStopPing(projectDir, { home = homedir(), read = read
   }
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The thread id a resumed session never sends. Walk the processes above this hook for
+// `mastracode resume <thread>`, which is how the session that stopped was opened.
+export function resumeThreadFromProcesses(startPid = process.ppid, { read = readFileSync } = {}) {
+  let pid = startPid;
+  for (let depth = 0; depth < 8 && pid > 1; depth += 1) {
+    let cmdline;
+    let stat;
+    try {
+      cmdline = read(`/proc/${pid}/cmdline`, 'utf8').split('\0');
+      stat = read(`/proc/${pid}/stat`, 'utf8');
+    } catch {
+      return undefined;
+    }
+    const at = cmdline.indexOf('resume');
+    if (at !== -1 && UUID.test(cmdline[at + 1] ?? '')) return cmdline[at + 1];
+    const after = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+    pid = Number(after[1]);
+  }
+  return undefined;
+}
+
+// Which session a stop belongs to. A payload id is used only when it names a thread
+// that exists; otherwise the resume command above, then the thread that moved last.
+// The source is recorded with the stop, so a guessed thread is never read as a fact.
+export function resolveThread(payload, db, { exists = threadExists, resume = resumeThreadFromProcesses, newest = newestThread } = {}) {
+  const claimed = payload?.session_id;
+  if (UUID.test(claimed ?? '') && exists(db, claimed)) return { thread: claimed, threadSource: 'payload' };
+  const fromProcess = resume();
+  if (fromProcess && exists(db, fromProcess)) return { thread: fromProcess, threadSource: 'resume command' };
+  const latest = newest(db);
+  if (latest) return { thread: latest, threadSource: 'newest thread' };
+  return { thread: claimed, threadSource: 'payload, unverified' };
+}
+
 // Linear never notifies Todd about a comment written with his own key, but an issue
 // reminder he sets for himself is delivered like any notification, phone included.
 const REMINDER_LEAD_MS = 30_000;
@@ -132,13 +168,14 @@ function record(file, entry) {
 export async function handleStop(payload, env = process.env, {
   threadCardFor = cardForThread,
   projectPathFor = threadProjectPath,
+  threadFor = resolveThread,
   post = postComment,
   remind = linearGraphQL,
 } = {}) {
   const file = stopsFile(env);
   const cardsFile = threadCardsFile(env);
-  const thread = payload.session_id;
   const db = join(appDataDir(env), 'mastra.db');
+  const { thread, threadSource } = threadFor(payload, db);
   const projectPath = projectPathFor(db, thread);
   const bindings = readThreadCards(cardsFile);
   const binding = bindings[thread]?.card;
@@ -149,7 +186,7 @@ export async function handleStop(payload, env = process.env, {
     binding,
     lastCard: lastCardFromStops(file),
   });
-  const stop = { id: randomUUID(), at: new Date().toISOString(), thread, cwd: payload.cwd ?? null, projectPath: projectPath ?? null, card: card ?? null, cardSource: source, reason: payload.reason, message: payload.message ?? null };
+  const stop = { id: randomUUID(), at: new Date().toISOString(), thread, threadSource, cwd: payload.cwd ?? null, projectPath: projectPath ?? null, card: card ?? null, cardSource: source, reason: payload.reason, message: payload.message ?? null };
   record(file, stop);
   if (!card) return { ...stop, posted: false, error: 'no card for this thread' };
   if (source === 'last ping') bindThreadCard(cardsFile, thread, card, source);
