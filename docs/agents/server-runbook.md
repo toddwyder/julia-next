@@ -68,7 +68,7 @@ node scripts/trace-store.mjs status
 node scripts/trace-store.mjs ledger
 node scripts/trace-store.mjs mine <thread> --card JUL-276
 node scripts/trace-store.mjs delete <thread> --card JUL-276
-node scripts/trace-store.mjs sweep --dry-run --wait-for-lock --minutes 180
+node scripts/trace-store.mjs sweep --complete JUL-284,JUL-283 --dry-run --wait-for-lock --minutes 180
 ```
 
 `mine` writes that session's tokens, cost per model, which model each call asked for and which
@@ -78,8 +78,10 @@ record compactions or handoffs, and `mine` says so in `notHeld` rather than inve
 
 Nothing is deleted by age. `delete` removes the session's `span_events` and `log_events` rows only
 when that session has been mined and `docs/retros/<card>.md` exists, and it names the missing piece
-when it refuses. `sweep` does the same for every mined session whose card is Complete, then compacts.
-`metric_events`, which carry the cost, are never deleted.
+when it refuses. `sweep` does the same for every mined session whose card is in `--complete`, then
+compacts; with no `--complete` list no card is known to be Complete and nothing is cleaned. Mining
+copies that session's cost rows into the ledger before anything is deleted, so the scorecard still
+prices the card once its payloads are gone. `metric_events`, which carry the cost, are never deleted.
 
 A running session holds DuckDB's exclusive lock, so every command exits 0 with `status: busy` and a
 PID instead of failing, and `--wait-for-lock --minutes N` polls until the lock frees. Compaction

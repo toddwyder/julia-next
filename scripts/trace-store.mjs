@@ -168,20 +168,23 @@ async function openStore(file, mode) {
   }
 }
 
-const METRIC_QUERY = `select threadId, epoch_ms(date_trunc('minute', timestamp)) as at, entityName, provider, model, name,
+// The scorecard prices a card from these two: per-minute token and cost rows,
+// and which model each call asked for. `thread` narrows them to one session so
+// mining can keep that session's numbers before its payload rows are deleted.
+const METRIC_QUERY = thread => `select threadId, epoch_ms(date_trunc('minute', timestamp)) as at, entityName, provider, model, name,
     sum(value) as value,
     case when count(*) filter (where estimatedCost is null) > 0 then null else sum(estimatedCost) end as estimatedCost,
     count(*) as rows
   from metric_events
-  where name like 'mastra_model_%tokens'
+  where name like 'mastra_model_%tokens'${thread ? ` and threadId = ${sqlText(thread)}` : ''}
   group by 1, 2, 3, 4, 5, 6
   order by 2`;
 
-const REQUESTED_QUERY = `select threadId, epoch_ms(timestamp) as at, entityName,
+const REQUESTED_QUERY = thread => `select threadId, epoch_ms(timestamp) as at, entityName,
     json_extract_string(attributes, '$.model') as model,
     json_extract_string(attributes, '$.provider') as provider
   from span_events
-  where spanType = 'model_generation' and endedAt is null
+  where spanType = 'model_generation' and endedAt is null${thread ? ` and threadId = ${sqlText(thread)}` : ''}
   order by 2`;
 
 async function readRows(connection, sql) {
@@ -196,8 +199,8 @@ export async function exportLedger(file = storeFile(), ledger = ledgerFile()) {
   if (opened.busy) return { status: 'busy', ...opened.busy };
   try {
     const connection = await opened.instance.connect();
-    const rows = await readRows(connection, METRIC_QUERY);
-    const requested = await readRows(connection, REQUESTED_QUERY);
+    const rows = await readRows(connection, METRIC_QUERY());
+    const requested = await readRows(connection, REQUESTED_QUERY());
     const merged = mergeLedger(readLedger(ledger), rows, requested);
     writeJsonAtomic(ledger, merged);
     return { status: 'ok', rows: rows.length, requested: requested.length, ledgerRows: merged.rows.length, ledger };
@@ -338,9 +341,15 @@ export async function mineSession(thread, { card, store = storeFile(), ledgerPat
   const opened = await openStore(store, 'READ_ONLY');
   if (opened.busy) return { status: 'busy', ...opened.busy, thread };
   let record;
+  let costRows = [];
+  let requestedRows = [];
   try {
     const connection = await opened.instance.connect();
     const rows = async sql => (await connection.runAndReadAll(sql)).getRowObjectsJson();
+    // The scorecard reads the ledger when the store is too big to copy, so a
+    // mined session keeps the same per-minute cost rows that exportLedger writes.
+    costRows = await readRows(connection, METRIC_QUERY(thread));
+    requestedRows = await readRows(connection, REQUESTED_QUERY(thread));
     const session = SESSION_QUERIES(thread);
     record = buildSessionRecord({
       thread,
@@ -359,8 +368,8 @@ export async function mineSession(thread, { card, store = storeFile(), ledgerPat
     opened.instance.closeSync?.();
   }
   record.card = card ?? readLedger(ledgerPath).sessions?.[thread]?.card ?? null;
-  if (!dryRun) writeJsonAtomic(ledgerPath, recordSession(readLedger(ledgerPath), record));
-  return { status: dryRun ? 'dry-run' : 'ok', thread, card: record.card, ledger: ledgerPath, record };
+  if (!dryRun) writeJsonAtomic(ledgerPath, recordSession(mergeLedger(readLedger(ledgerPath), costRows, requestedRows), record));
+  return { status: dryRun ? 'dry-run' : 'ok', thread, card: record.card, ledger: ledgerPath, record, costRows: costRows.length };
 }
 
 // deletePayloads removes the rows that carry this session's tool inputs and
@@ -406,16 +415,20 @@ export async function deletePayloads(thread, { card, store = storeFile(), ledger
   };
 }
 
-// Sessions the sweep may clean: mined, has a retro, and its card is Complete.
-export function sweepPlan(ledger, { retrosDir = retrosFolder(), completeCards = [], dryRun = false } = {}) {
+// Sessions the sweep may clean: mined, has a retro, its card is Complete, and
+// nothing holds it back on purpose. An empty Complete list means no card is
+// known to be Complete, so nothing is clean — the safe reading of a missing
+// answer, since the alternative deletes every retro'd session.
+export function sweepPlan(ledger, { retrosDir = retrosFolder(), completeCards = [], keep = {}, dryRun = false } = {}) {
   const complete = new Set(completeCards);
   const clean = [];
   const kept = [];
   for (const [thread, record] of Object.entries(ledger.sessions ?? {})) {
     const hasRetro = retroExists(record.card, { retrosDir });
-    const cardComplete = complete.size === 0 ? true : complete.has(record.card);
-    if (hasRetro && cardComplete) clean.push({ thread, card: record.card });
-    else kept.push({ thread, card: record.card, why: hasRetro ? 'its card is not Complete' : 'no retro record' });
+    const cardComplete = complete.has(record.card);
+    if (keep[thread]) kept.push({ thread, card: record.card, why: `kept on purpose: ${keep[thread]}` });
+    else if (hasRetro && cardComplete) clean.push({ thread, card: record.card });
+    else kept.push({ thread, card: record.card, why: cardComplete ? 'no retro record' : 'its card is not Complete' });
   }
   return { dryRun, clean, kept };
 }
@@ -520,8 +533,8 @@ export async function compactStore({ dryRun = false, store = storeFile() } = {})
   return { status: dryRun ? 'dry-run' : 'ok', ...entry };
 }
 
-export async function sweep({ dryRun = false, store = storeFile(), ledgerPath = ledgerFile(), retrosDir = retrosFolder(), completeCards = [] } = {}) {
-  const plan = sweepPlan(readLedger(ledgerPath), { retrosDir, completeCards, dryRun });
+export async function sweep({ dryRun = false, store = storeFile(), ledgerPath = ledgerFile(), retrosDir = retrosFolder(), completeCards = [], keep = {} } = {}) {
+  const plan = sweepPlan(readLedger(ledgerPath), { retrosDir, completeCards, keep, dryRun });
   const deleted = [];
   for (const item of plan.clean) {
     const answer = await deletePayloads(item.thread, { store, ledgerPath, retrosDir, dryRun });
@@ -539,7 +552,7 @@ function usage() {
     '       node scripts/trace-store.mjs mine <thread> [--card JUL-276] [--dry-run]',
     '       node scripts/trace-store.mjs delete <thread> [--card JUL-276] [--dry-run]',
     '       node scripts/trace-store.mjs compact [--dry-run]',
-    '       node scripts/trace-store.mjs sweep [--dry-run] [--wait-for-lock [--minutes 180]]',
+    '       node scripts/trace-store.mjs sweep [--complete JUL-1,JUL-2] [--dry-run] [--wait-for-lock [--minutes 180]]',
   ].join('\n');
 }
 
@@ -564,19 +577,21 @@ async function main(argv) {
     if (answer.status === 'no-room') answer.note = `not enough room to compact: ${gb(answer.bytes)} store needs about ${gb(answer.needed)} free, ${gb(answer.room)} is free`;
     if (answer.status === 'ok') answer.note = `${mb(answer.bytesBefore)} → ${mb(answer.bytesAfter)} on disk`;
   } else if (command === 'sweep') {
+    const completeCards = (flag('--complete') ?? '').split(',').map(s => s.trim()).filter(Boolean);
     const waitMinutes = Number(flag('--minutes') ?? (rest.includes('--wait-for-lock') ? 180 : 0));
     if (!Number.isFinite(waitMinutes) || waitMinutes < 0) throw new Error('--minutes needs a number (0 or more)');
     // A live session holds an exclusive lock for hours, so the sweep can be told to
     // wait for it rather than report busy and leave the store at 22.6 GB.
     const deadline = Date.now() + waitMinutes * 60_000;
     for (;;) {
-      answer = await sweep({ dryRun });
+      answer = await sweep({ dryRun, completeCards });
       if (answer.status !== 'busy' || Date.now() >= deadline) break;
       await sleep(30_000);
     }
     if (answer.status === 'busy') answer.note = `a Mastra Code session holds the trace store${answer.pid ? ` (PID ${answer.pid})` : ''}; this run waited ${waitMinutes} min and changed nothing`;
     if (answer.compact?.status === 'no-room') answer.note = `not enough room to compact: ${gb(answer.compact.bytes)} store needs about ${gb(answer.compact.needed)} free, ${gb(answer.compact.room)} is free`;
     if (answer.compact?.status === 'ok') answer.note = `${mb(answer.compact.bytesBefore)} → ${mb(answer.compact.bytesAfter)} on disk`;
+    if (!completeCards.length) answer.note = 'no --complete list, so no card is known to be Complete and nothing was cleaned';
   } else {
     console.error(usage());
     return 2;

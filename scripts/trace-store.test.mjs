@@ -280,7 +280,11 @@ test('compaction gives back the room a deleted payload was using, and deletes no
   assert.equal(await countOf(file, 'metric_events'), 1);
   const report = JSON.parse(readFileSync(answer.report, 'utf8'));
   assert.equal(report.runs.at(-1).bytesAfter, answer.bytesAfter);
-  assert.equal(readLedger(ledger).sessions['thread-a'].card, 'JUL-1');
+  const ledgerAfter = readLedger(ledger);
+  assert.equal(ledgerAfter.sessions['thread-a'].card, 'JUL-1');
+  const priced = ledgerAfter.rows.filter(row => row.threadId === 'thread-a' && row.name === 'mastra_model_total_input_tokens');
+  assert.equal(priced.length, 1, 'mining keeps the cost row the scorecard prices from, so the ledger can price the card without the payloads');
+  assert.equal(priced[0].estimatedCost, 0.5);
 });
 
 test('a sweep cleans only sessions that were mined, have a retro and whose card is Complete', { skip: noDuckdb }, async (t) => {
@@ -297,9 +301,9 @@ test('a sweep cleans only sessions that were mined, have a retro and whose card 
   await mineSession('thread-b', { card: 'JUL-2' });
   await mineSession('thread-c', { card: 'JUL-3' });
 
-  const plan = sweepPlan(readLedger(ledger), { retrosDir, completeCards: ['JUL-1', 'JUL-2', 'JUL-3'] });
+  const plan = sweepPlan(readLedger(ledger), { retrosDir, completeCards: ['JUL-1', 'JUL-2'] });
   assert.deepEqual(plan.clean, [{ thread: 'thread-a', card: 'JUL-1' }]);
-  assert.equal(plan.kept.length, 2);
+  assert.deepEqual(plan.kept.map(entry => entry.why), ['no retro record', 'its card is not Complete']);
 
   const answer = await sweep({ retrosDir, completeCards: ['JUL-1', 'JUL-2', 'JUL-3'] });
 
@@ -309,6 +313,26 @@ test('a sweep cleans only sessions that were mined, have a retro and whose card 
   assert.equal(await countOf(file, 'span_events', "threadId = 'thread-c'"), 1, 'a session whose card has no retro keeps its payloads');
   assert.equal(await countOf(file, 'metric_events'), 3);
   assert.equal(Object.keys(readLedger(ledger).sessions).length, 3);
+});
+
+test('a sweep with no Complete list cleans nothing, and a keep entry outranks a retro', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { file, retrosDir, ledger } = await withStore(t, [
+    span(at, 'a1', 0.05, 'thread-a'),
+    span(at, 'b1', 0.05, 'thread-b'),
+    metric(at, 'ka', 'mastra_model_total_input_tokens', 10, 0.01, 'thread-a'),
+  ], { retros: ['JUL-1'] });
+  await mineSession('thread-a', { card: 'JUL-1' });
+  await mineSession('thread-b', { card: 'JUL-1' });
+
+  const nothing = await sweep({ retrosDir });
+  assert.equal(nothing.plan.clean.length, 0, 'an empty list means no card is known Complete, not every card');
+  assert.equal(await countOf(file, 'span_events'), 2);
+
+  const kept = sweepPlan(readLedger(ledger), { retrosDir, completeCards: ['JUL-1'], keep: { 'thread-a': 'half of this session has no retro' } });
+  assert.deepEqual(kept.clean, [{ thread: 'thread-b', card: 'JUL-1' }]);
+  assert.equal(kept.kept[0].why, 'kept on purpose: half of this session has no retro');
+  assert.equal(await countOf(file, 'span_events'), 2, 'a plan alone deletes nothing');
 });
 
 test('the age rule is gone, so nothing is deleted by a date', { skip: noDuckdb }, async (t) => {
