@@ -297,6 +297,7 @@ export function streamTail(limit = KEPT_BYTES) {
   let kept = '';
   let carry = '';
   let ask = null;
+  let end = null;
   return {
     push(text) {
       const chunk = String(text ?? '');
@@ -304,16 +305,42 @@ export function streamTail(limit = KEPT_BYTES) {
       carry += chunk;
       const lines = carry.split('\n');
       carry = lines.pop();
-      for (const line of lines) ask = suspendedIn(line) ?? ask;
+      for (const line of lines) {
+        ask = suspendedIn(line) ?? ask;
+        end = endedIn(line) ?? end;
+      }
     },
     text: () => kept,
     ask: () => ask,
+    end: () => end,
   };
+}
+
+// The CLI writes this line just before its closing result line, and it is short
+// enough that a cut-off stream still carries it.
+function endedIn(line) {
+  if (!String(line ?? '').trim().startsWith('{')) return null;
+  try {
+    const event = JSON.parse(line);
+    if (event?.type !== 'agent_end') return null;
+    return String(event.reason ?? 'ended');
+  } catch {
+    return null;
+  }
 }
 
 export function lastSessionResult(text) {
   const lines = String(text ?? '').split('\n');
+  // Only the last session in a log counts. A log can hold several sessions, and a
+  // result left over from an earlier one would be read as this session's answer.
+  let from = 0;
   for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index].includes('"type":"thread_created"')) {
+      from = index;
+      break;
+    }
+  }
+  for (let index = lines.length - 1; index >= from; index -= 1) {
     const line = lines[index].trim();
     if (!line.startsWith('{')) continue;
     try {
@@ -326,6 +353,13 @@ export function lastSessionResult(text) {
   return null;
 }
 
+// measured: the CLI's closing result line is written to a pipe and the process
+// exits before it finishes flushing, so a 100kB result arrives cut in half.
+export function cutOffResult({ ended, code }) {
+  if (ended !== 'complete' || code !== 0) return null;
+  return { type: 'result', status: 'completed', finishReason: 'complete', exitCode: 0, text: '', cutOff: true };
+}
+
 async function runSession({ name, prompt, cwd, model, effort, title, log, timeoutMs }) {
   mkdirSync(resolve(log, '..'), { recursive: true });
   writeFileSync(log.replace(/\.log$/, '.prompt.md'), prompt);
@@ -334,6 +368,7 @@ async function runSession({ name, prompt, cwd, model, effort, title, log, timeou
   const child = spawn('mastracode', args, { cwd, env: process.env, stdio: ['pipe', 'pipe', 'pipe'] });
   const stream = streamTail();
   let killed = false;
+  let code = null;
   const backstop = setTimeout(() => {
     killed = true;
     child.kill('SIGKILL');
@@ -348,14 +383,19 @@ async function runSession({ name, prompt, cwd, model, effort, title, log, timeou
       clearTimeout(backstop);
       fail(new Error(`${name} session could not start: ${error.message}`));
     });
-    child.on('close', () => {
+    child.on('close', status => {
+      code = status;
       clearTimeout(backstop);
       done();
     });
     child.stdin.end(prompt);
   });
   if (killed) throw new Error(`${name} session was still running after ${Math.round(timeoutMs / 60000)} minutes and was stopped; its work is in ${cwd}, its log is ${log}`);
-  const result = lastSessionResult(stream.text());
+  const cut = cutOffResult({ ended: stream.end(), code });
+  if (cut) {
+    appendFileSync(log, `\n[run-card] the CLI's closing result line never finished writing; the session itself ended complete with exit 0, so its work stands\n`);
+  }
+  const result = lastSessionResult(stream.text()) ?? cut;
   if (result?.finishReason === 'suspended') {
     const ask = stream.ask() ?? suspendedAsk(stream.text());
     throw new Error(`${name} session ended asking for something this run cannot approve (${ask?.toolName ?? 'a tool'}: ${ask?.reason || 'no reason given'}); it judged nothing, so the card is not at fault. Do not retry the card until the ask is answered inside the session's prompt; log ${log}`);
@@ -363,7 +403,7 @@ async function runSession({ name, prompt, cwd, model, effort, title, log, timeou
   if (result?.status !== 'completed' || result.exitCode !== 0) {
     throw new Error(`${name} session did not finish (${result?.status ?? 'no result event'}, exit ${result?.exitCode ?? '?'}); log ${log}`);
   }
-  if (!String(result.text ?? '').trim()) {
+  if (!cut && !String(result.text ?? '').trim()) {
     throw new Error(`${name} session ended without saying what it did, so it cannot be read as a result; its work is in ${cwd}, its log is ${log}`);
   }
   return result;

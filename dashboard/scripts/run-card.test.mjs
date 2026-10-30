@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFile
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
-import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, costFrom, freePort, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
+import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, cutOffResult, costFrom, freePort, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
 const temporaryState = () => {
@@ -253,6 +253,38 @@ test('a session that streams for hundreds of megabytes is kept to its tail', () 
   assert.ok(stream.text().length <= 600);
   assert.match(stream.text(), /"type":"result"/);
   assert.deepEqual(stream.ask(), { toolName: 'request_access', reason: 'Read the models file' });
+});
+
+// Measured twice on JUL-290: the CLI writes its closing result line into a pipe
+// and exits before the write finishes, so the last line arrives cut in half.
+test('a session whose closing line was cut off is finished when the stream says so', () => {
+  const stream = streamTail(600);
+  stream.push(`${JSON.stringify({ type: 'agent_end', reason: 'complete' })}\n`);
+  stream.push('{"type":"result","status":"completed","text":"I will start by read');
+  assert.equal(stream.end(), 'complete');
+  assert.equal(lastSessionResult(stream.text()), null);
+  assert.deepEqual(cutOffResult({ ended: stream.end(), code: 0 }), {
+    type: 'result',
+    status: 'completed',
+    finishReason: 'complete',
+    exitCode: 0,
+    text: '',
+    cutOff: true,
+  });
+  assert.equal(cutOffResult({ ended: 'complete', code: 1 }), null);
+  assert.equal(cutOffResult({ ended: null, code: 0 }), null);
+});
+
+test('a log with several sessions answers with the last one, never an earlier one', () => {
+  const line = event => `${JSON.stringify(event)}\n`;
+  const text = [
+    line({ type: 'thread_created', thread: { id: 'thread-a', createdAt: '2026-10-30T22:00:00.000Z' } }),
+    line({ type: 'result', status: 'completed', finishReason: 'complete', text: 'round one judged', exitCode: 0 }),
+    line({ type: 'thread_created', thread: { id: 'thread-b', createdAt: '2026-10-30T23:00:00.000Z' } }),
+    '{"type":"result","status":"completed","finishReason":"suspended","text":"cut',
+  ].join('');
+  assert.equal(lastSessionResult(text), null);
+  assert.equal(lastSessionResult(text.split('\n').slice(0, 2).join('\n')).text, 'round one judged');
 });
 
 // The record has to survive the runner dying: a card picked up again keeps the
