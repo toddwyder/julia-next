@@ -225,7 +225,7 @@ test('the build uses the Start screen picks and Shipping its own slot', () => {
 
 test('the flags a run is started with are only the ones it explains', () => {
   assert.deepEqual(parseFlags(['--branch', 'feat/x', '--state', '/tmp/s']), { branch: 'feat/x', state: '/tmp/s' });
-  assert.deepEqual(parseFlags(['--from', 'preview']), { from: 'preview' });
+  assert.deepEqual(parseFlags(['--from', 'preview', '--worktree', '/home/ubuntu/julia-mastra']), { from: 'preview', worktree: '/home/ubuntu/julia-mastra' });
   assert.throws(() => parseFlags(['--repo', '/tmp/r']), /unknown flag "--repo"/);
   assert.throws(() => parseFlags(['--state']), /--state needs a value/);
 });

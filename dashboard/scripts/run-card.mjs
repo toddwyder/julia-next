@@ -200,7 +200,15 @@ export function worktreeHolding(branch) {
   return null;
 }
 
+// A card's branch can live in a checkout of its own (the operator keeps one per card while it
+// is being built), which no `git worktree add` from here can claim again. Reuse it by name.
+export function checkoutOn(path, branch) {
+  const head = shell('git', ['-C', path, 'rev-parse', '--abbrev-ref', 'HEAD']);
+  return head.code === 0 && String(head.stdout).trim() === branch;
+}
+
 export function ensureWorktree({ branch, path, base = 'origin/main' }) {
+  if (checkoutOn(path, branch)) return path;
   const held = worktreeHolding(branch);
   if (held) return held;
   mkdirSync(resolve(path, '..'), { recursive: true });
@@ -609,7 +617,7 @@ export function modelsFor(env = process.env) {
   };
 }
 
-export async function machine({ card, env = process.env, branch: wantedBranch, from = 'build' }) {
+export async function machine({ card, env = process.env, branch: wantedBranch, from = 'build', worktree = null }) {
   if (!STEPS.includes(from)) throw new Error(`--from must be one of ${STEPS.join(', ')}, not "${from}"`);
   const prior = readJsonRecord(recordFile(card, env)).value;
   if (prior && [...ACTIVE_RUN_STATUSES, 'waiting'].includes(prior.status)) {
@@ -622,7 +630,7 @@ export async function machine({ card, env = process.env, branch: wantedBranch, f
   const record = newRunRecord({
     card,
     branch,
-    worktree: join(env.JULIA_RUN_WORKTREES || join(stateRoot(env), 'worktrees'), runIdFor(card)),
+    worktree: worktree ? resolve(worktree) : join(env.JULIA_RUN_WORKTREES || join(stateRoot(env), 'worktrees'), runIdFor(card)),
     models: modelsFor(env),
     pull: openPull,
   });
@@ -713,7 +721,7 @@ export function parseFlags(argv) {
   const flags = {};
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg !== '--state' && arg !== '--branch' && arg !== '--from') throw new Error(`unknown flag "${arg}"`);
+    if (!['--state', '--branch', '--from', '--worktree'].includes(arg)) throw new Error(`unknown flag "${arg}"`);
     const value = argv[index + 1];
     if (!value) throw new Error(`${arg} needs a value`);
     flags[arg.slice(2)] = value;
@@ -725,13 +733,13 @@ export function parseFlags(argv) {
 export async function main(argv = process.argv.slice(2)) {
   const [command, cardArg] = argv;
   if (command !== 'start' || !cardArg) {
-    console.error('usage: run-card.mjs start <CARD> [--branch <name>] [--state <dir>] [--from <step>]');
+    console.error('usage: run-card.mjs start <CARD> [--branch <name>] [--worktree <dir>] [--state <dir>] [--from <step>]');
     process.exitCode = 2;
     return;
   }
   const flags = parseFlags(argv.slice(2));
   const env = { ...process.env, ...(flags.state ? { DASHBOARD_STATE_DIR: flags.state } : {}) };
-  const record = await machine({ card: normalizeCard(cardArg), env, branch: flags.branch, from: flags.from });
+  const record = await machine({ card: normalizeCard(cardArg), env, branch: flags.branch, from: flags.from, worktree: flags.worktree });
   process.exitCode = record.status === 'waiting' ? 0 : 1;
 }
 
