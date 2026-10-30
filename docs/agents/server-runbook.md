@@ -60,16 +60,15 @@ in which case the next timer run does the work.
 
 Mastra Code writes every span and token metric to `~/.local/share/mastracode/observability.duckdb`.
 By 29 October it reached 22.6 GB, and full prompt payloads in `span_events` were most of it.
-`scripts/trace-store.mjs` mines the numbers out of a session, deletes that session's payloads, and
-compacts the file.
+`scripts/trace-store.mjs` mines the numbers out of a session, and its `sweep` is the one command
+that deletes payloads and compacts the file.
 
 ```sh
 node scripts/trace-store.mjs status
 node scripts/trace-store.mjs ledger
 node scripts/trace-store.mjs mine <thread> --card JUL-276
-node scripts/trace-store.mjs delete <thread> --card JUL-276
-node scripts/trace-store.mjs sweep --complete JUL-284,JUL-283 --dry-run --wait-for-lock --minutes 180
-node scripts/trace-store.mjs delete <thread> --approvals docs/retros/census-2026-10-29.md
+node scripts/trace-store.mjs sweep --dry-run
+node scripts/trace-store.mjs sweep --wait-for-lock --minutes 180
 ```
 
 `mine` writes that session's tokens, cost per model, which model each call asked for and which
@@ -77,13 +76,15 @@ answered, time per stage, tool-call counts and stops into `~/.local/state/julia/
 which is the file `scripts/scorecard.mjs` reads when it cannot copy the store. The store does not
 record compactions or handoffs, and `mine` says so in `notHeld` rather than inventing them.
 
-Nothing is deleted by age. `delete` removes the session's `span_events` and `log_events` rows only
-when that session has been mined and either `docs/retros/<card>.md` exists or the session is listed
-under the approval heading in `--approvals` (default `docs/retros/census-2026-10-29.md`), and it
-names the missing piece when it refuses. The approval list exists because a session that never named
-a card can never open the retro gate. `sweep` does the same for every mined session whose card is in
-`--complete`, then compacts; with no `--complete` list no card is known to be Complete and nothing is
-cleaned, and a `keep` entry outranks both a retro and an approval. Mining
+`sweep` reads every session in `~/.local/share/mastracode/mastra.db`, mines each one, then deletes a
+session's `span_events` and `log_events` rows only when the session has been mined, is not held, and
+either its own card has a `docs/retros/<card>.md` and is listed as Complete in the census doc, or it
+names no card at all and is approved there. Every fact comes from `docs/retros/census-2026-10-29.md`
+(`--census` overrides): the `Cards with a session` table, the `Complete cards with no session` list,
+the `Approved to delete without a retro` bullets and the `Held back on purpose` bullets. A hold
+outranks a retro and a Complete card; an approval never stands in for a card the session itself
+named; a card passed on the command line never opens the gate. `--dry-run` mines, prints the plan and
+posts nothing. A real run posts its numbers and the reason each session was kept on JUL-276. Mining
 copies that session's cost rows into the ledger before anything is deleted, so the scorecard still
 prices the card once its payloads are gone. `metric_events`, which carry the cost, are never deleted.
 

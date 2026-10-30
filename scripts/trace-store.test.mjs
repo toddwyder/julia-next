@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 
 import {
   approvedWithoutRetro,
@@ -13,11 +14,15 @@ import {
   deletePayloads,
   deletionRefusal,
   exportLedger,
+  heldOnPurpose,
   isLockedMessage,
   ledgerFile,
+  listSessions,
   lockOwnerFromError,
   mergeLedger,
   mineSession,
+  mineSessions,
+  readCensus,
   readLedger,
   retroExists,
   retroFile,
@@ -25,6 +30,7 @@ import {
   storeFile,
   storeBytes,
   sweep,
+  sweepComment,
   sweepPlan,
 } from './trace-store.mjs';
 
@@ -33,8 +39,8 @@ const duckdbDir = [
   join(REPO, 'node_modules', '@duckdb', 'node-api'),
   join(process.env.HOME ?? '', '.local', 'lib', 'mastracode-program', 'node_modules', '@duckdb', 'node-api'),
 ].find(dir => existsSync(join(dir, 'package.json')));
-// The DuckDB client ships with the Mastra Code program, not this repo. CI has neither, so
-// the tests that open a real store skip there instead of failing: the pure rules still run.
+// The DuckDB client is a dev dependency here, so CI opens a real store too. The
+// skip stays for a machine that never ran `npm ci`: the pure rules still run.
 const noDuckdb = duckdbDir ? false : 'no @duckdb/node-api on this machine, so there is no store to open';
 const { DuckDBInstance } = duckdbDir ? createRequire(join(duckdbDir, 'package.json'))('@duckdb/node-api') : {};
 
@@ -79,10 +85,48 @@ async function runChild(code) {
   });
 }
 
-const ENV = ['XDG_STATE_HOME', 'MASTRA_OBSERVABILITY_DB_PATH', 'MASTRA_TRACE_LEDGER', 'JULIA_RETROS_DIR', 'JULIA_NO_CARD_APPROVALS'];
-const APPROVAL_HEADING = '## Approved to delete without a retro: they name no card. Todd approved, 29 Oct 2026.';
+// A census doc names real session ids, so a test that reads one must too.
+const session = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
-async function withStore(t, rows, { retros = [], approved = [] } = {}) {
+const ENV = ['XDG_STATE_HOME', 'MASTRA_OBSERVABILITY_DB_PATH', 'MASTRA_TRACE_LEDGER', 'JULIA_RETROS_DIR', 'JULIA_CENSUS'];
+const APPROVAL_HEADING = '## Approved to delete without a retro: they name no card. Todd approved, 29 Oct 2026.';
+const OPEN_CARD_HEADING = '## Sessions on a card that is not Complete';
+const HOLD_HEADING = '## Held back on purpose';
+
+// The census doc is the reviewed list a sweep decides from, so the tests build
+// one in the same shape as docs/retros/census-2026-10-29.md: a table of Complete
+// cards with their sessions, a list of sessions whose card is still open, the
+// Complete cards with no session, Todd's approvals, and the holds.
+function censusDoc({ cards = {}, open = {}, complete = [], approved = [], hold = {} } = {}) {
+  return [
+    '# census',
+    '',
+    '## Cards with a session',
+    '',
+    '| Card | Complete | Session | Started | Maps by | Retro record |',
+    '| --- | --- | --- | --- | --- | --- |',
+    ...Object.entries(cards).map(([thread, card]) => `| ${card} | 2026-10-29 | \`${thread}\` "a session" | 2026-10-29 | first request | none |`),
+    '',
+    OPEN_CARD_HEADING,
+    '',
+    ...Object.entries(open).map(([thread, card]) => `- ${card} \`${thread}\` 2026-10-29 (first request)`),
+    '',
+    '## Complete cards with no session',
+    '',
+    complete.join(', '),
+    '',
+    APPROVAL_HEADING,
+    '',
+    ...approved.map(thread => `- \`${thread}\` 2026-10-26`),
+    '',
+    HOLD_HEADING,
+    '',
+    ...Object.entries(hold).map(([thread, why]) => `- \`${thread}\` — ${why}`),
+    '',
+  ].join('\n');
+}
+
+async function withStore(t, rows, { retros = [], ...facts } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'trace-store-'));
   const saved = Object.fromEntries(ENV.map(key => [key, process.env[key]]));
   t.after(() => {
@@ -95,12 +139,11 @@ async function withStore(t, rows, { retros = [], approved = [] } = {}) {
   const retrosDir = join(dir, 'retros');
   mkdirSync(retrosDir, { recursive: true });
   for (const card of retros) writeFileSync(join(retrosDir, `${card}.md`), '# retro\n');
-  const approvals = join(dir, 'census.md');
-  const body = [APPROVAL_HEADING, '', ...approved.map(thread => `- \`${thread}\` 2026-10-26`), ''].join('\n');
-  writeFileSync(approvals, body);
+  const census = join(dir, 'census.md');
+  writeFileSync(census, censusDoc(facts));
   process.env.XDG_STATE_HOME = join(dir, 'state');
   process.env.JULIA_RETROS_DIR = retrosDir;
-  process.env.JULIA_NO_CARD_APPROVALS = approvals;
+  process.env.JULIA_CENSUS = census;
   const file = join(dir, 'observability.duckdb');
   const instance = await DuckDBInstance.create(file);
   const connection = await instance.connect();
@@ -108,7 +151,7 @@ async function withStore(t, rows, { retros = [], approved = [] } = {}) {
   for (const row of rows) await connection.run(row);
   instance.closeSync();
   process.env.MASTRA_OBSERVABILITY_DB_PATH = file;
-  return { dir, file, retrosDir, approvals, ledger: join(dir, 'state', 'julia', 'trace-costs.json'), stops: join(dir, 'state', 'julia', 'stops.jsonl') };
+  return { dir, file, retrosDir, census, ledger: join(dir, 'state', 'julia', 'trace-costs.json'), stops: join(dir, 'state', 'julia', 'stops.jsonl') };
 }
 
 const countOf = async (file, table, where = 'true') => {
@@ -203,12 +246,35 @@ test('a mining pass saves the session numbers and says what the store does not h
   assert.equal(saved.sessions['thread-1'].minedAt, minedAt);
 });
 
+test('one pass mines every session through one read-only connection', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const [a, b, c] = [1, 2, 3].map(session);
+  const { file, ledger } = await withStore(t, [
+    span(at, 'a1', 0.05, a),
+    span(at, 'b1', 0.05, b),
+    metric(at, 'ka', 'mastra_model_total_input_tokens', 10, 0.01, a),
+    metric(at, 'kb', 'mastra_model_total_input_tokens', 20, 0.02, b),
+  ], { cards: { [a]: 'JUL-1', [b]: 'JUL-2' } });
+  const first = storeBytes(file);
+
+  const answer = await mineSessions([a, b, c], { cards: readCensus().cards });
+
+  assert.equal(answer.status, 'ok');
+  assert.equal(answer.records.length, 3);
+  assert.equal(answer.costRows, 2);
+  assert.equal(storeBytes(file), first, 'mining reads the store and never writes to it');
+  const saved = readLedger(ledger);
+  assert.equal(saved.sessions[a].card, 'JUL-1', 'the card comes from the census doc');
+  assert.equal(saved.sessions[c].card, null, 'a session the store never saw still gets a record, so a sweep may skip it on purpose');
+  assert.equal(saved.sessions[c].totals.calls, 0);
+});
+
 test('a session whose payload rows were already mined keeps its numbers when the rows go', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file, ledger, retrosDir } = await withStore(t, [span(at, 's1', 0.05), modelSpan(at, 'm1', 'gpt-6.1-sol', 'openai.responses'), modelMetric(at, 'k1', 'mastra_model_total_input_tokens', 1000, 0.5), logRow(at, 'l1', 'boom')], { retros: ['JUL-1'] });
+  const { file, ledger } = await withStore(t, [span(at, 's1', 0.05), modelSpan(at, 'm1', 'gpt-6.1-sol', 'openai.responses'), modelMetric(at, 'k1', 'mastra_model_total_input_tokens', 1000, 0.5), logRow(at, 'l1', 'boom')], { retros: ['JUL-1'] });
   await mineSession('thread-1', { card: 'JUL-1' });
 
-  const answer = await deletePayloads('thread-1', { retrosDir });
+  const answer = await deletePayloads('thread-1', {});
 
   assert.equal(answer.status, 'ok');
   assert.deepEqual(answer.deleted, { span_events: 2, log_events: 1 });
@@ -220,9 +286,9 @@ test('a session whose payload rows were already mined keeps its numbers when the
 
 test('deleting the payloads of a session that was never mined is refused', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file, retrosDir } = await withStore(t, [span(at, 's1', 0.05)], { retros: ['JUL-1'] });
+  const { file } = await withStore(t, [span(at, 's1', 0.05)], { retros: ['JUL-1'] });
 
-  const answer = await deletePayloads('thread-1', { card: 'JUL-1', retrosDir });
+  const answer = await deletePayloads('thread-1', {});
 
   assert.equal(answer.status, 'refused');
   assert.equal(answer.code, 'not-mined');
@@ -232,10 +298,10 @@ test('deleting the payloads of a session that was never mined is refused', { ski
 
 test('deleting the payloads of a mined session with no retro is refused', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file, retrosDir } = await withStore(t, [span(at, 's1', 0.05)]);
+  const { file } = await withStore(t, [span(at, 's1', 0.05)]);
   await mineSession('thread-1', { card: 'JUL-1' });
 
-  const answer = await deletePayloads('thread-1', { retrosDir });
+  const answer = await deletePayloads('thread-1', {});
 
   assert.equal(answer.status, 'refused');
   assert.equal(answer.code, 'no-retro');
@@ -245,10 +311,10 @@ test('deleting the payloads of a mined session with no retro is refused', { skip
 
 test('a session that names no card is deleted only because Todd approved it', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file, retrosDir, approvals } = await withStore(t, [span(at, 's1', 0.05), logRow(at, 'l1', 'boom')], { approved: ['thread-1'] });
+  const { file } = await withStore(t, [span(at, 's1', 0.05), logRow(at, 'l1', 'boom')], { approved: ['thread-1'] });
   await mineSession('thread-1', {});
 
-  const answer = await deletePayloads('thread-1', { retrosDir, approvals });
+  const answer = await deletePayloads('thread-1', {});
 
   assert.equal(answer.status, 'ok');
   assert.equal(answer.approved, true);
@@ -257,9 +323,33 @@ test('a session that names no card is deleted only because Todd approved it', { 
   assert.equal(await countOf(file, 'span_events'), 0);
 });
 
+test('an approval never stands in for the retro of a card the session itself named', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { file } = await withStore(t, [span(at, 's1', 0.05)], { approved: ['thread-1'] });
+  await mineSession('thread-1', { card: 'JUL-1' });
+
+  const answer = await deletePayloads('thread-1', {});
+
+  assert.equal(answer.status, 'refused');
+  assert.equal(answer.code, 'no-retro', 'the approval covers sessions with no card, not a card whose lesson is unwritten');
+  assert.equal(await countOf(file, 'span_events'), 1);
+});
+
+test('a card handed to the delete cannot open the gate', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { file } = await withStore(t, [span(at, 's1', 0.05)], { retros: ['JUL-1'] });
+  await mineSession('thread-1', {});
+
+  const answer = await deletePayloads('thread-1', { card: 'JUL-1' });
+
+  assert.equal(answer.status, 'refused');
+  assert.equal(answer.code, 'no-card', 'a card passed in from outside is ignored: the session names none, so its lesson cannot be claimed');
+  assert.equal(await countOf(file, 'span_events'), 1);
+});
+
 test('a mined session on neither the retro list nor the approved list is refused', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file, retrosDir, approvals } = await withStore(t, [
+  const { file } = await withStore(t, [
     span(at, 'a1', 0.05, 'thread-a'),
     span(at, 'b1', 0.05, 'thread-b'),
     span(at, 'c1', 0.05, 'thread-c'),
@@ -268,11 +358,11 @@ test('a mined session on neither the retro list nor the approved list is refused
   await mineSession('thread-b', {});
   await mineSession('thread-c', {});
 
-  const noRetro = await deletePayloads('thread-a', { retrosDir, approvals });
+  const noRetro = await deletePayloads('thread-a', {});
   assert.equal(noRetro.status, 'refused');
   assert.equal(noRetro.code, 'no-retro');
 
-  const noCard = await deletePayloads('thread-c', { retrosDir, approvals });
+  const noCard = await deletePayloads('thread-c', {});
   assert.equal(noCard.status, 'refused');
   assert.equal(noCard.code, 'no-card');
   assert.match(noCard.message, /not on the approved list/);
@@ -293,12 +383,58 @@ test('only the ids written under the approval heading count', () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
+test('a hold is read from its own heading, with the reason written beside it', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'holds-'));
+  const file = join(dir, 'census.md');
+  const held = '13351dad-0d36-42f1-a43b-6e1d016cfa3e';
+  const other = '5d5df123-2d91-4268-8c69-4a6676a5d209';
+  writeFileSync(file, [
+    '# census', '',
+    `- \`${held}\` — a hold in the preamble is prose, not a list`, '',
+    HOLD_HEADING, '',
+    `- \`${held}\` — jul-284.md covers this session's first half only`, '',
+    `- \`${other}\``, '',
+    'The paragraph below the list names `13351dad-0d36-42f1-a43b-6e1d016cfa3e` again.',
+    '', '## Another list', '', `- \`${other}\` — this hold belongs to no session list`, '',
+  ].join('\n'));
+
+  const holds = heldOnPurpose(file);
+  assert.deepEqual([...holds.keys()], [held, other], 'only the hold section counts, and a bullet in another section is not a hold');
+  assert.equal(holds.get(held), "jul-284.md covers this session's first half only");
+  assert.equal(holds.get(other), 'held back on purpose, with no reason written', 'a hold with no reason still holds');
+  assert.equal(heldOnPurpose(join(dir, 'missing.md')).size, 0, 'no file holds nothing back');
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('the census doc gives the sweep every fact it needs', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'census-'));
+  const file = join(dir, 'census.md');
+  const completeThread = '72c42b39-e67d-45de-8900-4e43562c13e7';
+  const openThread = '1ed0e477-12d4-44fe-bd96-7c77b307346c';
+  writeFileSync(file, censusDoc({
+    cards: { [completeThread]: 'JUL-1' },
+    open: { [openThread]: 'JUL-276' },
+    complete: ['JUL-9', 'JUL-10'],
+    approved: ['b934e198-2a7b-4c0e-9208-9022c1d79942'],
+    hold: { '9e4bfa9d-de5b-4ba3-b7b8-e8704c3798e8': 'half of it has no retro' },
+  }));
+
+  const facts = readCensus(file);
+  assert.deepEqual([...facts.complete].sort(), ['JUL-1', 'JUL-10', 'JUL-9']);
+  assert.equal(facts.cards.get(completeThread), 'JUL-1');
+  assert.equal(facts.cards.get(openThread), 'JUL-276', 'a session on an open card still reports its card in the plan');
+  assert.equal(facts.complete.has('JUL-276'), false, 'the card an open session names is not Complete');
+  assert.equal(facts.approved.size, 1);
+  assert.equal(facts.hold.size, 1);
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test('a dry run says what would go and leaves every row in place', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file, retrosDir } = await withStore(t, [span(at, 's1', 0.05), logRow(at, 'l1', 'boom')], { retros: ['JUL-1'] });
+  const { file } = await withStore(t, [span(at, 's1', 0.05), logRow(at, 'l1', 'boom')], { retros: ['JUL-1'] });
   await mineSession('thread-1', { card: 'JUL-1' });
 
-  const answer = await deletePayloads('thread-1', { retrosDir, dryRun: true });
+  const answer = await deletePayloads('thread-1', { dryRun: true });
 
   assert.equal(answer.status, 'dry-run');
   assert.deepEqual(answer.deleted, { span_events: 1, log_events: 1 });
@@ -307,7 +443,7 @@ test('a dry run says what would go and leaves every row in place', { skip: noDuc
 });
 
 test('compaction gives back the room a deleted payload was using, and deletes nothing else', { skip: noDuckdb }, async (t) => {
-  const { file, retrosDir, ledger } = await withStore(t, [
+  const { file, ledger } = await withStore(t, [
     span(daysAgo(20), 'old-1', 2, 'thread-a'),
     span(daysAgo(20), 'old-2', 2, 'thread-a'),
     span(daysAgo(1), 'new-1', 0.01, 'thread-b'),
@@ -318,7 +454,7 @@ test('compaction gives back the room a deleted payload was using, and deletes no
   await mineSession('thread-a', { card: 'JUL-1' });
   const beforeDelete = storeBytes(file);
 
-  const deleted = await deletePayloads('thread-a', { retrosDir });
+  const deleted = await deletePayloads('thread-a', {});
   assert.deepEqual(deleted.deleted, { span_events: 2, log_events: 1 });
   const afterDelete = storeBytes(file);
   assert.ok(afterDelete >= beforeDelete * 0.9, 'a delete marks the rows dead; the file does not shrink by itself');
@@ -345,81 +481,143 @@ test('compaction gives back the room a deleted payload was using, and deletes no
 
 test('a sweep cleans only sessions that were mined, have a retro and whose card is Complete', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file, retrosDir, ledger } = await withStore(t, [
-    span(at, 'a1', 0.05, 'thread-a'),
-    span(at, 'b1', 0.05, 'thread-b'),
-    span(at, 'c1', 0.05, 'thread-c'),
-    metric(at, 'ka', 'mastra_model_total_input_tokens', 10, 0.01, 'thread-a'),
-    metric(at, 'kb', 'mastra_model_total_input_tokens', 20, 0.02, 'thread-b'),
-    metric(at, 'kc', 'mastra_model_total_input_tokens', 30, 0.03, 'thread-c'),
-  ], { retros: ['JUL-1'] });
-  await mineSession('thread-a', { card: 'JUL-1' });
-  await mineSession('thread-b', { card: 'JUL-2' });
-  await mineSession('thread-c', { card: 'JUL-3' });
+  const [a, b, c] = [1, 2, 3].map(session);
+  const { file, ledger } = await withStore(t, [
+    span(at, 'a1', 0.05, a),
+    span(at, 'b1', 0.05, b),
+    span(at, 'c1', 0.05, c),
+    metric(at, 'ka', 'mastra_model_total_input_tokens', 10, 0.01, a),
+    metric(at, 'kb', 'mastra_model_total_input_tokens', 20, 0.02, b),
+    metric(at, 'kc', 'mastra_model_total_input_tokens', 30, 0.03, c),
+  ], { retros: ['JUL-1'], cards: { [a]: 'JUL-1', [b]: 'JUL-2' }, open: { [c]: 'JUL-3' } });
 
-  const plan = sweepPlan(readLedger(ledger), { retrosDir, completeCards: ['JUL-1', 'JUL-2'] });
-  assert.deepEqual(plan.clean, [{ thread: 'thread-a', card: 'JUL-1' }]);
-  assert.deepEqual(plan.kept.map(entry => entry.why), ['no retro record', 'its card is not Complete']);
-
-  const answer = await sweep({ retrosDir, completeCards: ['JUL-1', 'JUL-2', 'JUL-3'] });
+  const answer = await sweep({ sessions: [a, b, c] });
 
   assert.equal(answer.status, 'ok');
-  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-a'"), 0);
-  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-b'"), 1, 'a mined session with no retro keeps its payloads');
-  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-c'"), 1, 'a session whose card has no retro keeps its payloads');
+  assert.deepEqual(answer.plan.clean, [{ thread: a, card: 'JUL-1' }]);
+  assert.deepEqual(answer.plan.kept.map(entry => entry.why), ['no retro record', 'its card is not Complete']);
+  assert.equal(await countOf(file, 'span_events', `threadId = '${a}'`), 0);
+  assert.equal(await countOf(file, 'span_events', `threadId = '${b}'`), 1, 'a mined session with no retro keeps its payloads');
+  assert.equal(await countOf(file, 'span_events', `threadId = '${c}'`), 1, 'a session whose card is still open keeps its payloads');
   assert.equal(await countOf(file, 'metric_events'), 3);
   assert.equal(Object.keys(readLedger(ledger).sessions).length, 3);
 });
 
 test('a sweep cleans an approved no-card session and keeps everything else held', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file, retrosDir, ledger, approvals } = await withStore(t, [
-    span(at, 'a1', 0.05, 'thread-a'),
-    span(at, 'b1', 0.05, 'thread-b'),
-    span(at, 'c1', 0.05, 'thread-c'),
-    span(at, 'd1', 0.05, 'thread-d'),
-    metric(at, 'ka', 'mastra_model_total_input_tokens', 10, 0.01, 'thread-a'),
-    metric(at, 'kb', 'mastra_model_total_input_tokens', 20, 0.02, 'thread-b'),
-    metric(at, 'kc', 'mastra_model_total_input_tokens', 30, 0.03, 'thread-c'),
-    metric(at, 'kd', 'mastra_model_total_input_tokens', 40, 0.04, 'thread-d'),
-  ], { retros: ['JUL-1'], approved: ['thread-b'] });
-  await mineSession('thread-a', { card: 'JUL-276' });
-  await mineSession('thread-b', {});
-  await mineSession('thread-c', {});
-  await mineSession('thread-d', { card: 'JUL-1' });
+  const [a, b, c, d, e] = [1, 2, 3, 4, 5].map(session);
+  const sessions = [a, b, c, d, e];
+  const rows = [
+    ...sessions.map((thread, n) => span(at, `s${n}`, 0.05, thread)),
+    ...sessions.map((thread, n) => metric(at, `k${n}`, 'mastra_model_total_input_tokens', 10 * (n + 1), 0.01, thread)),
+  ];
+  const { file, ledger } = await withStore(t, rows, {
+    retros: ['JUL-1'],
+    cards: { [d]: 'JUL-1', [e]: 'JUL-2' },
+    open: { [a]: 'JUL-276' },
+    approved: [b, e],
+    hold: { [d]: 'its second half has no retro' },
+  });
 
-  const plan = sweepPlan(readLedger(ledger), { retrosDir, approvals, completeCards: ['JUL-1'], keep: { 'thread-d': 'its second half has no retro' } });
-  assert.deepEqual(plan.clean, [{ thread: 'thread-b', card: null, approved: true }]);
-  assert.deepEqual(plan.kept.map(entry => entry.why), ['its card is not Complete', 'no card, no retro, not on the approved list', 'kept on purpose: its second half has no retro']);
+  const answer = await sweep({ sessions });
 
-  const answer = await sweep({ retrosDir, approvals, completeCards: ['JUL-1'], keep: { 'thread-d': 'its second half has no retro' } });
   assert.equal(answer.status, 'ok');
-  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-b'"), 0, 'the approved no-card session loses its payloads');
-  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-a'"), 1, 'a JUL-276 session keeps its payloads while that card is open');
-  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-c'"), 1, 'a no-card session nobody approved keeps its payloads');
-  assert.equal(await countOf(file, 'span_events', "threadId = 'thread-d'"), 1, 'a keep entry outranks a complete card with a retro');
-  assert.equal(await countOf(file, 'metric_events'), 4, 'every cost row stays');
-  assert.equal(Object.keys(readLedger(ledger).sessions).length, 4);
+  assert.deepEqual(answer.plan.clean, [{ thread: b, card: null, approved: true }]);
+  assert.deepEqual(answer.plan.kept.map(entry => entry.why), [
+    'its card is not Complete',
+    'no card, no retro, not on the approved list',
+    'kept on purpose: its second half has no retro',
+    'no retro record',
+  ]);
+  assert.equal(await countOf(file, 'span_events', `threadId = '${b}'`), 0, 'the approved no-card session loses its payloads');
+  assert.equal(await countOf(file, 'span_events', `threadId = '${a}'`), 1, 'a JUL-276 session keeps its payloads while that card is open');
+  assert.equal(await countOf(file, 'span_events', `threadId = '${c}'`), 1, 'a no-card session nobody approved keeps its payloads');
+  assert.equal(await countOf(file, 'span_events', `threadId = '${d}'`), 1, 'a hold outranks a Complete card with a retro');
+  assert.equal(await countOf(file, 'span_events', `threadId = '${e}'`), 1, 'an approval cannot stand in for the retro of a card the session named');
+  assert.equal(await countOf(file, 'metric_events'), 5, 'every cost row stays');
+  assert.equal(Object.keys(readLedger(ledger).sessions).length, 5);
 });
 
-test('a sweep with no Complete list cleans nothing, and a keep entry outranks a retro', { skip: noDuckdb }, async (t) => {
+test('a sweep with no Complete card cleans nothing and does not compact', { skip: noDuckdb }, async (t) => {
   const at = daysAgo(1);
-  const { file, retrosDir, ledger } = await withStore(t, [
-    span(at, 'a1', 0.05, 'thread-a'),
-    span(at, 'b1', 0.05, 'thread-b'),
+  const { file } = await withStore(t, [
+    span(at, 'a1', 1, 'thread-a'),
+    span(at, 'b1', 1, 'thread-b'),
     metric(at, 'ka', 'mastra_model_total_input_tokens', 10, 0.01, 'thread-a'),
-  ], { retros: ['JUL-1'] });
-  await mineSession('thread-a', { card: 'JUL-1' });
-  await mineSession('thread-b', { card: 'JUL-1' });
+  ], { retros: ['JUL-1'], open: { 'thread-a': 'JUL-1' } });
+  const before = storeBytes(file);
 
-  const nothing = await sweep({ retrosDir });
-  assert.equal(nothing.plan.clean.length, 0, 'an empty list means no card is known Complete, not every card');
+  const answer = await sweep({ sessions: ['thread-a', 'thread-b'] });
+
+  assert.equal(answer.status, 'ok');
+  assert.equal(answer.plan.clean.length, 0, 'an empty Complete list means no card is known Complete, not every card');
+  assert.equal(answer.compact, null, 'a run that deletes nothing does not spend an hour copying the store');
+  assert.equal(storeBytes(file), before);
   assert.equal(await countOf(file, 'span_events'), 2);
+});
 
-  const kept = sweepPlan(readLedger(ledger), { retrosDir, completeCards: ['JUL-1'], keep: { 'thread-a': 'half of this session has no retro' } });
-  assert.deepEqual(kept.clean, [{ thread: 'thread-b', card: 'JUL-1' }]);
-  assert.equal(kept.kept[0].why, 'kept on purpose: half of this session has no retro');
-  assert.equal(await countOf(file, 'span_events'), 2, 'a plan alone deletes nothing');
+test('a dry-run sweep plans from every session and writes nothing', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const [a, b] = [1, 2].map(session);
+  const { file, ledger } = await withStore(t, [span(at, 'a1', 0.05, a)], { retros: ['JUL-1'], cards: { [a]: 'JUL-1' } });
+  const before = storeBytes(file);
+
+  const answer = await sweep({ dryRun: true, sessions: [a, b] });
+
+  assert.equal(answer.status, 'ok');
+  assert.deepEqual(answer.plan.clean, [{ thread: a, card: 'JUL-1' }]);
+  assert.equal(answer.mined.written, false);
+  assert.equal(answer.mined.sessions, 2);
+  // The sweep mines in memory on a dry run, so the deletion step must be handed those
+  // rows: reading the ledger file would find it empty and refuse every planned session.
+  assert.deepEqual(answer.deleted.map(entry => entry.status), ['dry-run'], 'a dry run counts what would go instead of refusing it');
+  assert.equal(answer.deleted[0].deleted.span_events, 1);
+  assert.equal(existsSync(ledger), false, 'a dry run leaves no ledger behind');
+  assert.equal(await countOf(file, 'span_events'), 1);
+  assert.equal(storeBytes(file), before);
+});
+
+test('the sessions a sweep mines come from the thread store, not from the spans', { skip: noDuckdb }, async (t) => {
+  const at = daysAgo(1);
+  const { dir, ledger } = await withStore(t, [span(at, 'a1', 0.05, 'thread-a')], {});
+  const dbPath = join(dir, 'mastra.db');
+  const db = new DatabaseSync(dbPath);
+  db.exec('create table mastra_threads (id varchar primary key, title varchar, updatedAt timestamp)');
+  db.prepare('insert into mastra_threads values (?, ?, ?)').run('thread-a', 'a session with spans', '2026-10-29T10:00:00Z');
+  db.prepare('insert into mastra_threads values (?, ?, ?)').run('thread-b', 'a session with no spans at all', '2026-10-29T11:00:00Z');
+  db.close();
+
+  assert.deepEqual(listSessions(dbPath).map(session => session.thread), ['thread-a', 'thread-b']);
+  assert.deepEqual(listSessions(join(dir, 'no-such.db')), [], 'a missing thread store is an empty list, not a crash');
+
+  const answer = await sweep({ dbPath });
+
+  assert.equal(answer.mined.sessions, 2, 'the session that produced no spans is still mined, so the plan can say why it was kept');
+  assert.equal(Object.keys(readLedger(ledger).sessions).length, 2);
+});
+
+test('the sweep comment names what was kept and why', () => {
+  const answer = {
+    status: 'ok',
+    store: '/tmp/observability.duckdb',
+    mined: { sessions: 3, mined: 3, written: true },
+    plan: {
+      clean: [{ thread: 'thread-a', card: 'JUL-1' }],
+      kept: [
+        { thread: '13351dad-0d36-42f1-a43b-6e1d016cfa3e', card: 'JUL-284', why: 'kept on purpose: its second half has no retro' },
+        { thread: 'thread-c', card: null, why: 'no card, no retro, not on the approved list' },
+      ],
+    },
+    deleted: [{ thread: 'thread-a', card: 'JUL-1', status: 'ok', deleted: { span_events: 12, log_events: 3 } }],
+    compact: { bytesBefore: 900 * 1024 ** 2, bytesAfter: 300 * 1024 ** 2, compactedBytes: 300 * 1024 ** 2, freeBefore: 16 * 1024 ** 3, freeAfter: 16 * 1024 ** 3 },
+  };
+  const body = sweepComment(answer);
+  assert.match(body, /3 session\(s\) mined, 1 cleaned, 2 kept/);
+  assert.match(body, /Rows deleted: 15 across span_events and log_events/);
+  assert.match(body, /`13351dad-0d36-42f1-a43b-6e1d016cfa3e` \(JUL-284\) — kept on purpose/);
+  assert.match(body, /`thread-c` — no card, no retro/);
+  const nothing = sweepComment({ ...answer, plan: { clean: [], kept: [] }, deleted: [], compact: null });
+  assert.match(nothing, /nothing was deleted, so nothing was compacted/);
 });
 
 test('the age rule is gone, so nothing is deleted by a date', { skip: noDuckdb }, async (t) => {
@@ -505,15 +703,25 @@ test('a store that is not there is reported missing instead of crashing', async 
   assert.equal(answer.status, 'missing');
 });
 
-test('the guard order is mined first, card second, retro third', () => {
-  const retrosDir = mkdtempSync(join(tmpdir(), 'retros-'));
+test('the guard order is mined first, held second, card third, retro last', () => {
+  const held = session(9);
+  const dir = mkdtempSync(join(tmpdir(), 'guards-'));
+  const retrosDir = join(dir, 'retros');
+  mkdirSync(retrosDir, { recursive: true });
+  const census = join(dir, 'census.md');
+  writeFileSync(census, '# census\n');
   const ledger = { sessions: {} };
-  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir }).code, 'not-mined');
+  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir, census }).code, 'not-mined');
   ledger.sessions['thread-1'] = { thread: 'thread-1', card: null };
-  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir }).code, 'no-card');
+  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir, census }).code, 'no-card');
   ledger.sessions['thread-1'].card = 'JUL-1';
-  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir }).code, 'no-retro');
+  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir, census }).code, 'no-retro');
   writeFileSync(join(retrosDir, 'JUL-1.md'), '# retro\n');
-  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir }), null);
-  rmSync(retrosDir, { recursive: true, force: true });
+  assert.equal(deletionRefusal('thread-1', { ledger, retrosDir, census }), null);
+  ledger.sessions[held] = { thread: held, card: 'JUL-1' };
+  writeFileSync(census, censusDoc({ hold: { [held]: 'half of it has no retro' } }));
+  const guard = deletionRefusal(held, { ledger, retrosDir, census });
+  assert.equal(guard.code, 'held', 'a hold outranks the retro that is already written');
+  assert.match(guard.message, /half of it has no retro/);
+  rmSync(dir, { recursive: true, force: true });
 });
