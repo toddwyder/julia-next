@@ -285,9 +285,10 @@ test('only the ids written under the approval heading count', () => {
   const file = join(dir, 'census.md');
   const approvedId = 'b934e198-2a7b-4c0e-9208-9022c1d79942';
   const strayId = '13351dad-0d36-42f1-a43b-6e1d016cfa3e';
-  writeFileSync(file, `# census\n\n- \`${strayId}\` 2026-10-29\n\n${APPROVAL_HEADING}\n\n- \`${approvedId}\` 2026-10-21\n\n## Another list\n\n- \`${strayId}\` 2026-10-29\n`);
+  const prose = 'the file `scripts/trace-store.mjs` explains it, and the hold on `';
+  writeFileSync(file, `# census\n\n- \`${strayId}\` 2026-10-29\n\n${APPROVAL_HEADING}\n\n${prose}${strayId}\` lines.\n\n- \`${approvedId}\` 2026-10-21\n\n## Another list\n\n- \`${strayId}\` 2026-10-29\n`);
 
-  assert.deepEqual([...approvedWithoutRetro(file)], [approvedId], 'an id quoted outside the approved section is not an approval');
+  assert.deepEqual([...approvedWithoutRetro(file)], [approvedId], 'an id quoted outside the approved section, or named in prose inside it, is not an approval');
   assert.equal(approvedWithoutRetro(join(dir, 'missing.md')).size, 0, 'no file means no approval, so every session still waits');
   rmSync(dir, { recursive: true, force: true });
 });

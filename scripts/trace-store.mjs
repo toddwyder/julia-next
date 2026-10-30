@@ -77,7 +77,6 @@ export function approvalsFile(env = process.env) {
 // card, so no retro can ever be written for them. Only ids written under that
 // heading count: an id quoted anywhere else in the file is not an approval.
 const APPROVAL_HEADING = /^#{2,6} Approved to delete without a retro\b.*$/m;
-const BARE_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
 export function approvedWithoutRetro(file = approvalsFile()) {
   if (!existsSync(file)) return new Set();
@@ -87,8 +86,13 @@ export function approvedWithoutRetro(file = approvalsFile()) {
   const rest = text.slice(heading.index + heading[0].length);
   const next = /^#{1,6} /m.exec(rest);
   const section = next ? rest.slice(0, next.index) : rest;
-  const ids = new Set((section.match(/`[^`\s]+`/g) ?? []).map(span => span.slice(1, -1)));
-  for (const id of section.match(BARE_ID) ?? []) ids.add(id);
+  // An approval is a bullet, because prose in the same section names files and
+  // cards too; only the list's first token is an id.
+  const ids = new Set();
+  for (const line of section.split('\n')) {
+    const bullet = /^\s*[-*]\s+`?([^\s`]+)`?/.exec(line);
+    if (bullet) ids.add(bullet[1]);
+  }
   return ids;
 }
 
