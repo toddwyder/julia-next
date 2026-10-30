@@ -650,8 +650,10 @@ async function compact(file, room) {
   renameSync(file, parked);
   renameSync(temp, file);
   removeQuietly(`${file}.wal`);
+  removeQuietly(`${file}.wal.checkpoint`);
   removeQuietly(parked);
   removeQuietly(`${parked}.wal`);
+  removeQuietly(`${parked}.wal.checkpoint`);
   return compactBytes;
 }
 
@@ -704,6 +706,33 @@ export async function status() {
     }
   }
   return answer;
+}
+
+// A checkpoint rewrites the blocks a delete touched and drops blocks nothing points
+// at, in place: no second copy of the file, and the write-ahead log folds into it. It
+// needs room for its own spill, and DuckDB stops with an error rather than filling the
+// disk, so a run that cannot fit changes nothing.
+export async function checkpointStore({ dryRun = false, store = storeFile() } = {}) {
+  if (!existsSync(store)) return { status: 'missing', store };
+  const before = storeBytes(store);
+  const room = freeBytes(dirname(store));
+  const opened = await openStore(store);
+  if (opened.busy) return { status: 'busy', ...opened.busy, store, bytes: before };
+  try {
+    if (!dryRun) {
+      const connection = await opened.instance.connect();
+      await connection.run(`set threads = 1`);
+      await connection.run('checkpoint');
+    }
+  } catch (error) {
+    return { status: 'no-room', store, bytesBefore: before, bytesAfter: storeBytes(store), room, failure: error.message.split('\n')[0].slice(0, 300) };
+  } finally {
+    opened.instance.closeSync?.();
+  }
+  const after = storeBytes(store);
+  const entry = { at: new Date().toISOString(), store, dryRun, bytesBefore: before, bytesAfter: after, freeBefore: room, freeAfter: freeBytes(dirname(store)) };
+  if (!dryRun) entry.report = appendReport(entry);
+  return { status: dryRun ? 'dry-run' : 'ok', ...entry };
 }
 
 // Compaction is where the disk space comes back. It refuses when the copy would
@@ -820,6 +849,7 @@ function usage() {
     'usage: node scripts/trace-store.mjs status',
     '       node scripts/trace-store.mjs ledger',
     '       node scripts/trace-store.mjs mine <thread> [--dry-run]',
+    '       node scripts/trace-store.mjs repair [--dry-run]',
     '       node scripts/trace-store.mjs sweep [--dry-run] [--census <file>] [--no-comment] [--wait-for-lock [--minutes 180]]',
   ].join('\n');
 }
@@ -845,6 +875,15 @@ async function main(argv) {
   } else if (command === 'mine') {
     if (!thread) throw new Error('mine needs a thread id');
     answer = await mineSession(thread, { dryRun });
+  } else if (command === 'repair') {
+    // Folds the write-ahead log in and gives back the room a delete freed, in place.
+    // It deletes no rows, so it is safe to run after a killed sweep: on 30 October a
+    // sweep was killed inside its copy, and the next writable open refused the store
+    // with "checkpoint WAL cannot contain a checkpoint marker".
+    answer = await checkpointStore({ dryRun, store: storeFile() });
+    if (answer.status === 'ok') answer.note = `${mb(answer.bytesBefore)} → ${mb(answer.bytesAfter)} on disk`;
+    if (answer.failure) answer.note = `the checkpoint did not run and the store is as it was: ${answer.failure}`;
+    if (answer.status === 'busy') answer.note = `a Mastra Code session holds the trace store${answer.pid ? ` (PID ${answer.pid})` : ''}; nothing was changed`;
   } else if (command === 'sweep') {
     const census = flag('--census') ?? censusFile();
     const waitMinutes = Number(flag('--minutes') ?? (rest.includes('--wait-for-lock') ? 180 : 0));

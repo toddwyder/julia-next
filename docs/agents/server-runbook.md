@@ -69,6 +69,7 @@ node scripts/trace-store.mjs ledger
 node scripts/trace-store.mjs mine <thread>
 node scripts/trace-store.mjs sweep --dry-run
 node scripts/trace-store.mjs sweep --wait-for-lock --minutes 180
+node scripts/trace-store.mjs repair
 ```
 
 `mine` writes that session's tokens, cost per model, which model each call asked for and which
@@ -98,11 +99,27 @@ refuses to start when it would not fit in the free space. Sizes before and after
 `~/.local/state/julia/trace-store-report.json`; read that file rather than guessing whether the
 store is under control.
 
+`repair` checkpoints the store in place and deletes no rows: it folds the write-ahead log into the
+file and gives back the room a delete freed, without a second copy. It is the one command to run when
+the store cannot be opened for writing. A sweep killed inside its copy leaves a half-written
+checkpoint WAL beside the store, and the next writable open refuses the file with
+`checkpoint WAL cannot contain a checkpoint marker` — reading still works, so `status` looks healthy.
+Run `repair` first, then the sweep. A finished copy removes the recovery files beside the store, so
+the new file opens for writing.
+
+Both ways of giving space back need room of their own: on 30 October a checkpoint of the 22.6 GB
+store wanted about 12 GB of spill, and a copy wants a second copy of the store on the same disk.
+DuckDB stops with an error rather than filling the disk, and `repair` reports that error instead of
+changing anything. Clear space elsewhere first: `npm cache clean --force` alone gave back 3.9 GB.
+
 The store is opened with a memory budget of a third of the machine, at most 2 GB, spilling to a temp
 directory beside it. DuckDB's own default is 85% of memory, which on this 7 GB server is 6 GB, and on
 30 October the kernel killed a sweep at 6.15 GB the moment it started writing. For the same reason
 one open serves every session a sweep cleans: an open per session cost 3.1 GB of caches across 42 of
-them.
+them. The copy that compacts the file gets a budget of its own: one thread, insertion order off, and
+512 MB of spill, because on 30 October a copy tried to offload 13.2 GiB beside 15 GB of free disk and
+died. A copy that cannot run now says so on the card and leaves the store alone instead of filling
+the disk or dying after the deletes succeeded.
 
 ## GitHub boundaries
 

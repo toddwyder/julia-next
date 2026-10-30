@@ -25,6 +25,7 @@ import {
   mineSessions,
   openStore,
   readCensus,
+  checkpointStore,
   readLedger,
   retroExists,
   retroFile,
@@ -556,6 +557,44 @@ test('compaction gives back the room a deleted payload was using, and deletes no
   const priced = ledgerAfter.rows.filter(row => row.threadId === a && row.name === 'mastra_model_total_input_tokens');
   assert.equal(priced.length, 1, 'mining keeps the cost row the scorecard prices from, so the ledger can price the card without the payloads');
   assert.equal(priced[0].estimatedCost, 0.5);
+});
+
+test('a repair folds the write-ahead log in and takes no row with it', { skip: noDuckdb }, async (t) => {
+  const [a] = [1].map(session);
+  const { file } = await withStore(t, [
+    span(daysAgo(20), 'old-1', 2, a),
+    span(daysAgo(1), 'new-1', 0.01, a),
+    metric(daysAgo(1), 'metric-new', 'mastra_model_total_input_tokens', 1000, 0.5, a),
+  ], { retros: ['JUL-1'], cards: { [a]: 'JUL-1' } });
+  await mineSession(a, {});
+  const deleted = await deletePayloads(a, {});
+  assert.deepEqual(deleted.deleted, { span_events: 2, log_events: 0 });
+
+  const answer = await checkpointStore();
+
+  assert.equal(answer.status, 'ok');
+  assert.equal(await countOf(file, 'span_events'), 0, 'the rows the delete marked dead stay dead');
+  assert.equal(await countOf(file, 'metric_events'), 1, 'a repair never takes the cost rows with it');
+  assert.equal(existsSync(`${file}.wal`), false, 'the write-ahead log is folded into the file');
+});
+
+test('the copy clears the recovery files a killed run left beside the store', { skip: noDuckdb }, async (t) => {
+  const [a] = [1].map(session);
+  const { file } = await withStore(t, [
+    span(daysAgo(20), 'old-1', 2, a),
+    span(daysAgo(1), 'new-1', 0.01, a),
+  ], { retros: ['JUL-1'], cards: { [a]: 'JUL-1' } });
+  await mineSession(a, {});
+  // A sweep killed inside its copy leaves a half-written checkpoint WAL, and the
+  // next writable open refuses the store: "checkpoint WAL cannot contain a
+  // checkpoint marker". A fresh copy has no recovery files beside it.
+  writeFileSync(`${file}.wal.checkpoint`, 'half-written checkpoint');
+
+  const answer = await compactStore();
+
+  assert.equal(answer.status, 'ok');
+  assert.equal(existsSync(`${file}.wal.checkpoint`), false, 'the new file does not inherit the old recovery files');
+  assert.equal(existsSync(`${file}.wal`), false);
 });
 
 test('the copy that shrinks the store keeps a budget of its own', () => {
