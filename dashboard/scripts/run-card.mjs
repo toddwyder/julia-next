@@ -226,6 +226,14 @@ export function pullForCard(card) {
   return pulls.find(pull => pullNamesCard(pull, card)) ?? null;
 }
 
+// The pull record is a snapshot taken when the run started, and a build or a remediation
+// round pushes commits after that. Shipping reads the pull request again, so the judge is
+// handed the head that is there now instead of the one the run began on.
+export function refreshPull(record, read = number => ghJson(['pr', 'view', String(number), '--json', 'number,headRefName,headRefOid,title,body,url,state'])) {
+  record.pull = read(record.pull.number);
+  return record.pull;
+}
+
 export function worktreeHolding(branch) {
   const listing = printed('git', ['worktree', 'list', '--porcelain']);
   for (const block of listing.split('\n\n').filter(Boolean)) {
@@ -770,6 +778,12 @@ async function buildStep({ record, issue, env, name = 'build', verdict = null })
 async function shippingStep({ record, issue, env }) {
   const step = latest(record, 'shipping');
   record.rounds.shipping += 1;
+  // Judge the head that exists now. The pull record was read before the build or the
+  // remediation that just ran, so its head is old by the time a judge starts. A judge
+  // pointed at the old head reads the code the remediation already replaced, reports
+  // the failure that was just fixed, and the gate then stops the card for having no
+  // verdict on the head that is actually there.
+  refreshPull(record);
   saveRecord(record, env);
   try {
     await runSession({

@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFile
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
-import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, cutOffResult, costFrom, freePort, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
+import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, cutOffResult, costFrom, freePort, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshPull, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
 const temporaryState = () => {
@@ -142,6 +142,20 @@ test('the shipping prompt hands over the card, the pull request and the two shap
   assert.match(prompt, /"head":"f0534654aa"/);
   assert.match(prompt, /Kimi-K3\.1-Pro/);
   assert.match(prompt, /Do not fix anything, do not push, do not merge/);
+});
+
+test('a shipping round is handed the head the pull request has now, not the one the run started on', () => {
+  const issue = { title: 'Account status on Start', description: '## Outcome\nRows on Start.' };
+  const record = { card: 'JUL-290', pull: { number: 383, url: 'https://github.com/toddwyder/julia-next/pull/383', headRefName: 'feat/jul-290-account-status', headRefOid: 'f0534654aa' } };
+  const promptFor = pull => shippingPrompt({ card: record.card, issue, pull, verifierModel: 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro' });
+  assert.match(promptFor(record.pull), /"head":"f0534654aa"/);
+
+  // Remediation pushed two commits after the run started, so the pull request moved.
+  const fresh = refreshPull(record, () => ({ ...record.pull, headRefOid: '19ac887cae' }));
+  assert.equal(fresh.headRefOid, '19ac887cae');
+  const prompt = promptFor(record.pull);
+  assert.match(prompt, /"head":"19ac887cae"/);
+  assert.doesNotMatch(prompt, /f0534654aa/);
 });
 
 test('the remediation prompt quotes what Shipping saw and keeps the merge out of its hands', () => {
