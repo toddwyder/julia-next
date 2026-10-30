@@ -850,10 +850,17 @@ export function sweepComment(answer) {
 
 // The comment goes up through the wrapper that unlocks the Linear key, not by
 // importing the client here: this module runs on the server without the env file.
+// The wrapper runs what it is given through `op run`, so the client goes in as a
+// node program. The file itself is not executable in a fresh checkout, and running
+// it bare is the "fork/exec: permission denied" the first swap's comment got.
+export function commentArgs(card, file) {
+  return [join(REPO, 'scripts', 'julia-agents.mjs'), '--', process.execPath, join(REPO, 'scripts', 'linear-cli.mjs'), 'comment', card, '--file', file];
+}
+
 function postSweepComment(body, kind = 'trace-sweep') {
   const file = join(dirname(reportFile()), `${kind}-${new Date().toISOString().replace(/[:.]/g, '-')}.md`);
   writeFileSync(file, body);
-  const answer = spawnSync(process.execPath, [join(REPO, 'scripts', 'julia-agents.mjs'), '--', join(REPO, 'scripts', 'linear-cli.mjs'), 'comment', SWEEP_CARD, '--file', file], { cwd: REPO, encoding: 'utf8', timeout: 120_000 });
+  const answer = spawnSync(process.execPath, commentArgs(SWEEP_CARD, file), { cwd: REPO, encoding: 'utf8', timeout: 120_000 });
   return { card: SWEEP_CARD, file, exit: answer.status, output: `${answer.stdout ?? ''}${answer.stderr ?? ''}`.trim().slice(-400) };
 }
 

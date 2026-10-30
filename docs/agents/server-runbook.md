@@ -70,6 +70,8 @@ node scripts/trace-store.mjs mine <thread>
 node scripts/trace-store.mjs sweep --dry-run
 node scripts/trace-store.mjs sweep --wait-for-lock --minutes 180
 node scripts/trace-store.mjs repair
+node scripts/trace-store.mjs keep
+node scripts/trace-store.mjs swap --wait-for-lock --minutes 720
 ```
 
 `mine` writes that session's tokens, cost per model, which model each call asked for and which
@@ -120,6 +122,19 @@ them. The copy that compacts the file gets a budget of its own: one thread, inse
 512 MB of spill, because on 30 October a copy tried to offload 13.2 GiB beside 15 GB of free disk and
 died. A copy that cannot run now says so on the card and leaves the store alone instead of filling
 the disk or dying after the deletes succeeded.
+
+`keep` and `swap` replace the store with a small one when rewriting it in place is not worth the
+room. `keep` writes `observability.keep.duckdb` beside the store: every `metric_events` row, which
+carries the cost; the `span_events` and `log_events` detail of one session, named by `KEEP_THREAD`;
+and the small `score_events` and `feedback_events` tables. It checks every count against a fresh
+read of the live store and refuses to start below 8 GB free. `swap` polls the lock, renames the
+store and its write-ahead log to `observability.duckdb.old`, copies the kept rows into place, checks
+the counts again, and puts `.old` back if they do not match. Nothing is deleted: `.old` and the keep
+file stay until a session is seen running from the new store, and `swap` refuses to run while an
+earlier `.old` is still parked. On 30 October this took the store from 29.5 GB to 5.7 GB in one
+step, after two attempts to rewrite it in place had each spent about 5 GB and still left 19.5 GiB
+of free blocks mid-file that only a dense copy reclaims. The keep file duplicates the new store, so
+delete it once the new one is proven; `.old` is the only remaining copy of the sessions it dropped.
 
 ## GitHub boundaries
 

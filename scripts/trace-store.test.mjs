@@ -26,6 +26,7 @@ import {
   openStore,
   readCensus,
   checkpointStore,
+  commentArgs,
   keepFile,
   keepStore,
   readLedger,
@@ -947,4 +948,12 @@ test('swap will not rename over a store an earlier swap parked', async t => {
   assert.equal(answer.status, 'parked');
   assert.equal(await countOf(file, 'span_events'), 2, 'the live store is untouched');
   assert.equal(readFileSync(`${file}.old`, 'utf8'), 'a store someone still needs');
+});
+
+test('the card comment runs the client under node, from a fresh checkout', () => {
+  const args = commentArgs('JUL-276', '/tmp/body.md');
+  assert.equal(args[1], '--', 'the wrapper takes the command after a bare --');
+  assert.equal(args[2], process.execPath, 'without a node in front, the client is not executable and the comment is lost');
+  assert.ok(args[3].endsWith(join('scripts', 'linear-cli.mjs')));
+  assert.deepEqual(args.slice(4), ['comment', 'JUL-276', '--file', '/tmp/body.md']);
 });
