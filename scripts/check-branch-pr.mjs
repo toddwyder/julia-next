@@ -12,10 +12,11 @@ export function branchesWithoutOpenPullRequests({ branches, pulls, repository })
   return branches.map(branch => branch.name).filter(name => name !== 'main' && !covered.has(name)).sort();
 }
 
-// A card's scorecard is how a card's cost reaches Todd, and a scorecard that could not read
-// the session's trace file prints `Cost: **unknown**` while looking finished. So a pull
-// request that names a card has to carry that card's scorecard, and the card's cost has to be
-// a number somebody could check.
+// A card's scorecard is how a card's cost reaches Todd, and a scorecard that could not read a
+// session's trace file prints `Cost: **unknown**` while looking finished, or prints a number
+// smaller than the bill and says so on a `Cost incomplete` line. So a pull request that names
+// a card has to carry that card's scorecard, and the card's cost has to be a number somebody
+// could check.
 export function scorecardGaps({ pulls, headRef, readFile = path => readFileSync(path, 'utf8') }) {
   const gaps = [];
   for (const pull of pulls.filter(candidate => candidate.head?.ref === headRef)) {
@@ -26,16 +27,20 @@ export function scorecardGaps({ pulls, headRef, readFile = path => readFileSync(
     }
     for (const card of cards) {
       const path = `docs/scorecards/${card}.md`;
-      let cost;
+      let written;
       try {
-        cost = /^- Cost: \*\*(.+?)\*\*/m.exec(readFile(path))?.[1] ?? 'no Cost line';
+        written = readFile(path);
       } catch {
         gaps.push(`PR #${pull.number} names ${card} but ${path} is not on the branch: run node scripts/scorecard.mjs ${card} --write and commit what it writes`);
         continue;
       }
+      const cost = /^- Cost: \*\*(.+?)\*\*/m.exec(written)?.[1] ?? 'no Cost line';
       if (!/^\$\d+(\.\d+)?$/.test(cost) || Number(cost.slice(1)) <= 0) {
         gaps.push(`PR #${pull.number} carries ${path} with cost "${cost}" and a pull request needs a measured cost: the scorecard prices a card from its session's trace file, so read node scripts/trace-store.mjs status and re-run node scripts/scorecard.mjs ${card} --write`);
+        continue;
       }
+      const incomplete = /^- Cost incomplete: (.*)$/m.exec(written)?.[1];
+      if (incomplete) gaps.push(`PR #${pull.number} carries ${path} with a cost that is known to be short: ${incomplete}`);
     }
   }
   return gaps;

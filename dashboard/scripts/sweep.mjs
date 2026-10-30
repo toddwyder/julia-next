@@ -1,7 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 import { accountProviders, mergeSweep, parsePrices, stateDir } from '../lib/models.js';
@@ -13,32 +12,18 @@ export function readConfig(name) {
   return JSON.parse(readFileSync(join(dashboardRoot, 'config', name), 'utf8'));
 }
 
+// `mastracode` on PATH is the launcher, a plain script in this repo, so the program is not
+// beside it. MASTRACODE_PROGRAM names the program directory, and this server's installer puts
+// it at ~/.local/lib/mastracode-program.
 export function findSdkPath(env = process.env) {
   if (env.MASTRACODE_SDK_PATH) return env.MASTRACODE_SDK_PATH;
   const relative = join('node_modules', '@mastra', 'code-sdk', 'dist', 'index.js');
-  if (env.MASTRACODE_PROGRAM) {
-    const candidate = join(env.MASTRACODE_PROGRAM, relative);
+  const programs = [env.MASTRACODE_PROGRAM, env.MASTRACODE_PROGRAM_DIR, join(homedir(), '.local', 'lib', 'mastracode-program')].filter(Boolean);
+  for (const program of programs) {
+    const candidate = join(program, relative);
     if (existsSync(candidate)) return candidate;
-    throw new Error(`The Mastra Code SDK was not found at ${candidate}. Check MASTRACODE_PROGRAM.`);
   }
-  let bin;
-  try {
-    bin = execFileSync('which', ['mastracode'], { encoding: 'utf8' }).trim();
-  } catch {
-    bin = '';
-  }
-  if (!bin) {
-    throw new Error('The Mastra Code program was not found. Set MASTRACODE_PROGRAM or put mastracode on PATH.');
-  }
-  let directory = dirname(realpathSync(bin));
-  for (let depth = 0; depth < 6; depth += 1) {
-    const candidate = join(directory, relative);
-    if (existsSync(candidate)) return candidate;
-    const parent = dirname(directory);
-    if (parent === directory) break;
-    directory = parent;
-  }
-  throw new Error('The Mastra Code SDK was not found next to the mastracode program.');
+  throw new Error(`The Mastra Code SDK was not found in ${programs.join(' or ')}. Set MASTRACODE_PROGRAM to the directory that holds its node_modules.`);
 }
 
 export async function availableModels(env = process.env) {

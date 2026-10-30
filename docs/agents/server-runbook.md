@@ -69,7 +69,16 @@ The launcher at `~/.local/bin/mastracode` (`scripts/mastracode`, installed by
 its own file under `~/.local/share/mastracode/traces/<utc stamp>-<pid>.duckdb` through
 `MASTRA_OBSERVABILITY_DB_PATH`, so parallel sessions never share a lock, and before starting it folds
 whatever earlier sessions left behind. `JULIA_TRACES_DIR` moves the directory; `MASTRA_APP_DATA_DIR`
-moves it with the rest of the data.
+moves it with the rest of the data. `mastracode` on PATH is now the launcher rather than the
+program, so a script that needs the program's own packages reads `MASTRACODE_PROGRAM_DIR` or
+`~/.local/lib/mastracode-program`, never the command's neighbours.
+
+A session started any other way, by a Mastra Code update that replaces the launcher or by a command
+that skips it, records nothing and leaves no file of its own. Nothing on the machine notices that, so
+the card says it. A session that started after the launcher was installed and left no cost rows makes
+the scorecard print `- Cost incomplete:` with the reason, and `scripts/check-branch-pr.mjs` refuses
+that branch's pull request until the cost covers every session. The launcher's install time is the
+cutover, so a run from before it is history and not a loss.
 
 ```sh
 node scripts/trace-store.mjs status

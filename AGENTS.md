@@ -37,7 +37,7 @@ After a slice merges, run the retro skill on that slice's session and put its fi
 | Skill names are unique across the installed catalogs. | `node scripts/check-skill-names.mjs` rejects duplicate frontmatter names. |
 | Current agent-read files point only at paths that exist. | `node scripts/check-agent-links.mjs` checks the entry points, pstack skills, and `ask-matt`. |
 | Every branch except `main` has an open pull request to `main`. | `node scripts/check-branch-pr.mjs` audits GitHub branches and open pull requests in CI. |
-| A pull request that names a card carries that card's scorecard with a measured cost. | `node scripts/check-branch-pr.mjs` fails the branch when the scorecard is missing or its cost is unknown. |
+| A pull request that names a card carries that card's scorecard with a measured cost. | `node scripts/check-branch-pr.mjs` fails the branch when the scorecard is missing, its cost is unknown, or its cost is short. |
 
 <!-- BEGIN:nextjs-agent-rules -->
 

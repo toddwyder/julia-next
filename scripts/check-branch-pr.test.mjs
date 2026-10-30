@@ -49,6 +49,13 @@ test('a card pull request with no scorecard on the branch fails', () => {
   assert.match(gaps[0], /is not on the branch/);
 });
 
+test('a cost the scorecard says is short fails the pull request even though it is a number', () => {
+  const written = `${scorecard('**$1.69**')}- Cost incomplete: 1 session of this card started after the launcher and recorded no trace rows.\n`;
+  const gaps = scorecardGaps({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => written });
+  assert.equal(gaps.length, 1);
+  assert.match(gaps[0], /known to be short: 1 session of this card started after the launcher and recorded no trace rows/);
+});
+
 test('a pull request that names no card, or is another branch, is not checked', () => {
   assert.equal(scorecardGaps({ pulls: [pull({ title: 'Fix the font flake' })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }).length, 1);
   assert.deepEqual(scorecardGaps({ pulls: [pull({ ref: 'other' })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }), []);

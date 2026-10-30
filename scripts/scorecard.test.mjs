@@ -244,6 +244,25 @@ test('a folded archive with no span rows still prices the cost rows it holds', a
   assert.equal(tracing.requested.length, 1, 'only the session file can name the model that answered');
 });
 
+// The launcher is what gives each session its own trace file. A session started any other way
+// records nothing at all, and nothing else on the machine notices, so the card has to say so.
+test('a session that started after the launcher and recorded nothing makes the cost incomplete', () => {
+  const scorecard = since => buildScorecard({
+    card: 'JUL-273', threads: [thread], prices, tracing: { metrics: [], requested: [], launcher: since }, pulls: [], pings: [], uat: undefined,
+  });
+  const after = scorecard({ since: ms('18:30'), problem: null });
+  assert.match(after.tracingSkipped, /^1 session of this card started after the launcher and recorded no trace rows$/);
+  assert.match(renderScorecard(after), /^- Cost incomplete: 1 session of this card started after the launcher and recorded no trace rows\.$/m);
+
+  // A run from before the launcher existed is history, not a loss this card can fix.
+  assert.equal(scorecard({ since: ms('20:00'), problem: null }).tracingSkipped, undefined);
+
+  // A replaced launcher is the other way a session loses its rows.
+  const replaced = scorecard({ since: null, problem: 'the launcher runs something else' });
+  assert.equal(replaced.tracingSkipped, 'the launcher runs something else');
+  assert.match(renderScorecard(replaced), /^- Cost incomplete: the launcher runs something else\.$/m);
+});
+
 test('a card whose trace file was too large to copy says why its cost is unknown', () => {
   const skipped = 'the trace store is 21 GB and only 20 GB is free to copy it';
   const scorecard = buildScorecard({
@@ -256,7 +275,7 @@ test('a card whose trace file was too large to copy says why its cost is unknown
     uat: undefined,
   });
   assert.equal(scorecard.tracingSkipped, skipped);
-  assert.match(renderScorecard(scorecard), /Mastra's trace files were not read: the trace store is 21 GB and only 20 GB is free to copy it/);
+  assert.match(renderScorecard(scorecard), /The trace store is 21 GB and only 20 GB is free to copy it/);
 });
 
 test('a card with no trace store at all still says no usage records were found', () => {
