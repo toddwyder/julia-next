@@ -281,6 +281,22 @@ export function openOptions(file, mode) {
   return { ...(mode ? { access_mode: mode } : {}), memory_limit: `${limit}MB`, temp_directory: `${file}.tmp` };
 }
 
+// The copy that shrinks the store must not be what fills the disk. On 30 October
+// at 03:10 the first real sweep deleted all 42,915 rows it was allowed to, then
+// died copying the file: DuckDB offloaded 13.2 GiB into the temp directory beside
+// a store with 15 GB free, and the run ended with no compaction and no comment.
+// One thread, insertion order not preserved, and half a gigabyte of spill is the
+// budget for the copy; a copy that needs more than that fails and leaves the
+// store alone rather than eating the room it was trying to make.
+export function copyOptions(file, room) {
+  return {
+    ...openOptions(file),
+    threads: '1',
+    preserve_insertion_order: 'false',
+    max_temp_directory_size: `${Math.max(64, Math.min(512, Math.floor(room / 2 ** 20 / 4)))}MB`,
+  };
+}
+
 export async function openStore(file, mode) {
   const { DuckDBInstance } = duckdb();
   try {
@@ -607,13 +623,13 @@ function removeQuietly(file) {
   if (existsSync(file)) rmSync(file, { force: true });
 }
 
-async function compact(file) {
+async function compact(file, room) {
   const temp = `${file}.compact`;
   removeQuietly(temp);
   const { DuckDBInstance } = duckdb();
   // Copying 22 GB through an in-memory instance takes the same budget as reading
   // it, or the copy is what runs the machine out of memory.
-  const instance = await DuckDBInstance.create(':memory:', openOptions(file));
+  const instance = await DuckDBInstance.create(':memory:', copyOptions(file, room));
   try {
     const connection = await instance.connect();
     await connection.run(`attach '${file}' as src (read_only)`);
@@ -621,6 +637,10 @@ async function compact(file) {
     await connection.run('copy from database src to dst');
     await connection.run('detach dst');
     await connection.run('detach src');
+  } catch (error) {
+    removeQuietly(temp);
+    removeQuietly(`${temp}.wal`);
+    throw error;
   } finally {
     instance.closeSync?.();
   }
@@ -698,11 +718,23 @@ export async function compactStore({ dryRun = false, store = storeFile() } = {})
   if (!compactionFits(before, room)) {
     return { status: 'no-room', store, bytes: before, room, needed: Math.ceil(before / 2) + MARGIN_BYTES };
   }
-  const compacted = dryRun ? null : await compact(store);
+  let compacted = null;
+  let failure = null;
+  if (!dryRun) {
+    try {
+      compacted = await compact(store, room);
+    } catch (error) {
+      // A copy that ran out of room took nothing with it: the store is the one the
+      // delete wrote, and the rows that went stay gone. Say so instead of failing
+      // the whole run after it did its work.
+      failure = error.message.split('\n')[0].slice(0, 300);
+    }
+  }
   const finalBytes = dryRun ? before : storeBytes(store);
   const entry = { at: new Date().toISOString(), store, dryRun, bytesBefore: before, bytesAfter: finalBytes, compactedBytes: compacted, freeBefore: room, freeAfter: freeBytes(dirname(store)) };
+  if (failure) entry.failure = failure;
   if (!dryRun) entry.report = appendReport(entry);
-  return { status: dryRun ? 'dry-run' : 'ok', ...entry };
+  return { status: dryRun ? 'dry-run' : failure ? 'no-room' : 'ok', ...entry };
 }
 
 // The sweep is the one path that deletes payloads. It mines every session it is
@@ -762,6 +794,8 @@ export function sweepComment(answer) {
       `- Rows deleted: ${total} across ${PRUNED_TABLES.join(' and ')}; every cost row stays in the ledger.`,
       `- Disk: ${gb(compact.freeBefore)} free before, ${gb(compact.freeAfter)} free after.`,
     );
+    if (compact.failure) lines.push(`- The copy that shrinks the file did not run: ${compact.failure}`);
+    if (compact.status === 'no-room' && !compact.failure) lines.push(`- No room to compact: about ${gb(compact.needed)} is needed and ${gb(compact.room)} is free.`);
   } else {
     lines.push(`- Store: \`${answer.store}\`; nothing was deleted, so nothing was compacted.`);
   }
@@ -824,7 +858,8 @@ async function main(argv) {
       await sleep(30_000);
     }
     if (answer.status === 'busy') answer.note = `a Mastra Code session holds the trace store${answer.pid ? ` (PID ${answer.pid})` : ''}; this run waited ${waitMinutes} min and changed nothing`;
-    if (answer.compact?.status === 'no-room') answer.note = `not enough room to compact: ${gb(answer.compact.bytes)} store needs about ${gb(answer.compact.needed)} free, ${gb(answer.compact.room)} is free`;
+    if (answer.compact?.failure) answer.note = `the rows were deleted, but the copy that shrinks the file failed and left the store alone: ${answer.compact.failure}`;
+    else if (answer.compact?.status === 'no-room') answer.note = `not enough room to compact: ${gb(answer.compact.bytes)} store needs about ${gb(answer.compact.needed)} free, ${gb(answer.compact.room)} is free`;
     if (answer.compact?.status === 'ok') answer.note = `${mb(answer.compact.bytesBefore)} → ${mb(answer.compact.bytesAfter)} on disk`;
     if (dryRun && answer.plan) answer.note = `dry run: ${answer.mined.sessions} session(s) read and planned, nothing written, nothing deleted`;
     if (!dryRun && answer.plan && !answer.deleted.length) answer.note = 'nothing was clean to delete, so nothing was deleted and nothing was compacted';

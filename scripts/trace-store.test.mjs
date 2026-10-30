@@ -1,16 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir, totalmem } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 import {
   approvedWithoutRetro,
   compactStore,
   compactionFits,
+  copyOptions,
   deletePayloads,
   deletionRefusal,
   exportLedger,
@@ -555,6 +556,42 @@ test('compaction gives back the room a deleted payload was using, and deletes no
   const priced = ledgerAfter.rows.filter(row => row.threadId === a && row.name === 'mastra_model_total_input_tokens');
   assert.equal(priced.length, 1, 'mining keeps the cost row the scorecard prices from, so the ledger can price the card without the payloads');
   assert.equal(priced[0].estimatedCost, 0.5);
+});
+
+test('the copy that shrinks the store keeps a budget of its own', () => {
+  const big = copyOptions('/tmp/store.duckdb', 64 * 1024 ** 3);
+  assert.equal(big.threads, '1', 'two threads hold two rows at a time, and a row here carries a whole prompt');
+  assert.equal(big.preserve_insertion_order, 'false');
+  const bytes = value => Number(value.replace(/MB$/, '')) * 1024 ** 2;
+  assert.ok(bytes(big.max_temp_directory_size) <= 512 * 1024 ** 2, `a copy may spill at most half a gigabyte, not ${big.max_temp_directory_size}`);
+  const cramped = copyOptions('/tmp/store.duckdb', 400 * 1024 ** 2);
+  assert.ok(bytes(cramped.max_temp_directory_size) <= 400 * 1024 ** 2 / 4, 'a full disk shrinks the spill budget with it');
+  assert.ok(bytes(cramped.max_temp_directory_size) >= 64 * 1024 ** 2, 'the budget never reaches zero, or every copy fails');
+});
+
+test('a copy that cannot run leaves the store as it is and says why', { skip: noDuckdb }, async (t) => {
+  const one = session(1);
+  const { file } = await withStore(t, [
+    span(daysAgo(20), 'old-1', 2, one),
+    span(daysAgo(1), 'new-1', 0.01, one),
+    metric(daysAgo(20), 'metric-old', 'mastra_model_total_input_tokens', 1000, 0.5, one),
+  ], { retros: ['JUL-1'], cards: { [one]: 'JUL-1' } });
+  await mineSession(one, {});
+  await deletePayloads(one, {});
+  const before = storeBytes(file);
+
+  // A directory that cannot take a new file is how a full disk shows up here.
+  chmodSync(dirname(file), 0o500);
+  try {
+    const answer = await compactStore();
+    assert.equal(answer.status, 'no-room');
+    assert.ok(answer.failure && answer.failure.length > 0, 'the reason is reported, not swallowed');
+    assert.equal(answer.bytesAfter, before, 'the store the delete wrote is still the store on disk');
+  } finally {
+    chmodSync(dirname(file), 0o700);
+  }
+  assert.equal(existsSync(`${file}.compact`), false, 'a half-written copy is removed, not left beside the store');
+  assert.equal(await countOf(file, 'metric_events'), 1, 'the store still answers after the copy that could not run');
 });
 
 test('a sweep cleans only sessions that were mined, have a retro and whose card is Complete', { skip: noDuckdb }, async (t) => {
