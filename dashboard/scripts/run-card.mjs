@@ -941,7 +941,7 @@ async function waitForLive({ kind, commit, address, log, timeoutMs = 20 * 60_000
   throw new Error(`the live copy never came round to ${String(commit).slice(0, 7)}; nothing rolls back on its own, so this waits for a person`);
 }
 
-function retroPrompt({ card, issue, pull, merge, cost }) {
+export function retroPrompt({ card, issue, pull, merge, cost }) {
   return `You are the retro session for Linear card ${card}: ${issue.title}
 
 It landed: pull request #${pull.number} merged to main as ${merge.commit}.
@@ -950,7 +950,9 @@ The card's cost so far is ${cost}.
 ${UNATTENDED}
 
 Read AGENTS.md, then the retro skill at .claude/skills/retro/SKILL.md and the
-poteto-mode skill, and run the retro on this card's own build.
+poteto-mode skill, and run the retro on this card's own build. Start your branch
+from main as it is now: git fetch origin main && git switch -c retro/${runIdFor(card)} origin/main.
+The card's own branch is already merged and gone, so nothing of it belongs in yours.
 
 Put the fixes in one pull request on branch retro/${runIdFor(card)}:
 - one plain-English line per fix for Todd: the mistake it came from, what the
@@ -1092,8 +1094,8 @@ export async function tick(env = process.env) {
 }
 
 async function sendBack(record, env, reply) {
-  const file = join(runFolderFor(record.card, env), 'sent-back.md');
   mkdirSync(runFolderFor(record.card, env), { recursive: true });
+  const file = join(runFolderFor(record.card, env), 'sent-back.md');
   writeFileSync(file, `${record.card} goes back: ${reply.quote}
 
 Nothing merged. The build starts again from this note in the next run.`);

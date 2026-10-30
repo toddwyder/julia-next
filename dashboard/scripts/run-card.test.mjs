@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFile
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
-import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, costFrom, freePort, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshSpend, remediationPrompt, replyFrom, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
+import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, costFrom, freePort, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
 const temporaryState = () => {
@@ -365,11 +365,28 @@ test('every prompt says the run is unattended before the session starts to work'
     buildPrompt({ ...card, branch: pull.headRefName, pull }),
     shippingPrompt({ ...card, pull, verifierModel: 'moonshotai/Kimi-K3.1-Pro' }),
     remediationPrompt({ ...card, pull, verdict: { criteria: [{ criterion: 'rows', verdict: 'FAIL', note: 'missing' }] } }),
+    retroPrompt({ ...card, pull, merge: { commit: 'abc123' }, cost: '$1.69' }),
   ]) {
     assert.match(prompt, /unattended/);
     assert.match(prompt, /request_access/);
     assert.ok(prompt.includes(UNATTENDED));
   }
+});
+
+// A retro branch cut from the card's own merged branch would carry that branch's
+// commits back into a pull request that is meant to hold the retro alone.
+test('the retro session is told to start from main, not from the card branch it inherits', () => {
+  const prompt = retroPrompt({
+    card: 'JUL-290',
+    issue: { title: 'Account status', description: '## Outcome\nrows' },
+    pull: { number: 383 },
+    merge: { commit: 'abc123' },
+    cost: '$1.69',
+  });
+  assert.match(prompt, /git fetch origin main/);
+  assert.match(prompt, /retro\/jul-290/);
+  assert.match(prompt, /already merged and gone/);
+  assert.match(prompt, /\$1\.69/);
 });
 
 test('a session is priced from the log it wrote, even when its last line never finished', async () => {
