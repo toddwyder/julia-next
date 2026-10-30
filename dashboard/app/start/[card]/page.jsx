@@ -1,15 +1,37 @@
+import { execFile } from 'node:child_process';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { connection } from 'next/server';
 import ROLES from '../../../config/roles.json';
+import ACCOUNTS from '../../../config/accounts.json';
 import { getReadyCard } from '../../../lib/linear.js';
 import { accountProviders, displayName, onePerName, priceLabel, readModels, startModels } from '../../../lib/models.js';
 import { initialChoice, mergeDraft } from '../../../lib/roles.js';
 import { readJsonRecord, stateFolder, writeJsonRecord } from '../../../lib/state.js';
+import { accountView } from '../../../lib/usage-view.js';
+import AccountStatus from './account-status.jsx';
 import StartScreen from './start-screen.jsx';
 import styles from './start.module.css';
 
 const { groups: GROUPS } = ROLES;
 const DRAFT_FILE = () => join(stateFolder(), 'draft.json');
+const runFile = promisify(execFile);
+const usageScriptPath = join(process.cwd(), 'scripts', 'usage.mjs');
+
+async function readStatus() {
+  try {
+    const { stdout } = await runFile(process.execPath, [usageScriptPath], { timeout: 15000 });
+    const status = JSON.parse(stdout);
+    if (status.error || !Array.isArray(status.accounts) || status.accounts.length !== ACCOUNTS.accounts.length) throw new Error('Invalid account status.');
+    status.accounts.forEach(account => accountView(account));
+    return status;
+  } catch {
+    const readAt = new Date().toISOString();
+    return { readAt, accounts: ACCOUNTS.accounts.map(({ id, name }) => ({
+      id, name, readAt, rows: [{ key: id, label: name, kind: 'unreadable', problem: 'unreachable' }],
+    })) };
+  }
+}
 
 const SWEEP_MISSING = 'No model sweep has run yet, so there are no models or prices to show. Go back to the list and open this card again after the weekly sweep.';
 const UNPRICED_MISSING = 'The sweep has saved no model with a price, so this screen has nothing to show. Go back to the list and open this card again after the next sweep.';
@@ -51,6 +73,7 @@ async function saveDraft(next) {
 
 export default async function StartPage({ params }) {
   await connection();
+  const statusPromise = readStatus();
   const { card: identifier } = await params;
   let card;
   let failure;
@@ -107,9 +130,14 @@ export default async function StartPage({ params }) {
     }))
     .sort((left, right) => (accountRank(left.provider) - accountRank(right.provider)) || left.name.localeCompare(right.name));
 
+  const status = await statusPromise;
+  const statusViews = (status.accounts ?? []).map(account => accountView(account));
+  const warnings = statusViews.filter(view => view.warning).map(view => view.warning);
+
   return <><a className="back" href="/">← Back to Ready cards</a>
     <header><p className="eyebrow">Start screen</p>
       <p className="identifier">{identifier}</p><h1>{card ? card.title : 'Card unavailable'}</h1></header>
+    <AccountStatus accounts={statusViews} />
     {failure ? <p className="problem" role="alert">{failure}</p>
       : !card ? <p className="empty">This card is not in Julia-next Ready. Go Back to choose a Ready card.</p>
       : modelsProblem ? <p className="problem" role="alert">{modelsProblem}</p>
@@ -119,7 +147,7 @@ export default async function StartPage({ params }) {
         {saved.status === 'stale' ? <p className={styles.stale} role="status">
           The last sweep was on {sweepDay(saved.sweptAt)}. That is more than eight days ago. Run the weekly sweep to refresh these prices.
         </p> : null}
-        <StartScreen card={identifier} groups={GROUPS} models={picks} initial={choice}
+        <StartScreen warnings={warnings} card={identifier} groups={GROUPS} models={picks} initial={choice}
           mainSession={modelLine(picked.mainSession)} shipping={modelLine(picked.shipping)} saveDraft={saveDraft} />
         <section className={styles.section} aria-labelledby="prices-heading">
           <h2 id="prices-heading">Prices</h2>

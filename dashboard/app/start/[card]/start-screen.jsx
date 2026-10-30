@@ -50,7 +50,7 @@ function describeChange(prev, next, groups, byId) {
   return '';
 }
 
-export default function StartScreen({ card, groups, models, initial, mainSession, shipping, saveDraft }) {
+export default function StartScreen({ card, groups, models, initial, mainSession, shipping, saveDraft, warnings = [] }) {
   const [choice, setChoice] = useState(initial);
   const [expanded, setExpanded] = useState('');
   const [picker, setPicker] = useState(null);
@@ -189,7 +189,7 @@ export default function StartScreen({ card, groups, models, initial, mainSession
       <p className={styles.saved}>{saveProblem || SAVED_LINE}</p>
     </section>
 
-    {picker ? <ModelPicker label={pickerLabel(picker, groups)} models={models}
+    {picker ? <ModelPicker warnings={warnings} label={pickerLabel(picker, groups)} models={models}
       current={currentPick(choice, picker, groups)}
       chosen={chosenIds(choice, picker, groups)}
       panel={Boolean(groups.find(group => group.id === picker.groupId)?.panel)}
@@ -218,7 +218,7 @@ function chosenIds(choice, picker, groups) {
   return choice.groups[picker.groupId].models ?? [];
 }
 
-function ModelPicker({ label, models, current, chosen, panel, onClose, onChoose }) {
+function ModelPicker({ label, models, current, chosen, panel, warnings, onClose, onChoose }) {
   const box = useRef(null);
   useEffect(() => {
     box.current?.focus();
@@ -242,8 +242,11 @@ function ModelPicker({ label, models, current, chosen, panel, onClose, onChoose 
       </div>
       <div className={styles.pickList}>
         {accounts.map(account => <section className={styles.pickGroup} key={account.name}
-          aria-label={`${account.name} (${account.models.length})`}>
+          aria-label={`${account.name} (${account.models.length})`}
+          aria-describedby={warnings.some(warning => warning.name === account.name) ? `pick-warning-${accounts.indexOf(account)}` : undefined}>
           <h4 className={styles.pickAccount}>{account.name} <span>{account.models.length}</span></h4>
+          {warnings.filter(warning => warning.name === account.name).map(warning => <p key={warning.name}
+            id={`pick-warning-${accounts.indexOf(account)}`} className={styles.pickWarning}>{warning.text}</p>)}
           <ul className={styles.pickModels}>
             {account.models.map(model => {
               const picked = model.id === current;
