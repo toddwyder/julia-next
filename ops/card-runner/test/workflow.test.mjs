@@ -46,7 +46,7 @@ function writeHandover(runDir, { branch = 'runner/card-901', head = 'abc1234', s
   writeFileSync(join(runDir, 'build-done.json'), JSON.stringify({ card: 'JUL-901', branch, head, startedAt }))
 }
 
-function harness({ freeAnswers, finalAnswer, comments = [firstEvidence, secondEvidence], buildBackAddsEvidence = true }) {
+function harness({ freeAnswers, finalAnswer, comments = [firstEvidence, secondEvidence], buildBackAddsEvidence = true, dropFirstCardPost = false }) {
   const runDir = mkdtempSync(join(tmpdir(), 'card-runner-test-'))
   const posted = []
   const pullComments = []
@@ -55,6 +55,7 @@ function harness({ freeAnswers, finalAnswer, comments = [firstEvidence, secondEv
   const calls = []
   let evidence = [...comments]
   let freeIndex = 0
+  let cardPostFailures = dropFirstCardPost ? 1 : 0
   const now = (() => {
     let tick = 0
     return () => new Date(Date.UTC(2026, 9, 31, 0, 0, tick++)).toISOString()
@@ -82,7 +83,13 @@ function harness({ freeAnswers, finalAnswer, comments = [firstEvidence, secondEv
       return { number: 12, head: 'abc1234', url: 'https://github.com/x/y/pull/12', builder: 'toddwyder' }
     },
     requirePull: async () => ({ number: 12, head: 'abc1234', url: 'https://github.com/x/y/pull/12', builder: 'toddwyder' }),
-    postCardComment: async (identifier, body) => { posted.push({ identifier, body }) },
+    postCardComment: async (identifier, body) => {
+      if (cardPostFailures > 0) {
+        cardPostFailures -= 1
+        throw new TypeError('fetch failed')
+      }
+      posted.push({ identifier, body })
+    },
     postPullComment: async ({ number, body }) => { pullComments.push({ number, body }) },
     runSession: async (options) => {
       calls.push(options)
@@ -259,6 +266,21 @@ test('a final verdict for another head is refused, so nothing wrong reaches the 
   check(h.posted.at(-1).body.includes('Shipping gave no usable verdict'))
   const record = JSON.parse(readFileSync(join(h.runDir, 'run.json'), 'utf8'))
   equal(record.ok, false)
+})
+
+test('a dropped connection while posting the verdicts is retried, so a pass is never lost', async () => {
+  const free = verdictFor({ verifier: GLYPH })
+  const final = verdictFor({ verifier: KIMI })
+  const h = harness({ freeAnswers: [free], finalAnswer: final, dropFirstCardPost: true })
+
+  const workflow = createCardRunWorkflow(h.deps)
+  const run = await workflow.createRun()
+  const result = await run.start({ inputData: h.options })
+
+  equal(result.status, 'success')
+  equal(result.result.finalVerdict.verdict, 'PASS')
+  equal(h.posted.length, 2)
+  equal(h.pullComments.length, 1)
 })
 
 function check(value) {

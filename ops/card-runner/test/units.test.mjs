@@ -210,7 +210,7 @@ test('the shipping prompt names the verdict file, the model, the pull request an
   match(prompt, /The pull request to judge is https:\/\/github\.com\/o\/r\/pull\/12 \(number 12\), and its head commit at the time this run started was abc1234/)
   match(prompt, /node scripts\/linear-cli\.mjs comments JUL-900/)
   match(prompt, /Every FAIL note carries its reason in three parts/)
-  match(prompt, /copy each line below character for character/)
+  match(prompt, /Copy each line character for character/)
   match(prompt, /1\. The first thing works\.\n2\. The second thing works\./)
 })
 
@@ -245,6 +245,22 @@ test('a verdict is accepted only when it answers this card, this head and this m
   const quoted = structuredClone(verdict)
   quoted.criteria[1].criterion = 'The second thing works when a person opens it'
   equal(validateVerdict(quoted, { card: 'JUL-900', head: 'abc1234', verifier: verdict.verifier, expectedCriteria: criteriaFrom(card.description) }).ok, true)
+
+  // A judge that writes each criterion in its own shorter words still answers
+  // the card, and what the runner posts carries the card's wording.
+  const shortened = structuredClone(verdict)
+  shortened.criteria[0].criterion = 'the first thing works'
+  shortened.criteria[1].criterion = 'second thing works'
+  const accepted = validateVerdict(shortened, { card: 'JUL-900', head: 'abc1234', verifier: verdict.verifier, expectedCriteria: criteriaFrom(card.description) })
+  equal(accepted.ok, true)
+  equal(accepted.verdict.criteria.map((item) => item.criterion).join('|'), criteriaFrom(card.description).join('|'))
+  equal(accepted.verdict.criteria[1].note, shortened.criteria[1].note)
+
+  const extra = structuredClone(verdict)
+  extra.criteria.push({ criterion: 'Something else entirely.', verdict: 'PASS', note: 'Saw it.' })
+  const tooMany = validateVerdict(extra, { card: 'JUL-900', head: 'abc1234', verifier: verdict.verifier, expectedCriteria: criteriaFrom(card.description) })
+  equal(tooMany.ok, false)
+  match(tooMany.errors.join(' '), /answered a criterion the card does not ask: Something else entirely/)
 
   const readably = structuredClone(verdict)
   readably.verifier = 'Glyph Cluster'

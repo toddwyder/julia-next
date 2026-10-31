@@ -75,7 +75,7 @@ ${cardSection(card)}
 
 ## The criteria, in the card's words
 
-A criterion written any other way is refused, so copy each line below character for character into your verdict. Do not shorten, merge or rephrase.
+A verdict answers these one by one, in this order. Copy each line character for character; do not merge or drop a line.
 
 ${criteriaList}
 
@@ -110,7 +110,7 @@ Rules for the file:
 - \`verdict\` is PASS only when every criterion passes; otherwise FAIL.
 - \`head\` is the pull request head you actually tested. Get it with \`gh pr view <n> --json headRefOid\`.
 - \`builder\` is a different name from \`verifier\`. Get it from \`gh pr view <n> --json commits\` (the author login of the first commit).
-- Every line of the criteria list appears once as \`criterion\`, copied character for character.
+- Every line of the criteria list appears once, in the order given, as \`criterion\`.
 
 Do not change code, commit, push, merge or move the card. You judge; you do not fix.`
 }

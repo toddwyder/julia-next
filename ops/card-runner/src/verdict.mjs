@@ -69,17 +69,20 @@ export function normalizeCriterion(text) {
     .toLowerCase()
 }
 
-// Every criterion the card names has to appear in the verdict, or Shipping has
-// not answered the card it was handed. Shipping may quote the criterion with a
-// word or two of its own, so a containment match counts.
-export function coversCriteria(verdict, expected) {
-  if (!expected?.length) return { ok: true, missing: [] }
-  const answered = verdict.criteria.map((item) => normalizeCriterion(item.criterion))
-  const missing = expected.filter((criterion) => {
-    const wanted = normalizeCriterion(criterion)
-    return !answered.some((answer) => answer === wanted || answer.includes(wanted) || wanted.includes(answer))
+// Shipping is handed the card's criteria as one numbered line each, in that
+// order, and answers one PASS or FAIL per line. The answers are paired with the
+// card's lines by position, so a judge that shortens the words still answers
+// the card, and the verdict the runner posts carries the card's own wording.
+// An answer of a different length means the card was not answered in full.
+export function alignCriteria(verdict, expected) {
+  if (!expected?.length) return { ok: true, missing: [], extra: [], criteria: verdict.criteria }
+  const missing = expected.slice(verdict.criteria.length)
+  const extra = verdict.criteria.slice(expected.length).map((item) => item.criterion)
+  const criteria = expected.flatMap((criterion, index) => {
+    const answer = verdict.criteria[index]
+    return answer ? [{ criterion, verdict: answer.verdict, note: answer.note }] : []
   })
-  return { ok: missing.length === 0, missing }
+  return { ok: missing.length === 0 && extra.length === 0, missing, extra, criteria }
 }
 
 function modelKey(name) {
@@ -104,12 +107,15 @@ function sameModel(reported, expected) {
 export function validateVerdict(parsed, { card, head, verifier, expectedCriteria = [] }) {
   const result = parseVerdictObject(parsed)
   const errors = [...result.errors]
+  let verdict = result.verdict
   if (result.verdict) {
     if (result.verdict.card !== card) errors.push(`card is ${result.verdict.card}, expected ${card}`)
     if (result.verdict.head !== head) errors.push(`head is ${result.verdict.head}, expected ${head}`)
     if (verifier && !sameModel(result.verdict.verifier, verifier)) errors.push(`verifier is ${result.verdict.verifier}, expected ${verifier}`)
-    const covered = coversCriteria(result.verdict, expectedCriteria)
-    for (const criterion of covered.missing) errors.push(`no verdict for: ${criterion}`)
+    const aligned = alignCriteria(result.verdict, expectedCriteria)
+    for (const criterion of aligned.missing) errors.push(`no verdict for: ${criterion}`)
+    for (const criterion of aligned.extra) errors.push(`answered a criterion the card does not ask: ${criterion}`)
+    verdict = { ...result.verdict, criteria: aligned.criteria }
   }
-  return { ok: errors.length === 0, errors, verdict: result.verdict }
+  return { ok: errors.length === 0, errors, verdict }
 }

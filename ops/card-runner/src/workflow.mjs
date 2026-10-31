@@ -120,6 +120,19 @@ function clearVerdictFile(path) {
   rmSync(path, { force: true })
 }
 
+// A verdict is only worth the pass that produced it, so a dropped connection
+// while posting it is retried instead of ending the run without a record.
+async function postUntilItLands(send, attempts = 3) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await send()
+    } catch (error) {
+      if (attempt >= attempts) throw error
+      await new Promise((done) => setTimeout(done, 2000 * attempt))
+    }
+  }
+}
+
 export function createCardRunWorkflow(overrides = {}) {
   const deps = {
     loadCard: defaultLoadCard,
@@ -467,17 +480,17 @@ export function createCardRunWorkflow(overrides = {}) {
       const freeBody = freeVerdict
         ? verdictComment({ card: inputData.card, verdict: freeVerdict, model: models.shippingFree, pass: 'Free', attempts: freeAttempts })
         : exhaustedComment({ card: inputData.card, model: models.shippingFree, attempts: freeAttempts, errors: freeErrors })
-      await deps.postCardComment(inputData.card, freeBody)
+      await postUntilItLands(() => deps.postCardComment(inputData.card, freeBody))
 
       if (finalVerdict) {
-        await deps.postCardComment(inputData.card, verdictComment({ card: inputData.card, verdict: finalVerdict, model: models.shippingFinal, pass: 'Final', attempts: 1 }))
-        await deps.postPullComment({
+        await postUntilItLands(() => deps.postCardComment(inputData.card, verdictComment({ card: inputData.card, verdict: finalVerdict, model: models.shippingFinal, pass: 'Final', attempts: 1 })))
+        await postUntilItLands(() => deps.postPullComment({
           repoDir: inputData.checkout,
           number: inputData.pull.number,
           body: `Shipping verdict on ${inputData.pull.head}\n\n\`\`\`json\n${JSON.stringify(finalVerdict)}\n\`\`\``,
-        })
+        }))
       } else {
-        await deps.postCardComment(inputData.card, `## Final Shipping pass on ${models.shippingFinal}\n\nShipping gave no usable verdict: ${inputData.finalError ?? 'unknown reason'}`)
+        await postUntilItLands(() => deps.postCardComment(inputData.card, `## Final Shipping pass on ${models.shippingFinal}\n\nShipping gave no usable verdict: ${inputData.finalError ?? 'unknown reason'}`))
       }
 
       const ok = Boolean(finalVerdict)
