@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFile
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
-import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, cutOffResult, costFrom, freePort, investigationPrompt, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshPull, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
+import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, cutOffResult, costFrom, freePort, investigationPrompt, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshPull, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, smokeReturnPrompt, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
 const temporaryState = () => {
@@ -437,12 +437,33 @@ test('every prompt says the run is unattended before the session starts to work'
     shippingPrompt({ ...card, pull, verifierModel: 'moonshotai/Kimi-K3.1-Pro' }),
     remediationPrompt({ ...card, pull, verdict: { criteria: [{ criterion: 'rows', verdict: 'FAIL', note: 'missing' }] } }),
     investigationPrompt({ ...card, pull, verdict: { criteria: [{ criterion: 'rows', verdict: 'FAIL', note: 'missing' }] }, folder: '/var/lib/julia-dashboard/state/runs/jul-290' }),
+    smokeReturnPrompt({ ...card, pull, address: 'http://100.119.112.9:4314', failure: 'lanes 1-11 timed out on a button that was never there' }),
     retroPrompt({ ...card, pull, merge: { commit: 'abc123' }, cost: '$1.69' }),
   ]) {
     assert.match(prompt, /unattended/);
     assert.match(prompt, /request_access/);
     assert.ok(prompt.includes(UNATTENDED));
   }
+});
+
+// The suite runs on the preview address, which serves this branch's own code, so a
+// failure there is a defect in the change. Handing it to a fresh build session --
+// with the failing output, not a summary of it -- is what returns the card instead
+// of stopping one that someone can still fix.
+test('a suite that fails on the preview sends the card back to build with what failed', () => {
+  const prompt = smokeReturnPrompt({
+    card: 'JUL-290',
+    issue: { title: 'Account status', description: '## Outcome\nrows' },
+    pull: { number: 383, url: 'https://github.com/toddwyder/julia-next/pull/383', headRefName: 'feat/jul-290-account-status' },
+    address: 'http://100.119.112.9:4314',
+    failure: 'node scripts/lanes.mjs --url http://100.119.112.9:4314 failed (exit 1)\nlanes 1-11 timed out waiting for button "Building"',
+  });
+  assert.match(prompt, /JUL-290/);
+  assert.match(prompt, /http:\/\/100\.119\.112\.9:4314/);
+  assert.match(prompt, /lanes 1-11 timed out waiting for button "Building"/);
+  assert.match(prompt, /feat\/jul-290-account-status/);
+  assert.match(prompt, /fix the cause\s+it names rather than the assertion/);
+  assert.match(prompt, /Do not merge and do not move/);
 });
 
 // A stop that says only "failed twice" hands both questions to whoever reads it

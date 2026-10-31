@@ -14,7 +14,7 @@
 // reaches the scorecard), the Julia app through the verify-julia skill. Each
 // session's prompt is written next to its log, so a stopped card can be read back.
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createServer } from 'node:net';
@@ -530,6 +530,27 @@ Do not merge and do not move the card; Shipping's next pass has to find it green
 on its own.`;
 }
 
+export function smokeReturnPrompt({ card, issue, pull, address, failure }) {
+  return `You are the build session for Linear card ${card}: ${issue.title}
+
+The change is on the branch and the judge has passed it. Then the whole regression
+suite ran against the preview address ${address}, which serves this branch's own
+code, and it failed:
+
+${failure}
+
+${UNATTENDED}
+
+Read AGENTS.md, then docs/plans/path-forward.md. Activate the poteto-mode skill
+and follow its Bug fix playbook: the suite is the card's own gate, so fix the cause
+it names rather than the assertion that caught it, and add a check that would have
+caught it.
+
+Work on branch ${pull.headRefName}. Commit and push. Do not merge and do not move
+the card: the judge reads the new head and the suite reruns on the new preview, and
+neither of those is yours to skip.`;
+}
+
 export function investigationPrompt({ card, issue, pull, verdict, folder }) {
   const failed = (verdict?.criteria ?? []).filter(criterion => criterion.verdict !== 'PASS');
   const reasons = failed.map(criterion => `- ${criterion.criterion}: ${criterion.note ?? '(no note)'}`).join('\n');
@@ -616,13 +637,21 @@ async function dashboardPreview({ worktree, card, log, env = process.env }) {
   await mustRun('npm', ['run', 'build'], { cwd: dashboard, log }, 'npm run build for the preview');
   const port = await freePort();
   const address = `http://${tailnetHost()}:${port}`;
+  const previewState = join(stateRoot(env), `preview-state-${port}`);
+  // The Start screen reads its models from the state folder it is given, and a
+  // lane that boots its own server copies the live models file in for that reason.
+  // Without it the preview shows an empty picker, and eleven lanes time out on a
+  // page that is working exactly as it should.
+  mkdirSync(join(previewState, 'state'), { recursive: true });
+  const liveModels = join(stateFolder(env), 'models.json');
+  if (existsSync(liveModels)) copyFileSync(liveModels, join(previewState, 'state', 'models.json'));
   const child = spawn('node', ['server.js'], {
     cwd: dashboard,
     env: {
       ...process.env,
       DASHBOARD_HOST: '0.0.0.0',
       DASHBOARD_PORT: String(port),
-      DASHBOARD_STATE_DIR: join(stateRoot(env), `preview-state-${port}`),
+      DASHBOARD_STATE_DIR: previewState,
     },
     detached: true,
     stdio: ['ignore', 'ignore', 'pipe'],
@@ -783,16 +812,18 @@ export function failedCriteria(verdict) {
 // ---------------------------------------------------------------------------
 // steps
 
-async function buildStep({ record, issue, env, name = 'build', verdict = null }) {
+async function buildStep({ record, issue, env, name = 'build', verdict = null, smoke = null }) {
   const step = latest(record, name);
   const pull = pullForCard(record.card);
   record.worktree = ensureWorktree({ branch: record.branch, path: record.worktree });
   saveRecord(record, env);
   await runSession({
     name,
-    prompt: name === 'remediation'
-      ? remediationPrompt({ card: record.card, issue, pull: record.pull ?? pull, verdict })
-      : buildPrompt({ card: record.card, issue, branch: record.branch, pull }),
+    prompt: smoke
+      ? smokeReturnPrompt({ card: record.card, issue, pull: record.pull ?? pull, address: smoke.address, failure: smoke.failure })
+      : name === 'remediation'
+        ? remediationPrompt({ card: record.card, issue, pull: record.pull ?? pull, verdict })
+        : buildPrompt({ card: record.card, issue, branch: record.branch, pull }),
     cwd: record.worktree,
     model: record.models.builder,
     effort: record.models.effort,
@@ -968,6 +999,17 @@ async function previewStep({ record, env, log }) {
   const preview = await vercelPreview({ repo, sha: record.pull.headRefOid, log });
   appendFileSync(log, `preview ${preview.address}\n`);
   return preview;
+}
+
+// A preview that failed its suite must stop before the rebuilt one takes a port,
+// or two dashboards serve the same card's state folder from different code.
+function stopPreview(preview) {
+  if (!preview?.pid) return;
+  try {
+    process.kill(-preview.pid, 'SIGTERM');
+  } catch {
+    // already gone
+  }
 }
 
 async function smokeStep({ preview, worktree, log }) {
@@ -1348,11 +1390,30 @@ export async function machine({ card, env = process.env, branch: wantedBranch, f
     }
 
     record.pull = ghJson(['pr', 'view', String(record.pull.number), '--json', 'number,headRefName,headRefOid,title,body,url,state']);
-    const preview = await step('preview', entry => previewStep({ record, env, log: entry.log }));
-    record.preview = preview;
-    saveRecord(record, env);
+    let preview = null;
+    for (let attempt = 1; ; attempt += 1) {
+      preview = await step('preview', entry => previewStep({ record, env, log: entry.log }));
+      record.preview = preview;
+      saveRecord(record, env);
+      try {
+        await step('smoke', entry => smokeStep({ preview, worktree: record.worktree, log: entry.log }));
+        break;
+      } catch (error) {
+        // The suite is the card's own gate. A failure sends the card back to build
+        // once with the failing output in hand, and the judge reads the head that
+        // build pushes, because a verdict on the old head covers code that is gone.
+        stopPreview(preview);
+        record.preview = null;
+        if (attempt >= 2) throw error;
+        await step('build', entry => buildStep({
+          record, issue, env, smoke: { address: preview.address, failure: error.message },
+        }));
+        const shippedAgain = await judged({ record, issue, env, step, note, from: 'build' });
+        if (!shippedAgain) return record;
+        record.pull = ghJson(['pr', 'view', String(record.pull.number), '--json', 'number,headRefName,headRefOid,title,body,url,state']);
+      }
+    }
 
-    await step('smoke', entry => smokeStep({ preview, worktree: record.worktree, log: entry.log }));
     await step('uat', entry => uatStep({ record, issue, env, preview, log: entry.log }));
 
     console.log(`${card}: waiting -- ${record.waitingFor}`);
