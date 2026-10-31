@@ -204,6 +204,7 @@ export function createCardRunWorkflow(overrides = {}) {
         verifierModel: inputData.models.shippingFree,
         verdictPath,
         final: false,
+        pull: inputData.pull,
       })
       const session = await deps.runSession({
         prompt,
@@ -270,6 +271,7 @@ export function createCardRunWorkflow(overrides = {}) {
         verifierModel: inputData.models.shippingFinal,
         verdictPath,
         final: true,
+        pull: inputData.pull,
       })
       const session = await deps.runSession({
         prompt,

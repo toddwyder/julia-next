@@ -103,12 +103,13 @@ test('the build prompt carries the card, the evidence duty and no hand-off', () 
   match(prompt, /Do not merge the pull request and do not move the card/)
 })
 
-test('the shipping prompt names the verdict file, the model and the criterion duty', () => {
-  const prompt = shippingPrompt({ card, evidence: 'EVIDENCE', verifierModel: 'm', verdictPath: '/v.json', final: false })
+test('the shipping prompt names the verdict file, the model, the pull request and the criterion duty', () => {
+  const prompt = shippingPrompt({ card, evidence: 'EVIDENCE', verifierModel: 'm', verdictPath: '/v.json', final: false, pull: { number: 12, url: 'https://github.com/o/r/pull/12', head: 'abc1234' } })
   match(prompt, /\/v\.json/)
   match(prompt, /EVIDENCE/)
   match(prompt, /the first Shipping pass and it runs on m/)
   match(prompt, /A criterion judged from a description alone is a FAIL/)
+  match(prompt, /The pull request to judge is https:\/\/github\.com\/o\/r\/pull\/12 \(number 12\), and its head commit at the time this run started was abc1234/)
 })
 
 test('a verdict is accepted only when it answers this card, this head and this model', () => {

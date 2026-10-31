@@ -36,11 +36,13 @@ Post the evidence Shipping will judge, with no one in between:
 Print what changed, the pull request number, and which criterion Shipping should look at first.`
 }
 
-export function shippingPrompt({ card, evidence, verifierModel, verdictPath, final }) {
+export function shippingPrompt({ card, evidence, verifierModel, verdictPath, final, pull }) {
   const pass = final ? 'final' : 'first'
   return `You are Shipping. You did not build this card, and you have never seen the build session's conversation. Judge only what you can run and read for yourself.
 
 ${cardSection(card)}
+
+${pull ? `The pull request to judge is ${pull.url} (number ${pull.number}), and its head commit at the time this run started was ${pull.head}.` : ''}
 
 ## The evidence the build posted
 
