@@ -211,12 +211,17 @@ test('Todd is handed the card page of a dashboard preview and the card steps in 
 });
 
 test('the regression suite runs on the preview address, never against the live one', () => {
-  const dashboard = smokeCommands({ kind: 'dashboard', address: 'http://100.119.112.9:4314', worktree: '/srv/card' });
+  const dashboard = smokeCommands({
+    kind: 'dashboard',
+    address: 'http://100.119.112.9:4314',
+    startPage: 'http://100.119.112.9:4314/start/JUL-290',
+    worktree: '/srv/card',
+  });
   assert.deepEqual(dashboard.map(entry => entry.args.join(' ')), [
     'test',
     'run lint',
     'scripts/lanes.mjs --url http://100.119.112.9:4314',
-    'scripts/check-start-address.mjs http://100.119.112.9:4314',
+    'scripts/check-start-address.mjs http://100.119.112.9:4314/start/JUL-290',
   ]);
   assert.equal(dashboard[2].cwd, join('/srv/card', 'dashboard'));
 

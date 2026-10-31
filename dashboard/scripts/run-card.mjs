@@ -689,14 +689,17 @@ export function juliaSpecs() {
     .map(name => join(folder, name));
 }
 
-export function smokeCommands({ kind, address, worktree }) {
+// The Start screen lives at /start/<card>; the root path of the dashboard app is
+// not that page, so the check that proves Todd's address really shows it is handed
+// the page, not the host. Handing it the host failed on a dashboard that worked.
+export function smokeCommands({ kind, address, startPage = address, worktree }) {
   if (kind === 'dashboard') {
     const dashboard = join(worktree, 'dashboard');
     return [
       { cwd: dashboard, command: 'npm', args: ['test'], what: `${dashboard}: npm test` },
       { cwd: dashboard, command: 'npm', args: ['run', 'lint'], what: 'dashboard lint' },
       { cwd: dashboard, command: 'node', args: ['scripts/lanes.mjs', '--url', address], what: `lanes.mjs against ${address}` },
-      { cwd: dashboard, command: 'node', args: ['scripts/check-start-address.mjs', address], what: `Start screen check on ${address}` },
+      { cwd: dashboard, command: 'node', args: ['scripts/check-start-address.mjs', startPage], what: `Start screen check on ${startPage}` },
     ];
   }
   return [
@@ -1013,7 +1016,7 @@ function stopPreview(preview) {
 }
 
 async function smokeStep({ preview, worktree, log }) {
-  const commands = smokeCommands({ kind: preview.kind, address: preview.address, worktree });
+  const commands = smokeCommands({ kind: preview.kind, address: preview.address, startPage: preview.cardPage ?? preview.address, worktree });
   for (const entry of commands) {
     appendFileSync(log, `\n$ ${entry.command} ${entry.args.join(' ')}\n`);
     await mustRun(entry.command, entry.args, { cwd: entry.cwd, log, timeoutMs: 45 * 60_000 }, entry.what);
