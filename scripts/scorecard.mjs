@@ -86,7 +86,9 @@ export function cardWindows(thread, events) {
   }
   if (!windows.length) {
     // A chat started by naming the card rather than by a kickoff line still belongs to that card.
-    const card = (thread.title ?? '').match(/\bJUL-\d+\b/)?.[0] ?? (events.users[0]?.text ?? '').match(/\bJUL-\d+\b/)?.[0];
+    // Any opening message can carry the name: the harness wraps the first prompt in a reminder,
+    // so the card name is often in the second one.
+    const card = (thread.title ?? '').match(/\bJUL-\d+\b/)?.[0] ?? events.users.map(u => u.text).join('\n').match(/\bJUL-\d+\b/)?.[0];
     if (card && events.users.length) windows.push({ thread, card, start: events.users[0].at, end: Infinity });
   }
   return windows;
