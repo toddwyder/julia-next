@@ -253,6 +253,31 @@ test('the build uses the Start screen picks and Shipping its own slot', () => {
   }
 });
 
+// The Shipping line on the Start screen is read from the swept models file, so the
+// machine reads that file too. A weekly sweep once left the screen naming Claude Opus
+// while the runner paid Kimi; the same file now answers both questions.
+test('Shipping runs the model the Start screen names, not the config default behind it', () => {
+  const state = temporaryState();
+  try {
+    mkdirSync(join(state.root, 'state'), { recursive: true });
+    writeFileSync(join(state.root, 'state', 'models.json'), JSON.stringify({
+      sweptAt: '2026-10-31T00:00:00.000Z',
+      models: [
+        { id: 'commandcode/deepseek/deepseek-v4.1-flash', displayName: 'DeepSeek V4.1 Flash', inputPerMillion: 0.15, outputPerMillion: 0.6 },
+        { id: 'openai/gpt-6.1-sol', displayName: 'GPT-6.1 Sol', inputPerMillion: 2, outputPerMillion: 10 },
+      ],
+      defaults: { mainSession: 'commandcode/deepseek/deepseek-v4.1-flash', shipping: 'openai/gpt-6.1-sol', effort: 'large' },
+    }));
+    assert.equal(modelsFor(state.env).shipping, 'openai/gpt-6.1-sol');
+
+    rmSync(join(state.root, 'state', 'models.json'));
+    const defaults = JSON.parse(readFileSync(join(DASHBOARD_ROOT, 'config', 'defaults.json'), 'utf8'));
+    assert.equal(modelsFor(state.env).shipping, defaults.shipping);
+  } finally {
+    state.clean();
+  }
+});
+
 // A step that runs twice must not append its second round onto the first round's
 // log: the tail of that file is then the round before, and a line truncated mid
 // write in it reads as an answer it never gave.

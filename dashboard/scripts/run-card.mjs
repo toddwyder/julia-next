@@ -20,7 +20,8 @@ import { createInterface } from 'node:readline';
 import { createServer } from 'node:net';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { ACTIVE_RUN_STATUSES, readJsonRecord, runsFolder, stateRoot, writeJsonRecord } from '../lib/state.js';
+import { ACTIVE_RUN_STATUSES, readJsonRecord, runsFolder, stateFolder, stateRoot, writeJsonRecord } from '../lib/state.js';
+import { readModels, startModels } from '../lib/models.js';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -1256,9 +1257,14 @@ export function readDraft(env = process.env) {
 export function modelsFor(env = process.env) {
   const defaults = JSON.parse(readFileSync(join(DASHBOARD_ROOT, 'config', 'defaults.json'), 'utf8'));
   const draft = readDraft(env);
+  // The judge is the model the Start screen shows behind Shipping, so the run reads
+  // the same file the screen reads. The sweep publishes the configured default into
+  // models.json; reading config/defaults.json instead let the screen name one model
+  // while the machine paid for another until the next weekly sweep.
+  const screen = startModels(readModels({ directory: stateFolder(env) }));
   return {
     builder: draft?.groups?.building?.model ?? defaults.mainSession,
-    shipping: defaults.shipping,
+    shipping: screen.shipping?.id ?? defaults.shipping,
     effort: draft?.effort ?? defaults.effort,
   };
 }
