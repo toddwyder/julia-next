@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFile
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
-import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, cutOffResult, costFrom, freePort, investigationPrompt, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshPull, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, smokeReturnPrompt, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
+import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, cutOffResult, costFrom, failureTail, freePort, investigationPrompt, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshPull, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, smokeReturnPrompt, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
 const temporaryState = () => {
@@ -234,6 +234,31 @@ test('the regression suite runs on the preview address, never against the live o
   assert.deepEqual(julia[0].args.slice(1), ['launch', '--url', 'https://julia-next-git-x.vercel.app']);
   assert.deepEqual(julia[2].args.slice(1, 2), ['test']);
   assert.ok(julia[2].args.length > 2, 'the whole spec suite runs, not one file');
+});
+
+// Measured on JUL-290: the suite signed off with a skipped lane, so the run recorded "this lane
+// needs a server it can boot without the key" as the failure and handed that to the build session
+// while the two lanes that actually failed went unread.
+test('a failed suite reports the lanes that failed, not whichever lane signed off last', () => {
+  const output = [
+    'lane 1 FAIL  change the Building group model',
+    '        group note missing: hillclimb is back on the Building model, Claude Fable 5.',
+    'lane 2 PASS  set one role on its own',
+    'lane 4 FAIL  add a model to a panel',
+    '        expected one more chip, saw 1 then 1',
+    'lane 13 SKIP  say a number can\'t be read when its key is missing',
+    '        this lane needs a server it can boot without the key',
+    '',
+  ].join('\n');
+
+  const tail = failureTail(output, 2);
+  assert.match(tail, /lane 1 FAIL/);
+  assert.match(tail, /group note missing/);
+  assert.match(tail, /lane 4 FAIL/);
+  assert.doesNotMatch(tail, /lane 13 SKIP/);
+
+  // A failure with nothing to name keeps the last lines it printed.
+  assert.equal(failureTail('one\ntwo\nthree\nfour', 2), 'three | four');
 });
 
 // The models come from what the Start screen saved, so a run does what the

@@ -148,11 +148,26 @@ function shell(command, args, { cwd = REPO_ROOT } = {}) {
   return spawnSync(command, args, { cwd, encoding: 'utf8', env: commandEnv(), maxBuffer: 64 * 1024 * 1024 });
 }
 
+// A suite that says which lanes failed is worth more than whatever it printed last: lanes.mjs
+// signs off with a lane that was skipped, so the last lines alone once told the card a skipped
+// check was its failure while two real ones went unread.
+export function failureTail(text, keep = 3) {
+  const lines = withoutColour(text).trim().split('\n').map(line => line.replace(/\s+$/, ''));
+  const noted = [];
+  lines.forEach((line, index) => {
+    if (!/^\s*\S.*\bFAIL\b/.test(line)) return;
+    const below = lines[index + 1]?.trim();
+    noted.push(below ? `${line.trim()} (${below})` : line.trim());
+  });
+  if (noted.length) return noted.slice(0, keep).join(' | ');
+  return lines.slice(-keep).join(' | ');
+}
+
 export function printed(command, args, options) {
   const result = shell(command, args, options);
   // spawnSync reports the exit code as `status`; `code` belongs to execFileSync.
   if (result.status !== 0) {
-    const tail = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim().split('\n').slice(-2).join(' | ');
+    const tail = failureTail(`${result.stdout ?? ''}${result.stderr ?? ''}`, 2);
     throw new Error(`${command} ${args.join(' ')} failed (exit ${result.status ?? result.signal}): ${tail}`);
   }
   return result.stdout ?? '';
@@ -199,7 +214,7 @@ function run(command, args, { cwd = REPO_ROOT, log = null, input = null, timeout
 async function mustRun(command, args, options, what) {
   const result = await run(command, args, options);
   if (result.code !== 0) {
-    const tail = `${result.stdout}${result.stderr}`.trim().split('\n').slice(-3).join(' | ');
+    const tail = failureTail(`${result.stdout}${result.stderr}`);
     throw new Error(`${what} failed (exit ${result.code ?? result.signal}): ${tail}`);
   }
   return result;
