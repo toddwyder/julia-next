@@ -46,7 +46,7 @@ Assumed, and therefore outside the model:
 
 ## Coverage record
 
-Confirmed to describe these files at commit `PENDING`.
+Confirmed to describe these files at commit `2e78496`.
 
 | Model part (`formal/card-runner/CardRunner.tla`) | Code it stands for |
 | --- | --- |
