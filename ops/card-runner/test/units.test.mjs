@@ -4,11 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { DEFAULTS, providerModelId, thinkingForEffort } from '../src/config.mjs'
-import { branchFor, normalizeCard, prepareCheckout } from '../src/card.mjs'
+import { branchFor, normalizeCard, prepareAdoptedCheckout, prepareCheckout, publishPull } from '../src/card.mjs'
+import { missingEvidence, readBuildDone, readPullDraft, writeBuildHandover } from '../src/handover.mjs'
 import { selectEvidence, evidenceBlock } from '../src/evidence.mjs'
 import { parseVerdict, validateVerdict, criteriaFrom, normalizeCriterion } from '../src/verdict.mjs'
 import { sessionArgs, sessionEnv } from '../src/session.mjs'
-import { buildPrompt, shippingPrompt } from '../src/prompts.mjs'
+import { buildBackPrompt, buildPrompt, shippingPrompt } from '../src/prompts.mjs'
 import { buildSettings, prepareRunDir } from '../src/settings.mjs'
 
 const card = {
@@ -94,13 +95,106 @@ test('evidence is whatever the build posted after the run started', () => {
   match(evidenceBlock([{ id: 'c-1', author: 'b', body: 'Prove It Works: x', createdAt: '2026-10-31T00:00:10Z' }]), /\(Linear comment c-1\)/)
 })
 
-test('the build prompt carries the card, the evidence duty and no hand-off', () => {
-  const prompt = buildPrompt({ card, branch: 'runner/card-900' })
+test('an adopted checkout keeps the branch the build pushed', () => {
+  const calls = []
+  const exec = (command, args) => {
+    calls.push([command, ...args].join(' '))
+    if (args[0] === 'worktree' && args[1] === 'remove') throw new Error('no such worktree')
+    return ''
+  }
+  const runDir = mkdtempSync(join(tmpdir(), 'card-runner-adopt-'))
+  const prepared = prepareAdoptedCheckout({ repoDir: '/repo', branch: 'feat/jul-900-thing', runDir, exec })
+  equal(prepared.branch, 'feat/jul-900-thing')
+  deepEqual(calls, [
+    'git worktree remove --force ' + join(runDir, 'checkout'),
+    'git fetch origin feat/jul-900-thing',
+    'git worktree add --detach ' + join(runDir, 'checkout') + ' origin/feat/jul-900-thing',
+  ])
+})
+
+test('the runner publishes the title and description the build wrote', () => {
+  let created = false
+  const calls = []
+  const bodies = []
+  const exec = (command, args) => {
+    calls.push([command, ...args].join(' '))
+    if (args[0] === 'pr' && args[1] === 'body-file') throw new Error('unexpected')
+    const bodyIndex = args.indexOf('--body-file')
+    if (bodyIndex > -1) bodies.push(readFileSync(args[bodyIndex + 1], 'utf8'))
+    if (args[0] === 'pr' && args[1] === 'list') {
+      if (!created) return '[]'
+      return JSON.stringify([{ number: 12, headRefOid: 'abc1234', url: 'https://github.com/o/r/pull/12', title: 'Do the things (JUL-900)', commits: [{ authors: [{ login: 'toddwyder' }] }] }])
+    }
+    if (args[0] === 'pr' && args[1] === 'create') { created = true; return '' }
+    throw new Error(`unexpected: ${args.join(' ')}`)
+  }
+
+  const published = publishPull({ repoDir: '/repo', branch: 'runner/card-900', title: 'Do the things (JUL-900)', body: 'What changed.\n\nCard: JUL-900\n', exec })
+  equal(published.number, 12)
+  equal(published.head, 'abc1234')
+  equal(published.builder, 'toddwyder')
+  match(calls[1], /^gh pr create --head runner\/card-900 --base main --title Do the things \(JUL-900\) --body-file /)
+  deepEqual(bodies, ['What changed.\n\nCard: JUL-900\n'])
+})
+
+test('an existing pull request is edited, never opened twice', () => {
+  const calls = []
+  const exec = (command, args) => {
+    calls.push([command, ...args].join(' '))
+    if (args[0] === 'pr' && args[1] === 'list') return JSON.stringify([{ number: 12, headRefOid: 'abc1234', url: 'u', title: 'old', commits: [] }])
+    if (args[0] === 'pr' && args[1] === 'edit') return ''
+    throw new Error(`unexpected: ${args.join(' ')}`)
+  }
+  const published = publishPull({ repoDir: '/repo', branch: 'feat/x', title: 'New title (JUL-900)', body: 'Card: JUL-900\n', exec })
+  equal(published.number, 12)
+  match(calls[1], /^gh pr edit 12 --title New title \(JUL-900\) --body-file /)
+})
+
+test('a build hands over its branch, its words and the file that says it is done', () => {
+  const runDir = mkdtempSync(join(tmpdir(), 'card-runner-handover-'))
+  writeBuildHandover({ runDir, card: 'JUL-900', branch: 'runner/card-900', head: 'abc1234', startedAt: '2026-10-31T00:00:00Z' })
+  deepEqual(readBuildDone({ runDir, card: 'JUL-900' }), { card: 'JUL-900', branch: 'runner/card-900', head: 'abc1234', startedAt: '2026-10-31T00:00:00Z' })
+
+  const empty = mkdtempSync(join(tmpdir(), 'card-runner-handover-'))
+  throws(() => readBuildDone({ runDir: empty, card: 'JUL-900' }), /did not say it was done/)
+
+  writeBuildHandover({ runDir: empty, card: 'JUL-901', branch: 'b', head: 'abc1234' })
+  throws(() => readBuildDone({ runDir: empty, card: 'JUL-900' }), /JUL-901/)
+})
+
+test('a pull request description without the card line is refused', () => {
+  const runDir = mkdtempSync(join(tmpdir(), 'card-runner-draft-'))
+  mkdirSync(join(runDir, 'pr'))
+  writeFileSync(join(runDir, 'pr/title.txt'), 'Do the things (JUL-900)\n')
+  writeFileSync(join(runDir, 'pr/body.md'), 'What changed.\n\nCard: JUL-900\n')
+  deepEqual(readPullDraft({ runDir, card: 'JUL-900' }), { title: 'Do the things (JUL-900)', body: 'What changed.\n\nCard: JUL-900' })
+
+  writeFileSync(join(runDir, 'pr/body.md'), 'What changed.\n')
+  throws(() => readPullDraft({ runDir, card: 'JUL-900' }), /Card: JUL-900/)
+})
+
+test('an acceptance criterion without its own evidence comment is named as missing', () => {
+  const criteria = ['The first thing works.', 'The `second` thing works.']
+  const evidence = [{ id: 'c-1', author: 'build', createdAt: '2026-10-31T00:00:10Z', body: 'Prove It Works: the first thing works.\nran npm test' }]
+  deepEqual(missingEvidence(evidence, criteria), ['The `second` thing works.'])
+
+  const both = [...evidence, { id: 'c-2', author: 'build', createdAt: '2026-10-31T00:00:20Z', body: 'Prove It Works: The second thing works.\nopened the page' }]
+  deepEqual(missingEvidence(both, criteria), [])
+  deepEqual(missingEvidence([{ id: 'c-3', author: 'build', createdAt: '2026-10-31T00:00:30Z', body: 'notes about the first thing works' }], criteria), criteria)
+})
+
+test('the build prompt carries the card, the handover files and no hand-off', () => {
+  const prompt = buildPrompt({ card, branch: 'runner/card-900', runDir: '/state/JUL-900' })
   match(prompt, /JUL-900/)
   match(prompt, /runner\/card-900/)
   match(prompt, /Prove It Works: <the criterion in the card's words>/)
   match(prompt, /unattended/)
   match(prompt, /playbook its table names for this card's label \(Feature\)/)
+  match(prompt, /Write the title to \/state\/JUL-900\/pr\/title\.txt/)
+  match(prompt, /Card: JUL-900/)
+  match(prompt, /Write it last/) 
+  match(prompt, /\/state\/JUL-900\/build-done\.json/)
+  match(prompt, /Do not open or edit the pull request yourself/)
   match(prompt, /Do not merge the pull request and do not move the card/)
 })
 
@@ -112,6 +206,17 @@ test('the shipping prompt names the verdict file, the model, the pull request an
   match(prompt, /A criterion judged from a description alone is a FAIL/)
   match(prompt, /The pull request to judge is https:\/\/github\.com\/o\/r\/pull\/12 \(number 12\), and its head commit at the time this run started was abc1234/)
   match(prompt, /node scripts\/linear-cli\.mjs comments JUL-900/)
+  match(prompt, /Every FAIL note carries its reason in three parts/)
+})
+
+test('a build sent back is given the criteria it has not shown evidence for', () => {
+  const prompt = buildBackPrompt({ card, branch: 'runner/card-900', runDir: '/state/JUL-900', missing: ['The second thing works.'] })
+  match(prompt, /no .*Prove It Works:\W comment/)
+  match(prompt, /The second thing works\./)
+  match(prompt, /Prove It Works: <the criterion in the card's words>/)
+  match(prompt, /runner\/card-900/)
+  match(prompt, /\/state\/JUL-900\/build-done\.json/)
+  match(prompt, /Do not open or edit the pull request/)
 })
 
 test('a verdict is accepted only when it answers this card, this head and this model', () => {
@@ -197,4 +302,14 @@ function match(text, pattern) {
 
 function equal(actual, expected) {
   if (actual !== expected) throw new Error(`expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`)
+}
+
+function throws(fn, pattern) {
+  try {
+    fn()
+  } catch (error) {
+    if (!pattern.test(error.message)) throw new Error(`expected ${pattern}, got ${error.message}`)
+    return
+  }
+  throw new Error(`expected a throw matching ${pattern}`)
 }

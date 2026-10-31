@@ -9,7 +9,8 @@ import { createStep, createWorkflow } from '@mastra/core/workflows'
 import { z } from 'zod'
 import { DEFAULTS, thinkingForEffort } from './config.mjs'
 import { evidenceBlock, selectEvidence } from './evidence.mjs'
-import { exhaustedComment, buildPrompt, shippingPrompt, verdictComment } from './prompts.mjs'
+import { missingEvidence, readBuildDone, readPullDraft } from './handover.mjs'
+import { buildBackPrompt, buildPrompt, exhaustedComment, shippingPrompt, verdictComment } from './prompts.mjs'
 import { prepareRunDir } from './settings.mjs'
 import { runSession as defaultRunSession } from './session.mjs'
 import { parseVerdict, validateVerdict, criteriaFrom } from './verdict.mjs'
@@ -17,7 +18,9 @@ import {
   loadCard as defaultLoadCard,
   postCardComment as defaultPostCardComment,
   postPullComment as defaultPostPullComment,
+  prepareAdoptedCheckout as defaultPrepareAdoptedCheckout,
   prepareCheckout as defaultPrepareCheckout,
+  publishPull as defaultPublishPull,
   requirePull as defaultRequirePull,
 } from './card.mjs'
 
@@ -31,6 +34,7 @@ const modelsSchema = z.object({
   shippingFinal: z.string(),
   effort: z.string(),
   freeAttempts: z.number(),
+  evidenceAttempts: z.number(),
   timeoutMs: z.number(),
 })
 
@@ -72,12 +76,14 @@ export const runStateSchema = z.object({
   settingsPath: z.string(),
   branch: z.string(),
   checkout: z.string(),
-  pull: z.object({ number: z.number(), head: z.string(), url: z.string() }),
+  pull: z.object({ number: z.number(), head: z.string(), url: z.string() }).nullable(),
   builder: z.string(),
   evidenceStartedAt: z.string(),
   evidence: z.array(evidenceSchema),
   models: modelsSchema,
   timeline: z.array(activitySchema),
+  gateAttempts: z.number(),
+  evidenceMissing: z.array(z.string()),
   freeAttempts: z.number(),
   freeErrors: z.array(z.string()),
   freeVerdict: verdictSchema.nullable(),
@@ -89,6 +95,8 @@ export const cardRunInputSchema = z.object({
   card: z.string(),
   repoDir: z.string().optional(),
   runDir: z.string().optional(),
+  shipOnly: z.boolean().optional(),
+  branch: z.string().optional(),
   models: modelsSchema.partial().optional(),
 })
 
@@ -116,6 +124,8 @@ export function createCardRunWorkflow(overrides = {}) {
   const deps = {
     loadCard: defaultLoadCard,
     prepareCheckout: defaultPrepareCheckout,
+    prepareAdoptedCheckout: defaultPrepareAdoptedCheckout,
+    publishPull: defaultPublishPull,
     requirePull: defaultRequirePull,
     postCardComment: defaultPostCardComment,
     postPullComment: defaultPostPullComment,
@@ -137,31 +147,49 @@ export function createCardRunWorkflow(overrides = {}) {
 
       const card = await deps.loadCard(inputData.card)
       const prepared = await deps.prepareRunDir({ runDir, memoryModel: models.memory })
-      const { branch, checkout } = await deps.prepareCheckout({ repoDir, card, runDir })
+      let branch
+      let checkout
+      let evidenceStartedAt = startedAt
 
       const activity = {
-        id: 'build',
+        id: inputData.shipOnly ? 'build-handover' : 'build',
         startedAt,
         finishedAt: startedAt,
         model: models.build,
         ok: false,
       }
-      const session = await deps.runSession({
-        prompt: buildPrompt({ card, branch }),
-        model: models.build,
-        thinkingLevel: thinkingForEffort(models.effort),
-        title: `${card.identifier} build`,
-        timeoutMs: models.timeoutMs,
-        settingsPath: prepared.settingsPath,
-        cwd: checkout,
-        appData: prepared.appData,
-        tracePath: join(runDir, 'trace-build.duckdb'),
-      })
-      if (!session.ok) throw new Error(`the build session did not finish: ${session.error}`)
 
-      const pull = await deps.requirePull({ repoDir, branch })
+      if (inputData.shipOnly) {
+        // A build that already ran outside this workflow hands over its branch
+        // and the file that says it is done. The runner keeps that branch and
+        // starts at the same place as a build it ran itself.
+        const handedOver = readBuildDone({ runDir, card: card.identifier })
+        branch = inputData.branch ?? handedOver.branch
+        if (handedOver.branch !== branch) throw new Error(`the build said it was done on ${handedOver.branch}, expected ${branch}`)
+        checkout = (await deps.prepareAdoptedCheckout({ repoDir, branch, runDir })).checkout
+        evidenceStartedAt = handedOver.startedAt ?? startedAt
+      } else {
+        const preparedCheckout = await deps.prepareCheckout({ repoDir, card, runDir })
+        branch = preparedCheckout.branch
+        checkout = preparedCheckout.checkout
+        const session = await deps.runSession({
+          prompt: buildPrompt({ card, branch, runDir }),
+          model: models.build,
+          thinkingLevel: thinkingForEffort(models.effort),
+          title: `${card.identifier} build`,
+          timeoutMs: models.timeoutMs,
+          settingsPath: prepared.settingsPath,
+          cwd: checkout,
+          appData: prepared.appData,
+          tracePath: join(runDir, 'trace-build.duckdb'),
+        })
+        if (!session.ok) throw new Error(`the build session did not finish: ${session.error}`)
+        readBuildDone({ runDir, card: card.identifier })
+      }
+
       const after = await deps.loadCard(inputData.card)
-      const evidence = selectEvidence(after.comments, startedAt)
+      const evidence = selectEvidence(after.comments, evidenceStartedAt)
+      const evidenceMissing = missingEvidence(evidence, criteriaFrom(after.description))
       activity.finishedAt = deps.now()
       activity.ok = true
       appendStep(runDir, activity)
@@ -173,17 +201,125 @@ export function createCardRunWorkflow(overrides = {}) {
         settingsPath: prepared.settingsPath,
         branch,
         checkout,
-        pull: { number: pull.number, head: pull.head, url: pull.url },
-        builder: pull.builder,
-        evidenceStartedAt: startedAt,
+        pull: null,
+        builder: '',
+        evidenceStartedAt,
         evidence,
         models,
         timeline: [activity],
+        gateAttempts: 0,
+        evidenceMissing,
         freeAttempts: 0,
         freeErrors: [],
         freeVerdict: null,
         finalVerdict: null,
         finalError: null,
+      }
+    },
+  })
+
+  // The build writes the title and description; the runner is the one that
+  // posts them, so the pull request carries the build's own words.
+  const publishStep = createStep({
+    id: 'publish',
+    inputSchema: runStateSchema,
+    outputSchema: runStateSchema,
+    execute: async ({ inputData }) => {
+      const startedAt = deps.now()
+      const draft = readPullDraft({ runDir: inputData.runDir, card: inputData.card })
+      const pull = await deps.publishPull({
+        repoDir: inputData.checkout,
+        branch: inputData.branch,
+        title: draft.title,
+        body: draft.body,
+      })
+      const activity = {
+        id: 'publish',
+        startedAt,
+        finishedAt: deps.now(),
+        model: 'gh',
+        ok: true,
+      }
+      appendStep(inputData.runDir, activity)
+      return {
+        ...inputData,
+        pull: { number: pull.number, head: pull.head, url: pull.url },
+        builder: pull.builder,
+        timeline: [...inputData.timeline, activity],
+      }
+    },
+  })
+
+  // Shipping only starts once every criterion has its own evidence comment.
+  // When one is missing the same build session goes back for it, and a run that
+  // never produces the evidence stops without Shipping.
+  const evidenceGateStep = createStep({
+    id: 'evidence-gate',
+    inputSchema: runStateSchema,
+    outputSchema: runStateSchema,
+    execute: async ({ inputData }) => {
+      if (!inputData.evidenceMissing.length) {
+        const activity = {
+          id: 'evidence-gate',
+          startedAt: deps.now(),
+          finishedAt: deps.now(),
+          model: 'none',
+          ok: true,
+        }
+        appendStep(inputData.runDir, activity)
+        return { ...inputData, timeline: [...inputData.timeline, activity] }
+      }
+
+      const attempt = inputData.gateAttempts + 1
+      if (attempt > inputData.models.evidenceAttempts) {
+        throw new Error(`Shipping did not start: no evidence for ${inputData.evidenceMissing.join('; ')}`)
+      }
+
+      const startedAt = deps.now()
+      const card = await deps.loadCard(inputData.card)
+      const session = await deps.runSession({
+        prompt: buildBackPrompt({
+          card: { ...card, identifier: inputData.card },
+          branch: inputData.branch,
+          runDir: inputData.runDir,
+          missing: inputData.evidenceMissing,
+        }),
+        model: inputData.models.build,
+        thinkingLevel: thinkingForEffort(inputData.models.effort),
+        title: `${inputData.card} build back ${attempt}`,
+        timeoutMs: inputData.models.timeoutMs,
+        settingsPath: inputData.settingsPath,
+        cwd: inputData.checkout,
+        appData: inputData.appData,
+        tracePath: join(inputData.runDir, `trace-build-back-${attempt}.duckdb`),
+      })
+      if (!session.ok) throw new Error(`the build-back session did not finish: ${session.error}`)
+      readBuildDone({ runDir: inputData.runDir, card: inputData.card })
+
+      // A build-back can add a commit, so the pull request head is read again.
+      const pull = await deps.requirePull({ repoDir: inputData.checkout, branch: inputData.branch })
+      const after = await deps.loadCard(inputData.card)
+      const evidence = selectEvidence(after.comments, inputData.evidenceStartedAt)
+      const evidenceMissing = missingEvidence(evidence, criteriaFrom(after.description))
+
+      const activity = {
+        id: `build-back-${attempt}`,
+        startedAt,
+        finishedAt: deps.now(),
+        model: inputData.models.build,
+        ok: evidenceMissing.length === 0,
+        usage: session.usage,
+        error: evidenceMissing.length ? `still no evidence for ${evidenceMissing.join('; ')}` : undefined,
+      }
+      appendStep(inputData.runDir, activity)
+      return {
+        ...inputData,
+        pull: { number: pull.number, head: pull.head, url: pull.url },
+        builder: pull.builder,
+        evidence,
+        evidenceMissing,
+        gateAttempts: attempt,
+        timeline: [...inputData.timeline, activity],
       }
     },
   })
@@ -365,6 +501,8 @@ export function createCardRunWorkflow(overrides = {}) {
     outputSchema: runStateSchema,
   })
     .then(buildStep)
+    .then(publishStep)
+    .dountil(evidenceGateStep, async ({ inputData }) => inputData.evidenceMissing.length === 0)
     .dountil(shippingFreeStep, async ({ inputData }) => Boolean(inputData.freeVerdict) || inputData.freeAttempts >= inputData.models.freeAttempts)
     .then(shippingFinalStep)
     .then(recordStep)

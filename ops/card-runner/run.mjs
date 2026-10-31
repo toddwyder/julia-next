@@ -2,20 +2,25 @@
 // Runs one card's build and Shipping passes inside the Mastra workflow.
 //
 //   node scripts/julia-agents.mjs -- node ops/card-runner/run.mjs JUL-295
+//   node scripts/julia-agents.mjs -- node ops/card-runner/run.mjs JUL-295 --ship-only --branch feat/jul-295-x
 //
 // The workflow starts every step itself: nothing is launched by hand between
-// the build and Shipping.
+// the build and Shipping. `--ship-only` picks up a branch a build already
+// finished outside this workflow and starts at the same handover a build it ran
+// itself leaves behind.
 import { createCardRunWorkflow } from './src/workflow.mjs'
 
 function parseArgs(argv) {
   const [card, ...rest] = argv
-  if (!card || !/^JUL-\d+$/i.test(card)) throw new Error('usage: run.mjs JUL-<n> [--repo <path>] [--run-dir <path>]')
+  if (!card || !/^JUL-\d+$/i.test(card)) throw new Error('usage: run.mjs JUL-<n> [--repo <path>] [--run-dir <path>] [--ship-only] [--branch <name>]')
   const options = { card: card.toUpperCase() }
   for (let index = 0; index < rest.length; index += 1) {
     const flag = rest[index]
     const value = rest[index + 1]
     if (flag === '--repo') { options.repoDir = value; index += 1 }
     else if (flag === '--run-dir') { options.runDir = value; index += 1 }
+    else if (flag === '--ship-only') options.shipOnly = true
+    else if (flag === '--branch') { options.branch = value; index += 1 }
     else throw new Error(`unknown argument: ${flag}`)
   }
   return options

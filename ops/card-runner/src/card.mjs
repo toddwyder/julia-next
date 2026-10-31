@@ -66,6 +66,17 @@ export function prepareCheckout({ repoDir, card, runDir, exec }) {
   return { branch, checkout }
 }
 
+// A build that was handed over instead of run here keeps its own branch: the
+// runner adds a worktree at the pushed branch and never deletes or rebuilds it.
+export function prepareAdoptedCheckout({ repoDir, branch, runDir, exec }) {
+  const checkout = join(runDir, 'checkout')
+  mkdirSync(runDir, { recursive: true })
+  tryCommand('git', ['worktree', 'remove', '--force', checkout], { cwd: repoDir, exec })
+  runCommand('git', ['fetch', 'origin', branch], { cwd: repoDir, exec })
+  runCommand('git', ['worktree', 'add', '--detach', checkout, `origin/${branch}`], { cwd: repoDir, exec })
+  return { branch, checkout }
+}
+
 export function findPull({ repoDir, branch, exec }) {
   const text = runCommand('gh', ['pr', 'list', '--head', branch, '--state', 'open', '--json', 'number,headRefOid,url,title,commits'], { cwd: repoDir, exec })
   const pulls = JSON.parse(text || '[]')
@@ -78,8 +89,22 @@ export function findPull({ repoDir, branch, exec }) {
 
 export function requirePull(options) {
   const pull = findPull(options)
-  if (!pull) throw new Error(`the build did not open a pull request from ${options.branch}`)
+  if (!pull) throw new Error(`no open pull request from ${options.branch} after publishing`)
   return pull
+}
+
+// The runner posts the pull request with the title and description the build
+// wrote, so the PR carries the build's own words and no one retypes them.
+export function publishPull({ repoDir, branch, title, body, exec }) {
+  const file = join(mkdtempSync(join(tmpdir(), 'card-runner-pr-body-')), 'body.md')
+  writeFileSync(file, body)
+  const existing = findPull({ repoDir, branch, exec })
+  if (existing) {
+    runCommand('gh', ['pr', 'edit', String(existing.number), '--title', title, '--body-file', file], { cwd: repoDir, exec })
+  } else {
+    runCommand('gh', ['pr', 'create', '--head', branch, '--base', 'main', '--title', title, '--body-file', file], { cwd: repoDir, exec })
+  }
+  return requirePull({ repoDir, branch, exec })
 }
 
 export function postCardComment(identifier, body, { apiKey } = {}) {

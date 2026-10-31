@@ -25,6 +25,9 @@ export const DEFAULTS = {
   shippingFinal: 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro',
   effort: 'large',
   freeAttempts: 6,
+  // One build-back session to collect missing evidence is enough in practice;
+  // a second run that still cannot show its work stops the run.
+  evidenceAttempts: 2,
   timeoutMs: 90 * 60 * 1000,
 }
 
