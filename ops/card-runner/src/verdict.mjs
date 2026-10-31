@@ -82,13 +82,32 @@ export function coversCriteria(verdict, expected) {
   return { ok: missing.length === 0, missing }
 }
 
+function modelKey(name) {
+  return String(name ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+// A judge sometimes names the model it ran in readable words instead of the id
+// the runner started. One part of the id matching is enough to say it is that
+// model; a judge that reports another model still fails.
+function sameModel(reported, expected) {
+  const got = modelKey(reported)
+  if (!got) return false
+  const id = String(expected ?? '')
+  const parts = new Set([id, ...id.split('/'), id.split(':')[0]])
+  for (const part of parts) {
+    const key = modelKey(part)
+    if (key.length >= 5 && got.length >= 5 && (got === key || got.endsWith(key) || key.endsWith(got))) return true
+  }
+  return false
+}
+
 export function validateVerdict(parsed, { card, head, verifier, expectedCriteria = [] }) {
   const result = parseVerdictObject(parsed)
   const errors = [...result.errors]
   if (result.verdict) {
     if (result.verdict.card !== card) errors.push(`card is ${result.verdict.card}, expected ${card}`)
     if (result.verdict.head !== head) errors.push(`head is ${result.verdict.head}, expected ${head}`)
-    if (verifier && result.verdict.verifier !== verifier) errors.push(`verifier is ${result.verdict.verifier}, expected ${verifier}`)
+    if (verifier && !sameModel(result.verdict.verifier, verifier)) errors.push(`verifier is ${result.verdict.verifier}, expected ${verifier}`)
     const covered = coversCriteria(result.verdict, expectedCriteria)
     for (const criterion of covered.missing) errors.push(`no verdict for: ${criterion}`)
   }

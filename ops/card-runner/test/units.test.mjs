@@ -246,6 +246,14 @@ test('a verdict is accepted only when it answers this card, this head and this m
   quoted.criteria[1].criterion = 'The second thing works when a person opens it'
   equal(validateVerdict(quoted, { card: 'JUL-900', head: 'abc1234', verifier: verdict.verifier, expectedCriteria: criteriaFrom(card.description) }).ok, true)
 
+  const readably = structuredClone(verdict)
+  readably.verifier = 'Glyph Cluster'
+  equal(validateVerdict(readably, { card: 'JUL-900', head: 'abc1234', verifier: verdict.verifier, expectedCriteria: criteriaFrom(card.description) }).ok, true)
+
+  const anotherJudge = structuredClone(verdict)
+  anotherJudge.verifier = 'Kimi K3.1 Pro'
+  equal(validateVerdict(anotherJudge, { card: 'JUL-900', head: 'abc1234', verifier: verdict.verifier }).ok, false)
+
   // Markdown in a criterion must not decide whether the words match.
   equal(normalizeCriterion('A new file `ops/x.md` explains it'), normalizeCriterion('A new file ops/x.md explains it'))
 })
