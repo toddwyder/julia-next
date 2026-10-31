@@ -90,3 +90,8 @@ test('the command exits nonzero and names the failing criterion', t => {
   assert.match(result.stderr, /brief\.md:3: AC1 is procedural/);
   assert.match(result.stderr, /brief\.md:3: AC1 uses the implementation word "API"/);
 });
+
+test('accepts a PR, which Todd reads on GitHub', () => {
+  assert.deepEqual(checkCriterion({ id: 'AC1', text: 'The PR carries the title the building agent wrote.' }), []);
+  assert.deepEqual(checkCriterion({ id: 'AC1', text: 'Shipping runs the pull request itself.' }), []);
+});

@@ -27,7 +27,7 @@ const IMPERATIVE = new Set([
   'run', 'set', 'store', 'support', 'update', 'use', 'wire', 'write',
 ]);
 
-const IMPLEMENTATION = /\b(?:api|apis|argument|arguments|branch|class|classes|code|column|commit|component|components|constant|constants|controller|css|database|dependency|dependencies|deploy|deployment|endpoint|endpoints|file|files|function|functions|git|handler|html|implementation|interface|interfaces|javascript|json|merge|method|methods|middleware|migration|module|modules|next\.js|npm|package|parameter|parameters|parser|pr|pull request|query|queries|react|refactor|regex|route|router|schema|schemas|script|sql|type|types|typescript|variable|variables|yaml)\b/i;
+const IMPLEMENTATION = /\b(?:api|apis|argument|arguments|branch|class|classes|code|column|commit|component|components|constant|constants|controller|css|database|dependency|dependencies|deploy|deployment|endpoint|endpoints|file|files|function|functions|git|handler|html|implementation|interface|interfaces|javascript|json|merge|method|methods|middleware|migration|module|modules|next\.js|npm|package|parameter|parameters|parser|query|queries|react|refactor|regex|route|router|schema|schemas|script|sql|type|types|typescript|variable|variables|yaml)\b/i;
 
 const NEGATION = /\b(?:no|not|never|none|nothing|without|cannot|can[’']?t|won[’']?t|isn[’']?t|aren[’']?t|doesn[’']?t|don[’']?t|didn[’']?t|shouldn[’']?t|mustn[’']?t|nor|neither|nowhere)\b/i;
 
