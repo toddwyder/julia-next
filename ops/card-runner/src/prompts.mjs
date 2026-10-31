@@ -1,6 +1,6 @@
 import { criteriaFrom } from './verdict.mjs'
 
-export const UNATTENDED = `This run is unattended. No question and no approval can be answered, and asking for one ends the run with nothing judged. Do not call request_access or submit_plan, and stay inside the checkout you are in. The model and effort are already chosen for you, so skip the model files AGENTS.md points at.`
+export const UNATTENDED = `This run is unattended. No question and no approval can be answered, and asking for one ends the run with nothing judged. Do not call request_access or submit_plan, and stay inside the checkout you are in. The editor tools stop at the checkout, so write any file outside it with the shell, for example \`cat > /absolute/path <<'EOF'\` and then the contents and a closing \`EOF\` line. The model and effort are already chosen for you, so skip the model files AGENTS.md points at.`
 
 export function cardSection(card) {
   return `# Card ${card.identifier}: ${card.title}

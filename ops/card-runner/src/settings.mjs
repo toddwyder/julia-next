@@ -68,6 +68,10 @@ export function buildSettings(base, { buildModel, memoryModel, helperModel, ship
 export function prepareRunDir({ runDir, baseSettings, authSource = APP_DATA_DIR, buildModel, memoryModel, helperModel, shippingModel, thinkingLevel = 'high' }) {
   const appData = join(runDir, 'app-data')
   mkdirSync(appData, { recursive: true })
+  // Handover files and verdicts are written by sessions whose editor tools stop
+  // at the checkout, so the folders must exist before a shell heredoc lands in them.
+  mkdirSync(join(runDir, 'pr'), { recursive: true })
+  mkdirSync(join(runDir, 'verdicts'), { recursive: true })
   const auth = join(authSource, 'auth.json')
   if (!existsSync(auth)) throw new Error(`Mastra Code auth.json not found at ${auth}`)
   copyFileSync(auth, join(appData, 'auth.json'))

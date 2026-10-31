@@ -1,6 +1,41 @@
 import { spawnSync } from 'node:child_process'
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
 
 const ANSI = /\u001b\[[0-9;]*m/g
+
+// A runner killed with SIGKILL leaves its session process behind. That session
+// keeps the thread lock and the checkout busy, so the resumed runner would fail
+// with "Thread ... is locked by another process". The locks live in the run's
+// own app-data, so a resumed run can clear its own leftovers without touching
+// another run.
+export function stopLeftoverSessions({ appData }) {
+  const locks = join(appData, 'locks')
+  if (!existsSync(locks)) return []
+  const stopped = []
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        walk(path)
+        continue
+      }
+      if (!entry.name.endsWith('.lock')) continue
+      const pid = Number.parseInt(readFileSync(path, 'utf8').trim(), 10)
+      if (Number.isInteger(pid) && pid > 0 && pid !== process.pid) {
+        try {
+          process.kill(pid, 'SIGKILL')
+          stopped.push(pid)
+        } catch {
+          // The owner is already gone; removing the file is enough.
+        }
+      }
+      rmSync(path, { force: true })
+    }
+  }
+  walk(locks)
+  return stopped
+}
 
 export function sessionArgs({ model, thinkingLevel, title, timeoutMs, settingsPath }) {
   const seconds = Math.max(60, Math.floor(timeoutMs / 1000))
@@ -41,6 +76,10 @@ function lastJson(text) {
 
 export function runSession({ prompt, model, thinkingLevel = 'low', title, timeoutMs, settingsPath, cwd, appData, tracePath, env = process.env, spawn = spawnSync }) {
   const args = sessionArgs({ model, thinkingLevel, title, timeoutMs, settingsPath })
+  const stopped = stopLeftoverSessions({ appData })
+  if (stopped.length > 0) {
+    process.stderr.write(`stopped a leftover session from an interrupted run (pid ${stopped.join(', ')})\n`)
+  }
   const child = spawn('mastracode', args, {
     cwd,
     env: sessionEnv(env, { appData, tracePath }),

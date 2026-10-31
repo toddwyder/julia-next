@@ -1,5 +1,6 @@
 import { deepEqual } from 'node:assert'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -8,7 +9,7 @@ import { branchFor, normalizeCard, prepareAdoptedCheckout, prepareCheckout, publ
 import { missingEvidence, readBuildDone, readPullDraft, writeBuildHandover } from '../src/handover.mjs'
 import { selectEvidence, evidenceBlock } from '../src/evidence.mjs'
 import { parseVerdict, validateVerdict, criteriaFrom, normalizeCriterion } from '../src/verdict.mjs'
-import { sessionArgs, sessionEnv } from '../src/session.mjs'
+import { sessionArgs, sessionEnv, stopLeftoverSessions } from '../src/session.mjs'
 import { buildBackPrompt, buildPrompt, shippingPrompt } from '../src/prompts.mjs'
 import { buildSettings, prepareRunDir } from '../src/settings.mjs'
 import { cardOfRun, parseArgs, runDirFor } from '../run.mjs'
@@ -136,6 +137,23 @@ test('the session is told the model, the output format and the settings file', (
 test('a session env never carries colour and always points at its own storage', () => {
   const env = sessionEnv({ CLICOLOR_FORCE: '1', GH_FORCE_TTY: '1', FORCE_COLOR: '1', PATH: '/bin', LINEAR_API_KEY: 'k' }, { appData: '/a', tracePath: '/t.duckdb' })
   deepEqual(env, { PATH: '/bin', LINEAR_API_KEY: 'k', NO_COLOR: '1', CLICOLOR: '0', MASTRA_APP_DATA_DIR: '/a', MASTRA_OBSERVABILITY_DB_PATH: '/t.duckdb' })
+})
+
+test('a resumed run stops the session its killed runner left behind', async () => {
+  const appData = mkdtempSync(join(tmpdir(), 'card-runner-locks-'))
+  const locks = join(appData, 'locks')
+  mkdirSync(locks, { recursive: true })
+  const orphan = spawn('sleep', ['60'])
+  const stale = join(locks, 'old-thread.lock')
+  const live = join(locks, 'live-thread.lock')
+  writeFileSync(stale, '999999')
+  writeFileSync(live, String(orphan.pid))
+  const stopped = stopLeftoverSessions({ appData })
+  deepEqual(stopped, [orphan.pid])
+  equal(existsSync(stale), false)
+  equal(existsSync(live), false)
+  await new Promise((resolve) => orphan.on('exit', resolve))
+  equal(orphan.exitCode !== null || orphan.signalCode !== null, true)
 })
 
 test('evidence is whatever the build posted after the run started', () => {
