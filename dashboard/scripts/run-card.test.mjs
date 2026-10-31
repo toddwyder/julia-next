@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
-import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, cutOffResult, costFrom, failureTail, freePort, investigationPrompt, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshPull, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, smokeReturnPrompt, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
+import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, cutOffResult, costFrom, failureTail, freePort, investigationPrompt, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, preparePreviewState, previewKind, printed, pullNamesCard, recordFile, refreshPull, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, smokeReturnPrompt, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
 const temporaryState = () => {
@@ -234,6 +234,22 @@ test('the regression suite runs on the preview address, never against the live o
   assert.deepEqual(julia[0].args.slice(1), ['launch', '--url', 'https://julia-next-git-x.vercel.app']);
   assert.deepEqual(julia[2].args.slice(1, 2), ['test']);
   assert.ok(julia[2].args.length > 2, 'the whole spec suite runs, not one file');
+});
+
+// Measured on JUL-290: the preview kept its state folder between runs, so a lane read a
+// screen someone had already clicked and lane 1 failed twice for a pick left by lane 2.
+test('a preview starts from a clean screen each time, with the live models but no draft', () => {
+  const root = mkdtempSync(join(tmpdir(), 'preview-'));
+  const live = join(root, 'live-models.json');
+  writeFileSync(live, '{"models":[]}');
+
+  const first = preparePreviewState({ root, port: 4314, liveModels: live });
+  writeFileSync(join(first, 'state', 'draft.json'), '{"card":"JUL-280"}');
+
+  const second = preparePreviewState({ root, port: 4314, liveModels: live });
+  assert.equal(second, first);
+  assert.ok(existsSync(join(second, 'state', 'models.json')), 'the lanes need the swept models');
+  assert.equal(existsSync(join(second, 'state', 'draft.json')), false, 'the last run\'s picks stay behind');
 });
 
 // Measured on JUL-290: the suite signed off with a skipped lane, so the run recorded "this lane

@@ -14,7 +14,7 @@
 // reaches the scorecard), the Julia app through the verify-julia skill. Each
 // session's prompt is written next to its log, so a stopped card can be read back.
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, createReadStream, existsSync, mkdirSync, readdirSync, rmSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createServer } from 'node:net';
@@ -644,6 +644,22 @@ export async function freePort(start = PREVIEW_PORT, tries = 20) {
   throw new Error(`no free preview port in ${start} to ${start + tries - 1}`);
 }
 
+// The Start screen reads its models from the state folder it is given, and a lane that
+// boots its own server copies the live models file in for that reason. Without it the
+// preview shows an empty picker, and eleven lanes time out on a page that is working
+// exactly as it should.
+//
+// The folder is cleared first: a preview that keeps the last run's picks gives the next
+// run a screen someone has already clicked. Measured on JUL-290, where one lane's
+// leftover override failed lane 1 on two runs in a row.
+export function preparePreviewState({ root, port, liveModels }) {
+  const previewState = join(root, `preview-state-${port}`);
+  rmSync(previewState, { recursive: true, force: true });
+  mkdirSync(join(previewState, 'state'), { recursive: true });
+  if (liveModels && existsSync(liveModels)) copyFileSync(liveModels, join(previewState, 'state', 'models.json'));
+  return previewState;
+}
+
 async function dashboardPreview({ worktree, card, log, env = process.env }) {
   const dashboard = join(worktree, 'dashboard');
   if (!existsSync(join(dashboard, 'node_modules'))) {
@@ -652,14 +668,7 @@ async function dashboardPreview({ worktree, card, log, env = process.env }) {
   await mustRun('npm', ['run', 'build'], { cwd: dashboard, log }, 'npm run build for the preview');
   const port = await freePort();
   const address = `http://${tailnetHost()}:${port}`;
-  const previewState = join(stateRoot(env), `preview-state-${port}`);
-  // The Start screen reads its models from the state folder it is given, and a
-  // lane that boots its own server copies the live models file in for that reason.
-  // Without it the preview shows an empty picker, and eleven lanes time out on a
-  // page that is working exactly as it should.
-  mkdirSync(join(previewState, 'state'), { recursive: true });
-  const liveModels = join(stateFolder(env), 'models.json');
-  if (existsSync(liveModels)) copyFileSync(liveModels, join(previewState, 'state', 'models.json'));
+  const previewState = preparePreviewState({ root: stateRoot(env), port, liveModels: join(stateFolder(env), 'models.json') });
   const child = spawn('node', ['server.js'], {
     cwd: dashboard,
     env: {
