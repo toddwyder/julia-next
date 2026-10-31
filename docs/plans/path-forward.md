@@ -153,3 +153,7 @@ These override earlier lines in this file where they differ. Every step below st
 - **Every stop is diagnosed.** Each stop, failure, blocker or rubber stamp gets its cause: why it happened, what the process got wrong, and what keeps it from returning. The fix goes through pstack as high in [the inverse pyramid](../principles/inverse-pyramid.md) as it will go.
 - **Advisor.** The advisor sees a card only with a PASS and its evidence, after a second FAIL, or when the builder is blocked. It checks each PASS for a rubber stamp; a rubber stamp counts as a FAIL. A blocker's fix goes through pstack as a card.
 - **Every change has a card**, corrections included.
+- **The path runs as a Mastra workflow**, the way Factory ran. Mastra keeps each step's state, the FAIL count and the pause for Todd's yes; the workflow starts every session, Shipping included, and nothing is launched by hand. A homemade runner script is the wrong shape: PR #387's runner is closed unmerged (Todd, 30 Oct 2026).
+- **Built one step at a time.** Each step of the path is built and proven before the next is started: build, Shipping, Remediation, preview, smoke test, the wait for Todd's yes, merge, live check, retro.
+- **Memory helpers run on Mastra's suggested free default model.** This lands before the workflow work.
+- **Tests of the machine run on free models only**, never on a real card while the machine change is unmerged.
