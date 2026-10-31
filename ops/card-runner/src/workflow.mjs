@@ -1,19 +1,23 @@
-// JUL-295 step 1: one card's build evidence reaches Shipping by itself.
+// One card run, as a Mastra workflow: build, publish, collect evidence, one
+// Shipping review, record the answer, then wait for Todd's yes.
 //
-// The shape is a Mastra workflow: a build step, a loop that lets a free model
-// judge until it returns a usable verdict, one final pass on Kimi K3.1 Pro, and
-// a step that puts both verdicts where a person and CI can read them.
-import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+// Mastra storage holds the run's step state, so a killed runner restarts at the
+// step it died on and a paused run stays paused. The only files this workflow
+// writes are the ones a person or another program needs: the build's handover,
+// the judge's verdict, and the run record.
+
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createStep, createWorkflow } from '@mastra/core/workflows'
 import { z } from 'zod'
-import { DEFAULTS, thinkingForEffort } from './config.mjs'
+import { readRunnerConfig, thinkingForEffort } from './config.mjs'
 import { evidenceBlock, selectEvidence } from './evidence.mjs'
 import { missingEvidence, readBuildDone, readPullDraft } from './handover.mjs'
-import { buildBackPrompt, buildPrompt, exhaustedComment, shippingPrompt, verdictComment } from './prompts.mjs'
+import { buildBackPrompt, buildPrompt, shippingPrompt, verdictComment } from './prompts.mjs'
 import { prepareRunDir } from './settings.mjs'
 import { runSession as defaultRunSession } from './session.mjs'
-import { parseVerdict, validateVerdict, criteriaFrom } from './verdict.mjs'
+import { criteriaFrom, parseVerdict, validateVerdict } from './verdict.mjs'
+import { usageSummary } from './usage.mjs'
 import {
   loadCard as defaultLoadCard,
   postCardComment as defaultPostCardComment,
@@ -25,17 +29,21 @@ import {
 } from './card.mjs'
 
 export const STATE_DIR = process.env.CARD_RUNNER_STATE_DIR ?? '/var/lib/julia-dashboard/state/runs'
+export const WORKFLOW_ID = 'card-run'
 
 const modelsSchema = z.object({
   build: z.string(),
   memory: z.string(),
   helper: z.string(),
-  shippingFree: z.string(),
-  shippingFinal: z.string(),
+  shipping: z.string(),
+})
+
+const configSchema = z.object({
+  models: modelsSchema,
   effort: z.string(),
-  freeAttempts: z.number(),
   evidenceAttempts: z.number(),
   timeoutMs: z.number(),
+  configPath: z.string(),
 })
 
 const verdictSchema = z.object({
@@ -80,15 +88,16 @@ export const runStateSchema = z.object({
   builder: z.string(),
   evidenceStartedAt: z.string(),
   evidence: z.array(evidenceSchema),
-  models: modelsSchema,
+  config: configSchema,
   timeline: z.array(activitySchema),
   gateAttempts: z.number(),
   evidenceMissing: z.array(z.string()),
-  freeAttempts: z.number(),
-  freeErrors: z.array(z.string()),
-  freeVerdict: verdictSchema.nullable(),
-  finalVerdict: verdictSchema.nullable(),
-  finalError: z.string().nullable(),
+  verdictPath: z.string(),
+  verdict: verdictSchema.nullable(),
+  verdictError: z.string().nullable(),
+  postError: z.string().nullable(),
+  approved: z.boolean().nullable(),
+  approvedAt: z.string().nullable(),
 })
 
 export const cardRunInputSchema = z.object({
@@ -97,27 +106,24 @@ export const cardRunInputSchema = z.object({
   runDir: z.string().optional(),
   shipOnly: z.boolean().optional(),
   branch: z.string().optional(),
-  models: modelsSchema.partial().optional(),
+  // Tests pass a config object; the command line never does, so a real run
+  // always reads dashboard/config/defaults.json.
+  config: configSchema.optional(),
 })
 
-function modelsFor(overrides = {}) {
-  return { ...DEFAULTS, ...overrides }
+export function runRecordPath(runDir, runId) {
+  return join(runDir, 'records', `${runId}.json`)
 }
 
-function appendStep(runDir, activity) {
-  mkdirSync(runDir, { recursive: true })
-  appendFileSync(join(runDir, 'steps.jsonl'), `${JSON.stringify(activity)}\n`)
+export function readRunRecord(runDir, runId) {
+  return JSON.parse(readFileSync(runRecordPath(runDir, runId), 'utf8'))
 }
 
-function writeRunRecord(runDir, record) {
-  mkdirSync(runDir, { recursive: true })
-  const path = join(runDir, 'run.json')
+function writeRunRecord(runDir, runId, record) {
+  const path = runRecordPath(runDir, runId)
+  mkdirSync(join(runDir, 'records'), { recursive: true })
   writeFileSync(path, `${JSON.stringify(record, null, 2)}\n`)
   return path
-}
-
-function clearVerdictFile(path) {
-  rmSync(path, { force: true })
 }
 
 // A verdict is only worth the pass that produced it, so a dropped connection
@@ -131,6 +137,22 @@ async function postUntilItLands(send, attempts = 3) {
       await new Promise((done) => setTimeout(done, 2000 * attempt))
     }
   }
+}
+
+export function verdictPathFor(runDir, runId) {
+  return join(runDir, 'verdicts', `${runId}.json`)
+}
+
+function readIfPresent(path) {
+  try {
+    return readFileSync(path, 'utf8')
+  } catch {
+    return ''
+  }
+}
+
+function criteriaFor(card) {
+  return criteriaFrom(card.description)
 }
 
 export function createCardRunWorkflow(overrides = {}) {
@@ -153,13 +175,21 @@ export function createCardRunWorkflow(overrides = {}) {
     inputSchema: cardRunInputSchema,
     outputSchema: runStateSchema,
     execute: async ({ inputData }) => {
-      const models = modelsFor(inputData.models)
+      const config = inputData.config ?? readRunnerConfig()
+      const { models } = config
       const runDir = inputData.runDir ?? join(STATE_DIR, inputData.card)
       const repoDir = inputData.repoDir ?? process.cwd()
       const startedAt = deps.now()
 
       const card = await deps.loadCard(inputData.card)
-      const prepared = await deps.prepareRunDir({ runDir, memoryModel: models.memory })
+      const prepared = await deps.prepareRunDir({
+        runDir,
+        buildModel: models.build,
+        memoryModel: models.memory,
+        helperModel: models.helper,
+        shippingModel: models.shipping,
+        thinkingLevel: thinkingForEffort(config.effort),
+      })
       let branch
       let checkout
       let evidenceStartedAt = startedAt
@@ -188,27 +218,26 @@ export function createCardRunWorkflow(overrides = {}) {
         const session = await deps.runSession({
           prompt: buildPrompt({ card, branch, runDir }),
           model: models.build,
-          thinkingLevel: thinkingForEffort(models.effort),
-          title: `${card.identifier} build`,
-          timeoutMs: models.timeoutMs,
+          thinkingLevel: thinkingForEffort(config.effort),
+          title: `${inputData.card} build`,
+          timeoutMs: config.timeoutMs,
           settingsPath: prepared.settingsPath,
           cwd: checkout,
           appData: prepared.appData,
           tracePath: join(runDir, 'trace-build.duckdb'),
         })
+        activity.finishedAt = deps.now()
+        activity.ok = session.ok
+        activity.usage = session.usage
+        activity.error = session.ok ? undefined : session.error
         if (!session.ok) throw new Error(`the build session did not finish: ${session.error}`)
-        readBuildDone({ runDir, card: card.identifier })
+        readBuildDone({ runDir, card: inputData.card })
       }
 
       const after = await deps.loadCard(inputData.card)
       const evidence = selectEvidence(after.comments, evidenceStartedAt)
-      const evidenceMissing = missingEvidence(evidence, criteriaFrom(after.description))
-      activity.finishedAt = deps.now()
-      activity.ok = true
-      appendStep(runDir, activity)
-
       return {
-        card: card.identifier,
+        card: inputData.card,
         runDir,
         appData: prepared.appData,
         settingsPath: prepared.settingsPath,
@@ -218,21 +247,20 @@ export function createCardRunWorkflow(overrides = {}) {
         builder: '',
         evidenceStartedAt,
         evidence,
-        models,
+        config,
         timeline: [activity],
         gateAttempts: 0,
-        evidenceMissing,
-        freeAttempts: 0,
-        freeErrors: [],
-        freeVerdict: null,
-        finalVerdict: null,
-        finalError: null,
+        evidenceMissing: missingEvidence(evidence, criteriaFor(after)),
+        verdictPath: '',
+        verdict: null,
+        verdictError: null,
+        postError: null,
+        approved: null,
+        approvedAt: null,
       }
     },
   })
 
-  // The build writes the title and description; the runner is the one that
-  // posts them, so the pull request carries the build's own words.
   const publishStep = createStep({
     id: 'publish',
     inputSchema: runStateSchema,
@@ -253,7 +281,6 @@ export function createCardRunWorkflow(overrides = {}) {
         model: 'gh',
         ok: true,
       }
-      appendStep(inputData.runDir, activity)
       return {
         ...inputData,
         pull: { number: pull.number, head: pull.head, url: pull.url },
@@ -265,7 +292,7 @@ export function createCardRunWorkflow(overrides = {}) {
 
   // Shipping only starts once every criterion has its own evidence comment.
   // When one is missing the same build session goes back for it, and a run that
-  // never produces the evidence stops without Shipping.
+  // never produces the evidence stops without a Shipping review.
   const evidenceGateStep = createStep({
     id: 'evidence-gate',
     inputSchema: runStateSchema,
@@ -279,12 +306,11 @@ export function createCardRunWorkflow(overrides = {}) {
           model: 'none',
           ok: true,
         }
-        appendStep(inputData.runDir, activity)
         return { ...inputData, timeline: [...inputData.timeline, activity] }
       }
 
       const attempt = inputData.gateAttempts + 1
-      if (attempt > inputData.models.evidenceAttempts) {
+      if (attempt > inputData.config.evidenceAttempts) {
         throw new Error(`Shipping did not start: no evidence for ${inputData.evidenceMissing.join('; ')}`)
       }
 
@@ -297,10 +323,10 @@ export function createCardRunWorkflow(overrides = {}) {
           runDir: inputData.runDir,
           missing: inputData.evidenceMissing,
         }),
-        model: inputData.models.build,
-        thinkingLevel: thinkingForEffort(inputData.models.effort),
+        model: inputData.config.models.build,
+        thinkingLevel: thinkingForEffort(inputData.config.effort),
         title: `${inputData.card} build back ${attempt}`,
-        timeoutMs: inputData.models.timeoutMs,
+        timeoutMs: inputData.config.timeoutMs,
         settingsPath: inputData.settingsPath,
         cwd: inputData.checkout,
         appData: inputData.appData,
@@ -313,18 +339,17 @@ export function createCardRunWorkflow(overrides = {}) {
       const pull = await deps.requirePull({ repoDir: inputData.checkout, branch: inputData.branch })
       const after = await deps.loadCard(inputData.card)
       const evidence = selectEvidence(after.comments, inputData.evidenceStartedAt)
-      const evidenceMissing = missingEvidence(evidence, criteriaFrom(after.description))
+      const evidenceMissing = missingEvidence(evidence, criteriaFor(after))
 
       const activity = {
         id: `build-back-${attempt}`,
         startedAt,
         finishedAt: deps.now(),
-        model: inputData.models.build,
+        model: inputData.config.models.build,
         ok: evidenceMissing.length === 0,
         usage: session.usage,
         error: evidenceMissing.length ? `still no evidence for ${evidenceMissing.join('; ')}` : undefined,
       }
-      appendStep(inputData.runDir, activity)
       return {
         ...inputData,
         pull: { number: pull.number, head: pull.head, url: pull.url },
@@ -337,47 +362,68 @@ export function createCardRunWorkflow(overrides = {}) {
     },
   })
 
-  const shippingFreeStep = createStep({
-    id: 'shipping-free',
+  // One Shipping review per run. The judge writes its answer to a file named
+  // after this run, and that file is never deleted. A marker written before the
+  // session starts means a restarted step reads the kept answer instead of
+  // starting a second review.
+  const shippingStep = createStep({
+    id: 'shipping',
     inputSchema: runStateSchema,
     outputSchema: runStateSchema,
-    execute: async ({ inputData }) => {
-      const attempt = inputData.freeAttempts + 1
+    execute: async ({ inputData, runId }) => {
       const startedAt = deps.now()
-      const verdictPath = join(inputData.runDir, `shipping-free-${attempt}.json`)
-      clearVerdictFile(verdictPath)
-      const card = await deps.loadCard(inputData.card)
-      const prompt = shippingPrompt({
-        card: { ...card, identifier: inputData.card },
-        evidence: evidenceBlock(inputData.evidence),
-        verifierModel: inputData.models.shippingFree,
-        verdictPath,
-        final: false,
-        pull: inputData.pull,
-      })
-      const session = await deps.runSession({
-        prompt,
-        model: inputData.models.shippingFree,
-        thinkingLevel: thinkingForEffort(inputData.models.effort),
-        title: `${inputData.card} shipping free attempt ${attempt}`,
-        timeoutMs: inputData.models.timeoutMs,
-        settingsPath: inputData.settingsPath,
-        cwd: inputData.checkout,
-        appData: inputData.appData,
-        tracePath: join(inputData.runDir, `trace-shipping-free-${attempt}.duckdb`),
-      })
+      const verdictPath = verdictPathFor(inputData.runDir, runId)
+      const markerPath = join(inputData.runDir, 'verdicts', `${runId}.started.json`)
+      const model = inputData.config.models.shipping
+
+      let session = null
+      if (existsSync(verdictPath)) {
+        // A restarted step finds the answer already on disk.
+      } else if (existsSync(markerPath)) {
+        const error = `the Shipping review already ran as part of this run and wrote no answer; this run starts no second review`
+        const activity = { id: 'shipping', startedAt, finishedAt: deps.now(), model, ok: false, error }
+        return {
+          ...inputData,
+          verdictPath,
+          verdict: null,
+          verdictError: error,
+          timeline: [...inputData.timeline, activity],
+        }
+      } else {
+        mkdirSync(join(inputData.runDir, 'verdicts'), { recursive: true })
+        writeFileSync(markerPath, `${JSON.stringify({ model, startedAt })}\n`)
+        const card = await deps.loadCard(inputData.card)
+        session = await deps.runSession({
+          prompt: shippingPrompt({
+            card: { ...card, identifier: inputData.card },
+            evidence: evidenceBlock(inputData.evidence),
+            verifierModel: model,
+            verdictPath,
+            pull: inputData.pull,
+          }),
+          model,
+          thinkingLevel: thinkingForEffort(inputData.config.effort),
+          title: `${inputData.card} shipping`,
+          timeoutMs: inputData.config.timeoutMs,
+          settingsPath: inputData.settingsPath,
+          cwd: inputData.checkout,
+          appData: inputData.appData,
+          tracePath: join(inputData.runDir, 'trace-shipping.duckdb'),
+        })
+      }
 
       let verdict = null
-      let error = session.ok ? undefined : session.error
-      if (session.ok) {
+      let error = session && !session.ok ? session.error : undefined
+      if (!error || existsSync(verdictPath)) {
         const parsed = parseVerdict(readIfPresent(verdictPath))
         if (!parsed.ok) {
           error = `the verdict was not usable: ${parsed.errors.join('; ')}`
         } else {
+          const card = await deps.loadCard(inputData.card)
           const checked = validateVerdict(parsed.verdict, {
             card: inputData.card,
             head: inputData.pull.head,
-            verifier: inputData.models.shippingFree,
+            verifier: model,
             expectedCriteria: criteriaFor(card),
           })
           if (checked.ok) verdict = checked.verdict
@@ -386,87 +432,20 @@ export function createCardRunWorkflow(overrides = {}) {
       }
 
       const activity = {
-        id: `shipping-free-${attempt}`,
+        id: 'shipping',
         startedAt,
         finishedAt: deps.now(),
-        model: inputData.models.shippingFree,
+        model,
         ok: Boolean(verdict),
-        usage: session.usage,
+        usage: session?.usage,
         error,
       }
-      appendStep(inputData.runDir, activity)
       return {
         ...inputData,
-        timeline: [...inputData.timeline, activity],
-        freeAttempts: attempt,
-        freeErrors: error ? [...inputData.freeErrors, error] : inputData.freeErrors,
-        freeVerdict: verdict ?? inputData.freeVerdict,
-      }
-    },
-  })
-
-  const shippingFinalStep = createStep({
-    id: 'shipping-final',
-    inputSchema: runStateSchema,
-    outputSchema: runStateSchema,
-    execute: async ({ inputData }) => {
-      const startedAt = deps.now()
-      const verdictPath = join(inputData.runDir, 'shipping-final.json')
-      clearVerdictFile(verdictPath)
-      const card = await deps.loadCard(inputData.card)
-      const prompt = shippingPrompt({
-        card: { ...card, identifier: inputData.card },
-        evidence: evidenceBlock(inputData.evidence),
-        verifierModel: inputData.models.shippingFinal,
         verdictPath,
-        final: true,
-        pull: inputData.pull,
-      })
-      const session = await deps.runSession({
-        prompt,
-        model: inputData.models.shippingFinal,
-        thinkingLevel: thinkingForEffort(inputData.models.effort),
-        title: `${inputData.card} shipping final`,
-        timeoutMs: inputData.models.timeoutMs,
-        settingsPath: inputData.settingsPath,
-        cwd: inputData.checkout,
-        appData: inputData.appData,
-        tracePath: join(inputData.runDir, 'trace-shipping-final.duckdb'),
-      })
-
-      let verdict = null
-      let error = session.ok ? undefined : session.error
-      if (session.ok) {
-        const parsed = parseVerdict(readIfPresent(verdictPath))
-        if (!parsed.ok) {
-          error = `the verdict was not usable: ${parsed.errors.join('; ')}`
-        } else {
-          const checked = validateVerdict(parsed.verdict, {
-            card: inputData.card,
-            head: inputData.pull.head,
-            verifier: inputData.models.shippingFinal,
-            expectedCriteria: criteriaFor(card),
-          })
-          if (checked.ok) verdict = checked.verdict
-          else error = `the verdict did not answer the card: ${checked.errors.join('; ')}`
-        }
-      }
-
-      const activity = {
-        id: 'shipping-final',
-        startedAt,
-        finishedAt: deps.now(),
-        model: inputData.models.shippingFinal,
-        ok: Boolean(verdict),
-        usage: session.usage,
-        error,
-      }
-      appendStep(inputData.runDir, activity)
-      return {
-        ...inputData,
+        verdict,
+        verdictError: verdict ? null : (error ?? 'Shipping gave no answer'),
         timeline: [...inputData.timeline, activity],
-        finalVerdict: verdict,
-        finalError: error ?? null,
       }
     },
   })
@@ -475,61 +454,98 @@ export function createCardRunWorkflow(overrides = {}) {
     id: 'record',
     inputSchema: runStateSchema,
     outputSchema: runStateSchema,
-    execute: async ({ inputData }) => {
-      const { models, freeVerdict, finalVerdict, freeErrors, freeAttempts } = inputData
-      const freeBody = freeVerdict
-        ? verdictComment({ card: inputData.card, verdict: freeVerdict, model: models.shippingFree, pass: 'Free', attempts: freeAttempts })
-        : exhaustedComment({ card: inputData.card, model: models.shippingFree, attempts: freeAttempts, errors: freeErrors })
-      await postUntilItLands(() => deps.postCardComment(inputData.card, freeBody))
-
-      if (finalVerdict) {
-        await postUntilItLands(() => deps.postCardComment(inputData.card, verdictComment({ card: inputData.card, verdict: finalVerdict, model: models.shippingFinal, pass: 'Final', attempts: 1 })))
-        await postUntilItLands(() => deps.postPullComment({
-          repoDir: inputData.checkout,
-          number: inputData.pull.number,
-          body: `Shipping verdict on ${inputData.pull.head}\n\n\`\`\`json\n${JSON.stringify(finalVerdict)}\n\`\`\``,
-        }))
-      } else {
-        await postUntilItLands(() => deps.postCardComment(inputData.card, `## Final Shipping pass on ${models.shippingFinal}\n\nShipping gave no usable verdict: ${inputData.finalError ?? 'unknown reason'}`))
+    execute: async ({ inputData, runId }) => {
+      const model = inputData.config.models.shipping
+      let postError = null
+      try {
+        if (inputData.verdict) {
+          await postUntilItLands(() => deps.postCardComment(
+            inputData.card,
+            verdictComment({ model: inputData.verdict.verifier ?? model, verdict: inputData.verdict }),
+          ))
+          if (inputData.pull) {
+            await postUntilItLands(() => deps.postPullComment({
+              repoDir: inputData.checkout,
+              number: inputData.pull.number,
+              body: `Shipping verdict on ${inputData.pull.head}\n\n\`\`\`json\n${JSON.stringify(inputData.verdict)}\n\`\`\``,
+            }))
+          }
+        } else {
+          await postUntilItLands(() => deps.postCardComment(
+            inputData.card,
+            `## Shipping pass on ${model}\n\nShipping gave no usable verdict: ${inputData.verdictError ?? 'unknown reason'}`,
+          ))
+        }
+      } catch (error) {
+        // The answer is kept on disk, so a failed post loses nothing and can be
+        // sent again with `run.mjs <card> --repost <runId>`.
+        postError = error.message
       }
 
-      const ok = Boolean(finalVerdict)
-      writeRunRecord(inputData.runDir, {
+      const usage = usageSummary(inputData.timeline)
+      const recordPath = writeRunRecord(inputData.runDir, runId, {
+        runId,
         card: inputData.card,
         branch: inputData.branch,
+        checkout: inputData.checkout,
         pull: inputData.pull,
+        configPath: inputData.config.configPath,
         startedAt: inputData.timeline[0]?.startedAt,
         finishedAt: deps.now(),
-        ok,
+        ok: Boolean(inputData.verdict) && !postError,
+        verdictPath: inputData.verdictPath,
+        verdict: inputData.verdict,
+        verdictError: inputData.verdictError,
+        postError,
+        tokens: usage.tokens,
+        costUsd: usage.costUsd,
+        costNote: usage.costNote,
+        priceCatalogue: usage.priceCatalogue,
         steps: inputData.timeline,
-        freeErrors,
       })
-      return { ...inputData, finalError: ok ? inputData.finalError : inputData.finalError ?? 'no final verdict' }
+      return { ...inputData, postError }
+    },
+  })
+
+  const approvalStep = createStep({
+    id: 'approval',
+    inputSchema: runStateSchema,
+    outputSchema: runStateSchema,
+    suspendSchema: z.object({
+      card: z.string(),
+      runId: z.string().optional(),
+      verdict: z.string().nullable(),
+      question: z.string(),
+    }),
+    resumeSchema: z.object({ approved: z.boolean() }),
+    execute: async ({ inputData, resumeData, suspend, runId }) => {
+      if (inputData.verdict?.verdict !== 'PASS') {
+        // Nothing reaches UAT without a Shipping PASS, so a FAIL or an unusable
+        // answer ends here instead of asking for a yes it would not mean.
+        return { ...inputData, approved: false, approvedAt: null }
+      }
+      if (!resumeData) {
+        return suspend({
+          card: inputData.card,
+          runId,
+          verdict: inputData.verdict?.verdict ?? null,
+          question: `Approve ${inputData.card} for UAT?`,
+        })
+      }
+      return { ...inputData, approved: resumeData.approved, approvedAt: deps.now() }
     },
   })
 
   return createWorkflow({
-    id: 'card-run',
+    id: WORKFLOW_ID,
     inputSchema: cardRunInputSchema,
     outputSchema: runStateSchema,
   })
     .then(buildStep)
     .then(publishStep)
     .dountil(evidenceGateStep, async ({ inputData }) => inputData.evidenceMissing.length === 0)
-    .dountil(shippingFreeStep, async ({ inputData }) => Boolean(inputData.freeVerdict) || inputData.freeAttempts >= inputData.models.freeAttempts)
-    .then(shippingFinalStep)
+    .then(shippingStep)
     .then(recordStep)
+    .then(approvalStep)
     .commit()
-}
-
-function readIfPresent(path) {
-  try {
-    return readFileSync(path, 'utf8')
-  } catch {
-    return ''
-  }
-}
-
-function criteriaFor(card) {
-  return criteriaFrom(card.description)
 }

@@ -1,5 +1,12 @@
 {
   "mainSession": "openai/gpt-6.1-sol",
-  "shipping": "anthropic/claude-opus-5-5",
-  "effort": "large"
+  "shipping": "mastracode/commandcode/moonshotai/Kimi-K3.1-Pro",
+  "effort": "large",
+  "runner": {
+    "build": "mastracode/commandcode/reflection/beam:free",
+    "memory": "mastracode/commandcode/reflection/beam:free",
+    "helper": "mastracode/commandcode/reflection/beam:free",
+    "evidenceAttempts": 2,
+    "timeoutMs": 5400000
+  }
 }

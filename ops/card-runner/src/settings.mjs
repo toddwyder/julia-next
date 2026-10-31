@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import {
   CUSTOM_PROVIDER_NAME,
   CUSTOM_PROVIDER_URL,
-  DEFAULTS,
   FREE_MODELS,
   isCommandCodeModel,
   providerModelId,
@@ -37,9 +36,9 @@ export function withProviderModels(provider, models) {
   return { ...provider, models: [...new Set([...provider.models, ...wanted])] }
 }
 
-export function buildSettings(base, { buildModel, memoryModel, helperModel, thinkingLevel = 'high' }) {
+export function buildSettings(base, { buildModel, memoryModel, helperModel, shippingModel, thinkingLevel = 'high' }) {
   const models = { build: buildModel, plan: buildModel, fast: helperModel, memory: memoryModel }
-  const provider = withProviderModels(commandCodeProvider(base), [buildModel, memoryModel, helperModel])
+  const provider = withProviderModels(commandCodeProvider(base), [buildModel, memoryModel, helperModel, shippingModel])
   return {
     ...base,
     onboarding: { ...(base.onboarding ?? {}), completedAt: base.onboarding?.completedAt ?? new Date().toISOString(), omPackId: null },
@@ -66,7 +65,7 @@ export function buildSettings(base, { buildModel, memoryModel, helperModel, thin
 // A run gets its own app-data folder so its threads, observations and
 // credentials cannot mix with an interactive session's. Only auth.json is
 // carried over; it is copied 0600 and never printed.
-export function prepareRunDir({ runDir, baseSettings, authSource = APP_DATA_DIR, buildModel = DEFAULTS.build, memoryModel = DEFAULTS.memory, helperModel = DEFAULTS.helper, thinkingLevel = 'high' }) {
+export function prepareRunDir({ runDir, baseSettings, authSource = APP_DATA_DIR, buildModel, memoryModel, helperModel, shippingModel, thinkingLevel = 'high' }) {
   const appData = join(runDir, 'app-data')
   mkdirSync(appData, { recursive: true })
   const auth = join(authSource, 'auth.json')
@@ -75,7 +74,7 @@ export function prepareRunDir({ runDir, baseSettings, authSource = APP_DATA_DIR,
   chmodSync(join(appData, 'auth.json'), 0o600)
 
   const base = baseSettings ?? readSettings(join(authSource, 'settings.json'))
-  const settings = buildSettings(base, { buildModel, memoryModel, helperModel, thinkingLevel })
+  const settings = buildSettings(base, { buildModel, memoryModel, helperModel, shippingModel, thinkingLevel })
   // Mastra Code reads the settings file beside the app data it runs on, so the
   // generated file has to live in the run's own app-data folder. A --settings
   // path outside it leaves the custom provider unregistered.

@@ -1,9 +1,19 @@
-// The models and limits one card run uses. Every memory-helper request runs on
-// a free Command Code model, so memory adds nothing to a card's cost.
+// Every model a card run uses comes from the one file the dashboard reads:
+// dashboard/config/defaults.json. `shipping` is the dashboard's own Shipping
+// model, so changing that line changes both what the dashboard shows and what
+// the runner runs. The `runner` block holds the runner's other models and its
+// limits, which the dashboard ignores.
+
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export const CUSTOM_PROVIDER_NAME = 'CommandCode'
 export const CUSTOM_PROVIDER_URL = 'https://api.commandcode.ai/provider/v1'
 export const CUSTOM_PROVIDER_PREFIX = 'mastracode/commandcode/'
+
+// The one config file, found from this file rather than the working directory.
+export const CONFIG_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'dashboard', 'config', 'defaults.json')
 
 // Free Command Code models, as listed on the provider's pricing page on
 // 31 October 2026. They are named here so the isolated settings file can
@@ -15,16 +25,9 @@ export const FREE_MODELS = [
   'minimax/minimax-m3.1-flash',
 ]
 
-export const DEFAULTS = {
-  // Beam 1.0 has a 1M context and no daily request cap, so it is the free
-  // default the helpers and the rehearsal build run on.
-  build: 'mastracode/commandcode/reflection/beam:free',
-  memory: 'mastracode/commandcode/reflection/beam:free',
-  helper: 'mastracode/commandcode/reflection/beam:free',
-  shippingFree: 'mastracode/commandcode/stealth/glyph-cluster:free',
-  shippingFinal: 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro',
-  effort: 'large',
-  freeAttempts: 6,
+// Limits that belong to the runner, used only when the config file leaves them
+// out. Models are never defaulted here: a config without a model is an error.
+export const LIMIT_DEFAULTS = {
   // One build-back session to collect missing evidence is enough in practice;
   // a second run that still cannot show its work stops the run.
   evidenceAttempts: 2,
@@ -39,7 +42,7 @@ export const THINKING_FOR_EFFORT = {
 }
 
 export function thinkingForEffort(effort) {
-  return THINKING_FOR_EFFORT[effort] ?? THINKING_FOR_EFFORT[DEFAULTS.effort]
+  return THINKING_FOR_EFFORT[effort] ?? THINKING_FOR_EFFORT.large
 }
 
 // `mastracode/commandcode/reflection/beam:free` is how a session addresses a
@@ -50,4 +53,31 @@ export function providerModelId(model) {
 
 export function isCommandCodeModel(model) {
   return typeof model === 'string' && (model.startsWith('commandcode/') || model.startsWith(CUSTOM_PROVIDER_PREFIX))
+}
+
+export function readRunnerConfig({ configPath = CONFIG_PATH } = {}) {
+  let raw
+  try {
+    raw = JSON.parse(readFileSync(configPath, 'utf8'))
+  } catch (error) {
+    throw new Error(`the shared config at ${configPath} could not be read: ${error.message}`)
+  }
+  const runner = raw.runner ?? {}
+  const models = {
+    build: runner.build ?? raw.mainSession,
+    memory: runner.memory ?? raw.mainSession,
+    helper: runner.helper ?? raw.mainSession,
+    // The dashboard shows this same line as its Shipping model.
+    shipping: raw.shipping,
+  }
+  for (const [role, model] of Object.entries(models)) {
+    if (typeof model !== 'string' || !model) throw new Error(`the shared config at ${configPath} has no ${role} model`)
+  }
+  return {
+    models,
+    effort: raw.effort ?? 'large',
+    evidenceAttempts: runner.evidenceAttempts ?? LIMIT_DEFAULTS.evidenceAttempts,
+    timeoutMs: runner.timeoutMs ?? LIMIT_DEFAULTS.timeoutMs,
+    configPath,
+  }
 }

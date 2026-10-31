@@ -65,8 +65,7 @@ For each one:
 Then rewrite ${runDir}/build-done.json with the new head commit from \`git rev-parse HEAD\` and the same card and branch. Do not open or edit the pull request, do not merge, and do not move the card.`
 }
 
-export function shippingPrompt({ card, evidence, verifierModel, verdictPath, final, pull }) {
-  const pass = final ? 'final' : 'first'
+export function shippingPrompt({ card, evidence, verifierModel, verdictPath, pull }) {
   const criteria = criteriaFrom(card.description ?? '')
   const criteriaList = criteria.map((criterion, index) => `${index + 1}. ${criterion}`).join('\n')
   return `You are Shipping. You did not build this card, and you have never seen the build session's conversation. Judge only what you can run and read for yourself.
@@ -98,7 +97,7 @@ Answer every acceptance criterion above with PASS or FAIL and one note saying ex
 
 Every FAIL note carries its reason in three parts: the command or action you ran, what you expected, and what you saw instead. A FAIL note without all three is not a usable reason.
 
-This is the ${pass} Shipping pass and it runs on ${verifierModel}.
+This Shipping pass runs on ${verifierModel}.
 
 Write your verdict to this absolute path, and print it too:
 ${verdictPath}
@@ -115,13 +114,7 @@ Rules for the file:
 Do not change code, commit, push, merge or move the card. You judge; you do not fix.`
 }
 
-export function verdictComment({ card, verdict, model, pass, attempts }) {
-  const header = `${pass} Shipping pass on ${model}${attempts ? ` (attempt ${attempts})` : ''}`
-  if (!verdict) return `## ${header}\n\nShipping produced no valid verdict, so nothing was judged.`
+export function verdictComment({ model, verdict }) {
   const lines = verdict.criteria.map((item) => `- ${item.verdict}: ${item.criterion}\n  - ${item.note}`)
-  return `## ${header}\n\n**${verdict.verdict}**\n\n${lines.join('\n')}`
-}
-
-export function exhaustedComment({ card, model, attempts, errors }) {
-  return `## First Shipping pass on ${model}\n\nShipping ran ${attempts} time(s) and produced no valid verdict for ${card.identifier}.\n\n${errors.map((error) => `- ${error}`).join('\n')}`
+  return `## Shipping pass on ${model}\n\n**${verdict.verdict}**\n\n${lines.join('\n')}`
 }

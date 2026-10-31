@@ -3,10 +3,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { createCardRunWorkflow } from '../src/workflow.mjs'
+import { createCardRunWorkflow, readRunRecord, runRecordPath, verdictPathFor } from '../src/workflow.mjs'
 
 const BEAM = 'mastracode/commandcode/reflection/beam:free'
-const GLYPH = 'mastracode/commandcode/stealth/glyph-cluster:free'
 const KIMI = 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro'
 
 const description = 'Outcome: two things work.\n\nAcceptance criteria:\n- The first thing works.\n- The second thing works.\n'
@@ -24,7 +23,15 @@ const secondEvidence = {
   user: { name: 'build' },
 }
 
-function verdictFor({ verifier, head = 'abc1234', verdict = 'PASS', first = 'PASS', second = 'PASS' }) {
+const config = {
+  models: { build: BEAM, memory: BEAM, helper: BEAM, shipping: KIMI },
+  effort: 'large',
+  evidenceAttempts: 2,
+  timeoutMs: 60_000,
+  configPath: '/repo/dashboard/config/defaults.json',
+}
+
+function verdictFor({ verifier = KIMI, head = 'abc1234', verdict = 'PASS', first = 'PASS', second = 'PASS' } = {}) {
   return {
     juliaShippingVerdict: 1,
     card: 'JUL-901',
@@ -46,7 +53,7 @@ function writeHandover(runDir, { branch = 'runner/card-901', head = 'abc1234', s
   writeFileSync(join(runDir, 'build-done.json'), JSON.stringify({ card: 'JUL-901', branch, head, startedAt }))
 }
 
-function harness({ freeAnswers, finalAnswer, comments = [firstEvidence, secondEvidence], buildBackAddsEvidence = true, dropFirstCardPost = false }) {
+function harness({ shippingAnswer, comments = [firstEvidence, secondEvidence], buildBackAddsEvidence = true, dropCardPosts = 0, keptVerdict = false, startedMarker = false, runId = 'JUL-901-1' } = {}) {
   const runDir = mkdtempSync(join(tmpdir(), 'card-runner-test-'))
   const posted = []
   const pullComments = []
@@ -54,8 +61,17 @@ function harness({ freeAnswers, finalAnswer, comments = [firstEvidence, secondEv
   const adopted = []
   const calls = []
   let evidence = [...comments]
-  let freeIndex = 0
-  let cardPostFailures = dropFirstCardPost ? 1 : 0
+  let cardPostFailures = dropCardPosts
+
+  if (keptVerdict) {
+    mkdirSync(join(runDir, 'verdicts'), { recursive: true })
+    writeFileSync(verdictPathFor(runDir, runId), JSON.stringify(keptVerdict === true ? verdictFor() : keptVerdict))
+  }
+  if (startedMarker) {
+    mkdirSync(join(runDir, 'verdicts'), { recursive: true })
+    writeFileSync(join(runDir, 'verdicts', `${runId}.started.json`), JSON.stringify({ model: KIMI, startedAt: '2026-10-31T00:00:00Z' }))
+  }
+
   const now = (() => {
     let tick = 0
     return () => new Date(Date.UTC(2026, 9, 31, 0, 0, tick++)).toISOString()
@@ -103,184 +119,246 @@ function harness({ freeAnswers, finalAnswer, comments = [firstEvidence, secondEv
       }
       const path = options.prompt.match(/Write your verdict to this absolute path, and print it too:\n(\S+)/)?.[1]
       if (!path) throw new Error(`no verdict path in prompt:\n${options.prompt}`)
-      if (options.model === GLYPH) {
-        const answer = freeAnswers[freeIndex++]
-        if (answer) writeFileSync(path, JSON.stringify(answer))
-        return { ok: true, status: 'completed', usage: { inputTokens: 10, outputTokens: 2 }, text: 'done' }
-      }
-      if (finalAnswer) writeFileSync(path, JSON.stringify(finalAnswer))
+      if (shippingAnswer) writeFileSync(path, JSON.stringify(shippingAnswer))
       return { ok: true, status: 'completed', usage: { inputTokens: 20, outputTokens: 3 }, text: 'done' }
     },
   }
 
-  return { deps, runDir, posted, pullComments, published, adopted, calls, options: { card: 'JUL-901', repoDir: '/repo', runDir } }
+  return {
+    deps,
+    runDir,
+    runId,
+    posted,
+    pullComments,
+    published,
+    adopted,
+    calls,
+    workflow: () => createCardRunWorkflow(deps),
+    options: { card: 'JUL-901', repoDir: '/repo', runDir, config },
+  }
 }
 
-test('the runner publishes the build, gates on evidence, then gets one free verdict and one Kimi verdict', async () => {
-  const free = verdictFor({ verifier: GLYPH })
-  const final = verdictFor({ verifier: KIMI })
-  const h = harness({ freeAnswers: [null, free], finalAnswer: final })
+function stepOutput(result, id) {
+  return result.steps?.[id]?.output
+}
 
-  const workflow = createCardRunWorkflow(h.deps)
-  const run = await workflow.createRun()
+test('one run publishes the build, gates on evidence, and gets exactly one Shipping verdict', async () => {
+  const h = harness({ shippingAnswer: verdictFor() })
+  const run = await h.workflow().createRun({ runId: h.runId })
   const result = await run.start({ inputData: h.options })
 
-  equal(result.status, 'success')
-  equal(result.result.freeVerdict.verdict, 'PASS')
-  equal(result.result.freeAttempts, 2)
-  equal(result.result.finalVerdict.verdict, 'PASS')
-  equal(result.result.evidenceMissing.length, 0)
+  // A PASS hands the run to Todd, so the run is suspended until he says yes.
+  equal(result.status, 'suspended')
+  const record = stepOutput(result, 'record')
+  equal(record.verdict.verdict, 'PASS')
 
-  // The pull request carries the words the build wrote, and the runner posts them.
+  const shippingCalls = h.calls.filter((call) => call.model === KIMI)
+  equal(shippingCalls.length, 1)
+  deepEqual(h.calls.map((call) => call.model), [BEAM, KIMI])
+  deepEqual([...new Set(h.calls.map((call) => call.settingsPath))], [join(h.runDir, 'settings.json')])
+
   equal(h.published.length, 1)
   equal(h.published[0].title, 'Do the things (JUL-901)')
   check(h.published[0].body.includes('Card: JUL-901'))
 
-  // One build call, no build-back, two free attempts, one final pass.
-  deepEqual(h.calls.map((call) => call.model), [BEAM, GLYPH, GLYPH, KIMI])
-  deepEqual([...new Set(h.calls.map((call) => call.settingsPath))], [join(h.runDir, 'settings.json')])
-
-  const bodies = h.posted.map((comment) => comment.body).join('\n')
-  check(bodies.includes('Free Shipping pass on mastracode/commandcode/stealth/glyph-cluster:free (attempt 2)'))
-  check(bodies.includes('Final Shipping pass on mastracode/commandcode/moonshotai/Kimi-K3.1-Pro'))
+  equal(h.posted.length, 1)
+  check(h.posted[0].body.startsWith(`## Shipping pass on ${KIMI}`))
   equal(h.pullComments.length, 1)
-  check(h.pullComments[0].body.includes('```json\n{"juliaShippingVerdict":1'))
-  check(h.pullComments[0].body.includes('"head":"abc1234"'))
 
-  const record = JSON.parse(readFileSync(join(h.runDir, 'run.json'), 'utf8'))
-  equal(record.ok, true)
-  deepEqual(record.steps.map((step) => step.id), ['build', 'publish', 'evidence-gate', 'shipping-free-1', 'shipping-free-2', 'shipping-final'])
-  check(existsSync(join(h.runDir, 'steps.jsonl')))
-  // Both pieces of evidence reached Shipping without anyone passing them.
-  check(h.calls[1].prompt.includes('Prove It Works: The first thing works.'))
-  check(h.calls[1].prompt.includes('Prove It Works: The second thing works.'))
+  // The answer is kept on disk under this run's id, and the run record names it.
+  check(existsSync(verdictPathFor(h.runDir, h.runId)))
+  const saved = readRunRecord(h.runDir, h.runId)
+  equal(saved.ok, true)
+  equal(saved.verdict.verdict, 'PASS')
+  equal(saved.verdictPath, verdictPathFor(h.runDir, h.runId))
+  equal(saved.pull.number, 12)
 })
 
 test('a criterion with no evidence sends the build back before Shipping starts', async () => {
-  const free = verdictFor({ verifier: GLYPH })
-  const final = verdictFor({ verifier: KIMI })
-  const h = harness({ freeAnswers: [free], finalAnswer: final, comments: [firstEvidence] })
-
-  const workflow = createCardRunWorkflow(h.deps)
-  const run = await workflow.createRun()
+  const h = harness({ shippingAnswer: verdictFor(), comments: [firstEvidence] })
+  const run = await h.workflow().createRun({ runId: h.runId })
   const result = await run.start({ inputData: h.options })
 
-  equal(result.status, 'success')
-  equal(result.result.gateAttempts, 1)
-  deepEqual(h.calls.map((call) => call.model), [BEAM, BEAM, GLYPH, KIMI])
-  // The build-back is told exactly which criterion it owes evidence for.
-  check(h.calls[1].prompt.includes('The second thing works.'))
-  // The pull request is read again after the build-back, before Shipping judges.
-  equal(h.published.length, 1)
+  equal(result.status, 'suspended')
+  const record = stepOutput(result, 'record')
+  equal(record.gateAttempts, 1)
+  equal(record.evidenceMissing.length, 0)
+  equal(h.calls.filter((call) => call.model === KIMI).length, 1)
+  check(h.calls.some((call) => call.prompt.includes('back before Shipping')))
 })
 
-test('the run stops without Shipping when the evidence never arrives', async () => {
-  const final = verdictFor({ verifier: KIMI })
-  const h = harness({ freeAnswers: [], finalAnswer: final, comments: [firstEvidence], buildBackAddsEvidence: false })
-  h.options.models = { evidenceAttempts: 1 }
-
-  const workflow = createCardRunWorkflow(h.deps)
-  const run = await workflow.createRun()
+test('the run stops without any Shipping review when the evidence never arrives', async () => {
+  const h = harness({ shippingAnswer: verdictFor(), comments: [firstEvidence], buildBackAddsEvidence: false })
+  const run = await h.workflow().createRun({ runId: h.runId })
   const result = await run.start({ inputData: h.options })
 
   equal(result.status, 'failed')
-  check(JSON.stringify(result.steps).includes('Shipping did not start: no evidence for The second thing works.'))
-  deepEqual(h.calls.map((call) => call.model), [BEAM, BEAM])
-  equal(h.pullComments.length, 0)
+  check(String(result.error?.message ?? result.error).includes('Shipping did not start: no evidence for The second thing works.'))
+  equal(h.calls.filter((call) => call.model === KIMI).length, 0)
+  equal(h.posted.length, 0)
+})
+
+test('a FAIL verdict names the defect and ends the run without a pause', async () => {
+  const h = harness({ shippingAnswer: verdictFor({ verdict: 'FAIL', second: 'FAIL' }) })
+  const run = await h.workflow().createRun({ runId: h.runId })
+  const result = await run.start({ inputData: h.options })
+
+  equal(result.status, 'success')
+  const record = stepOutput(result, 'record')
+  equal(record.verdict.verdict, 'FAIL')
+  equal(result.result.approved, false)
+  equal(h.calls.filter((call) => call.model === KIMI).length, 1)
+  check(h.posted[0].body.includes('FAIL: The second thing works.'))
+})
+
+test('an unusable answer ends the run with its reason and starts no second review', async () => {
+  const h = harness({ shippingAnswer: null })
+  const run = await h.workflow().createRun({ runId: h.runId })
+  const result = await run.start({ inputData: h.options })
+
+  equal(result.status, 'success')
+  const record = stepOutput(result, 'record')
+  equal(record.verdict, null)
+  check(record.verdictError.includes('no verdict'))
+  equal(h.calls.filter((call) => call.model === KIMI).length, 1)
+  equal(h.posted.length, 1)
+  check(h.posted[0].body.includes('Shipping gave no usable verdict'))
+
+  const saved = readRunRecord(h.runDir, h.runId)
+  equal(saved.ok, false)
+  equal(saved.verdict, null)
+})
+
+test('a kept answer is used instead of starting a second review', async () => {
+  const h = harness({ keptVerdict: verdictFor() })
+  const run = await h.workflow().createRun({ runId: h.runId })
+  const result = await run.start({ inputData: h.options })
+
+  equal(result.status, 'suspended')
+  equal(h.calls.filter((call) => call.model === KIMI).length, 0)
+  equal(stepOutput(result, 'record').verdict.verdict, 'PASS')
+})
+
+test('a run whose review already started and wrote nothing starts no second review', async () => {
+  const h = harness({ startedMarker: true })
+  const run = await h.workflow().createRun({ runId: h.runId })
+  const result = await run.start({ inputData: h.options })
+
+  equal(result.status, 'success')
+  equal(h.calls.filter((call) => call.model === KIMI).length, 0)
+  check(stepOutput(result, 'record').verdictError.includes('no second review'))
+})
+
+test('a verdict for another head is refused, so nothing wrong reaches the gate', async () => {
+  const h = harness({ shippingAnswer: verdictFor({ head: 'fffffff' }) })
+  const run = await h.workflow().createRun({ runId: h.runId })
+  const result = await run.start({ inputData: h.options })
+
+  equal(result.status, 'success')
+  const record = stepOutput(result, 'record')
+  equal(record.verdict, null)
+  check(record.verdictError.includes('head is fffffff'))
+  equal(readRunRecord(h.runDir, h.runId).ok, false)
+  equal(h.calls.filter((call) => call.model === KIMI).length, 1)
+})
+
+test('a dropped connection while posting is retried, so a pass is never lost', async () => {
+  const h = harness({ shippingAnswer: verdictFor(), dropCardPosts: 1 })
+  const run = await h.workflow().createRun({ runId: h.runId })
+  const result = await run.start({ inputData: h.options })
+
+  equal(h.posted.length, 1)
+  equal(h.pullComments.length, 1)
+  equal(readRunRecord(h.runDir, h.runId).ok, true)
+})
+
+test('a post that never lands keeps the answer and records the failure', async () => {
+  const h = harness({ shippingAnswer: verdictFor(), dropCardPosts: 99 })
+  const run = await h.workflow().createRun({ runId: h.runId })
+  const result = await run.start({ inputData: h.options })
+
+  const record = stepOutput(result, 'record')
+  check(record.postError.includes('fetch failed'))
+  const saved = readRunRecord(h.runDir, h.runId)
+  equal(saved.ok, false)
+  equal(saved.verdict.verdict, 'PASS')
+  check(existsSync(saved.verdictPath))
+})
+
+test('the run record carries token and cost totals from the dashboard price list', async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), 'card-runner-prices-'))
+  mkdirSync(join(stateDir, 'state'), { recursive: true })
+  writeFileSync(join(stateDir, 'state', 'models.json'), JSON.stringify({
+    models: [
+      { id: 'x/Kimi-K3.1-Pro', inputPerMillion: 1, outputPerMillion: 10, free: false },
+      { id: 'x/beam:free', inputPerMillion: 0, outputPerMillion: 0, free: true },
+    ],
+  }))
+  const previous = process.env.DASHBOARD_STATE_DIR
+  process.env.DASHBOARD_STATE_DIR = stateDir
+  try {
+    const h = harness({ shippingAnswer: verdictFor() })
+    const run = await h.workflow().createRun({ runId: h.runId })
+    await run.start({ inputData: h.options })
+
+    const saved = readRunRecord(h.runDir, h.runId)
+    // build 5/1 on a free model, Shipping 20/3 on Kimi at $1 in and $10 out.
+    equal(saved.tokens.inputTokens, 25)
+    equal(saved.tokens.outputTokens, 4)
+    equal(saved.costUsd, Number(((20 * 1 + 3 * 10) / 1e6).toFixed(4)))
+    equal(saved.costNote, null)
+  } finally {
+    if (previous === undefined) delete process.env.DASHBOARD_STATE_DIR
+    else process.env.DASHBOARD_STATE_DIR = previous
+  }
+})
+
+test('a run whose model has no price keeps its tokens and says why the cost is missing', async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), 'card-runner-prices-'))
+  mkdirSync(join(stateDir, 'state'), { recursive: true })
+  writeFileSync(join(stateDir, 'state', 'models.json'), JSON.stringify({ models: [] }))
+  const previous = process.env.DASHBOARD_STATE_DIR
+  process.env.DASHBOARD_STATE_DIR = stateDir
+  try {
+    const h = harness({ shippingAnswer: verdictFor() })
+    const run = await h.workflow().createRun({ runId: h.runId })
+    await run.start({ inputData: h.options })
+
+    const saved = readRunRecord(h.runDir, h.runId)
+    equal(saved.tokens.inputTokens, 25)
+    equal(saved.costUsd, null)
+    check(saved.costNote.includes('price catalogue has no row'))
+  } finally {
+    if (previous === undefined) delete process.env.DASHBOARD_STATE_DIR
+    else process.env.DASHBOARD_STATE_DIR = previous
+  }
 })
 
 test('ship-only adopts a branch a build already finished and starts at the handover', async () => {
-  const free = verdictFor({ verifier: GLYPH })
-  const final = verdictFor({ verifier: KIMI })
-  const h = harness({ freeAnswers: [free], finalAnswer: final })
-  h.options.shipOnly = true
-  h.options.branch = 'feat/jul-901-thing'
-  writeHandover(h.runDir, { branch: 'feat/jul-901-thing', head: 'abc1234' })
+  const h = harness({ shippingAnswer: verdictFor() })
+  writeHandover(h.runDir)
+  const run = await h.workflow().createRun({ runId: h.runId })
+  const result = await run.start({
+    inputData: { ...h.options, shipOnly: true, branch: 'runner/card-901' },
+  })
 
-  const workflow = createCardRunWorkflow(h.deps)
-  const run = await workflow.createRun()
-  const result = await run.start({ inputData: h.options })
-
-  equal(result.status, 'success')
-  equal(result.result.branch, 'feat/jul-901-thing')
-  deepEqual(h.adopted.map((call) => call.branch), ['feat/jul-901-thing'])
-  // No build session ran: the branch is kept, not rebuilt.
-  deepEqual(h.calls.map((call) => call.model), [GLYPH, KIMI])
-  equal(h.published[0].branch, 'feat/jul-901-thing')
-  check(h.calls[0].prompt.includes('Prove It Works: The first thing works.'))
+  equal(result.status, 'suspended')
+  equal(h.adopted.length, 1)
+  deepEqual(h.calls.map((call) => call.model), [KIMI])
+  check(existsSync(runRecordPath(h.runDir, h.runId)))
 })
 
 test('ship-only refuses a handover that names another branch', async () => {
-  const h = harness({ freeAnswers: [], finalAnswer: null })
-  h.options.shipOnly = true
-  h.options.branch = 'feat/jul-901-thing'
-  writeHandover(h.runDir, { branch: 'runner/card-901' })
-
-  const workflow = createCardRunWorkflow(h.deps)
-  const run = await workflow.createRun()
-  const result = await run.start({ inputData: h.options })
+  const h = harness({ shippingAnswer: verdictFor() })
+  writeHandover(h.runDir)
+  const run = await h.workflow().createRun({ runId: h.runId })
+  const result = await run.start({
+    inputData: { ...h.options, shipOnly: true, branch: 'feat/jul-901-thing' },
+  })
 
   equal(result.status, 'failed')
-  equal(h.adopted.length, 0)
-})
-
-test('a free model that never answers still gets exactly one Kimi pass', async () => {
-  const final = verdictFor({ verifier: KIMI })
-  const h = harness({ freeAnswers: [], finalAnswer: final })
-  const base = h.deps.runSession
-  h.deps.runSession = async (options) => {
-    if (options.model.includes('glyph-cluster')) {
-      h.calls.push(options)
-      return { ok: false, status: 'error', error: 'the session printed no result line' }
-    }
-    return base(options)
-  }
-  h.options.models = { freeAttempts: 3 }
-
-  const workflow = createCardRunWorkflow(h.deps)
-  const run = await workflow.createRun()
-  const result = await run.start({ inputData: h.options })
-
-  equal(result.status, 'success')
-  equal(result.result.freeAttempts, 3)
-  equal(result.result.freeVerdict, null)
-  equal(result.result.finalVerdict.verdict, 'PASS')
-  equal(h.calls.filter((call) => call.model === KIMI).length, 1)
-  check(h.posted[0].body.includes('Shipping ran 3 time(s) and produced no valid verdict'))
-  equal(h.pullComments.length, 1)
-})
-
-test('a final verdict for another head is refused, so nothing wrong reaches the gate', async () => {
-  const free = verdictFor({ verifier: GLYPH })
-  const final = verdictFor({ verifier: KIMI, head: 'fffffff' })
-  const h = harness({ freeAnswers: [free], finalAnswer: final })
-
-  const workflow = createCardRunWorkflow(h.deps)
-  const run = await workflow.createRun()
-  const result = await run.start({ inputData: h.options })
-
-  equal(result.status, 'success')
-  equal(result.result.finalVerdict, null)
-  check(result.result.finalError.includes('head is fffffff'))
-  equal(h.pullComments.length, 0)
-  check(h.posted.at(-1).body.includes('Shipping gave no usable verdict'))
-  const record = JSON.parse(readFileSync(join(h.runDir, 'run.json'), 'utf8'))
-  equal(record.ok, false)
-})
-
-test('a dropped connection while posting the verdicts is retried, so a pass is never lost', async () => {
-  const free = verdictFor({ verifier: GLYPH })
-  const final = verdictFor({ verifier: KIMI })
-  const h = harness({ freeAnswers: [free], finalAnswer: final, dropFirstCardPost: true })
-
-  const workflow = createCardRunWorkflow(h.deps)
-  const run = await workflow.createRun()
-  const result = await run.start({ inputData: h.options })
-
-  equal(result.status, 'success')
-  equal(result.result.finalVerdict.verdict, 'PASS')
-  equal(h.posted.length, 2)
-  equal(h.pullComments.length, 1)
+  check(String(result.error?.message ?? result.error).includes('the build said it was done on runner/card-901'))
+  equal(h.calls.length, 0)
 })
 
 function check(value) {

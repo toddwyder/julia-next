@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { DEFAULTS, providerModelId, thinkingForEffort } from '../src/config.mjs'
+import { CONFIG_PATH, providerModelId, readRunnerConfig, thinkingForEffort } from '../src/config.mjs'
 import { branchFor, normalizeCard, prepareAdoptedCheckout, prepareCheckout, publishPull } from '../src/card.mjs'
 import { missingEvidence, readBuildDone, readPullDraft, writeBuildHandover } from '../src/handover.mjs'
 import { selectEvidence, evidenceBlock } from '../src/evidence.mjs'
@@ -11,6 +11,7 @@ import { parseVerdict, validateVerdict, criteriaFrom, normalizeCriterion } from 
 import { sessionArgs, sessionEnv } from '../src/session.mjs'
 import { buildBackPrompt, buildPrompt, shippingPrompt } from '../src/prompts.mjs'
 import { buildSettings, prepareRunDir } from '../src/settings.mjs'
+import { cardOfRun, parseArgs, runDirFor } from '../run.mjs'
 
 const card = {
   identifier: 'JUL-900',
@@ -33,11 +34,63 @@ const verdict = {
   ],
 }
 
-test('memory helpers and the free judge are free Command Code models, the final pass is Kimi', () => {
-  equal(DEFAULTS.memory, 'mastracode/commandcode/reflection/beam:free')
-  equal(DEFAULTS.shippingFree, 'mastracode/commandcode/stealth/glyph-cluster:free')
-  equal(DEFAULTS.shippingFinal, 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro')
-  equal(providerModelId(DEFAULTS.shippingFree), 'stealth/glyph-cluster:free')
+test('every runner model comes from the dashboard config file', () => {
+  check(CONFIG_PATH.endsWith('/dashboard/config/defaults.json'))
+
+  const config = readRunnerConfig()
+  equal(config.configPath, CONFIG_PATH)
+  equal(config.models.shipping, 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro')
+  equal(config.models.build, 'mastracode/commandcode/reflection/beam:free')
+  equal(config.models.memory, config.models.build)
+  equal(config.models.helper, config.models.build)
+  equal(config.effort, 'large')
+  equal(config.evidenceAttempts, 2)
+  equal(config.timeoutMs, 5_400_000)
+  equal(providerModelId(config.models.shipping), 'moonshotai/Kimi-K3.1-Pro')
+})
+
+test('the runner config is read from disk each time, so an edit changes the next run', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'card-runner-config-'))
+  const path = join(dir, 'defaults.json')
+  writeFileSync(path, JSON.stringify({
+    mainSession: 'openai/gpt-6.1-sol',
+    shipping: 'anthropic/claude-opus-5-5',
+    effort: 'medium',
+    runner: { build: 'a/build', memory: 'a/memory', helper: 'a/helper', evidenceAttempts: 3, timeoutMs: 1000 },
+  }))
+  const first = readRunnerConfig({ configPath: path })
+  equal(first.models.shipping, 'anthropic/claude-opus-5-5')
+  equal(first.models.memory, 'a/memory')
+  equal(first.effort, 'medium')
+
+  writeFileSync(path, JSON.stringify({ ...JSON.parse(readFileSync(path, 'utf8')), shipping: 'someone/else' }))
+  equal(readRunnerConfig({ configPath: path }).models.shipping, 'someone/else')
+})
+
+test('a config file with no shipping model is refused instead of guessing one', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'card-runner-config-'))
+  const path = join(dir, 'defaults.json')
+  writeFileSync(path, JSON.stringify({ mainSession: 'openai/gpt-6.1-sol' }))
+  throws(() => readRunnerConfig({ configPath: path }), /shipping/)
+  throws(() => readRunnerConfig({ configPath: join(dir, 'missing.json') }), /could not be read/)
+})
+
+test('the command line takes a card, the run switches, and refuses anything else', () => {
+  deepEqual(parseArgs(['JUL-901']), { card: 'JUL-901' })
+  deepEqual(parseArgs(['jul-901', '--repo', '/r', '--ship-only', '--branch', 'b']), { card: 'JUL-901', repoDir: '/r', shipOnly: true, branch: 'b' })
+  deepEqual(parseArgs(['--approve', 'JUL-901-1']), { approve: 'JUL-901-1' })
+  deepEqual(parseArgs(['--repost', 'JUL-901-1', '--run-dir', '/d']), { repost: 'JUL-901-1', runDir: '/d' })
+  throws(() => parseArgs([]), /usage/)
+  throws(() => parseArgs(['JUL-901', '--model', 'x']), /unknown argument/)
+  throws(() => parseArgs(['not-a-card']), /not a card id/)
+  throws(() => parseArgs(['JUL-901', 'JUL-902']), /unexpected argument/)
+})
+
+test('a run id names the card and so the run folder', () => {
+  equal(cardOfRun('JUL-901-1761900000000'), 'JUL-901')
+  throws(() => cardOfRun('nope'), /not a card run id/)
+  equal(runDirFor({ runId: 'JUL-901-1' }), '/var/lib/julia-dashboard/state/runs/JUL-901')
+  equal(runDirFor({ runId: 'JUL-901-1', runDir: '/d' }), '/d')
 })
 
 test('effort names translate to thinking levels', () => {
@@ -202,10 +255,10 @@ test('the build prompt carries the card, the handover files and no hand-off', ()
 })
 
 test('the shipping prompt names the verdict file, the model, the pull request and the criterion duty', () => {
-  const prompt = shippingPrompt({ card, evidence: 'EVIDENCE', verifierModel: 'm', verdictPath: '/v.json', final: false, pull: { number: 12, url: 'https://github.com/o/r/pull/12', head: 'abc1234' } })
+  const prompt = shippingPrompt({ card, evidence: 'EVIDENCE', verifierModel: 'm', verdictPath: '/v.json', pull: { number: 12, url: 'https://github.com/o/r/pull/12', head: 'abc1234' } })
   match(prompt, /\/v\.json/)
   match(prompt, /EVIDENCE/)
-  match(prompt, /the first Shipping pass and it runs on m/)
+  match(prompt, /This Shipping pass runs on m\./)
   match(prompt, /A criterion judged from a description alone is a FAIL/)
   match(prompt, /The pull request to judge is https:\/\/github\.com\/o\/r\/pull\/12 \(number 12\), and its head commit at the time this run started was abc1234/)
   match(prompt, /node scripts\/linear-cli\.mjs comments JUL-900/)
@@ -298,7 +351,7 @@ const baseSettings = {
 }
 
 test('every memory helper is pinned to the free model, and the provider can name it', () => {
-  const settings = buildSettings(baseSettings, { buildModel: 'mastracode/commandcode/stealth/glyph-cluster:free', memoryModel: 'mastracode/commandcode/reflection/beam:free', helperModel: 'mastracode/commandcode/reflection/beam:free' })
+  const settings = buildSettings(baseSettings, { buildModel: 'mastracode/commandcode/stealth/glyph-cluster:free', memoryModel: 'mastracode/commandcode/reflection/beam:free', helperModel: 'mastracode/commandcode/reflection/beam:free', shippingModel: 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro' })
   equal(settings.models.observerModelOverride, 'mastracode/commandcode/reflection/beam:free')
   equal(settings.models.observerModelSelection, 'mastracode/commandcode/reflection/beam:free')
   equal(settings.models.reflectorModelOverride, 'mastracode/commandcode/reflection/beam:free')
@@ -319,11 +372,15 @@ test('a run keeps its own settings in its own app-data folder', () => {
   const runDir = mkdtempSync(join(tmpdir(), 'card-runner-run-'))
   mkdirSync(join(runDir, 'app-data'), { recursive: true })
 
-  const prepared = prepareRunDir({ runDir, authSource: source, memoryModel: 'mastracode/commandcode/reflection/beam:free', buildModel: 'mastracode/commandcode/reflection/beam:free', helperModel: 'mastracode/commandcode/reflection/beam:free' })
+  const prepared = prepareRunDir({ runDir, authSource: source, memoryModel: 'mastracode/commandcode/reflection/beam:free', buildModel: 'mastracode/commandcode/reflection/beam:free', helperModel: 'mastracode/commandcode/reflection/beam:free', shippingModel: 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro' })
   equal(prepared.settingsPath, join(runDir, 'app-data', 'settings.json'))
   equal(JSON.parse(readFileSync(prepared.settingsPath, 'utf8')).models.modeDefaults.memory, 'mastracode/commandcode/reflection/beam:free')
   equal(readFileSync(join(runDir, 'app-data', 'auth.json'), 'utf8'), '{"accounts":[]}\n')
 })
+
+function check(value) {
+  if (!value) throw new Error('expected a truthy value')
+}
 
 function match(text, pattern) {
   if (!pattern.test(text)) throw new Error(`expected ${pattern} in:\n${text}`)
