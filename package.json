@@ -9,6 +9,7 @@
     "start": "next start",
     "lint:framework": "node scripts/lint-framework.mjs",
     "check:recipes-model": "node scripts/check-recipes-model.mjs",
+    "check:card-runner-model": "node scripts/check-card-runner-model.mjs",
     "prove:recipe-events": "node scripts/prove-recipe-events.mjs",
     "prove:household-rules": "node scripts/prove-household-rules.mjs",
     "login:firebase": "node scripts/firebase-login-link.mjs",
