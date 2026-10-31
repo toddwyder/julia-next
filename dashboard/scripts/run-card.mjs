@@ -529,6 +529,40 @@ Do not merge and do not move the card; Shipping's next pass has to find it green
 on its own.`;
 }
 
+export function investigationPrompt({ card, issue, pull, verdict, folder }) {
+  const failed = (verdict?.criteria ?? []).filter(criterion => criterion.verdict !== 'PASS');
+  const reasons = failed.map(criterion => `- ${criterion.criterion}: ${criterion.note ?? '(no note)'}`).join('\n');
+  return `You are the investigation session for Linear card ${card}: ${issue.title}
+
+Shipping failed this card twice. The card stops here and nothing merges, so the
+run is not asking for a repair. It is asking for the two causes, in words someone
+can act on.
+
+The second FAIL, on pull request #${pull.number} (${pull.url}) at head
+${pull.headRefOid}:
+
+${reasons || '- the verdict listed none; read the pull request comments for what Shipping saw'}
+
+${UNATTENDED}
+
+Read AGENTS.md, then docs/plans/path-forward.md. Activate the poteto-mode skill
+and follow its Investigation playbook.
+
+Answer both questions, one Linear comment each, posted with:
+  node scripts/linear-cli.mjs comment ${card} --file <path>
+1. The cause in the work: what in the change, or in the card itself, made the
+   criterion fail twice even after a remediation.
+2. The cause in the process: what in the machine let it get that far without
+   catching this. The run's ledger, one entry per step with its times, is
+   ${folder} -- read it beside the session logs it names, and name the step that
+   handed the judge or the builder the wrong thing.
+
+A finding that says "the session was sloppy" is not a cause; name the step, the
+prompt, or the check that let it happen and what would block it next time.
+
+Do not fix anything, do not push, do not move the card or merge anything.`;
+}
+
 // ---------------------------------------------------------------------------
 // preview
 
@@ -706,7 +740,7 @@ export async function sessionsInLog(path) {
   return sessions.filter(session => session.usage.promptTokens || session.usage.completionTokens);
 }
 
-const MODEL_FOR_STEP = Object.freeze({ build: 'builder', remediation: 'builder', retro: 'builder', shipping: 'shipping' });
+const MODEL_FOR_STEP = Object.freeze({ build: 'builder', remediation: 'builder', retro: 'builder', shipping: 'shipping', investigation: 'shipping' });
 
 // The spend is derived from the logs, not accumulated as the run goes, so it
 // survives a runner that dies mid-session: the log is already on disk and the next
@@ -811,6 +845,27 @@ async function shippingStep({ record, issue, env }) {
   return pullVerdict(record, step.startedAt);
 }
 
+// A card that failed twice is not left saying only that it failed. Two questions
+// have answers the code already knows: what in the work the judge kept seeing, and
+// what in the machine let a card reach a second FAIL without catching it. The
+// session that asks them writes the answers on the card and fixes nothing, because
+// a repair made during a stop is a repair nobody judged.
+async function investigationStep({ record, issue, env, verdict }) {
+  const step = latest(record, 'investigation');
+  await runSession({
+    name: 'investigation',
+    prompt: investigationPrompt({ card: record.card, issue, pull: record.pull, verdict, folder: runFolderFor(record.card, env) }),
+    cwd: record.worktree,
+    model: record.models.shipping,
+    effort: 'large',
+    title: `${record.card} investigation`,
+    log: step.log,
+    timeoutMs: 60 * 60_000,
+  });
+  await refreshSpend(record, env);
+  return 'cause in the work and cause in the process posted on the card';
+}
+
 // Only a verdict posted during this session counts. One left over from an
 // earlier round would otherwise be read as this round's answer, and a judge
 // that broke before judging would look like a judge that failed the card.
@@ -858,13 +913,13 @@ async function judged({ record, issue, env, step, note, from }) {
     const before = record.rounds.shipping;
     const first = keep(await step('shipping', () => shippingStep({ record, issue, env })));
     if (passing(first.verdict)) return first;
-    if (before >= 1) return stopTwice(record, first, env, note);
+    if (before >= 1) return stopTwice({ record, shipping: first, env, note, step, issue });
     await remediate(first.verdict);
   }
 
   const second = keep(await step('shipping', () => shippingStep({ record, issue, env })));
   if (passing(second.verdict)) return second;
-  return stopTwice(record, second, env, note);
+  return stopTwice({ record, shipping: second, env, note, step, issue });
 }
 
 // The card stops on its second FAIL, and the count is the card's, not the process's: a run
@@ -874,17 +929,30 @@ export function secondJudge(record) {
   return (record?.rounds?.shipping ?? 0) >= 1;
 }
 
-function stopTwice(record, shipping, env, note) {
-  record.status = 'stopped';
+async function stopTwice({ record, shipping, env, note, step, issue }) {
   record.stoppedBecause = `Shipping failed twice on ${record.card}: ${shipping.verdict?.missing?.join('; ') ?? 'no verdict on the head'}`;
   saveRecord(record, env);
   console.error(`${record.card}: ${record.stoppedBecause}`);
+  // The card stopped, so the two causes are what it has to say for itself. A
+  // session that breaks here still leaves the stop standing: the card failed
+  // twice whether or not anyone explained it.
+  let investigated = false;
+  try {
+    await step('investigation', () => investigationStep({ record, issue, env, verdict: shipping.verdict }));
+    investigated = true;
+  } catch (error) {
+    console.error(`${record.card}: the investigation session did not finish -- ${error.message}`);
+  }
+  record.status = 'stopped';
+  saveRecord(record, env);
   try {
     printed(process.execPath, [LINEAR_CLI, 'remind', record.card]);
   } catch (error) {
     console.error(`${record.card}: could not raise a reminder -- ${error.message}`);
   }
-  note(`Stopped: ${record.stoppedBecause}. Nothing merges. Next step is diagnosis: what the process got wrong and what would stop it coming back.`);
+  note(investigated
+    ? `Stopped: ${record.stoppedBecause}. Nothing merges. The investigation session posted the cause in the work and the cause in the process on this card.`
+    : `Stopped: ${record.stoppedBecause}. Nothing merges. Next step is diagnosis: what the process got wrong and what would stop it coming back.`);
   return null;
 }
 

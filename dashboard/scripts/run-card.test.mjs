@@ -5,7 +5,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFile
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
-import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, cutOffResult, costFrom, freePort, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshPull, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
+import { DASHBOARD_ROOT, LAND_STEPS, PREVIEW_PORT, STEPS, UNATTENDED, branchFor, buildPrompt, carriedOver, commandEnv, cutOffResult, costFrom, freePort, investigationPrompt, lastSessionResult, ledger, machine, modelsFor, needsJudging, newRunRecord, normalizeCard, parseFlags, passing, portFree, previewKind, printed, pullNamesCard, recordFile, refreshPull, refreshSpend, remediationPrompt, replyFrom, retroPrompt, runIdFor, saveRecord, secondJudge, sessionArgs, sessionsInLog, shippingPrompt, smokeCommands, stateReply, stepEntry, stopRun, streamTail, suspendedAsk, thinkingForEffort, tick, uatComment, uatSection, verdictCovers, withoutColour } from './run-card.mjs';
 import { shippingVerdict } from '../../scripts/check-shipping-verdict.mjs';
 
 const temporaryState = () => {
@@ -411,12 +411,34 @@ test('every prompt says the run is unattended before the session starts to work'
     buildPrompt({ ...card, branch: pull.headRefName, pull }),
     shippingPrompt({ ...card, pull, verifierModel: 'moonshotai/Kimi-K3.1-Pro' }),
     remediationPrompt({ ...card, pull, verdict: { criteria: [{ criterion: 'rows', verdict: 'FAIL', note: 'missing' }] } }),
+    investigationPrompt({ ...card, pull, verdict: { criteria: [{ criterion: 'rows', verdict: 'FAIL', note: 'missing' }] }, folder: '/var/lib/julia-dashboard/state/runs/jul-290' }),
     retroPrompt({ ...card, pull, merge: { commit: 'abc123' }, cost: '$1.69' }),
   ]) {
     assert.match(prompt, /unattended/);
     assert.match(prompt, /request_access/);
     assert.ok(prompt.includes(UNATTENDED));
   }
+});
+
+// A stop that says only "failed twice" hands both questions to whoever reads it
+// next. The card's own done-means name the two answers: cause in the work, cause
+// in the process.
+test('the investigation prompt asks for both causes, from the ledger, and fixes nothing', () => {
+  const prompt = investigationPrompt({
+    card: 'JUL-290',
+    issue: { title: 'Account status', description: '## Outcome\nrows' },
+    pull: { number: 383, url: 'https://github.com/toddwyder/julia-next/pull/383', headRefOid: '19ac887cae090259bc2a5d7c599fc299b1f7c788' },
+    verdict: { criteria: [{ criterion: 'the row says why', verdict: 'FAIL', note: 'read "No number"' }] },
+    folder: '/var/lib/julia-dashboard/state/runs/jul-290',
+  });
+  assert.match(prompt, /cause in the work/);
+  assert.match(prompt, /cause in the process/);
+  assert.match(prompt, /the row says why: read "No number"/);
+  assert.match(prompt, /19ac887cae/);
+  assert.match(prompt, /state\/runs\/jul-290/);
+  assert.match(prompt, /linear-cli\.mjs comment JUL-290/);
+  assert.match(prompt, /Do not fix anything/);
+  assert.doesNotMatch(prompt, /commit and push/);
 });
 
 // A retro branch cut from the card's own merged branch would carry that branch's
