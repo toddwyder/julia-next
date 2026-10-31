@@ -11,7 +11,7 @@ The dashboard has two pages, joined by a Back link.
 
 The list reads every Julia-next card in the Ready state from Linear on each request. `dashboard/lib/linear.js` sets `cache: 'no-store'` and gives the request 10 seconds.
 
-A card reaches the page only if it passes validation: it has an id, its identifier matches `JUL-<number>`, its title is not empty, its createdAt parses, its state is Ready, and its team is Julia-next. A duplicate identifier or a page cursor that loops fails the whole read.
+A card reaches the page only if it passes validation: it has an id, its identifier matches `JUL-<number>`, its title is not empty, its createdAt parses, its state is Ready, and its team is Julia-next. A duplicate Linear id, or a page cursor that loops, fails the whole read.
 
 The list shows newest first, with the identifier as the tie-break. Each row has the identifier, the title, and one **Start \<title\>** link to `/start/<identifier>`.
 
@@ -28,12 +28,13 @@ Below the heading the page shows Settings (Main session, Shipping, Effort), Effo
 
 A choice is saved to this machine as `draft.json` in the dashboard state folder, which defaults to `/var/lib/julia-dashboard/state/draft.json`. The browser sends the whole draft, so the page checks every group, role and model against `config/roles.json` and the latest sweep before it writes the file.
 
-The screen shows a message instead of the controls in four cases.
+The screen shows a message instead of the controls in three cases.
 
-- No sweep file, or an empty one: "No model sweep has run yet, so there are no models or prices to show."
-- The sweep has no priced model: "The sweep has saved no model with a price, so this screen has nothing to show."
-- The sweep is older than eight days: "The last sweep was on <date>. That is more than eight days ago."
+- No sweep file, or an empty one: "No model sweep has run yet, so there are no models or prices to show. Go back to the list and open this card again after the weekly sweep."
+- The sweep has no priced model, or no main session or shipping model can be chosen from it: "The sweep has saved no model with a price, so this screen has nothing to show. Go back to the list and open this card again after the next sweep."
 - The sweep cannot be read: the error in a `role="alert"` paragraph.
+
+A sweep older than eight days does not replace the controls. They show, with a status line above them: "The last sweep was on <date>. That is more than eight days ago. Run the weekly sweep to refresh these prices."
 
 Nothing on this screen starts a build or changes the card in Linear. The only write is the draft file.
 
