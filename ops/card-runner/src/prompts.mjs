@@ -1,3 +1,5 @@
+import { criteriaFrom } from './verdict.mjs'
+
 export const UNATTENDED = `This run is unattended. No question and no approval can be answered, and asking for one ends the run with nothing judged. Do not call request_access or submit_plan, and stay inside the checkout you are in. The model and effort are already chosen for you, so skip the model files AGENTS.md points at.`
 
 export function cardSection(card) {
@@ -65,9 +67,17 @@ Then rewrite ${runDir}/build-done.json with the new head commit from \`git rev-p
 
 export function shippingPrompt({ card, evidence, verifierModel, verdictPath, final, pull }) {
   const pass = final ? 'final' : 'first'
+  const criteria = criteriaFrom(card.description ?? '')
+  const criteriaList = criteria.map((criterion, index) => `${index + 1}. ${criterion}`).join('\n')
   return `You are Shipping. You did not build this card, and you have never seen the build session's conversation. Judge only what you can run and read for yourself.
 
 ${cardSection(card)}
+
+## The criteria, in the card's words
+
+A criterion written any other way is refused, so copy each line below character for character into your verdict. Do not shorten, merge or rephrase.
+
+${criteriaList}
 
 ${pull ? `The pull request to judge is ${pull.url} (number ${pull.number}), and its head commit at the time this run started was ${pull.head}.` : ''}
 
@@ -100,7 +110,7 @@ Rules for the file:
 - \`verdict\` is PASS only when every criterion passes; otherwise FAIL.
 - \`head\` is the pull request head you actually tested. Get it with \`gh pr view <n> --json headRefOid\`.
 - \`builder\` is a different name from \`verifier\`. Get it from \`gh pr view <n> --json commits\` (the author login of the first commit).
-- Every acceptance criterion appears once, in the card's own words.
+- Every line of the criteria list appears once as \`criterion\`, copied character for character.
 
 Do not change code, commit, push, merge or move the card. You judge; you do not fix.`
 }

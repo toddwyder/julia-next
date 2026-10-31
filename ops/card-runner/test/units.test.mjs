@@ -210,6 +210,8 @@ test('the shipping prompt names the verdict file, the model, the pull request an
   match(prompt, /The pull request to judge is https:\/\/github\.com\/o\/r\/pull\/12 \(number 12\), and its head commit at the time this run started was abc1234/)
   match(prompt, /node scripts\/linear-cli\.mjs comments JUL-900/)
   match(prompt, /Every FAIL note carries its reason in three parts/)
+  match(prompt, /copy each line below character for character/)
+  match(prompt, /1\. The first thing works\.\n2\. The second thing works\./)
 })
 
 test('a build sent back is given the criteria it has not shown evidence for', () => {
