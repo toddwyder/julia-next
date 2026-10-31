@@ -157,3 +157,13 @@ These override earlier lines in this file where they differ. Every step below st
 - **Built one step at a time.** Each step of the path is built and proven before the next is started: build, Shipping, Remediation, preview, smoke test, the wait for Todd's yes, merge, live check, retro.
 - **Memory helpers run on Mastra's suggested free default model.** This lands before the workflow work.
 - **Tests of the machine run on free models only**, never on a real card while the machine change is unmerged.
+
+## Agents and runners (Todd, 30 Oct 2026)
+
+Agents use judgment; runners are machines.
+
+- **Agents** think: build, review, root cause, retro. Each works in its own folder, leaves its result there and stops. An agent starts no other agent and never touches Linear or GitHub.
+- **Runners** are Mastra workflows. They start every agent, pick up its result and do the rest by fixed rules: push, open pull requests, post, move cards, record each step's start, finish and cost. They sign what they post with their own identity; only signed posts count.
+- **Evidence.** When a build ends, the runner checks that every criterion has evidence, without judging it. Missing goes back to the builder; missing twice for the same criterion stops the card.
+- **Shipping.** Only the runner knows the Shipping model. It records each PASS and FAIL: a first FAIL goes to Remediation, a second stops the card for a root cause and reports to Todd.
+- **Crash recovery.** The runner's saved state survives a crash, and it resumes at the step it was on.
