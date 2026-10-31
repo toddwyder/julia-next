@@ -48,6 +48,8 @@ ${pull ? `The pull request to judge is ${pull.url} (number ${pull.number}), and 
 
 ${evidence}
 
+Each block names the Linear comment it came from. Read any of them yourself before you judge it: \`node scripts/linear-cli.mjs comments ${card.identifier}\`.
+
 ${UNATTENDED}
 
 Do not trust the evidence or any summary in it. Run the change yourself:

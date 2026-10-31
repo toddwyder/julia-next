@@ -91,6 +91,7 @@ test('evidence is whatever the build posted after the run started', () => {
   ]
   deepEqual(selectEvidence(comments, '2026-10-31T00:00:00Z'), [{ id: 'new', author: 'b', body: 'Prove It Works: x', createdAt: '2026-10-31T00:00:10Z' }])
   equal(evidenceBlock([]), 'The build posted no evidence comment on the card.')
+  match(evidenceBlock([{ id: 'c-1', author: 'b', body: 'Prove It Works: x', createdAt: '2026-10-31T00:00:10Z' }]), /\(Linear comment c-1\)/)
 })
 
 test('the build prompt carries the card, the evidence duty and no hand-off', () => {
@@ -110,6 +111,7 @@ test('the shipping prompt names the verdict file, the model, the pull request an
   match(prompt, /the first Shipping pass and it runs on m/)
   match(prompt, /A criterion judged from a description alone is a FAIL/)
   match(prompt, /The pull request to judge is https:\/\/github\.com\/o\/r\/pull\/12 \(number 12\), and its head commit at the time this run started was abc1234/)
+  match(prompt, /node scripts\/linear-cli\.mjs comments JUL-900/)
 })
 
 test('a verdict is accepted only when it answers this card, this head and this model', () => {

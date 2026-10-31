@@ -18,6 +18,6 @@ export function selectEvidence(comments, sinceISO) {
 export function evidenceBlock(evidence) {
   if (!evidence?.length) return 'The build posted no evidence comment on the card.'
   return evidence
-    .map((item) => `### Evidence from ${item.author} at ${item.createdAt}\n\n${item.body}`)
+    .map((item) => `### Evidence from ${item.author} at ${item.createdAt} (Linear comment ${item.id})\n\n${item.body}`)
     .join('\n\n')
 }
