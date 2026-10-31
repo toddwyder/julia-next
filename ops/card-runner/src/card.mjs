@@ -93,6 +93,16 @@ export function requirePull(options) {
   return pull
 }
 
+// `gh pr edit` asks GitHub for the PR's project cards, and that query now fails
+// on this account, so an existing PR is updated through the REST API instead.
+function editPull({ repoDir, pull, title, body, exec }) {
+  const slug = /github\.com\/([^/]+)\/([^/]+)\/pull\//.exec(pull.url ?? '')
+  if (!slug) throw new Error(`cannot read the repository from the pull request url: ${pull.url}`)
+  const file = join(mkdtempSync(join(tmpdir(), 'card-runner-pr-edit-')), 'body.json')
+  writeFileSync(file, JSON.stringify({ title, body }))
+  runCommand('gh', ['api', '--method', 'PATCH', `repos/${slug[1]}/${slug[2]}/pulls/${pull.number}`, '--input', file], { cwd: repoDir, exec })
+}
+
 // The runner posts the pull request with the title and description the build
 // wrote, so the PR carries the build's own words and no one retypes them.
 export function publishPull({ repoDir, branch, title, body, exec }) {
@@ -100,7 +110,7 @@ export function publishPull({ repoDir, branch, title, body, exec }) {
   writeFileSync(file, body)
   const existing = findPull({ repoDir, branch, exec })
   if (existing) {
-    runCommand('gh', ['pr', 'edit', String(existing.number), '--title', title, '--body-file', file], { cwd: repoDir, exec })
+    editPull({ repoDir, pull: existing, title, body, exec })
   } else {
     runCommand('gh', ['pr', 'create', '--head', branch, '--base', 'main', '--title', title, '--body-file', file], { cwd: repoDir, exec })
   }

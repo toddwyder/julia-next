@@ -139,15 +139,18 @@ test('the runner publishes the title and description the build wrote', () => {
 
 test('an existing pull request is edited, never opened twice', () => {
   const calls = []
+  const sent = []
   const exec = (command, args) => {
     calls.push([command, ...args].join(' '))
-    if (args[0] === 'pr' && args[1] === 'list') return JSON.stringify([{ number: 12, headRefOid: 'abc1234', url: 'u', title: 'old', commits: [] }])
-    if (args[0] === 'pr' && args[1] === 'edit') return ''
+    if (args[0] === 'pr' && args[1] === 'list') return JSON.stringify([{ number: 12, headRefOid: 'abc1234', url: 'https://github.com/o/r/pull/12', title: 'old', commits: [] }])
+    const inputIndex = args.indexOf('--input')
+    if (inputIndex > -1) { sent.push(readFileSync(args[inputIndex + 1], 'utf8')); return '' }
     throw new Error(`unexpected: ${args.join(' ')}`)
   }
   const published = publishPull({ repoDir: '/repo', branch: 'feat/x', title: 'New title (JUL-900)', body: 'Card: JUL-900\n', exec })
   equal(published.number, 12)
-  match(calls[1], /^gh pr edit 12 --title New title \(JUL-900\) --body-file /)
+  match(calls[1], /^gh api --method PATCH repos\/o\/r\/pulls\/12 --input /)
+  deepEqual(JSON.parse(sent[0]), { title: 'New title (JUL-900)', body: 'Card: JUL-900\n' })
 })
 
 test('a build hands over its branch, its words and the file that says it is done', () => {
