@@ -62,6 +62,11 @@ test('a chat that names the card in its opening message is that card run, and on
   assert.deepEqual(cardWindows(unnamed, unnamed.events), []);
 });
 
+test('a card named after a wrapped opening message still names the thread', () => {
+  const wrapped = { id: 't', title: 'Card-runner proof', events: threadEvents([user('10:00', 'Please continue and respond to the latest message.'), user('10:00', 'Build JUL-295, starting from main.')]) };
+  assert.deepEqual(cardWindows(wrapped, wrapped.events).map(w => w.card), ['JUL-295']);
+});
+
 test('a stop lasts from the last agent activity to the reply; an ask_user answer is not agent activity, and back-to-back user messages are one stop', () => {
   const stops = findStops(thread.events);
   assert.deepEqual(stops.map(s => [s.kind, (s.resumed - s.since) / 60_000]), [['question', 14], ['turn ended', 10]]);
