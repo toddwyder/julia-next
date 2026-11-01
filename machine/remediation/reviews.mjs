@@ -1,0 +1,89 @@
+// One review round of the loop. Shipping's own workflow judges the change; this
+// adds the round's name, its own trace file and store, and the posting.
+
+import fs from 'node:fs';
+import path from 'node:path';
+
+import { stopHarness } from '../shipping/harness.mjs';
+import { runShipping, FREE_MODEL, PLAYBOOK, WORKFLOW_ID } from '../shipping/workflow.mjs';
+import { commandsFromSpans, determinationComment, playbookSteps } from '../shipping/determination.mjs';
+import { readSpans, workflowRun } from '../shipping/trace-record.mjs';
+import { postComment, traceFileFor } from '../shipping/run-parts.mjs';
+import { MAX_REVIEWS, failedCriteria } from './workflow.mjs';
+
+export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL, post = true, log = console.log }) {
+  const traceFile = traceFileFor(record.pr, `remediation-review-${round}`);
+  // The harness reads this when it boots, so setting it here gives this round
+  // its own trace file without the workflow reaching into the process env.
+  process.env.MASTRA_OBSERVABILITY_DB_PATH = traceFile;
+  const storage = {
+    backend: 'libsql',
+    url: `file:${path.join(runDir, `review-${round}.db`)}`,
+    isRemote: false,
+  };
+
+  const run = await runShipping({
+    pr: record.pr,
+    sha: record.head,
+    checkout: record.checkout,
+    card: record.card.identifier,
+    modelId,
+    storage,
+    log,
+  });
+  if (run.booted) await stopHarness(run.booted);
+
+  const spans = await readSpans(traceFile);
+  const workflowSpan = workflowRun(spans, WORKFLOW_ID);
+  const { commands, otherTools } = commandsFromSpans(spans);
+  let steps = [];
+  try {
+    steps = playbookSteps(fs.readFileSync(path.join(record.checkout, PLAYBOOK), 'utf8'));
+  } catch {
+    steps = [];
+  }
+
+  const verdict = run.verdict ?? null;
+  const failed = failedCriteria(verdict, run.output?.criteria ?? record.criteria);
+  const failure = run.output ? null : `the workflow ended ${run.status}: ${run.error ?? 'no answer'}`;
+
+  const body = determinationComment({
+    pr: record.pr,
+    sha: record.head,
+    card: run.output?.card ?? record.card,
+    model: run.output?.modelId ?? modelId,
+    playbook: PLAYBOOK,
+    workflowRunId: workflowSpan?.runId ?? run.runId,
+    workflowId: WORKFLOW_ID,
+    traceFile,
+    criteria: run.output?.criteria ?? record.criteria,
+    verdict,
+    commands,
+    otherTools,
+    steps,
+    failed: failure,
+    review: { round, of: MAX_REVIEWS },
+  });
+
+  fs.mkdirSync(runDir, { recursive: true });
+  const determination = path.join(runDir, `determination-${round}.md`);
+  fs.writeFileSync(determination, body);
+
+  let postedUrl = null;
+  if (post) {
+    postedUrl = postComment(record.pr, determination);
+    log(`Posted review ${round} of ${MAX_REVIEWS} on pull request #${record.pr}: ${postedUrl}`);
+  } else {
+    log(`Left review ${round} of ${MAX_REVIEWS} unposted at ${determination}`);
+  }
+
+  return {
+    modelId: run.output?.modelId ?? modelId,
+    verdict: verdict?.verdict ?? null,
+    answer: verdict?.raw ?? run.output?.answer ?? '',
+    failed,
+    determination,
+    postedUrl,
+    traceFile,
+  };
+}
