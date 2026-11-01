@@ -44,7 +44,7 @@ export const EFFORTS = Object.freeze([
   },
 ]);
 
-export const PANEL_MINIMUM = 'A panel needs at least one model.';
+export const PANEL_MINIMUM = 'A panel needs a model.';
 export const PANEL_MODEL_ONLY = 'Panels hold a list of models. Change the chips instead.';
 
 const copy = value => JSON.parse(JSON.stringify(value));
