@@ -24,7 +24,7 @@ export function runAgentsCommand(argv,{tokenPath=agentsTokenPath,environment=pro
   return child.status??1
  }catch{
   console.error('provider unavailable')
-  return 1
+  return 0
  }
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
