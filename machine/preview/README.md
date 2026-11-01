@@ -64,7 +64,8 @@ the person reading the record was not at the terminal. On a
 FAIL the card goes back to the build with the failing lines. The second FAIL on
 the same pull request stops the card and pings Todd instead of sending it back a
 third time. Remediation is not involved: the fix is the builder's own next
-change.
+change. A run of a commit it has already judged does nothing unless it is forced,
+so a stop comes from two different commits or from someone asking twice.
 
 ## Running it
 
