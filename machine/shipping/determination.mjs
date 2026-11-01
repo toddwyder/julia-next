@@ -72,8 +72,14 @@ function parseJson(value) {
   }
 }
 
+// The agent's shell keeps the colours it wrote for a terminal, and a determination
+// is read in a browser, so the escape codes come out before anything is quoted.
+function plain(text) {
+  return String(text ?? '').replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, '');
+}
+
 function collapse(text) {
-  return String(text ?? '')
+  return plain(text)
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(Boolean)
@@ -99,7 +105,7 @@ export function describeReturn(output) {
     return { text: JSON.stringify(parsed), refused: false };
   }
   if (typeof parsed === 'string') {
-    const text = parsed.trim();
+    const text = plain(parsed).trim();
     return { text: text || '(no output)', refused: false };
   }
   return { text: String(parsed), refused: false };

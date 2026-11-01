@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   commandsFromSpans,
+  describeReturn,
   criteriaFromCard,
   determinationComment,
   parseVerdict,
@@ -174,4 +175,9 @@ test('no verdict is written down as no verdict, never as a pass', () => {
   assert.ok(comment.startsWith('Shipping agent: NO VERDICT\n'));
   assert.match(comment, /The machine could not get a verdict: the workflow ended failed/);
   assert.match(comment, /\*\*1\. no verdict\*\*/);
+});
+
+test('a return written for a terminal is quoted without its colour codes', () => {
+  const output = JSON.stringify('\u001b[32m7 tests\u001b[39m\n\u001b[32m0 failing\u001b[39m\n');
+  assert.deepEqual(describeReturn(output), { text: '7 tests\n0 failing', refused: false });
 });
