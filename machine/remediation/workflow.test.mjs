@@ -229,6 +229,41 @@ test('a FAIL when the builder session is gone starts a fresh builder and says so
   assert.equal(record.reviews.length, 2);
 });
 
+test('a review that comes back with no verdict stops the loop instead of failing the card', async () => {
+  const fakes = fakeDeps({ answers: [FAIL_ANSWER, PASS_ANSWER] });
+  // The free reviewer answers with a provider error now and then: it has not
+  // judged anything, so the builder must not be handed the error to fix.
+  fakes.deps.reviewRound = async ({ round }) => {
+    fakes.calls.rounds.push({ round });
+    return {
+      modelId: 'fake-review-model',
+      verdict: null,
+      answer: `Subagent "Execute" failed: {"error":{"message":"Missing required parameter: 'messages[48].reasoning_content'"}}`,
+      failed: [],
+      determination: '/tmp/practice/run/determination-1.md',
+      postedUrl: 'https://example.test/pull/1#comment-1',
+      traceFile: null,
+    };
+  };
+
+  const { started, calls } = await runLoop(null, fakes);
+  assert.equal(started.status, 'success', started.error);
+  const record = started.result;
+
+  assert.equal(record.reviews.length, 1, 'the loop does not go on to a second review');
+  assert.equal(record.reviews[0].verdict, null);
+  assert.equal(calls.handed.length, 0, 'the builder is not woken with an error');
+  assert.equal(calls.fresh.length, 0);
+  assert.equal(calls.investigations.length, 0, 'a missing verdict is not two failed reviews');
+
+  assert.ok(record.stop, 'the loop records a stop');
+  assert.match(record.stop.reason, /could not answer/);
+  assert.match(record.stop.reason, /JUL-999/);
+  assert.match(record.stop.rootCause, /reasoning_content/);
+  assert.equal(calls.pings.length, 1, 'Todd is told the machine could not get an answer');
+  assert.match(calls.pings[0].message, /could not answer/);
+});
+
 test('the review limit lives in one constant and the chain asks for at most that many reviews', async () => {
   assert.equal(MAX_REVIEWS, 2);
   const empty = { reviews: [] };

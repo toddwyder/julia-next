@@ -11,28 +11,48 @@ import { readSpans, workflowRun } from '../shipping/trace-record.mjs';
 import { postComment, traceFileFor } from '../shipping/run-parts.mjs';
 import { MAX_REVIEWS, failedCriteria } from './workflow.mjs';
 
+// The free reviewer answers with a provider error instead of a verdict now and
+// then: CommandCode wants the reasoning of every earlier assistant message back
+// and a long tool run loses some. A brand-new session is a short history, so it
+// usually gets through. Nothing is posted until an attempt actually judges the
+// card, which is why a retry cannot post twice.
+export const REVIEW_ATTEMPTS = 3;
+
+const firstLine = text => String(text ?? '').trim().split(/\r?\n/)[0].slice(0, 300);
+
 export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL, post = true, log = console.log }) {
-  const traceFile = traceFileFor(record.pr, `remediation-review-${round}`);
-  // The harness reads this when it boots, so setting it here gives this round
-  // its own trace file without the workflow reaching into the process env.
-  process.env.MASTRA_OBSERVABILITY_DB_PATH = traceFile;
-  const storage = {
-    backend: 'libsql',
-    url: `file:${path.join(runDir, `review-${round}.db`)}`,
-    isRemote: false,
-  };
+  let attemptUsed = null;
+  for (let attempt = 1; attempt <= REVIEW_ATTEMPTS; attempt++) {
+    const name = attempt === 1 ? `review-${round}` : `review-${round}-try-${attempt}`;
+    const traceFile = traceFileFor(record.pr, `remediation-${name}`);
+    // The harness reads this when it boots, so setting it here gives this
+    // attempt its own trace file without the workflow reaching into the env.
+    process.env.MASTRA_OBSERVABILITY_DB_PATH = traceFile;
+    const storage = {
+      backend: 'libsql',
+      url: `file:${path.join(runDir, `${name}.db`)}`,
+      isRemote: false,
+    };
 
-  const run = await runShipping({
-    pr: record.pr,
-    sha: record.head,
-    checkout: record.checkout,
-    card: record.card.identifier,
-    modelId,
-    storage,
-    log,
-  });
-  if (run.booted) await stopHarness(run.booted);
+    const run = await runShipping({
+      pr: record.pr,
+      sha: record.head,
+      checkout: record.checkout,
+      card: record.card.identifier,
+      modelId,
+      storage,
+      log,
+    });
+    if (run.booted) await stopHarness(run.booted);
 
+    const verdict = run.verdict ?? null;
+    attemptUsed = { run, verdict, traceFile };
+    if (verdict?.verdict) break;
+    if (attempt === REVIEW_ATTEMPTS) break;
+    log(`The reviewer answered without a verdict: ${firstLine(verdict?.raw ?? run.error ?? 'no answer')}. Asking a new one (${attempt + 1} of ${REVIEW_ATTEMPTS}).`);
+  }
+
+  const { run, verdict, traceFile } = attemptUsed;
   const spans = await readSpans(traceFile);
   const workflowSpan = workflowRun(spans, WORKFLOW_ID);
   const { commands, otherTools } = commandsFromSpans(spans);
@@ -43,7 +63,6 @@ export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL,
     steps = [];
   }
 
-  const verdict = run.verdict ?? null;
   const failed = failedCriteria(verdict, run.output?.criteria ?? record.criteria);
   const failure = run.output ? null : `the workflow ended ${run.status}: ${run.error ?? 'no answer'}`;
 

@@ -28,6 +28,7 @@ export function failedCriteria(verdict, criteria = []) {
 }
 
 export function shouldReview(record, round) {
+  if (record.stop) return false;
   if (round > MAX_REVIEWS) return false;
   if (record.reviews.length !== round - 1) return false;
   if (round === 1) return true;
@@ -35,6 +36,7 @@ export function shouldReview(record, round) {
 }
 
 export function shouldRemediate(record) {
+  if (record.stop) return false;
   const last = record.reviews[record.reviews.length - 1];
   return record.reviews.length > 0 && record.reviews.length < MAX_REVIEWS && !passed(last?.verdict);
 }
@@ -52,7 +54,8 @@ export function stopReason(record) {
 
 export function stopMessage(record) {
   const lines = [
-    `The remediation loop stopped on ${record.card.identifier} after ${MAX_REVIEWS} FAIL determinations.`,
+    `The remediation loop stopped on ${record.card.identifier}.`,
+    `Why: ${record.stop?.reason ?? 'no reason recorded'}`,
     `Pull request: https://github.com/toddwyder/julia-next/pull/${record.pr}`,
   ];
   for (const review of record.reviews) {
@@ -63,6 +66,20 @@ export function stopMessage(record) {
   }
   lines.push(`Root cause: ${record.stop?.rootCause || 'the investigation session answered with nothing usable'}`);
   return lines.join('\n');
+}
+
+// A review that came back with a provider error instead of a verdict has not
+// judged the card, so it is not a FAIL and must not go to a builder: the builder
+// would be handed an error to fix. The loop stops here and Todd hears why,
+// because a machine that cannot get an answer is the thing worth looking at.
+export function unjudgedStop(record, review) {
+  const said = String(review?.answer ?? '').trim().split(/\r?\n/)[0].slice(0, 300);
+  return {
+    reason: `Shipping could not answer on ${record.card?.identifier ?? 'the card'} at review ${review?.round ?? 1}, so the card was not judged`,
+    rootCause: said || 'the reviewer answered with nothing',
+    threadId: null,
+    ping: null,
+  };
 }
 
 export function cardNoteForFreshBuilder(record, builder) {
@@ -192,6 +209,10 @@ export async function createRemediationWorkflow({ mastra, deps, log = console.lo
           postedUrl: outcome.postedUrl ?? null,
           traceFile: outcome.traceFile ?? null,
         };
+        if (!review.verdict) {
+          log(`Review ${round} came back without a verdict, so the loop stops instead of failing the card.`);
+          return persist({ ...record, reviews: [...record.reviews, review], stop: unjudgedStop(record, review) });
+        }
         return persist({ ...record, reviews: [...record.reviews, review] });
       },
     });
