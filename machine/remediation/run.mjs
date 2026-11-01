@@ -8,7 +8,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { getIssue, postComment as postCardComment } from '../../scripts/linear-cli.mjs';
-import { handleStop, bindThreadCard, threadCardsFile } from '../../scripts/stop-ping.mjs';
+import { handleStop } from '../../scripts/stop-ping.mjs';
+import { stopPingDeps } from './ping.mjs';
 import { loadMastra } from '../shipping/harness.mjs';
 import { FREE_MODEL } from '../shipping/workflow.mjs';
 import { prepareCheckout, repoRoot, traceFileFor } from '../shipping/run-parts.mjs';
@@ -124,11 +125,8 @@ async function main() {
     ping: async ({ record, message }) => {
       const thread = record.stop?.threadId ?? record.builder?.threadId ?? null;
       if (!thread) return { posted: false, error: 'no session thread to hang the stop on' };
-      // The stop is filed against the investigation session, so the ping reaches
-      // Todd from the card this loop was working on rather than from whatever
-      // session happens to be newest.
-      bindThreadCard(threadCardsFile(process.env), thread, record.card.identifier, 'remediation runner');
-      return handleStop({ session_id: thread, cwd: root, reason: 'agent_done', message }, process.env);
+      const deps = stopPingDeps({ thread, card: record.card.identifier, projectPath: root });
+      return handleStop({ session_id: thread, cwd: root, reason: 'agent_done', message }, process.env, deps);
     },
     saveRecord: record => writeRecord(runDir, { ...record, pr: options.pr, runDir }),
   };
