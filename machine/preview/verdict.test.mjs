@@ -113,6 +113,38 @@ test('the live failure names the record that moved, so the reader can look at it
   assert.deepEqual(judged.failing, ['live dashboard records: touched while the preview ran: runs/jul-290.json changed']);
 });
 
+test('a live folder nothing touched is a pass, and says no record the machine could move changed', () => {
+  const judged = verdictOf({
+    scope: 'dashboard',
+    preview: { address: 'http://127.0.0.1:4401' },
+    checks: { ok: true, items: [passingCheck] },
+    proofs: [passingProof],
+    live: { ...unchanged, changed: [], touched: [] },
+  });
+
+  assert.equal(judged.verdict, 'PASS');
+  const line = judged.items.find(item => item.kind === 'live');
+  assert.equal(line.detail, 'no record the machine could move changed');
+});
+
+test('a file the live service rewrites on its own timer is named as its own, not hidden', () => {
+  const judged = verdictOf({
+    scope: 'dashboard',
+    preview: { address: 'http://127.0.0.1:4401' },
+    checks: { ok: true, items: [passingCheck] },
+    proofs: [passingProof],
+    live: {
+      ...unchanged,
+      changed: [{ path: 'watchdog.json', how: 'changed' }, { path: 'models.json', how: 'changed' }],
+      touched: [],
+    },
+  });
+
+  assert.equal(judged.verdict, 'PASS');
+  const line = judged.items.find(item => item.kind === 'live');
+  assert.equal(line.detail, 'no record the machine could move changed; the live service rewrote watchdog.json, models.json on its own timer');
+});
+
 test('a run with no live folder to compare says so without failing the change', () => {
   const judged = verdictOf({ scope: 'machine', checks: { ok: true, items: [passingCheck] }, proofs: [passingProof], live: null });
 

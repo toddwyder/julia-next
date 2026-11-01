@@ -3,7 +3,7 @@
 const TODD = 'https://linear.app/julia-next/profiles/toddwyder';
 
 function checkItem(check) {
-  const result = check.conclusion ?? check.status ?? 'unknown';
+  const result = check.absent ? 'never ran for this commit' : check.conclusion ?? check.status ?? 'unknown';
   return { kind: 'check', name: check.name, ok: check.ok === true, detail: result };
 }
 
@@ -23,7 +23,15 @@ function previewItem({ scope, preview, previewGap }) {
 
 function liveItem(live) {
   if (!live?.dir) return { kind: 'live', name: 'live dashboard records', ok: true, detail: 'not compared: no live state folder was given', skip: true };
-  if (live.unchanged === true) return { kind: 'live', name: 'live dashboard records', ok: true, detail: 'identical before and after the run' };
+  if (live.unchanged === true) {
+    // The live service rewrites some of its own files on a timer. Saying those
+    // moved is honest; saying the whole folder was identical when it was not
+    // would not be.
+    const touched = new Set((live.touched ?? []).map(file => file.path));
+    const theirs = (live.changed ?? []).map(file => file.path).filter(name => !touched.has(name));
+    const aside = theirs.length ? `; the live service rewrote ${theirs.join(', ')} on its own timer` : '';
+    return { kind: 'live', name: 'live dashboard records', ok: true, detail: `no record the machine could move changed${aside}` };
+  }
   const touched = (live.touched ?? []).map(file => `${file.path} ${file.how}`).join(', ');
   return {
     kind: 'live',

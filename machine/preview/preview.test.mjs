@@ -81,8 +81,12 @@ test('a live records folder the preview never moved has nothing to answer for', 
   put(live, 'watchdog.json', 'one');
   const before = evidenceDigest(live);
   put(live, 'watchdog.json', 'two');
+  // The weekly sweep refreshes the model list from the account. A good preview
+  // must not fail because the live service refreshed a file it owns.
+  put(live, 'models.json', 'models, refreshed');
 
   assert.deepEqual(liveTrouble(before, evidenceDigest(live)), []);
+  assert.deepEqual(changedSince(before, evidenceDigest(live)).map(file => file.path), ['models.json', 'watchdog.json']);
 });
 
 test('the preview seeds the models file and nothing else from the live records', () => {

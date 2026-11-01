@@ -39,8 +39,10 @@ export function sameDigest(before, after) {
 }
 
 // The live service rewrites these on its own timers, so they move whether or not
-// a preview is running and cannot say who touched them.
-export const LIVE_TIMER_FILES = new Set(['watchdog.json', 'build.json', 'sweep-log.jsonl']);
+// a preview is running and cannot say who touched them. The model sweep is the
+// one that matters: it refreshes models.json from the account every week, and a
+// good preview must not be blamed for it.
+export const LIVE_TIMER_FILES = new Set(['watchdog.json', 'build.json', 'sweep-log.jsonl', 'models.json']);
 
 export function changedSince(before, after) {
   const was = new Map((before?.files ?? []).map(file => [file.path, file.sha256]));
