@@ -30,11 +30,10 @@ export function declaresNoCard(body) {
 export function scorecardGaps({ pulls, headRef, readFile = path => readFileSync(path, 'utf8') }) {
   const gaps = [];
   for (const pull of pulls.filter(candidate => candidate.head?.ref === headRef)) {
-    const where = pull.label ?? `PR #${pull.number}`;
     const cards = [...new Set(`${pull.title ?? ''}\n${pull.body ?? ''}`.match(/\bJUL-\d+\b/g) ?? [])];
     if (!cards.length) {
       if (declaresNoCard(pull.body)) continue;
-      gaps.push(`${where} names no JUL card, so there is no scorecard to check: put the card in the title, as (JUL-123), or say "No card: <reason>" in the body when the work is not a card`);
+      gaps.push(`PR #${pull.number} names no JUL card, so there is no scorecard to check: put the card in the title, as (JUL-123), or say "No card: <reason>" in the body when the work is not a card`);
       continue;
     }
     for (const card of cards) {
@@ -43,33 +42,19 @@ export function scorecardGaps({ pulls, headRef, readFile = path => readFileSync(
       try {
         written = readFile(path);
       } catch {
-        gaps.push(`${where} names ${card} but ${path} is not on the branch: run node scripts/scorecard.mjs ${card} --write and commit what it writes`);
+        gaps.push(`PR #${pull.number} names ${card} but ${path} is not on the branch: run node scripts/scorecard.mjs ${card} --write and commit what it writes`);
         continue;
       }
       const cost = /^- Cost: \*\*(.+?)\*\*/m.exec(written)?.[1] ?? 'no Cost line';
       if (!/^\$\d+(\.\d+)?$/.test(cost) || Number(cost.slice(1)) <= 0) {
-        gaps.push(`${where} carries ${path} with cost "${cost}" and a pull request needs a measured cost: the scorecard prices a card from its session's trace file, so read node scripts/trace-store.mjs status and re-run node scripts/scorecard.mjs ${card} --write`);
+        gaps.push(`PR #${pull.number} carries ${path} with cost "${cost}" and a pull request needs a measured cost: the scorecard prices a card from its session's trace file, so read node scripts/trace-store.mjs status and re-run node scripts/scorecard.mjs ${card} --write`);
         continue;
       }
       const incomplete = /^- Cost incomplete: (.*)$/m.exec(written)?.[1];
-      if (incomplete) gaps.push(`${where} carries ${path} with a cost that is known to be short: ${incomplete}`);
+      if (incomplete) gaps.push(`PR #${pull.number} carries ${path} with a cost that is known to be short: ${incomplete}`);
     }
   }
   return gaps;
-}
-
-// A body is a draft before it is published, and every card key in it is a scorecard CI will
-// demand. Writing a body that names the umbrella card and a throwaway card beside the slice it
-// actually ships costs a whole CI cycle, because the token cannot restart a run and a body edit
-// does not start one. So the same rule answers offline: `--body <path>` reads the draft the way
-// CI will read the published pull request, and names every card it would ask a scorecard for.
-export function bodyGaps({ title = '', body, readFile } = {}) {
-  const headRef = 'preflight';
-  return scorecardGaps({
-    pulls: [{ label: 'This pull request', title, body, head: { ref: headRef } }],
-    headRef,
-    ...(readFile ? { readFile } : {}),
-  });
 }
 
 async function githubPages(path, { apiUrl, repository, token }) {
@@ -108,39 +93,13 @@ export async function checkBranchPullRequests({
   };
 }
 
-function preflightBody(file, title) {
-  if (!file || file.startsWith('--')) {
-    console.error('usage: node scripts/check-branch-pr.mjs --body <path> [--title <title>]');
-    return 1;
-  }
-  const gaps = bodyGaps({ title, body: readFileSync(file, 'utf8') });
-  if (!gaps.length) {
-    console.log('This body names only cards this branch carries a priced scorecard for.');
-    return 0;
-  }
-  console.error(`This body would fail the branch audit:\n${gaps.join('\n')}`);
-  return 1;
-}
-
-async function auditBranches() {
-  const { branches, scorecards } = await checkBranchPullRequests();
-  if (branches.length) console.error(`Branches without an open pull request to main:\n${branches.join('\n')}`);
-  if (scorecards.length) console.error(`Pull requests without a scorecard that shows a cost:\n${scorecards.join('\n')}`);
-  if (branches.length || scorecards.length) return 1;
-  console.log('Every non-main branch has an open pull request to main, and the one being pushed carries a scorecard with a cost.');
-  return 0;
-}
-
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2);
-  const after = flag => {
-    const at = args.indexOf(flag);
-    return at === -1 ? undefined : args[at + 1];
-  };
   try {
-    process.exitCode = args.includes('--body')
-      ? preflightBody(after('--body') ?? '', after('--title') ?? '')
-      : await auditBranches();
+    const { branches, scorecards } = await checkBranchPullRequests();
+    if (branches.length) console.error(`Branches without an open pull request to main:\n${branches.join('\n')}`);
+    if (scorecards.length) console.error(`Pull requests without a scorecard that shows a cost:\n${scorecards.join('\n')}`);
+    if (branches.length || scorecards.length) process.exitCode = 1;
+    else console.log('Every non-main branch has an open pull request to main, and the one being pushed carries a scorecard with a cost.');
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

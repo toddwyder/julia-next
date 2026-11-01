@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// The four writing-for-agents rules for a card brief, as one check:
+// The five writing-for-agents rules for a card brief, as one check:
 //   1. no text copied from repository docs
 //   2. acceptance criteria in outcome form
 //   3. no implementation words in acceptance criteria
 //   4. no negations in acceptance criteria
+//   5. no specific model named in acceptance criteria
 //
 // Triage runs this before showing Todd a brief.
 
@@ -30,6 +31,16 @@ const IMPERATIVE = new Set([
 const IMPLEMENTATION = /\b(?:api|apis|argument|arguments|branch|class|classes|code|column|commit|component|components|constant|constants|controller|css|database|dependency|dependencies|deploy|deployment|endpoint|endpoints|file|files|function|functions|git|handler|html|implementation|interface|interfaces|javascript|json|merge|method|methods|middleware|migration|module|modules|next\.js|npm|package|parameter|parameters|parser|query|queries|react|refactor|regex|route|router|schema|schemas|script|sql|type|types|typescript|variable|variables|yaml)\b/i;
 
 const NEGATION = /\b(?:no|not|never|none|nothing|without|cannot|can[’']?t|won[’']?t|isn[’']?t|aren[’']?t|doesn[’']?t|don[’']?t|didn[’']?t|shouldn[’']?t|mustn[’']?t|nor|neither|nowhere)\b/i;
+
+const MODEL = new RegExp(
+  `\\b(?:${[
+    'claude', 'opus', 'sonnet', 'haiku', 'gpt', 'grok', 'deepseek', 'kimi', 'gemini', 'llama',
+    'mistral', 'qwen', 'beam', 'sol',
+    'anthropic/', 'openai/', 'commandcode/', 'reflection/', 'moonshotai/', 'opencode/', 'kilo/',
+    ':free',
+  ].join('|')})\\b`,
+  'i',
+);
 
 function textOf(line) {
   return line
@@ -133,6 +144,11 @@ export function checkCriterion(criterion) {
   if (negation) {
     findings.push(`${criterion.id} uses the negation "${negation[0]}"; state the positive behavior instead`);
   }
+  // Matched against the raw text, because plain drops the slash from a provider address such as commandcode/reflection/beam.
+  const model = MODEL.exec(text);
+  if (model) {
+    findings.push(`${criterion.id} names the model "${model[0]}"; name a kind of model, such as a free model, and leave the specific one in the pstack models file`);
+  }
   return findings;
 }
 
@@ -179,7 +195,7 @@ function main(args) {
   const text = textIndex > -1 ? args[textIndex + 1] : readFileSync(resolve(file), 'utf8');
   const findings = checkBrief({ text, file, root });
   if (!findings.length) {
-    console.log('The brief passes the four writing-for-agents rules.');
+    console.log('The brief passes the five writing-for-agents rules.');
     return;
   }
   console.error(findings.join('\n'));

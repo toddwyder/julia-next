@@ -181,3 +181,40 @@ test('a return written for a terminal is quoted without its colour codes', () =>
   const output = JSON.stringify('\u001b[32m7 tests\u001b[39m\n\u001b[32m0 failing\u001b[39m\n');
   assert.deepEqual(describeReturn(output), { text: '7 tests\n0 failing', refused: false });
 });
+
+test('criteria come from a card acceptance criteria heading, and stop at the next heading', () => {
+  const card = `The Shipping agent leaves one comment on the pull request.
+
+## Outcome
+
+The Shipping agent leaves one comment on the pull request.
+
+## Acceptance criteria
+
+- [ ] The comment lists each criterion beside its verdict.
+- [ ] The comment names the model that ran the review.
+
+## UAT steps
+
+- [ ] Open the pull request and read the comment.
+- [ ] Check the model name against the run.
+`;
+  assert.deepEqual(criteriaFromCard(card), [
+    'The comment lists each criterion beside its verdict.',
+    'The comment names the model that ran the review.',
+  ]);
+});
+
+test('the older criteria heading still reads its bullets', () => {
+  const card = `One letter, so a machine can tell whether the check ran.
+
+## Criteria
+
+- [ ] The comment lists each verdict.
+
+## UAT
+
+- [ ] Open the pull request and read the comment.
+`;
+  assert.deepEqual(criteriaFromCard(card), ['The comment lists each verdict.']);
+});
