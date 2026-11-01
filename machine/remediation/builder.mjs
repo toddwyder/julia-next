@@ -101,7 +101,7 @@ export function remediationOrder({ card, pr, sha, determination, playbookText, p
   ].join('\n');
 }
 
-export function freshBuilderOrder({ card, pr, sha, determination, playbookText, criteria = [], playbook = BUG_FIX_PLAYBOOK }) {
+export function freshBuilderOrder({ card, pr, sha, checkout, determination, playbookText, criteria = [], playbook = BUG_FIX_PLAYBOOK }) {
   return [
     `You are a fresh builder. The session that wrote pull request #${pr} (${pullRequestUrl(pr)}) could not be taken: it is gone from the store, or another process was still writing it. Nothing of that session is here.`,
     '',
@@ -117,7 +117,10 @@ export function freshBuilderOrder({ card, pr, sha, determination, playbookText, 
     '',
     ...criteria.map((criterion, index) => `${index + 1}. ${criterion}`),
     '',
-    `Run \`gh pr checkout ${pr}\` first, so the pull request's branch is the one you change. Shipping failed it with this determination, quoted word for word.`,
+    // The builder changes the checkout of the pull request head, never the
+    // repository the other sessions are working in.
+    `The pull request head is checked out at ${checkout ?? 'the checkout in front of you'}, detached at commit ${sha}. Make the change there, and do not switch branches anywhere else.`,
+    `Push it with \`git push origin HEAD:refs/heads/<branch>\`, naming the branch \`gh pr view ${pr} --json headRefName --jq .headRefName\` prints. Shipping failed it with this determination, quoted word for word.`,
     '',
     ...quote('determination', determination),
     '',
@@ -253,14 +256,14 @@ async function bootOnThread(tools, { root, threadId, attempts = 3 }) {
   }
 }
 
-export async function startFreshBuilder({ root = repoRoot, runDir, card, pr, sha, determination, playbookText, criteria = [], modelId, log = console.log }) {
+export async function startFreshBuilder({ root = repoRoot, checkout, runDir, card, pr, sha, determination, playbookText, criteria = [], modelId, log = console.log }) {
   const { threadId, store } = await freshSession({
-    root,
+    root: checkout ?? root,
     runDir,
     storeName: 'fresh-builder',
     modelId,
     log,
-    order: freshBuilderOrder({ card, pr, sha, determination, playbookText, criteria }),
+    order: freshBuilderOrder({ card, pr, sha, checkout, determination, playbookText, criteria }),
   });
   return { threadId, resumed: false, store };
 }

@@ -159,6 +159,7 @@ test('a fresh builder is given the card, its criteria and the same determination
     card: CARD,
     pr: 42,
     sha: 'abc123',
+    checkout: '/tmp/practice/checkout',
     determination: 'VERDICT: FAIL',
     playbookText: 'Bug fix text.',
     criteria: ['the loading state appears', 'the error is written down'],
@@ -169,6 +170,11 @@ test('a fresh builder is given the card, its criteria and the same determination
   assert.match(order, /1\. the loading state appears/);
   assert.match(order, /2\. the error is written down/);
   assert.match(order, /VERDICT: FAIL/);
+  // The fresh builder changes the pull request checkout, not the repository the
+  // other sessions are working in.
+  assert.match(order, /checked out at \/tmp\/practice\/checkout/);
+  assert.match(order, /git push origin HEAD:refs\/heads\/<branch>/);
+  assert.doesNotMatch(order, /gh pr checkout/);
 });
 
 test('the investigation is told both determinations, both causes, and what not to touch', () => {

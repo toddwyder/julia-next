@@ -210,6 +210,7 @@ export async function createRemediationWorkflow({ mastra, deps, log = console.lo
         sha: record.head,
         determination: last.answer,
         criteria: record.criteria,
+        checkout: record.checkout,
         playbookText: deps.readPlaybook(BUG_FIX_PLAYBOOK),
         modelId: deps.builderModel,
         runDir: deps.runDir,
