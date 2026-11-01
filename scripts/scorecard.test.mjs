@@ -178,6 +178,24 @@ test('a thread whose metadata is not JSON does not stop the scorecard reading th
   }
 });
 
+// The libSQL store saves metadata with `jsonb()`, so a real thread row holds binary
+// JSON. Reading only text JSON silently lost every session's token counts.
+test('thread metadata written as binary JSON still gives up its token counts and its project', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'scorecard-jsonb-'));
+  try {
+    const db = new DatabaseSync(join(dir, 'mastra.db'));
+    db.exec('create table mastra_threads (id text, title text, metadata blob); create table mastra_messages (thread_id text, role text, type text, createdAt text, content text)');
+    const metadata = JSON.stringify({ projectPath: '/home/ubuntu/julia-builder', tokenUsage: thread.usage });
+    db.prepare('insert into mastra_threads values (?, ?, jsonb(?))').run('thread-1', 'Some title', metadata);
+    for (const r of rows) db.prepare('insert into mastra_messages values (?, ?, ?, ?, ?)').run('thread-1', r.role, r.type, r.createdAt, r.content);
+    db.close();
+    assert.deepEqual(readThreads(join(dir, 'mastra.db'))[0].usage, thread.usage);
+    assert.equal(threadProjectPath(join(dir, 'mastra.db'), 'thread-1'), '/home/ubuntu/julia-builder');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('stop and ping lines with one id merge into one record', () => {
   const dir = mkdtempSync(join(tmpdir(), 'scorecard-stops-'));
   try {

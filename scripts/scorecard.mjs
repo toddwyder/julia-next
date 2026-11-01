@@ -110,10 +110,16 @@ export function findStops(events) {
   return stops;
 }
 
+// The store writes thread metadata with `jsonb()`, so the column holds SQLite's
+// binary JSON. `json_valid(metadata)` only says yes to text and answered no to
+// every thread, which lost each session's token counts; flag 6 asks about both
+// encodings and `json()` decodes either one.
+const METADATA_JSON = 'case when json_valid(metadata, 6) then json(metadata) end';
+
 export function readThreads(dbPath) {
   const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
-    return db.prepare("select id, title, case when json_valid(metadata) then json(metadata) end as metadata from mastra_threads").all().map(thread => {
+    return db.prepare(`select id, title, ${METADATA_JSON} as metadata from mastra_threads`).all().map(thread => {
       const rows = db.prepare('select role, type, createdAt, content from mastra_messages where thread_id = ? order by createdAt').all(thread.id);
       return { id: thread.id, title: thread.title, usage: JSON.parse(thread.metadata ?? '{}').tokenUsage, events: threadEvents(rows) };
     });
@@ -132,7 +138,7 @@ export function cardForThread(dbPath, threadId) {
 export function threadProjectPath(dbPath, threadId) {
   const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
-    const row = db.prepare('select case when json_valid(metadata) then json(metadata) end as metadata from mastra_threads where id = ?').get(threadId);
+    const row = db.prepare(`select ${METADATA_JSON} as metadata from mastra_threads where id = ?`).get(threadId);
     return row ? JSON.parse(row.metadata ?? '{}').projectPath : undefined;
   } finally {
     db.close();
