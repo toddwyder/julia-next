@@ -58,3 +58,7 @@ asks the same model again.
 The card must have a `## Criteria` section with one bullet per criterion. The
 machine judges nothing itself: it prints the criteria, hands them to the
 Shipping agent, and writes down what came back.
+
+Write a criterion as a command plus a condition that stays true while the branch
+changes, never a count. A criterion that said "runs 7 tests" failed this slice's
+own pull request the moment an eighth test was added, and the agent was right.

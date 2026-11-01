@@ -21,7 +21,11 @@ import { existsSync, readFileSync } from 'node:fs';
 // an authenticated caller passes, so it writes to the board as
 // its own identity. The `apiKey` path is untouched -- the coordinator, the
 // Ready queue and every existing caller still use it.
-export async function linearGraphQL(query, variables, { apiKey, accessToken, fetchImpl = fetch, url = LINEAR_GRAPHQL_URL } = {}) {
+// 31 October 2026: the key came only from the `apiKey` field, while the refusal below told the
+// caller to "pass LINEAR_API_KEY". A script outside the CLI read the message, set the variable,
+// and still died in 28 milliseconds because the field was empty. The variable is where a key
+// lives on this machine, so it is read here, and both calls behave the same way.
+export async function linearGraphQL(query, variables, { apiKey = process.env.LINEAR_API_KEY, accessToken, fetchImpl = fetch, url = LINEAR_GRAPHQL_URL } = {}) {
   if (!apiKey && !accessToken) {
     throw new Error('linearGraphQL: apiKey is required (pass LINEAR_API_KEY), or an accessToken for the app identity');
   }

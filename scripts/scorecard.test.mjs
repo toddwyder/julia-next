@@ -335,3 +335,19 @@ test('a traced row Mastra cannot price is priced from our own list', () => {
   assert.equal(card.cost[0].basis, 'our price list; cache read unpriced');
   assert.equal(card.cost[0].requested, 'not recorded', 'a span that names no model is not a model called null/null');
 });
+
+test('a scorecard with no UAT yes says where the yes is written down, instead of leaving the reader to grep', () => {
+  // 1 November 2026: a slice scorecard read "not decided yet (no UAT yes recorded)" and nothing
+  // said where a yes lives, so the answer cost a read of this script.
+  const s = buildScorecard({ card: 'JUL-273', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls: [], pings: [] });
+  const markdown = renderScorecard(s, new Date(ms('20:00')));
+  assert.match(markdown, /Success: \*\*not decided yet \(no UAT yes recorded\)\*\*/);
+  assert.match(markdown, /- To record it: write `"JUL-273": \{"yesAt": "<UTC time>", "said": "<his words>"\}` into docs\/scorecards\/uat\.json/);
+});
+
+test('a scorecard that has its yes, or no run records to judge, gets no reminder', () => {
+  const said = buildScorecard({ card: 'JUL-273', threads: [thread], prices, tracing: { metrics: [], requested: [] }, pulls: [], pings: [], uat: { yesAt: T('19:30'), said: 'approve it' } });
+  assert.doesNotMatch(renderScorecard(said), /docs\/scorecards\/uat\.json/);
+  const noRuns = buildScorecard({ card: 'JUL-301', threads: [], prices, tracing: { metrics: [], requested: [] }, pulls: [], pings: [] });
+  assert.doesNotMatch(renderScorecard(noRuns), /docs\/scorecards\/uat\.json/);
+});
