@@ -549,7 +549,7 @@ export function renderScorecard(s, generatedAt = new Date()) {
   if (!s.stops.length) lines.push('None.');
   else {
     const counts = x => (x.isUatWait ? (x.counts ? `yes: UAT wait that also asked ${s.uat.alsoAsked}` : 'no: the UAT wait itself') : x.counts ? 'yes' : 'no: after the UAT yes');
-    const ping = x => (x.ping ? (x.ping.comment ? `[comment](${x.ping.comment})${x.ping.notified ? ' + reminder' : ', Todd not notified'}` : 'recorded, not posted') : 'none recorded');
+    const ping = x => (x.ping ? (x.ping.comment ? `[comment](${x.ping.comment})${x.ping.notify ? ` + ${x.ping.notify}` : x.ping.notified ? ' + reminder' : ', Todd not notified'}` : 'recorded, not posted') : 'none recorded');
     lines.push('| # | Waiting since (UTC) | Length | Kind | Counts against success | Ping |', '| --- | --- | --- | --- | --- | --- |');
     s.stops.forEach((x, i) => lines.push(`| ${i + 1} | ${utc(x.since)} | ${minutes(x.resumed - x.since)} | ${x.kind} | ${cell(counts(x))} | ${ping(x)} |`));
     lines.push('', '### What each stop asked', '');

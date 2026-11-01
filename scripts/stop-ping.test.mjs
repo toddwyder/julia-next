@@ -232,3 +232,42 @@ test('a stop in a resumed session pings the card of the session it resumed', asy
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// The machine comments as the Julia controller app now, not as Todd, and Linear
+// notifies a mention in somebody else's comment. A record that still said
+// "reminder" would claim the app reminded itself, and the scorecard would read it
+// as Todd being notified.
+test('the stop record says the mention reached Todd when the app wrote the comment', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'stop-ping-mention-'));
+  try {
+    const env = { XDG_STATE_HOME: root, MASTRA_APP_DATA_DIR: root, LINEAR_API_KEY: 'test' };
+    const result = await handleStop({ session_id: 'thread-app', cwd: '/home/ubuntu/repo', reason: 'agent_done' }, env, {
+      threadCardFor: () => 'JUL-313',
+      projectPathFor: () => undefined,
+      post: async () => ({ url: 'https://linear/313' }),
+      remind: async () => ({ viewer: { name: 'Julia controller' }, issueReminder: { success: true } }),
+    });
+    assert.equal(result.posted, true);
+    assert.equal(result.author, 'Julia controller');
+    assert.equal(result.notify, 'mention');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a comment written as Todd still needs the reminder, and the record says so', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'stop-ping-self-'));
+  try {
+    const env = { XDG_STATE_HOME: root, MASTRA_APP_DATA_DIR: root, LINEAR_API_KEY: 'test' };
+    const result = await handleStop({ session_id: 'thread-todd', cwd: '/home/ubuntu/repo', reason: 'agent_done' }, env, {
+      threadCardFor: () => 'JUL-274',
+      projectPathFor: () => undefined,
+      post: async () => ({ url: 'https://linear/274' }),
+      remind: async () => ({ viewer: { name: 'Todd Wyder' }, issueReminder: { success: true } }),
+    });
+    assert.equal(result.author, 'Todd Wyder');
+    assert.equal(result.notify, 'reminder');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
