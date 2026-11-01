@@ -7,7 +7,7 @@ const VERDICT = /(PASS\+NOTES|PASS|FAIL)/i;
 
 export function criteriaFromCard(description) {
   const text = String(description ?? '');
-  const heading = /^#{1,6}[ \t]*criteria[ \t]*$/im.exec(text);
+  const heading = /^#{1,6}[ \t]*(?:acceptance[ \t]+)?criteria[ \t]*$/im.exec(text);
   if (!heading) return [];
   const after = text.slice(heading.index + heading[0].length);
   const next = /^#{1,6}[ \t]+\S/m.exec(after);

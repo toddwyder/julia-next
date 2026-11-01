@@ -95,3 +95,20 @@ test('accepts a PR, which Todd reads on GitHub', () => {
   assert.deepEqual(checkCriterion({ id: 'AC1', text: 'The PR carries the title the building agent wrote.' }), []);
   assert.deepEqual(checkCriterion({ id: 'AC1', text: 'Shipping runs the pull request itself.' }), []);
 });
+
+test('refuses a criterion that names a specific model', () => {
+  const findings = checkCriterion({ id: 'AC1', text: 'The determination names commandcode/reflection/beam:free.' });
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /AC1 names the model "commandcode\//);
+});
+
+test('accepts a criterion that names a kind of model', () => {
+  assert.deepEqual(checkCriterion({ id: 'AC1', text: 'The Shipping review runs on a free model.' }), []);
+  assert.deepEqual(checkCriterion({ id: 'AC1', text: 'The build runs on a paid model.' }), []);
+});
+
+test('refuses a criterion naming a model family only', () => {
+  const findings = checkCriterion({ id: 'AC1', text: 'The build runs on DeepSeek.' });
+  assert.equal(findings.length, 1);
+  assert.match(findings[0], /names the model "deepseek"/i);
+});

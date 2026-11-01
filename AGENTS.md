@@ -10,6 +10,7 @@ Julia uses pstack (adopted 22 October 2026). pstack builds and proves. This file
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
 - Every card's PR includes its scorecard, built with `node scripts/scorecard.mjs JUL-<n> --write`, and every stop pings Todd; the rest is in [docs/adr/0024-run-scorecard-and-stop-ping.md](docs/adr/0024-run-scorecard-and-stop-ping.md). Money never stops a card.
 - Framework facts come from the installed packages and their version-matched official docs.
+- A rule or an acceptance criterion names a kind of model, a free model or a paid model. A specific model lives in the pstack models file and in the dated decision that chose it; Triage runs `node scripts/check-agent-brief.mjs`, which flags a criterion that names one.
 - Commit and push as you go, and open the pull request in the same step: `check-branch-pr` fails any branch that is pushed without one. Publish with gh using the ordinary signed-in GitHub access.
 
 ## Todd

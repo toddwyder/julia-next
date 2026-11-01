@@ -55,10 +55,6 @@ asks the same model again.
 
 ## The cards it reads
 
-The card must have a `## Criteria` section with one bullet per criterion. The
-machine judges nothing itself: it prints the criteria, hands them to the
-Shipping agent, and writes down what came back.
-
-Write a criterion as a command plus a condition that stays true while the branch
-changes, never a count. A criterion that said "runs 7 tests" failed this slice's
-own pull request the moment an eighth test was added, and the agent was right.
+The card must have an `## Acceptance criteria` section with one bullet per criterion. Cards written
+before that rule have a `## Criteria` section, which reads the same way. The machine judges nothing
+itself: it prints the criteria, hands them to the Shipping agent, and writes down what came back.
