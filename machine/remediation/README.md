@@ -68,3 +68,8 @@ determination looks the same on both machines.
 
 **A failing review is a result, not a fault.** The loop only refuses to start
 when there is no card or the card names no criteria.
+
+The workflow modules come from the installed Mastra Code program, the same way
+Shipping's do, so `workflow.test.mjs` needs that program as well. It runs on the
+server; a runner without the program reports those rounds as skipped and names
+the packages that are missing.

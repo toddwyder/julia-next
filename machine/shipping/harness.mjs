@@ -5,18 +5,28 @@
 // made the changes this machine reviews (see docs/plans/path-forward.md and
 // the deviation rows in docs/pstack-deviations.md).
 
+import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const programDir = process.env.MASTRACODE_PROGRAM_DIR || path.join(os.homedir(), '.local', 'lib', 'mastracode-program');
 const modules = path.join(programDir, 'node_modules');
+const NEEDED = ['@mastra/code-sdk', '@mastra/core', '@mastra/libsql', '@libsql/client', 'zod'];
 
 async function load(relative) {
   return import(pathToFileURL(path.join(modules, relative)).href);
 }
 
 export const harness = { programDir, modules };
+
+// A checkout without the installed program cannot boot anything, which is how a
+// runner without Mastra Code fails: name the missing packages instead of dying
+// on the first import.
+export function missingProgram() {
+  const missing = NEEDED.filter(name => !existsSync(path.join(modules, name)));
+  return missing.length ? `the installed Mastra Code program has no ${missing.join(', ')} under ${programDir}` : null;
+}
 
 export async function loadMastra() {
   const [codeSdk, project, threadLock, workflows, requestContext, zod, core, libsql, libsqlClient] = await Promise.all([

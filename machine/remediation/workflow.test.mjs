@@ -7,8 +7,15 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { loadMastra } from '../shipping/harness.mjs';
+import { loadMastra, missingProgram } from '../shipping/harness.mjs';
 import { MAX_REVIEWS, createRemediationWorkflow, shouldInvestigate, shouldRemediate, shouldReview } from './workflow.mjs';
+
+// The chain needs a real Mastra, and those modules come from the installed
+// program rather than this repo's dependencies (docs/pstack-deviations.md row
+// 10). A runner without the program skips these rounds and says why; they run
+// on the server, where the machine runs.
+const programGap = missingProgram();
+const withoutProgram = programGap ? { skip: `${programGap}, so the loop's rounds run on the server instead` } : {};
 
 const CARD = {
   identifier: 'JUL-999',
@@ -134,7 +141,7 @@ async function runLoop(answers, deps = null) {
   return { started, calls: fakes.calls };
 }
 
-test('a first review that passes ends the loop without waking the builder', async () => {
+test('a first review that passes ends the loop without waking the builder', withoutProgram, async () => {
   const { started, calls } = await runLoop([PASS_ANSWER]);
   assert.equal(started.status, 'success', started.error);
   const record = started.result;
@@ -148,7 +155,7 @@ test('a first review that passes ends the loop without waking the builder', asyn
   assert.equal(calls.rounds.length, 1);
 });
 
-test('one FAIL hands that determination to the builder and a fresh review passes the fix', async () => {
+test('one FAIL hands that determination to the builder and a fresh review passes the fix', withoutProgram, async () => {
   const { started, calls } = await runLoop([FAIL_ANSWER, PASS_ANSWER]);
   assert.equal(started.status, 'success', started.error);
   const record = started.result;
@@ -181,7 +188,7 @@ test('one FAIL hands that determination to the builder and a fresh review passes
   assert.equal(calls.posts.length, 0, 'a found session needs no note on the card');
 });
 
-test('two FAILs in a row run the investigation once and stop with a ping that names the pull request and the root cause', async () => {
+test('two FAILs in a row run the investigation once and stop with a ping that names the pull request and the root cause', withoutProgram, async () => {
   const { started, calls } = await runLoop([FAIL_ANSWER, FAIL_ANSWER]);
   assert.equal(started.status, 'success', started.error);
   const record = started.result;
@@ -211,7 +218,7 @@ test('two FAILs in a row run the investigation once and stop with a ping that na
   assert.equal(record.stop.ping.posted, true);
 });
 
-test('a FAIL when the builder session is gone starts a fresh builder and says so on the card', async () => {
+test('a FAIL when the builder session is gone starts a fresh builder and says so on the card', withoutProgram, async () => {
   const fakes = fakeDeps({ answers: [FAIL_ANSWER, PASS_ANSWER] });
   fakes.deps.handToBuilder = async () => null;
   const { started, calls } = await runLoop(null, fakes);
@@ -229,7 +236,7 @@ test('a FAIL when the builder session is gone starts a fresh builder and says so
   assert.equal(record.reviews.length, 2);
 });
 
-test('a review that comes back with no verdict stops the loop instead of failing the card', async () => {
+test('a review that comes back with no verdict stops the loop instead of failing the card', withoutProgram, async () => {
   const fakes = fakeDeps({ answers: [FAIL_ANSWER, PASS_ANSWER] });
   // The free reviewer answers with a provider error now and then: it has not
   // judged anything, so the builder must not be handed the error to fix.
@@ -281,7 +288,7 @@ test('the review limit lives in one constant and the chain asks for at most that
   assert.equal(shouldInvestigate({ reviews: [{ verdict: 'FAIL' }] }), false);
 });
 
-test('the record is saved as each step finishes, so a crash keeps the rounds that already posted', async () => {
+test('the record is saved as each step finishes, so a crash keeps the rounds that already posted', withoutProgram, async () => {
   const { calls } = await runLoop([FAIL_ANSWER, PASS_ANSWER]);
   assert.ok(calls.saved.length >= 3, `expected a save per step, saw ${calls.saved.length}`);
   const last = calls.saved[calls.saved.length - 1];
