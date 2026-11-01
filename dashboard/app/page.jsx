@@ -20,5 +20,6 @@ async function ReadyCards() {
 export default function Page() {
   return <><header><p className="eyebrow">Julia dashboard</p><h1>Ready cards</h1><p>Choose a card to open its Start screen.</p></header>
     <Suspense fallback={<p role="status" className="loading">Loading Ready cards from Linear…</p>}><ReadyCards /></Suspense>
+    <p>Ready to cook</p>
   </>;
 }
