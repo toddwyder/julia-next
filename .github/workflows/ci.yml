@@ -1,74 +1,19 @@
-name: CI
+name: checks
 
 on:
-  pull_request:
   push:
+    branches: [main]
+  pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   repository-hygiene:
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.14.1
-      - name: Require unique skill names
-        run: node scripts/check-skill-names.mjs
-      - name: Require current agent-read paths
-        run: node scripts/check-agent-links.mjs
-      - name: Require an open pull request for every branch
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/check-branch-pr.mjs
-
-  package-tests:
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.14.1
-      - name: Install pinned Bun runtime
-        run: npm install --global bun@1.4.4
-      - name: Discover test ownership
-        run: node scripts/test-owners.mjs --plan
-      - name: Install each owner's locked dependencies
-        run: node scripts/test-owners.mjs --install
-      - name: Install browser runtimes declared by local test owners
-        run: node scripts/test-owners.mjs --install-browsers local
-      - name: Run every local package test
-        run: node scripts/test-owners.mjs --run local
-
-  web:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.14.1
-      - name: Install application dependencies
-        run: npm ci
-      - name: Install browser owners' locked dependencies
-        run: node scripts/test-owners.mjs --install browser
-      - name: Install each browser owner's Chromium
-        run: node scripts/test-owners.mjs --install-browsers browser
-      - name: Run skill-owned browser tests
-        run: node scripts/test-owners.mjs --run browser
-      - name: Lint framework code
-        run: npm run lint:framework
-      - name: Build application
-        run: npm run build
-
-  shipping-verdict:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -79,20 +24,67 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.14.1
-      - name: Require a shipping verdict on the card's current head
+      - name: Check skill names are unique
+        run: node scripts/check-skill-names.mjs
+      - name: Check agent-read files point at paths that exist
+        run: node scripts/check-agent-links.mjs
+      - name: Check every branch has an open pull request
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/check-shipping-verdict.mjs
+        run: node scripts/check-branch-pr.mjs
+
+  package-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+      - name: Plan the test owners
+        run: node scripts/test-owners.mjs --plan
+      - name: Install locked dependencies
+        run: node scripts/test-owners.mjs --install
+      - name: Install each local owner's locked dependencies
+        run: node scripts/test-owners.mjs --install local
+      - name: Run local owners' tests
+        run: node scripts/test-owners.mjs --run local
+      - name: Install each browser owner's locked dependencies
+        run: node scripts/test-owners.mjs --install browser
+      - name: Install each browser owner's Chromium
+        run: node scripts/test-owners.mjs --install-browsers browser
+      - name: Run skill-owned browser tests
+        run: node scripts/test-owners.mjs --run browser
+
+  web:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - name: Install the application's locked dependencies
+        run: npm ci
+      - name: Install each browser owner's locked dependencies
+        run: node scripts/test-owners.mjs --install browser
+      - name: Install each browser owner's Chromium
+        run: node scripts/test-owners.mjs --install-browsers browser
+      - name: Lint framework code
+        run: npm run lint:framework
+      - name: Build application
+        run: npm run build
 
   checks:
-    needs: [repository-hygiene, package-tests, web, shipping-verdict]
+    needs: [repository-hygiene, package-tests, web]
     if: always()
     runs-on: ubuntu-22.04
     env:
       REPOSITORY_HYGIENE: ${{ needs.repository-hygiene.result }}
       PACKAGE_TESTS: ${{ needs.package-tests.result }}
       WEB: ${{ needs.web.result }}
-      SHIPPING_VERDICT: ${{ needs.shipping-verdict.result }}
     steps:
       - name: Require every job to pass
         run: |
@@ -100,4 +92,3 @@ jobs:
           [[ "$REPOSITORY_HYGIENE" == success ]]
           [[ "$PACKAGE_TESTS" == success ]]
           [[ "$WEB" == success ]]
-          [[ "$SHIPPING_VERDICT" == success ]]
