@@ -38,10 +38,14 @@ dashboard is also driven, in a real browser, at its own address
 - It builds in the pull request's own worktree, so the code it serves is the
   commit under review, and it refuses to run when the build is older than the
   checkout.
-- Its records folder is seeded from a **copy** of the live dashboard's
-  `models.json` and nothing else, so clicks in the preview never reach the live
-  records. The live folder is hashed before and after the run and the record
-  says whether it stayed identical.
+- Its records folder starts empty and is seeded from a **copy** of the live
+  dashboard's `models.json` and nothing else, so clicks in the preview never
+  reach the live records. Kept from the last run, those clicks make the same
+  change pass once and fail twice, which is how that was found. The live folder
+  is hashed before and after the run and the record says whether it stayed
+  identical. The live service rewrites its own watchdog, build and sweep files
+  on timers, so those three are not blamed on the preview; everything else is
+  compared file by file and a difference is a failing line naming the file.
 - It starts through `scripts/julia-agents.mjs`, the same vault launcher the live
   service uses, so it gets Linear access without a key on disk. Only whether a
   key was present is ever reported, never its value.
@@ -52,7 +56,11 @@ dashboard is also driven, in a real browser, at its own address
 ## One PASS or FAIL
 
 The record lists every line with its result: the preview address and how long
-the build took, each check, each proof, and the live records comparison. On a
+the build took, each check, each proof, and the live records comparison. A proof
+line carries its counts, and a proof that exits 0 without collecting a test is a
+failure rather than a pass. A failed proof names the lines that failed, and the
+whole output of every proof is kept under `proofs/` beside the record, because
+the person reading the record was not at the terminal. On a
 FAIL the card goes back to the build with the failing lines. The second FAIL on
 the same pull request stops the card and pings Todd instead of sending it back a
 third time. Remediation is not involved: the fix is the builder's own next
@@ -68,8 +76,8 @@ Flags: `--no-post` writes the record into `.artifacts/preview/pr-<n>/` without
 posting it, `--force` reruns a commit that already has a record, `--card-file
 <path>` reads the card from a file instead of Linear.
 
-The run folder holds `worktree/`, `state.db`, `record.json`, `record.md` and a
-trace file per run. A crashed run leaves the record of the steps that finished,
+The run folder holds `worktree/`, `state.db`, `record.json`, `record.md`,
+`proofs/` and a trace file per run. A crashed run leaves the record of the steps that finished,
 and the failure count carries over from the previous record for that pull
 request.
 
