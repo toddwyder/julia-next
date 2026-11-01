@@ -13,6 +13,7 @@ function RecipeCount() {
   const { db } = useHousehold();
 
   useEffect(() => {
+    if (!db) return;
     let current = true;
     listRecipes(db).then(
       recipes => { if (current) { setCount(recipes.length); setError(''); } },
