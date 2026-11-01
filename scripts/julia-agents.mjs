@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { resolve,dirname } from 'node:path'
 export const agentsTokenPath='/home/ubuntu/.config/julia-agents/service-account-token'
 const referencesPath=fileURLToPath(new URL('./julia-agents.env',import.meta.url))
-const fields=new Set(['COMMANDCODE_API_KEY','LINEAR_API_KEY','SENTRY_AUTH_TOKEN','NEXT_PUBLIC_SENTRY_DSN','SENTRY_ORG','SENTRY_PROJECT','AXIOM_TOKEN','AXIOM_DATASET','STITCH_API_KEY'])
+const tokenScript=fileURLToPath(new URL('./linear-token.mjs',import.meta.url))
+const fields=new Set(['COMMANDCODE_API_KEY','LINEAR_API_KEY','LINEAR_CLIENT_ID','LINEAR_CLIENT_SECRET','LINEAR_OAUTH_SCOPE','SENTRY_AUTH_TOKEN','NEXT_PUBLIC_SENTRY_DSN','SENTRY_ORG','SENTRY_PROJECT','AXIOM_TOKEN','AXIOM_DATASET','STITCH_API_KEY'])
 export function runAgentsCommand(argv,{tokenPath=agentsTokenPath,environment=process.env}={}){
  try{
   if(!Array.isArray(argv)||!argv.length||argv.some(s=>typeof s!=='string'||!s))throw Error()
@@ -18,7 +19,7 @@ export function runAgentsCommand(argv,{tokenPath=agentsTokenPath,environment=pro
   Object.assign(env,{OP_SERVICE_ACCOUNT_TOKEN:token,OP_BIOMETRIC_UNLOCK_ENABLED:'false',OP_CACHE:'false'})
   const auth=spawnSync('op',['user','get','--me','--format=json'],{env,encoding:'utf8',timeout:30000})
   if(auth.status!==0||auth.error||JSON.parse(auth.stdout).type!=='SERVICE_ACCOUNT')throw Error()
-  const child=spawnSync('op',['run','--env-file',referencesPath,'--',...argv],{env,stdio:'inherit',timeout:undefined})
+  const child=spawnSync('op',['run','--env-file',referencesPath,'--',process.execPath,tokenScript,'--',...argv],{env,stdio:'inherit',timeout:undefined})
   if(child.error)throw Error()
   return child.status??1
  }catch{

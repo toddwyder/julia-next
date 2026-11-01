@@ -16,7 +16,7 @@ Run commands that need Julia credentials through this wrapper from the repositor
 node scripts/julia-agents.mjs -- <command> [args...]
 ```
 
-The wrapper reads `/home/ubuntu/.config/julia-agents/service-account-token`, clears inherited 1Password authentication overrides, and invokes `op run --env-file=scripts/julia-agents.env`. Never print credentials, OAuth links or codes, pairing material, or raw credential-bearing subprocess output.
+The wrapper reads `/home/ubuntu/.config/julia-agents/service-account-token`, clears inherited 1Password authentication overrides, and invokes `op run --env-file=scripts/julia-agents.env`. It then runs the command through `scripts/linear-token.mjs`, which trades the "Julia controller" app's client pair for a Linear access token at the start of every run and passes it as `LINEAR_API_KEY` in the form `Bearer <token>`, so no long-lived Linear key sits on the machine. Never print credentials, OAuth links or codes, pairing material, or raw credential-bearing subprocess output.
 
 ## The dashboard service
 

@@ -58,7 +58,7 @@ test('the command runs with a fresh Bearer header and without the secret', async
 test('a refused grant stops the command instead of running it without access', async () => {
   let spawned = false;
   await assert.rejects(runWithFreshToken(['node', 'x.mjs'], {
-    env: clients,
+    env: { LINEAR_CLIENT_ID: clients.clientId, LINEAR_CLIENT_SECRET: clients.clientSecret },
     fetchImpl: answering({ error: 'invalid_client', error_description: 'Client authentication failed' }, 401),
     spawn: () => { spawned = true; return { status: 0 }; },
   }), /invalid_client/);
