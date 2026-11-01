@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { REVIEW_TIME_LIMIT_MS, runWithinTimeLimit } from './workflow.mjs';
+import { REVIEW_TIME_LIMIT_MS, reviewLimitNote, runWithinTimeLimit } from './workflow.mjs';
 
 const neverAnswers = () => new Promise(() => {});
 
@@ -46,4 +46,9 @@ test('a review that answers is handed back and the clock does not hold the proce
 
 test('a review is given twenty minutes by default', () => {
   assert.equal(REVIEW_TIME_LIMIT_MS, 20 * 60_000);
+});
+
+test('the note the stop quotes counts minutes in plain words', () => {
+  assert.equal(reviewLimitNote(60_000), 'longer than 1 minute');
+  assert.equal(reviewLimitNote(20 * 60_000), 'longer than 20 minutes');
 });

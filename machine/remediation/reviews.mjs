@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { stopHarness } from '../shipping/harness.mjs';
-import { runShipping, FREE_MODEL, PLAYBOOK, WORKFLOW_ID } from '../shipping/workflow.mjs';
+import { runShipping, REVIEW_TIME_LIMIT_MS, reviewLimitNote, FREE_MODEL, PLAYBOOK, WORKFLOW_ID } from '../shipping/workflow.mjs';
 import { commandsFromSpans, determinationComment, playbookSteps } from '../shipping/determination.mjs';
 import { readSpans, workflowRun } from '../shipping/trace-record.mjs';
 import { postComment, traceFileFor } from '../shipping/run-parts.mjs';
@@ -20,7 +20,7 @@ export const REVIEW_ATTEMPTS = 3;
 
 const firstLine = text => String(text ?? '').trim().split(/\r?\n/)[0].slice(0, 300);
 
-export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL, post = true, log = console.log }) {
+export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL, post = true, timeLimitMs = REVIEW_TIME_LIMIT_MS, log = console.log }) {
   let attemptUsed = null;
   for (let attempt = 1; attempt <= REVIEW_ATTEMPTS; attempt++) {
     const name = attempt === 1 ? `review-${round}` : `review-${round}-try-${attempt}`;
@@ -42,6 +42,7 @@ export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL,
       cardRecord: record.card,
       modelId,
       storage,
+      timeLimitMs,
       log,
     });
     if (run.booted) await stopHarness(run.booted);
@@ -49,11 +50,19 @@ export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL,
     const verdict = run.verdict ?? null;
     attemptUsed = { run, verdict, traceFile };
     if (verdict?.verdict) break;
+    // A review the clock ended is a hang, not the provider hiccup a fresh
+    // session fixes: asking another reviewer would hang the same way.
+    if (run.timedOut) break;
     if (attempt === REVIEW_ATTEMPTS) break;
     log(`The reviewer answered without a verdict: ${firstLine(verdict?.raw ?? run.error ?? 'no answer')}. Asking a new one (${attempt + 1} of ${REVIEW_ATTEMPTS}).`);
   }
 
   const { run, verdict, traceFile } = attemptUsed;
+  // The round still writes and posts its determination with no verdict, so the
+  // answer says what actually happened instead of pretending the review ran.
+  const timedOutNote = run.timedOut
+    ? `the review ran ${reviewLimitNote(timeLimitMs)} and was ended without a verdict`
+    : null;
   const spans = await readSpans(traceFile);
   const workflowSpan = workflowRun(spans, WORKFLOW_ID);
   const { commands, otherTools } = commandsFromSpans(spans);
@@ -100,7 +109,7 @@ export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL,
   return {
     modelId: run.output?.modelId ?? modelId,
     verdict: verdict?.verdict ?? null,
-    answer: verdict?.raw ?? run.output?.answer ?? '',
+    answer: timedOutNote ?? verdict?.raw ?? run.output?.answer ?? '',
     failed,
     determination,
     postedUrl,
