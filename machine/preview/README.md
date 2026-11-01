@@ -5,7 +5,10 @@ passed, puts it on a preview where the change needs one, runs the proofs that
 fit, and records **one PASS or FAIL** that names every check and every proof.
 
 A skipped check counts as a failure. So does a proof that could not run, because
-a proof nobody ran is the same to a reader as a proof that passed.
+a proof nobody ran is the same to a reader as a proof that passed. A command
+that exits 0 having collected nothing proves nothing either: a test suite must
+print a summary with tests in it, a lane run must report every lane the checkout
+declares, and skipping where a skip means the engine was missing is a failure.
 
 ## What it does
 
@@ -16,7 +19,9 @@ a proof nobody ran is the same to a reader as a proof that passed.
 2. **preview** builds that exact checkout and starts a second copy of the
    dashboard at its own address, with its own records folder. Only for a change
    that touches `dashboard/`.
-3. **checks** reads the pull request's check runs for that commit.
+3. **checks** reads the pull request's check runs for that commit, and the jobs
+   its workflow runs defined. A job that never reported is a failing line: green
+   on three jobs out of four is not green.
 4. **proofs** runs the commands whose exit codes it can read.
 5. **settle** stops the preview copy, compares the live dashboard's records with
    the ones it hashed before the run, and posts the record.
@@ -42,10 +47,12 @@ dashboard is also driven, in a real browser, at its own address
   dashboard's `models.json` and nothing else, so clicks in the preview never
   reach the live records. Kept from the last run, those clicks make the same
   change pass once and fail twice, which is how that was found. The live folder
-  is hashed before and after the run and the record says whether it stayed
-  identical. The live service rewrites its own watchdog, build and sweep files
-  on timers, so those three are not blamed on the preview; everything else is
-  compared file by file and a difference is a failing line naming the file.
+  is hashed before and after the run and the record says whether any record the
+  machine could move changed. The live service rewrites its own watchdog, build,
+  sweep and model files on timers, so those four are not blamed on the preview;
+  the model file is refreshed from the account by the weekly sweep, and a good
+  preview must not fail for it. Everything else is compared file by file, and a
+  difference is a failing line naming the file.
 - It starts through `scripts/julia-agents.mjs`, the same vault launcher the live
   service uses, so it gets Linear access without a key on disk. Only whether a
   key was present is ever reported, never its value.
@@ -65,7 +72,9 @@ FAIL the card goes back to the build with the failing lines. The second FAIL on
 the same pull request stops the card and pings Todd instead of sending it back a
 third time. Remediation is not involved: the fix is the builder's own next
 change. A run of a commit it has already judged does nothing unless it is forced,
-so a stop comes from two different commits or from someone asking twice.
+so a stop comes from two different commits or from someone asking twice. The ping
+to Todd is sent before the pull request comment, so a post that GitHub refuses
+cannot swallow the one message that has to arrive.
 
 ## Running it
 
@@ -80,7 +89,8 @@ posting it, `--force` reruns a commit that already has a record, `--card-file
 The run folder holds `worktree/`, `state.db`, `record.json`, `record.md`,
 `proofs/` and a trace file per run. A crashed run leaves the record of the steps that finished,
 and the failure count carries over from the previous record for that pull
-request.
+request: a crash before the verdict does not wipe the first failure, so the
+second one still stops the card.
 
 ## Where the pieces come from
 
