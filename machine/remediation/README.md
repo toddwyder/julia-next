@@ -18,6 +18,10 @@ below), `--builder-model` the model a fresh builder or the investigation gets.
 whose Linear key is gone. `--review-timeout-min <n>` sets how long one review may
 run before it is ended (default 20).
 
+The loop's own record lives at `.artifacts/remediation/pr-<n>/record.json`. It is
+what tells a later reader how many rounds ran, what each one decided, and where the
+loop stopped, so a stop can be answered without reading the comments again.
+
 ## What happens, in order
 
 1. `run.mjs` fetches `pull/<n>/head` into `.artifacts/remediation/pr-<n>/worktree`
