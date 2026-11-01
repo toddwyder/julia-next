@@ -4,12 +4,12 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { buildMark, emptyState, evidenceDigest, freePort, sameDigest, seedState, startPreview, stopPreview, waitForAnswer } from './preview.mjs';
+import { buildMark, changedSince, emptyState, evidenceDigest, freePort, liveTrouble, sameDigest, seedState, startPreview, stopPreview, waitForAnswer } from './preview.mjs';
 
 function workspace() {
   return mkdtempSync(join(tmpdir(), 'preview-'));
@@ -47,6 +47,44 @@ test('the digest of a folder that is gone is compared as nothing, never as equal
   assert.equal(sameDigest(evidenceDigest(workspace()), evidenceDigest(workspace())), true);
 });
 
+test('what moved between two readings is named file by file', () => {
+  const dir = workspace();
+  put(dir, 'models.json', 'models');
+  put(dir, 'draft.json', 'one');
+  const before = evidenceDigest(dir);
+  put(dir, 'draft.json', 'two');
+  put(dir, 'new.json', 'new');
+  unlinkSync(join(dir, 'models.json'));
+
+  assert.deepEqual(changedSince(before, evidenceDigest(dir)), [
+    { path: 'draft.json', how: 'changed' },
+    { path: 'models.json', how: 'went away' },
+    { path: 'new.json', how: 'appeared' },
+  ]);
+});
+
+test('the live service writing its own files is not blamed on the preview', () => {
+  const live = workspace();
+  put(live, 'models.json', 'models');
+  put(live, 'watchdog.json', 'one');
+  put(live, 'runs/jul-290.json', 'run');
+  const before = evidenceDigest(live);
+  put(live, 'watchdog.json', 'two');
+  put(live, 'runs/jul-290.json', 'run, again');
+
+  assert.deepEqual(liveTrouble(before, evidenceDigest(live)), [{ path: 'runs/jul-290.json', how: 'changed' }]);
+});
+
+test('a live records folder the preview never moved has nothing to answer for', () => {
+  const live = workspace();
+  put(live, 'models.json', 'models');
+  put(live, 'watchdog.json', 'one');
+  const before = evidenceDigest(live);
+  put(live, 'watchdog.json', 'two');
+
+  assert.deepEqual(liveTrouble(before, evidenceDigest(live)), []);
+});
+
 test('the preview seeds the models file and nothing else from the live records', () => {
   const live = workspace();
   const preview = workspace();
@@ -58,6 +96,18 @@ test('the preview seeds the models file and nothing else from the live records',
 
   assert.equal(seeded.file, join(preview, 'state', 'models.json'));
   assert.equal(readFileSync(seeded.file, 'utf8'), '{"groups":[]}');
+  assert.deepEqual(evidenceDigest(preview).files.map(file => file.path), ['state/models.json']);
+});
+
+test('a second run starts from the live records, not from the first run\'s clicks', () => {
+  const live = workspace();
+  const preview = workspace();
+  put(live, 'models.json', '{"groups":[]}');
+  put(preview, 'state/draft.json', '{"draft":"from the first run"}');
+  put(preview, 'state/runs/jul-1.json', '{"id":"jul-1"}');
+
+  seedState({ from: live, to: preview });
+
   assert.deepEqual(evidenceDigest(preview).files.map(file => file.path), ['state/models.json']);
 });
 

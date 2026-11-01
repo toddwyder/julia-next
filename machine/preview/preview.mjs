@@ -3,7 +3,7 @@
 // ever reads its state folder.
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { connect } from 'node:net';
 
@@ -38,9 +38,34 @@ export function sameDigest(before, after) {
   return before.digest === after.digest;
 }
 
+// The live service rewrites these on its own timers, so they move whether or not
+// a preview is running and cannot say who touched them.
+export const LIVE_TIMER_FILES = new Set(['watchdog.json', 'build.json', 'sweep-log.jsonl']);
+
+export function changedSince(before, after) {
+  const was = new Map((before?.files ?? []).map(file => [file.path, file.sha256]));
+  const now = new Map((after?.files ?? []).map(file => [file.path, file.sha256]));
+  const changed = [];
+  for (const [path, sha256] of now) {
+    if (!was.has(path)) changed.push({ path, how: 'appeared' });
+    else if (was.get(path) !== sha256) changed.push({ path, how: 'changed' });
+  }
+  for (const path of was.keys()) if (!now.has(path)) changed.push({ path, how: 'went away' });
+  return changed.sort((left, right) => (left.path < right.path ? -1 : left.path > right.path ? 1 : 0));
+}
+
+// What a preview could be blamed for: any live record that moved, other than the
+// ones the live service writes by itself.
+export function liveTrouble(before, after) {
+  return changedSince(before, after).filter(file => !LIVE_TIMER_FILES.has(file.path));
+}
+
 // The preview copies the live models file so its Start screen shows the same
 // choices Todd sees, and nothing else, so its clicks cannot reach live records.
+// The folder starts empty, because last run's clicks are not live records: kept,
+// they make the same change pass once and fail the second time.
 export function seedState({ from, to, file = 'models.json' } = {}) {
+  rmSync(to, { recursive: true, force: true });
   const target = join(to, 'state');
   mkdirSync(target, { recursive: true });
   copyFileSync(join(from, file), join(target, file));

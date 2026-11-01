@@ -96,6 +96,23 @@ test('live records that moved while the preview ran fail the change', () => {
   assert.deepEqual(judged.failing, ['live dashboard records: changed while the preview ran']);
 });
 
+test('the live failure names the record that moved, so the reader can look at it', () => {
+  const judged = verdictOf({
+    scope: 'machine',
+    checks: { ok: true, items: [passingCheck] },
+    proofs: [passingProof],
+    live: {
+      dir: '/var/lib/julia-dashboard/state',
+      before: { digest: 'a' },
+      after: { digest: 'b' },
+      unchanged: false,
+      touched: [{ path: 'runs/jul-290.json', how: 'changed' }],
+    },
+  });
+
+  assert.deepEqual(judged.failing, ['live dashboard records: touched while the preview ran: runs/jul-290.json changed']);
+});
+
 test('a run with no live folder to compare says so without failing the change', () => {
   const judged = verdictOf({ scope: 'machine', checks: { ok: true, items: [passingCheck] }, proofs: [passingProof], live: null });
 
@@ -116,7 +133,7 @@ test('the record lists every check and proof, and what failed only when somethin
       { kind: 'preview', name: 'preview', ok: true, detail: 'http://127.0.0.1:4401' },
       { kind: 'check', name: 'web', ok: true, detail: 'success' },
       { kind: 'proof', name: 'server tests', ok: true, detail: 'exited 0, 0 skipped' },
-      { kind: 'live', name: 'live dashboard records', ok: true, detail: 'identical before and after the preview run', skip: false },
+      { kind: 'live', name: 'live dashboard records', ok: true, detail: 'identical before and after the run', skip: false },
     ],
     failing: [],
     at: '2026-11-01T18:00:00.000Z',

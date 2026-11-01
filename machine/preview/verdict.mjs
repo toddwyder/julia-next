@@ -23,11 +23,13 @@ function previewItem({ scope, preview, previewGap }) {
 
 function liveItem(live) {
   if (!live?.dir) return { kind: 'live', name: 'live dashboard records', ok: true, detail: 'not compared: no live state folder was given', skip: true };
+  if (live.unchanged === true) return { kind: 'live', name: 'live dashboard records', ok: true, detail: 'identical before and after the run' };
+  const touched = (live.touched ?? []).map(file => `${file.path} ${file.how}`).join(', ');
   return {
     kind: 'live',
     name: 'live dashboard records',
-    ok: live.unchanged === true,
-    detail: live.unchanged === true ? 'identical before and after the preview run' : 'changed while the preview ran',
+    ok: false,
+    detail: touched ? `touched while the preview ran: ${touched}` : 'changed while the preview ran',
   };
 }
 

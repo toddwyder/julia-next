@@ -2,7 +2,7 @@
 // dependencies so the decisions can be read and tested without a live server.
 import { checksVerdict } from './checks.mjs';
 import { DASHBOARD_PROOFS, LOCAL_TESTS, programReason, proofResult, proofThatCouldNotRun, proofsFor } from './proofs.mjs';
-import { sameDigest } from './preview.mjs';
+import { changedSince, liveTrouble } from './preview.mjs';
 import { scopeOf, scopeReason } from './scope.mjs';
 
 export const MAX_FAILS = 2;
@@ -96,7 +96,11 @@ export async function proofs(deps, state) {
 export async function settle(deps, state, { verdictOf, failedBefore = 0 } = {}) {
   await deps.stopPreview();
   const live = state.live ? { ...state.live, after: deps.digest(state.live.dir) } : null;
-  if (live) live.unchanged = sameDigest(live.before, live.after);
+  if (live) {
+    live.changed = changedSince(live.before, live.after);
+    live.touched = liveTrouble(live.before, live.after);
+    live.unchanged = live.touched.length === 0;
+  }
   const judged = verdictOf({
     scope: state.scope,
     checks: state.checks,
