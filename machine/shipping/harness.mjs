@@ -19,24 +19,33 @@ async function load(relative) {
 export const harness = { programDir, modules };
 
 export async function loadMastra() {
-  const [codeSdk, workflows, requestContext, zod] = await Promise.all([
+  const [codeSdk, workflows, requestContext, zod, core, libsql] = await Promise.all([
     load('@mastra/code-sdk/dist/index.js'),
     load('@mastra/core/dist/workflows/index.js'),
     load('@mastra/core/dist/request-context/index.js'),
     load('zod/index.js'),
+    load('@mastra/core/dist/index.js'),
+    load('@mastra/libsql/dist/index.js'),
   ]);
   return {
     bootLocalAgentController: codeSdk.bootLocalAgentController,
     createWorkflow: workflows.createWorkflow,
     createStep: workflows.createStep,
     RequestContext: requestContext.RequestContext,
+    Mastra: core.Mastra,
+    LibSQLStore: libsql.LibSQLStore,
     z: zod.z,
   };
 }
 
-export async function bootHarness({ cwd }) {
+// A caller that supplies storage owns the database the harness reads and writes,
+// so a run can be given its own file instead of the one the store defaults to.
+export async function bootHarness({ cwd, storage, createInitialThread = true, modes }) {
   const mastraTools = await loadMastra();
-  const booted = await mastraTools.bootLocalAgentController({ cwd, createInitialThread: true });
+  const config = { cwd, createInitialThread };
+  if (storage) config.storage = storage;
+  if (modes !== undefined) config.modes = modes;
+  const booted = await mastraTools.bootLocalAgentController(config);
   const session = booted.session;
   const mastra = booted.controller.getMastra?.() ?? booted.mastra;
   const requestContext = new mastraTools.RequestContext();

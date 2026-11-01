@@ -9,14 +9,10 @@
 // The harness reads this file's own environment first, so the trace path and
 // the state database are set below before any Mastra module is loaded.
 
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, '../..');
+import { postComment, prepareCheckout, repoRoot, savedPosting, traceFileFor } from './run-parts.mjs';
 
 const USAGE = `usage: node machine/shipping/run.mjs --pr <number> --card <JUL-number> [--model <id>] [--no-post] [--force]`;
 
@@ -37,56 +33,6 @@ function parseArgs(argv) {
   if (!Number.isInteger(options.pr) || options.pr <= 0) throw new Error(`--pr is required\n${USAGE}`);
   if (!/^[A-Z]+-\d+$/.test(String(options.card ?? ''))) throw new Error(`--card is required\n${USAGE}`);
   return options;
-}
-
-function git(args) {
-  return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-}
-
-function prepareCheckout(pr, runDir, checkout) {
-  git(['fetch', '--no-tags', '--quiet', 'origin', `pull/${pr}/head`]);
-  const sha = git(['rev-parse', 'FETCH_HEAD^{commit}']);
-  try {
-    git(['worktree', 'remove', '--force', checkout]);
-  } catch {
-    // No worktree there yet; the add below fails loudly if something else is.
-  }
-  try {
-    git(['worktree', 'prune']);
-  } catch {
-    // Prune is tidiness; a stale registration fails the add with a clear message.
-  }
-  fs.mkdirSync(runDir, { recursive: true });
-  git(['worktree', 'add', '--detach', '--quiet', checkout, sha]);
-  return sha;
-}
-
-function traceFileFor(pr) {
-  const dir = process.env.JULIA_TRACES_DIR || path.join(os.homedir(), '.local', 'share', 'mastracode', 'traces');
-  fs.mkdirSync(dir, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  return path.join(dir, `${stamp}-${process.pid}-shipping-pr-${pr}.duckdb`);
-}
-
-// A posting step reads the saved result first: a run that reached the pull request
-// and then died must not comment a second time when it is started again.
-function savedPosting(runDir, pr, sha, card) {
-  try {
-    const saved = JSON.parse(fs.readFileSync(path.join(runDir, 'record.json'), 'utf8'));
-    if (saved.pr !== pr || saved.sha !== sha || saved.card?.identifier !== card) return null;
-    return saved.posted?.url ? saved : null;
-  } catch {
-    return null;
-  }
-}
-
-function postComment(pr, bodyFile) {
-  const url = execFileSync('gh', ['pr', 'comment', String(pr), '--body-file', bodyFile], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
-  return url.split(/\s+/).find(part => part.startsWith('http')) ?? url;
 }
 
 async function main() {

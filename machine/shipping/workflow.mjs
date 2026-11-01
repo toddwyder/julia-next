@@ -58,9 +58,10 @@ export function reviewTask({ pr, sha, checkout, card, criteria }) {
   ].join('\n');
 }
 
-export async function runShipping({ pr, sha, checkout, card, modelId = FREE_MODEL, log = console.log }) {
+export async function runShipping({ pr, sha, checkout, card, modelId = FREE_MODEL, storage, log = console.log }) {
   const { z, createWorkflow, createStep } = await loadMastra();
-  const { booted, session, mastra, requestContext, subagent } = await bootHarness({ cwd: checkout });
+  const traceFile = process.env.MASTRA_OBSERVABILITY_DB_PATH ?? null;
+  const { booted, session, mastra, requestContext, subagent } = await bootHarness({ cwd: checkout, storage });
 
   const inputSchema = z.object({ pr: z.number(), sha: z.string(), checkout: z.string(), card: z.string() });
   const contextSchema = z.object({
@@ -137,6 +138,7 @@ export async function runShipping({ pr, sha, checkout, card, modelId = FREE_MODE
     output,
     verdict: output ? parseVerdict(output.answer) : null,
     error: result.status === 'success' ? null : JSON.stringify(result.error ?? result.status),
+    traceFile,
     booted,
   };
 }
