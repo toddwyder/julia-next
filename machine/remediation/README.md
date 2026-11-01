@@ -14,6 +14,9 @@ node scripts/julia-agents.mjs -- node machine/remediation/run.mjs --pr 412 --car
 runs are made. `--model` sets the Shipping model (default is the free Beam model
 below), `--builder-model` the model a fresh builder or the investigation gets.
 `--force` starts the loop again when the saved record says it already stopped.
+`--card-file <path>` reads the card from JSON instead of Linear, for a machine
+whose Linear key is gone. `--review-timeout-min <n>` sets how long one review may
+run before it is ended (default 20).
 
 ## What happens, in order
 
@@ -41,7 +44,10 @@ below), `--builder-model` the model a fresh builder or the investigation gets.
    fault in the process, then `finish` records the stop and pings Todd through
    `scripts/stop-ping.mjs` with the pull request link and the root cause.
 
-The review limit is one constant, `MAX_REVIEWS = 2` in `workflow.mjs`.
+The review limit is one constant, `MAX_REVIEWS = 2` in `workflow.mjs`. A review
+that has not answered after twenty minutes is ended by the clock in
+`machine/shipping/workflow.mjs`, its harness is stopped, and the round is written
+down as no verdict, which stops the loop instead of failing the card.
 
 ## One harness alive at a time
 
