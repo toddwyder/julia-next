@@ -140,7 +140,7 @@ export default function StartScreen({ card, groups, models, initial, mainSession
           </li>;
         })}
       </ul>
-      <p className={styles.whyText}>How hard the models think. More brains is slower and costs more.</p>
+      <p className={styles.whyText}>How hard the models think. More brains is slower and costs more, so pick the smallest effort that does the job.</p>
     </section>
 
     <section className={styles.section} aria-labelledby="models-heading">
