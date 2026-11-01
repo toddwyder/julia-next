@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { bodyGaps, branchesWithoutOpenPullRequests, scorecardGaps } from './check-branch-pr.mjs';
+import { branchesWithoutOpenPullRequests, scorecardGaps } from './check-branch-pr.mjs';
 
 const repository = 'toddwyder/julia-next';
 
@@ -78,23 +78,4 @@ test('a pull request that names a card still needs that card\'s scorecard, whate
   const gaps = scorecardGaps({ pulls: [pull({ body })], headRef: 'feat/jul-282', readFile: () => { throw new Error('ENOENT'); } });
   assert.equal(gaps.length, 1);
   assert.match(gaps[0], /names JUL-282 but docs\/scorecards\/JUL-282\.md is not on the branch/);
-});
-
-test('a draft body that names a card the branch does not ship is refused before it is published', () => {
-  const body = 'The second slice of JUL-299, proved on JUL-305.\n';
-  const onlyTheShippedCard = path => path === 'docs/scorecards/JUL-301.md' ? scorecard('**$0.27**') : (() => { throw new Error('ENOENT'); })();
-  const gaps = bodyGaps({ title: 'Ship the second slice (JUL-301)', body, readFile: onlyTheShippedCard });
-  assert.equal(gaps.length, 2);
-  assert.match(gaps[0], /This pull request names JUL-299 but docs\/scorecards\/JUL-299\.md is not on the branch/);
-  assert.match(gaps[1], /This pull request names JUL-305 but docs\/scorecards\/JUL-305\.md is not on the branch/);
-});
-
-test('a draft body that names only the card it ships passes', () => {
-  const gaps = bodyGaps({ title: 'Ship the second slice (JUL-301)', body: 'The second slice of the umbrella card.\n', readFile: () => scorecard('**$0.27**') });
-  assert.deepEqual(gaps, []);
-});
-
-test('a draft body that names no card still needs a reason', () => {
-  assert.match(bodyGaps({ title: 'Fix the font flake', body: '', readFile: () => scorecard('**$3.00**') })[0], /This pull request names no JUL card/);
-  assert.deepEqual(bodyGaps({ title: 'Fix the font flake', body: 'No card: a flake Todd asked about.\n', readFile: () => scorecard('**$3.00**') }), []);
 });

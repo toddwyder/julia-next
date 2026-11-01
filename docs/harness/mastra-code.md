@@ -90,19 +90,6 @@ That retry runs inside the same turn: `canRetryError` (`@mastra/core/dist/agent-
 
 On 29 October that shape cost 100 minutes. The turn stopped after a memory save at 23:39:18.597, the last span written for the thread, and the next recorded message is the human's at 01:18:36; one `retry 1/10` notice was all the screen showed. Tracing for the process stopped nine minutes later (23:47:27), so the store cannot show what happened after that. The patch fixes which policy matches, not the missing deadline: the durable answer is a deadline per API call upstream, plus the runner's own turn timeout (PR 6 of `docs/plans/jul-276-start-screen.md`). A cut-stream repro cannot stand in for it, because headless `mastracode -p` ends the turn about 6 s after a silent stream instead of hanging.
 
-## Your own program, driving one subagent
-
-`machine/shipping` is the worked example: a plain Node program that boots the harness, runs a Mastra workflow whose step calls the stock `subagent` tool, then reads the run's record back. Four facts it had to establish, none of them in a `.d.ts`:
-
-- Own the files. `MASTRA_OBSERVABILITY_DB_PATH` and `MASTRA_DB_PATH` point at files this run created (`scripts/mastracode` already does the first). A second process on the interactive session's files dies on a DuckDB lock, which is why `.artifacts/shipping/pr-<n>/state.db` exists.
-- The toolset comes from the controller: `controller.buildToolsets(session, requestContext)`, not from `session`. It returns `{ controllerBuiltIn }`, and `subagent` is in there only when the configuration enables subagents.
-- The tool needs a workspace: `subagent.execute(input, { workspace, requestContext, mastra })`.
-- Nothing is recorded unless the process flushes: `observability.flush()`, wait, `observability.shutdown()`, `storageMaintenance.closeStorage()`, wait, then exit. A bare `process.exit` leaves every table of the trace file empty while the file still looks written.
-
-Two run ids share one trace file. The `workflow_run` span carries the workflow's run id, and every `tool_call` span carries the subagent's `agent_run` run id instead. Filter a verifier's commands by the `agent_run` ids found in the same file, or the record reads empty (`machine/shipping/trace-record.mjs`).
-
-A model behind a custom provider is addressed with that provider's prefix. Free Beam is `commandcode/reflection/beam:free`; the bare `reflection/beam:free` fails at router config lookup even though a catalogue lists it, and the machine holds no `REFLECTION_API_KEY` at all.
-
 ## Unproven
 
 - Setting reasoning effort per subagent. Mastra Code 1.14.0 exposes no field for it at the tool or subagent-definition level; only the session `thinkingLevel` exists.
