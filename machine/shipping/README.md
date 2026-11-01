@@ -41,6 +41,11 @@ run that died after commenting cannot comment twice.
 A failing verdict is a result, not a fault: the run still writes its record and
 still posts. Only a run that cannot start writes nothing.
 
+A review that has not answered after twenty minutes is ended: the harness is
+stopped and the run returns a timeout instead of a verdict, so nothing waits on a
+person. `REVIEW_TIME_LIMIT_MS` in `workflow.mjs` is the limit; callers can pass
+`timeLimitMs` when they need a shorter one.
+
 ## Where the pieces come from
 
 The Mastra modules are loaded from the installed Mastra Code program

@@ -85,9 +85,16 @@ export function cardWindows(thread, events) {
     windows.push({ thread, card, start: user.at, end: Infinity });
   }
   if (!windows.length) {
-    // A chat started by naming the card rather than by a kickoff line still belongs to that card.
-    const card = (thread.title ?? '').match(/\bJUL-\d+\b/)?.[0] ?? (events.users[0]?.text ?? '').match(/\bJUL-\d+\b/)?.[0];
-    if (card && events.users.length) windows.push({ thread, card, start: events.users[0].at, end: Infinity });
+    // A chat started by naming the card rather than by a kickoff line still belongs
+    // to that card. The title is renamed as the work goes on and Mastra drifts it away
+    // from the card, so the opening turn is read too: the first turn that names a card
+    // counts only when it names one, because a turn naming several cards has no single
+    // card to bill.
+    const title = (thread.title ?? '').match(/\bJUL-\d+\b/)?.[0];
+    const opening = events.users.find(u => new Set(u.text?.match(/\bJUL-\d+\b/g) ?? []).size === 1);
+    const card = title ?? opening?.text.match(/\bJUL-\d+\b/)?.[0];
+    const start = title ? events.users[0]?.at : opening?.at;
+    if (card && start !== undefined) windows.push({ thread, card, start, end: Infinity });
   }
   return windows;
 }
@@ -110,10 +117,16 @@ export function findStops(events) {
   return stops;
 }
 
+// The store writes thread metadata with `jsonb()`, so the column holds SQLite's
+// binary JSON. `json_valid(metadata)` only says yes to text and answered no to
+// every thread, which lost each session's token counts; flag 6 asks about both
+// encodings and `json()` decodes either one.
+const METADATA_JSON = 'case when json_valid(metadata, 6) then json(metadata) end';
+
 export function readThreads(dbPath) {
   const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
-    return db.prepare("select id, title, case when json_valid(metadata) then json(metadata) end as metadata from mastra_threads").all().map(thread => {
+    return db.prepare(`select id, title, ${METADATA_JSON} as metadata from mastra_threads`).all().map(thread => {
       const rows = db.prepare('select role, type, createdAt, content from mastra_messages where thread_id = ? order by createdAt').all(thread.id);
       return { id: thread.id, title: thread.title, usage: JSON.parse(thread.metadata ?? '{}').tokenUsage, events: threadEvents(rows) };
     });
@@ -132,7 +145,7 @@ export function cardForThread(dbPath, threadId) {
 export function threadProjectPath(dbPath, threadId) {
   const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
-    const row = db.prepare('select case when json_valid(metadata) then json(metadata) end as metadata from mastra_threads where id = ?').get(threadId);
+    const row = db.prepare(`select ${METADATA_JSON} as metadata from mastra_threads where id = ?`).get(threadId);
     return row ? JSON.parse(row.metadata ?? '{}').projectPath : undefined;
   } finally {
     db.close();
@@ -536,7 +549,7 @@ export function renderScorecard(s, generatedAt = new Date()) {
   if (!s.stops.length) lines.push('None.');
   else {
     const counts = x => (x.isUatWait ? (x.counts ? `yes: UAT wait that also asked ${s.uat.alsoAsked}` : 'no: the UAT wait itself') : x.counts ? 'yes' : 'no: after the UAT yes');
-    const ping = x => (x.ping ? (x.ping.comment ? `[comment](${x.ping.comment})${x.ping.notified ? ' + reminder' : ', Todd not notified'}` : 'recorded, not posted') : 'none recorded');
+    const ping = x => (x.ping ? (x.ping.comment ? `[comment](${x.ping.comment})${x.ping.notify ? ` + ${x.ping.notify}` : x.ping.notified ? ' + reminder' : ', Todd not notified'}` : 'recorded, not posted') : 'none recorded');
     lines.push('| # | Waiting since (UTC) | Length | Kind | Counts against success | Ping |', '| --- | --- | --- | --- | --- | --- |');
     s.stops.forEach((x, i) => lines.push(`| ${i + 1} | ${utc(x.since)} | ${minutes(x.resumed - x.since)} | ${x.kind} | ${cell(counts(x))} | ${ping(x)} |`));
     lines.push('', '### What each stop asked', '');

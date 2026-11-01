@@ -4,7 +4,7 @@
 // anything: the answer comes back as text and the machine writes it down.
 
 import { getIssue } from '../../scripts/linear-cli.mjs';
-import { bootHarness, loadMastra } from './harness.mjs';
+import { bootHarness, loadMastra, stopHarness } from './harness.mjs';
 import { criteriaFromCard, parseVerdict } from './determination.mjs';
 
 export const WORKFLOW_ID = 'shipping';
@@ -15,6 +15,32 @@ const TRANSIENT = /(429|rate[ -]?limit|too many requests|temporarily unavailable
 const RETRY_WAITS_MS = [30_000, 90_000, 240_000];
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+export const REVIEW_TIME_LIMIT_MS = 20 * 60_000;
+
+export const reviewLimitNote = ms => {
+  const minutes = Math.round(ms / 60_000);
+  return `longer than ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+};
+
+// A review that never answers used to hold the run open until a person
+// noticed. The clock ends it and the caller records what it got.
+export async function runWithinTimeLimit(start, { limitMs = REVIEW_TIME_LIMIT_MS, onLimit = null, log = () => {} } = {}) {
+  let timer = null;
+  const limit = new Promise(resolve => {
+    timer = setTimeout(() => resolve({ timedOut: true }), limitMs);
+    timer.unref?.();
+  });
+  try {
+    const raced = await Promise.race([start().then(value => ({ timedOut: false, value })), limit]);
+    if (!raced.timedOut) return raced;
+    log(`The review ran ${reviewLimitNote(limitMs)} and was ended.`);
+    if (onLimit) await onLimit();
+    return { timedOut: true, value: undefined };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 async function askVerifier(subagent, payload, context, { log = () => {} } = {}) {
   for (let attempt = 0; ; attempt++) {
@@ -58,9 +84,10 @@ export function reviewTask({ pr, sha, checkout, card, criteria }) {
   ].join('\n');
 }
 
-export async function runShipping({ pr, sha, checkout, card, modelId = FREE_MODEL, log = console.log }) {
+export async function runShipping({ pr, sha, checkout, card, cardRecord = null, modelId = FREE_MODEL, storage, timeLimitMs = REVIEW_TIME_LIMIT_MS, log = console.log }) {
   const { z, createWorkflow, createStep } = await loadMastra();
-  const { booted, session, mastra, requestContext, subagent } = await bootHarness({ cwd: checkout });
+  const traceFile = process.env.MASTRA_OBSERVABILITY_DB_PATH ?? null;
+  const { booted, session, mastra, requestContext, subagent } = await bootHarness({ cwd: checkout, storage });
 
   const inputSchema = z.object({ pr: z.number(), sha: z.string(), checkout: z.string(), card: z.string() });
   const contextSchema = z.object({
@@ -77,9 +104,14 @@ export async function runShipping({ pr, sha, checkout, card, modelId = FREE_MODE
     inputSchema,
     outputSchema: contextSchema,
     execute: async ({ inputData }) => {
-      const apiKey = process.env.LINEAR_API_KEY;
-      if (!apiKey) throw new Error('LINEAR_API_KEY is not set, so the machine cannot read the card.');
-      const issue = await getIssue(inputData.card, { apiKey });
+      // A caller that already read the card hands it over, so the review can run
+      // on a machine whose Linear key is gone. Otherwise the card is read here.
+      let issue = cardRecord;
+      if (!issue) {
+        const apiKey = process.env.LINEAR_API_KEY;
+        if (!apiKey) throw new Error('LINEAR_API_KEY is not set, so the machine cannot read the card.');
+        issue = await getIssue(inputData.card, { apiKey });
+      }
       if (!issue) throw new Error(`Linear returned no card for ${inputData.card}`);
       const criteria = criteriaFromCard(issue.description);
       if (criteria.length === 0) throw new Error(`${inputData.card} names no criteria, so there is nothing to judge.`);
@@ -126,17 +158,37 @@ export async function runShipping({ pr, sha, checkout, card, modelId = FREE_MODE
   const run = await workflow.createRun();
   log(`Mastra workflow run ${run.runId} started.`);
   const started = Date.now();
-  const result = await run.start({ inputData: { pr, sha, checkout, card } });
+  const result = await runWithinTimeLimit(() => run.start({ inputData: { pr, sha, checkout, card } }), {
+    limitMs: timeLimitMs,
+    log,
+    onLimit: () => stopHarness(booted),
+  });
   const elapsedMs = Date.now() - started;
 
-  const output = result.status === 'success' ? result.result : null;
+  if (result.timedOut) {
+    return {
+      runId: run.runId,
+      status: 'timeout',
+      elapsedMs,
+      output: null,
+      verdict: null,
+      error: `The review ran ${reviewLimitNote(timeLimitMs)}, so it was ended without a verdict.`,
+      traceFile,
+      booted: null,
+      timedOut: true,
+    };
+  }
+
+  const output = result.value.status === 'success' ? result.value.result : null;
   return {
     runId: run.runId,
-    status: result.status,
+    status: result.value.status,
     elapsedMs,
     output,
     verdict: output ? parseVerdict(output.answer) : null,
-    error: result.status === 'success' ? null : JSON.stringify(result.error ?? result.status),
+    error: result.value.status === 'success' ? null : JSON.stringify(result.value.error ?? result.value.status),
+    traceFile,
     booted,
+    timedOut: false,
   };
 }

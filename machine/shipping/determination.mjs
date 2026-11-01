@@ -177,10 +177,11 @@ export function determinationComment({
   otherTools = [],
   steps = [],
   failed = null,
+  review = null,
 }) {
   const badge = verdict?.verdict ?? 'NO VERDICT';
   const lines = [];
-  lines.push(`Shipping agent: ${badge}`, '');
+  lines.push(`Shipping agent: ${badge}${review ? ` (review ${review.round} of ${review.of})` : ''}`, '');
   lines.push(`**Card** ${card?.identifier ?? 'unknown'} · **Pull request** #${pr} · **Commit** ${code(sha)}`, '');
   if (failed) lines.push(`The machine could not get a verdict: ${failed}`, '');
   lines.push('| Which | What |', '| --- | --- |');
