@@ -116,3 +116,42 @@ test('a conclusion nobody recognises is not a pass', () => {
   assert.equal(verdict.ok, false);
   assert.equal(verdict.items[0].conclusion, 'stale');
 });
+
+test('a job the commit started that never reported is a failure, not an absence', () => {
+  const verdict = checksVerdict([ran('checks', 'success'), ran('web', 'success')], SHA, {
+    expected: ['checks', 'package-tests', 'web'],
+  });
+
+  assert.equal(verdict.ok, false);
+  assert.deepEqual(verdict.failed, ['package-tests']);
+  assert.deepEqual(verdict.items.find(item => item.name === 'package-tests'), {
+    name: 'package-tests',
+    status: null,
+    conclusion: null,
+    sha: SHA,
+    ok: false,
+    absent: true,
+  });
+  assert.deepEqual(verdict.counts, { total: 3, passed: 2, failed: 1, skipped: 0 });
+});
+
+test('every job reporting and passing is a pass, whatever order they arrive in', () => {
+  const verdict = checksVerdict([ran('web', 'success'), ran('package-tests', 'success'), ran('checks', 'success')], SHA, {
+    expected: ['checks', 'package-tests', 'web'],
+  });
+
+  assert.equal(verdict.ok, true);
+  assert.deepEqual(verdict.items.map(item => item.name), ['checks', 'package-tests', 'web']);
+});
+
+test('a commit whose workflow started no job at all fails by name', () => {
+  const verdict = checksVerdict([], SHA, { expected: [] });
+
+  assert.equal(verdict.ok, false);
+  assert.ok(verdict.failed.includes('no workflow job is defined for this commit'));
+});
+
+test('when nobody asked what the workflow should have run, only the runs it saw are judged', () => {
+  assert.equal(checksVerdict([ran('web', 'success')], SHA).ok, true);
+  assert.equal(checksVerdict([ran('web', 'success')], SHA, { expected: null }).ok, true);
+});

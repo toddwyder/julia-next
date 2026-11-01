@@ -4,6 +4,7 @@
 
 const UNNAMED = '(unnamed check)';
 const NO_RUNS = 'no check runs for this commit';
+const NO_JOBS = 'no workflow job is defined for this commit';
 
 function text(value) {
   return typeof value === 'string' ? value : null;
@@ -59,8 +60,21 @@ export function checkItems(checkRuns, sha) {
     .sort(byName);
 }
 
-export function checksVerdict(checkRuns, sha) {
-  const items = checkItems(checkRuns, sha);
+// A check run is what GitHub reports for the commit, and a job that never
+// reported has no run at all, so the runs alone cannot say what is missing. The
+// workflow jobs the commit started are the list of what should be there, and a
+// job on that list with no run is a failure rather than an absence.
+function absentItems(items, expected, sha) {
+  const present = new Set(items.map(item => item.name));
+  return expected
+    .filter(name => typeof name === 'string' && name && !present.has(name))
+    .map(name => ({ name, status: null, conclusion: null, sha, ok: false, absent: true }));
+}
+
+export function checksVerdict(checkRuns, sha, { expected = null } = {}) {
+  const runs = checkItems(checkRuns, sha);
+  const jobs = Array.isArray(expected) ? expected : null;
+  const items = [...runs, ...absentItems(runs, jobs ?? [], sha)].sort(byName);
   const failed = items.filter(item => !item.ok).map(item => item.name);
   const counts = {
     total: items.length,
@@ -68,8 +82,10 @@ export function checksVerdict(checkRuns, sha) {
     failed: failed.length,
     skipped: items.filter(item => item.status === 'completed' && item.conclusion === 'skipped').length,
   };
-  if (items.length === 0) {
-    return { sha, ok: false, items, failed: [NO_RUNS], counts };
-  }
-  return { sha, ok: failed.length === 0, items, failed, counts };
+  // A commit whose workflow run started no job at all, and a commit with no
+  // readable run, are both failures the reader is told about by name.
+  if (jobs && jobs.length === 0) failed.push(NO_JOBS);
+  if (items.length === 0) failed.push(NO_RUNS);
+  const named = [...new Set(failed)];
+  return { sha, ok: named.length === 0, items, failed: named, counts };
 }
