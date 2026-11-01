@@ -77,7 +77,7 @@ export async function freePort({ host, from = PREVIEW_PORT_FROM, to = PREVIEW_PO
 // The launcher is the same vault wrapper the live service uses, so the preview
 // gets its Linear access the same way and no key is written to disk.
 export function startPreview({ dir, host, port, stateDir, spawnImpl = spawn, env = process.env } = {}) {
-  const child = spawnImpl(process.execPath, ['scripts/julia-agents.mjs', '--', 'node', 'server.js'], {
+  const child = spawnImpl(process.execPath, ['scripts/julia-agents.mjs', '--', 'node', 'dashboard/server.js'], {
     cwd: dir,
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],

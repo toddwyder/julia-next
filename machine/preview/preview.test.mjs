@@ -141,7 +141,7 @@ test('the preview starts through the launcher with its own address and records',
   const events = new EventEmitter();
   const spawned = [];
   const child = startPreview({
-    dir: '/tmp/worktree/dashboard',
+    dir: '/tmp/worktree',
     host: '100.119.112.9',
     port: 4401,
     stateDir: '/tmp/run/preview',
@@ -157,8 +157,8 @@ test('the preview starts through the launcher with its own address and records',
   });
 
   assert.equal(spawned.length, 1);
-  assert.deepEqual(spawned[0].argv, ['scripts/julia-agents.mjs', '--', 'node', 'server.js']);
-  assert.equal(spawned[0].options.cwd, '/tmp/worktree/dashboard');
+  assert.deepEqual(spawned[0].argv, ['scripts/julia-agents.mjs', '--', 'node', 'dashboard/server.js']);
+  assert.equal(spawned[0].options.cwd, '/tmp/worktree');
   assert.equal(spawned[0].options.detached, true);
   assert.equal(spawned[0].options.env.DASHBOARD_HOST, '100.119.112.9');
   assert.equal(spawned[0].options.env.DASHBOARD_PORT, '4401');
