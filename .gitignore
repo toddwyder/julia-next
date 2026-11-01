@@ -12,8 +12,9 @@ playwright-report/
 
 # Playwright CLI output (may contain credentials)
 .playwright-cli/
-# Local proof artifacts for verify-julia (retained after run cleanup)
-.artifacts/verify-julia/
+# Local run artifacts: proof kept by verify-julia, and the checkouts and records
+# the shipping machine writes beside it
+.artifacts/
 
 # Command Code local session state
 .commandcode/
