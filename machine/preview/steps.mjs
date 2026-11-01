@@ -37,7 +37,10 @@ export async function gather(deps, input) {
     verdict: null,
     items: [],
     failing: [],
-    failCount: 0,
+    // An interrupted run leaves this record behind, so the count has to come
+    // from where the run started rather than from zero, or a crash erases the
+    // first failure and the card is never stopped.
+    failCount: Number.isFinite(deps.failedBefore) ? deps.failedBefore : 0,
     stopped: false,
     at: new Date().toISOString(),
   };
@@ -59,7 +62,8 @@ export async function preview(deps, state) {
 export async function checks(deps, state) {
   try {
     const runs = await deps.checkRuns(state.sha);
-    return persist(deps, { ...state, checks: checksVerdict(runs, state.sha) });
+    const expected = await deps.workflowJobs(state.sha);
+    return persist(deps, { ...state, checks: checksVerdict(runs, state.sha, { expected }) });
   } catch (error) {
     // The pull request's checks decide whether the change is fit to look at. A
     // reader that could not reach them gets a failing line, not a silent pass.
@@ -88,12 +92,12 @@ export async function proofs(deps, state) {
       results.push(proofThatCouldNotRun(proof, `the command could not be started: ${error.message}`));
       continue;
     }
-    results.push(proofResult({ proof, code: run.code, seconds: run.seconds, output: run.output }));
+    results.push(proofResult({ proof, code: run.code, seconds: run.seconds, output: run.output, declared: run.declared ?? null }));
   }
   return persist(deps, { ...state, proofs: results });
 }
 
-export async function settle(deps, state, { verdictOf, failedBefore = 0 } = {}) {
+export async function settle(deps, state, { verdictOf, failedBefore = null } = {}) {
   await deps.stopPreview();
   const live = state.live ? { ...state.live, after: deps.digest(state.live.dir) } : null;
   if (live) {
@@ -109,7 +113,10 @@ export async function settle(deps, state, { verdictOf, failedBefore = 0 } = {}) 
     proofs: state.proofs,
     live,
   });
-  const failCount = judged.ok ? 0 : failedBefore + 1;
+  // A run that never reached its own settle still holds the count it started
+  // with, so the count is read from the state as well as from the caller.
+  const before = Number.isFinite(failedBefore) ? failedBefore : (Number.isFinite(state.failCount) ? state.failCount : 0);
+  const failCount = judged.ok ? 0 : before + 1;
   const record = {
     ...state,
     live,

@@ -29,7 +29,13 @@ function fakeDeps(overrides = {}) {
     digest: () => ({ files: [], digest: 'same' }),
     buildPreview: async ({ sha }) => ({ address: 'http://127.0.0.1:4401', sha, buildSeconds: 33.4, bootSeconds: 5 }),
     checkRuns: async () => [{ name: 'web', status: 'completed', conclusion: 'success', head_sha: 'commit-under-test' }],
-    runProof: async () => ({ code: 0, seconds: 1.5, output: 'ℹ skipped 0\n' }),
+    workflowJobs: async () => ['web'],
+    runProof: async proof => ({
+      code: 0,
+      seconds: 1.5,
+      output: proof.expects === 'lanes' ? 'lane 1 PASS  change the Building group model\n' : 'ℹ tests 3\nℹ pass 3\nℹ fail 0\nℹ skipped 0\n',
+      ...(proof.expects === 'lanes' ? { declared: 1 } : {}),
+    }),
     stopPreview: async () => {
       calls.stopped += 1;
       return { stopped: true };

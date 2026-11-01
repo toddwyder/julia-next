@@ -34,6 +34,7 @@ function fakeDeps(overrides = {}) {
       return { address: 'http://127.0.0.1:4401', sha, buildSeconds: 33.4, bootSeconds: 5 };
     },
     checkRuns: async () => [{ name: 'web', status: 'completed', conclusion: 'success', head_sha: 'commit-under-test' }],
+    workflowJobs: async () => ['web'],
     runProof: async proof => {
       calls.proofs.push(proof.name);
       return { code: 0, seconds: 1.5, output: 'ℹ skipped 0\n' };
@@ -200,4 +201,32 @@ test('a FAIL counts up across runs and the second one stops the card', async () 
   const second = await settle(deps, state, { verdictOf, failedBefore: 1 });
   assert.equal(second.failCount, MAX_FAILS);
   assert.equal(second.stopped, true);
+});
+
+test('a run that dies before its verdict does not erase the failure before it', async () => {
+  const { deps } = fakeDeps({
+    failedBefore: 1,
+    checkRuns: async () => [{ name: 'web', status: 'completed', conclusion: 'failure', head_sha: 'commit-under-test' }],
+  });
+  const gathered = await gather(deps, { pr: 412, card: CARD.identifier });
+
+  // The machine stops here the way a crash would, with only the gather record
+  // saved. The next run reads that record and must still know about failure one.
+  assert.equal(gathered.failCount, 1);
+  const next = await gather(deps, { pr: 412, card: CARD.identifier });
+  const judged = await settle(deps, { ...next, proofs: [] }, { verdictOf });
+
+  assert.equal(judged.verdict, 'FAIL');
+  assert.equal(judged.failCount, MAX_FAILS);
+  assert.equal(judged.stopped, true);
+});
+
+test('a workflow job that never reported is a failing check, named in the record', async () => {
+  const { deps } = fakeDeps({ workflowJobs: async () => ['checks', 'web'] });
+  const gathered = await gather(deps, { pr: 412, card: CARD.identifier });
+  const after = await checks(deps, gathered);
+
+  assert.equal(after.checks.ok, false);
+  assert.deepEqual(after.checks.failed, ['checks']);
+  assert.equal(after.checks.items.find(item => item.name === 'checks').absent, true);
 });

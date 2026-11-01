@@ -18,6 +18,7 @@ import { getIssue, postComment as commentOnCard } from '../../scripts/linear-cli
 import { readCardFile } from '../remediation/card-file.mjs';
 import { postComment, prepareCheckout, repoRoot, savedPosting } from '../shipping/run-parts.mjs';
 import { evidenceDigest, freePort, seedState, startPreview, stopPreview, waitForAnswer } from './preview.mjs';
+import { countLanes } from './proofs.mjs';
 import { buildNote, recordBody, stopMessage } from './verdict.mjs';
 
 const USAGE = 'usage: node machine/preview/run.mjs --pr <number> --card <JUL-number> [--card-file <path>] [--no-post] [--force]';
@@ -87,6 +88,22 @@ function checkRuns(sha) {
   return JSON.parse(gh(['api', `repos/${repo}/commits/${sha}/check-runs`, '--jq', '.check_runs']));
 }
 
+// The check runs only say what did report. The jobs the commit's workflow runs
+// started say what should have reported, so a job that never appeared is a
+// failure rather than a line nobody notices is missing.
+function workflowJobs(sha) {
+  const repo = gh(['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner']).trim();
+  const runs = JSON.parse(gh(['api', `repos/${repo}/actions/runs?head_sha=${sha}&per_page=100`, '--jq', '.workflow_runs']));
+  const names = new Set();
+  for (const run of Array.isArray(runs) ? runs : []) {
+    const jobs = JSON.parse(gh(['api', `repos/${repo}/actions/runs/${run.id}/jobs?per_page=100`, '--jq', '.jobs']));
+    for (const job of Array.isArray(jobs) ? jobs : []) {
+      if (job?.name) names.add(job.name);
+    }
+  }
+  return [...names];
+}
+
 // The address Todd reaches, so a preview is something he can open rather than a
 // port on the machine's own loopback.
 function previewHost() {
@@ -141,10 +158,21 @@ async function main() {
     return prepared;
   }
 
+  function declaredLanes() {
+    try {
+      return countLanes(fs.readFileSync(path.join(checkout, 'dashboard/scripts/lanes.mjs'), 'utf8'));
+    } catch {
+      return null;
+    }
+  }
+
   async function runProof(proof) {
     const install = await installOnce();
     if (install.code !== 0) return install;
     const result = command(proof.argv, checkout);
+    // How much of the dashboard the lane run should have driven is declared by
+    // the checkout under test, so a run that stops early cannot look complete.
+    const declared = proof.expects === 'lanes' ? declaredLanes() : null;
     // The reader of a failed record was not at the terminal, so the whole
     // output is kept beside the record under the name of the proof.
     const logs = path.join(runDir, 'proofs');
@@ -152,7 +180,7 @@ async function main() {
     const file = path.join(logs, `${proof.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.log`);
     fs.writeFileSync(file, `$ ${proof.argv.join(' ')}\nexit ${result.code} after ${result.seconds}s\n\n${result.output}`);
     console.log(`  ${proof.name}: ${result.code === 0 ? 'passed' : `failed (${result.code})`} in ${result.seconds}s.`);
-    return result;
+    return declared === null ? result : { ...result, declared };
   }
 
   async function buildPreview({ runDir: dir, sha: wanted }) {
@@ -239,18 +267,25 @@ async function main() {
       console.log(`Left the result unposted at ${bodyFile}.`);
       return { url: null, bodyFile };
     }
-    const url = postComment(options.pr, bodyFile);
-    console.log(`Posted the ${record.verdict} on pull request #${options.pr}: ${url}`);
+    // The message that stops the card goes out before the pull request comment:
+    // a caller that fails to post one must not swallow the ping Todd needs.
     const identifier = record.card?.identifier;
+    if (identifier && record.stopped) {
+      await noteOnCard(identifier, stopMessage(record));
+      console.log(`The card is stopped and ${identifier} carries the ping.`);
+    }
+    let url = null;
+    try {
+      url = postComment(options.pr, bodyFile);
+      console.log(`Posted the ${record.verdict} on pull request #${options.pr}: ${url}`);
+    } catch (error) {
+      console.log(`GitHub refused the pull request comment, so it is on disk at ${bodyFile}: ${error.message}`);
+    }
     if (identifier) {
       if (record.verdict === 'PASS') {
         await noteOnCard(identifier, recordBody(record));
-      } else {
+      } else if (!record.stopped) {
         await noteOnCard(identifier, buildNote(record));
-        if (record.stopped) {
-          await noteOnCard(identifier, stopMessage(record));
-          console.log(`The card is stopped and ${identifier} carries the ping.`);
-        }
       }
     }
     return { url, bodyFile };
@@ -260,6 +295,7 @@ async function main() {
     runDir,
     checkout,
     liveStateDir,
+    failedBefore: failed,
     getIssue: async identifier => cardRecord ?? getIssue(identifier, { apiKey: process.env.LINEAR_API_KEY }),
     pullFiles,
     prepareCheckout: async () => gitIn(checkout, ['rev-parse', 'HEAD']),
@@ -272,6 +308,7 @@ async function main() {
     },
     buildPreview,
     checkRuns,
+    workflowJobs,
     runProof,
     stopPreview: stopRunningPreview,
     saveRecord,
