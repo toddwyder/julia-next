@@ -178,6 +178,20 @@ test('the card note sends the change back with the failing lines and the count',
   assert.match(note, /This is failure 1 of 2\. The second one stops the card\./);
 });
 
+test('the card note names the preview the failing change was driven at', () => {
+  const note = buildNote({
+    pr: 411,
+    sha: 'abc123',
+    preview: { address: 'http://100.119.112.9:4401' },
+    failing: ['dashboard proofs: exited 1: lane 5 FAIL refuse to empty a panel'],
+    failCount: 1,
+  });
+  const noPreview = buildNote({ pr: 413, sha: 'abc123', preview: null, failing: ['server tests: exited 1'], failCount: 1 });
+
+  assert.match(note, /The second copy of the dashboard ran at http:\/\/100\.119\.112\.9:4401, with its own records folder\./);
+  assert.doesNotMatch(noPreview, /second copy of the dashboard/);
+});
+
 test('the stop message reaches Todd by name and says the card is stopped', () => {
   const message = stopMessage({ pr: 412, failing: ['local tests: exited 1'], failCount: 2 });
 

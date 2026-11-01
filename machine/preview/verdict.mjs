@@ -86,6 +86,7 @@ export function recordBody(record) {
 
 export function buildNote(record) {
   const lines = [`The preview and smoke test failed for #${record.pr} at \`${record.sha}\`. The card goes back to the build.`, ''];
+  if (record.preview?.address) lines.push(`The second copy of the dashboard ran at ${record.preview.address}, with its own records folder.`, '');
   lines.push(...(record.failing ?? []).map(entry => `- ${entry}`));
   lines.push('', `This is failure ${record.failCount ?? 1} of 2. The second one stops the card.`);
   return `${lines.join('\n')}\n`;
