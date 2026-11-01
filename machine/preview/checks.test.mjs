@@ -49,11 +49,33 @@ test('a check that ran for another commit does not count for this one', () => {
   assert.equal(verdict.items[0].sha, 'a1b2c3d');
 });
 
-test('two runs of the same check both appear', () => {
+test('a re-run replaces the older attempt of the same check', () => {
+  const first = { name: 'unit', status: 'completed', conclusion: 'failure', head_sha: SHA, started_at: '2026-11-01T10:00:00Z' };
+  const second = { name: 'unit', status: 'completed', conclusion: 'success', head_sha: SHA, started_at: '2026-11-01T10:05:00Z' };
+  const verdict = checksVerdict([first, second], SHA);
+  assert.equal(verdict.items.length, 1);
+  assert.equal(verdict.items[0].conclusion, 'success');
+  assert.equal(verdict.ok, true);
+});
+
+test('a cancelled older attempt does not sink a green re-run', () => {
+  const cancelled = { name: 'checks', status: 'completed', conclusion: 'cancelled', head_sha: SHA, id: 10 };
+  const green = { name: 'checks', status: 'completed', conclusion: 'success', head_sha: SHA, id: 11 };
+  assert.equal(checksVerdict([green, cancelled], SHA).ok, true);
+});
+
+test('when two attempts started at once the later one listed counts', () => {
   const verdict = checksVerdict([ran('unit', 'failure'), ran('unit', 'success')], SHA);
-  assert.equal(verdict.items.length, 2);
-  assert.deepEqual(verdict.items.map(item => item.name), ['unit', 'unit']);
-  assert.deepEqual(verdict.items.map(item => item.ok), [false, true]);
+  assert.equal(verdict.items.length, 1);
+  assert.equal(verdict.ok, true);
+});
+
+test('an older attempt that failed cannot hide behind a newer one that has not finished', () => {
+  const running = { name: 'unit', status: 'in_progress', conclusion: null, head_sha: SHA, started_at: '2026-11-01T10:05:00Z' };
+  const passed = { name: 'unit', status: 'completed', conclusion: 'success', head_sha: SHA, started_at: '2026-11-01T10:00:00Z' };
+  const verdict = checksVerdict([passed, running], SHA);
+  assert.equal(verdict.items.length, 1);
+  assert.equal(verdict.items[0].status, 'in_progress');
   assert.equal(verdict.ok, false);
 });
 
