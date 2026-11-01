@@ -1,0 +1,17 @@
+.page {
+  padding-top: 24px;
+  padding-bottom: 48px;
+  color: var(--vintage-heading);
+}
+
+.heading {
+  margin: 0;
+  font-size: 30px;
+  line-height: 36px;
+}
+
+.line {
+  margin: 8px 0 0;
+  color: var(--vintage-ink);
+  font-size: 16px;
+}
