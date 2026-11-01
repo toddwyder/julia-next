@@ -85,9 +85,16 @@ export function cardWindows(thread, events) {
     windows.push({ thread, card, start: user.at, end: Infinity });
   }
   if (!windows.length) {
-    // A chat started by naming the card rather than by a kickoff line still belongs to that card.
-    const card = (thread.title ?? '').match(/\bJUL-\d+\b/)?.[0] ?? (events.users[0]?.text ?? '').match(/\bJUL-\d+\b/)?.[0];
-    if (card && events.users.length) windows.push({ thread, card, start: events.users[0].at, end: Infinity });
+    // A chat started by naming the card rather than by a kickoff line still belongs
+    // to that card. The title is renamed as the work goes on and Mastra drifts it away
+    // from the card, so the opening turn is read too: the first turn that names a card
+    // counts only when it names one, because a turn naming several cards has no single
+    // card to bill.
+    const title = (thread.title ?? '').match(/\bJUL-\d+\b/)?.[0];
+    const opening = events.users.find(u => new Set(u.text?.match(/\bJUL-\d+\b/g) ?? []).size === 1);
+    const card = title ?? opening?.text.match(/\bJUL-\d+\b/)?.[0];
+    const start = title ? events.users[0]?.at : opening?.at;
+    if (card && start !== undefined) windows.push({ thread, card, start, end: Infinity });
   }
   return windows;
 }

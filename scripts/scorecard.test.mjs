@@ -62,6 +62,30 @@ test('a chat that names the card in its opening message is that card run, and on
   assert.deepEqual(cardWindows(unnamed, unnamed.events), []);
 });
 
+test('a chat started from the card address is that card run, and its window starts at that message', () => {
+  // Mastra renames a thread as the work goes on, so the title stops naming the card and
+  // the opening message is what is left. The first row can be a continue reminder.
+  const t = {
+    id: 't',
+    title: 'Revoked key; ping card fix',
+    events: threadEvents([
+      user('10:00', 'Please continue naturally with the conversation so far.'),
+      user('10:05', 'Read the skill and build the card at https://linear.app/julia-next/issue/JUL-307/remediation-a-fail-goes-back.'),
+      user('11:00', 'Carry on.'),
+    ]),
+  };
+  assert.deepEqual(cardWindows(t, t.events).map(w => [w.card, w.start]), [['JUL-307', ms('10:05')]]);
+});
+
+test('a chat whose opening turns name more than one card is not billed to one of them', () => {
+  const t = {
+    id: 't',
+    title: 'Housekeeping',
+    events: threadEvents([user('10:00', 'Compare JUL-307 with JUL-313 and tell me what differs.')]),
+  };
+  assert.deepEqual(cardWindows(t, t.events), []);
+});
+
 test('a stop lasts from the last agent activity to the reply; an ask_user answer is not agent activity, and back-to-back user messages are one stop', () => {
   const stops = findStops(thread.events);
   assert.deepEqual(stops.map(s => [s.kind, (s.resumed - s.since) / 60_000]), [['question', 14], ['turn ended', 10]]);
