@@ -66,8 +66,15 @@ function gitIn(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
+// gh colours the JSON it prints, and a parsed record has to be exactly what it
+// says, so the colour is turned off rather than stripped afterwards.
 function gh(args) {
-  return execFileSync('gh', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return execFileSync('gh', args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, NO_COLOR: '1', CLICOLOR: '0', GH_FORCE_TTY: '0' },
+  });
 }
 
 function pullFiles(pr) {
@@ -138,6 +145,12 @@ async function main() {
     const install = await installOnce();
     if (install.code !== 0) return install;
     const result = command(proof.argv, checkout);
+    // The reader of a failed record was not at the terminal, so the whole
+    // output is kept beside the record under the name of the proof.
+    const logs = path.join(runDir, 'proofs');
+    fs.mkdirSync(logs, { recursive: true });
+    const file = path.join(logs, `${proof.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.log`);
+    fs.writeFileSync(file, `$ ${proof.argv.join(' ')}\nexit ${result.code} after ${result.seconds}s\n\n${result.output}`);
     console.log(`  ${proof.name}: ${result.code === 0 ? 'passed' : `failed (${result.code})`} in ${result.seconds}s.`);
     return result;
   }
