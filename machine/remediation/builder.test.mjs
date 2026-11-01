@@ -14,88 +14,124 @@ import {
 const ROOT = '/home/ubuntu/julia-builder';
 const CARD = { identifier: 'JUL-307', title: 'Remediation: a FAIL goes back to the builder', description: 'The outcome.' };
 
-function textMessage(text, { type = 'user', role = 'signal' } = {}) {
-  return { role, type, content: { format: 2, parts: [{ type: 'text', text }] } };
+function userTurn(text) {
+  return JSON.stringify({ format: 2, parts: [{ type: 'text', text }] });
 }
 
-function fakeSession({ threads, messages }) {
+function assistantTurn(text) {
+  return JSON.stringify({ format: 2, parts: [{ type: 'text', text }] });
+}
+
+// The store as the runner sees it: two tables, rows of strings, and a record of
+// every query so a test can say what was read and what was left alone.
+function fakeStore({ threads, messages }) {
   const asked = [];
   return {
     asked,
-    thread: {
-      list: async () => threads,
-      listMessages: async ({ threadId, limit }) => {
-        asked.push({ threadId, limit });
-        return messages[threadId] ?? [];
+    client: {
+      execute: async query => {
+        const sql = typeof query === 'string' ? query : query.sql;
+        const args = typeof query === 'string' ? [] : (query.args ?? []);
+        asked.push({ sql, args });
+        if (/from mastra_threads/.test(sql)) {
+          const [project] = args;
+          const wanted = Buffer.from(project).toString('utf8');
+          const mine = threads.filter(thread => thread.metadata.includes(wanted));
+          return { rows: [...mine].sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt))) };
+        }
+        if (/from mastra_messages/.test(sql)) {
+          const [threadId, like] = args;
+          const needle = String(like).replaceAll('%', '').toLowerCase();
+          const rows = (messages[threadId] ?? [])
+            .filter(message => message.type === 'user')
+            .filter(message => message.content.toLowerCase().includes(needle));
+          return { rows };
+        }
+        return { rows: [] };
       },
     },
   };
 }
 
+// The store keeps this column encoded; for these tests it is enough that the
+// project's name is in it and that a thread from another project is not.
+function threadRow(id, title, updatedAt, projectPath = ROOT) {
+  return { id, title, updatedAt, metadata: JSON.stringify(projectPath === null ? {} : { projectPath }) };
+}
+
 test('the builder thread is the newest one in this project whose user turn names the card', async () => {
-  const session = fakeSession({
+  const store = fakeStore({
     threads: [
-      { id: 'old-jul-307', title: 'JUL-307 build', updatedAt: '2026-10-31T10:00:00.000Z', metadata: { projectPath: ROOT } },
-      { id: 'new-jul-307', title: 'JUL-307 remediation loop', updatedAt: '2026-11-01T06:50:00.000Z', metadata: { projectPath: ROOT } },
-      { id: 'another-card', title: 'JUL-300 closeout', updatedAt: '2026-11-01T07:00:00.000Z', metadata: { projectPath: ROOT } },
-      { id: 'other-project', title: 'JUL-307 elsewhere', updatedAt: '2026-11-01T08:00:00.000Z', metadata: { projectPath: '/tmp/spike/work' } },
-      { id: 'no-metadata', title: 'JUL-307 without a project', updatedAt: '2026-11-01T09:00:00.000Z' },
+      threadRow('old-jul-307', 'JUL-307 build', '2026-10-31T10:00:00.000Z'),
+      threadRow('new-jul-307', '', '2026-11-01T06:50:00.000Z'),
+      threadRow('another-card', '', '2026-11-01T07:00:00.000Z'),
+      threadRow('other-project', 'JUL-307 elsewhere', '2026-11-01T08:00:00.000Z', '/tmp/spike/work'),
+      threadRow('no-metadata', 'JUL-307 without a project', '2026-11-01T09:00:00.000Z', null),
     ],
     messages: {
-      'old-jul-307': [textMessage('Build JUL-307 as a task.')],
-      'new-jul-307': [textMessage('Read the poteto-mode skill and build JUL-307.')],
-      'another-card': [textMessage('Close out JUL-300 slice 1.')],
-      'other-project': [textMessage('Do JUL-307 in the spike.')],
+      'new-jul-307': [{ type: 'user', content: userTurn('Read the poteto-mode skill and build JUL-307.') }],
+      'other-project': [{ type: 'user', content: userTurn('Do JUL-307 in the spike.') }],
     },
   });
 
-  const found = await findBuilderThread({ session, repoRoot: ROOT, card: 'JUL-307' });
-  assert.deepEqual(found, { threadId: 'new-jul-307', title: 'JUL-307 remediation loop', updatedAt: '2026-11-01T06:50:00.000Z' });
-  assert.deepEqual(session.asked, [{ threadId: 'another-card', limit: 500 }], 'only a thread whose title says nothing is read, and only in this project');
+  const found = await findBuilderThread({ client: store.client, repoRoot: ROOT, card: 'JUL-307' });
+  assert.deepEqual(found, { threadId: 'new-jul-307', title: '', updatedAt: '2026-11-01T06:50:00.000Z' });
+
+  const read = store.asked.filter(query => /from mastra_messages/.test(query.sql)).map(query => query.args[0]);
+  assert.ok(!read.includes('other-project'), 'a thread from another project is never looked at');
+  assert.ok(!read.includes('no-metadata'), 'a thread with no project is never looked at');
+  assert.ok(!read.includes('old-jul-307'), 'a thread whose title names the card is not read');
 });
 
 test('a card number inside a branch name still finds the thread, and a longer number does not', async () => {
-  const session = fakeSession({
+  const store = fakeStore({
     threads: [
-      { id: 'branch', title: '', updatedAt: '2026-11-01T00:00:00.000Z', metadata: { projectPath: ROOT } },
-      { id: 'longer', title: '', updatedAt: '2026-11-02T00:00:00.000Z', metadata: { projectPath: ROOT } },
+      threadRow('longer', '', '2026-11-01T00:00:00.000Z'),
+      threadRow('branch', '', '2026-11-01T00:00:00.000Z'),
     ],
     messages: {
-      branch: [textMessage('carry on, we are on jul-307/remediation-loop')],
-      longer: [textMessage('JUL-3070 is a different card')],
+      longer: [{ type: 'user', content: userTurn('JUL-3070 is a different card') }],
+      branch: [{ type: 'user', content: userTurn('carry on, we are on jul-307/remediation-loop') }],
     },
   });
 
-  const found = await findBuilderThread({ session, repoRoot: ROOT, card: 'JUL-307' });
+  const found = await findBuilderThread({ client: store.client, repoRoot: ROOT, card: 'JUL-307' });
   assert.equal(found.threadId, 'branch');
 });
 
 test('an agent talking about the card does not make its thread the builder', async () => {
-  const session = fakeSession({
-    threads: [{ id: 'reviewer', title: '', updatedAt: '2026-11-01T00:00:00.000Z', metadata: { projectPath: ROOT } }],
+  const store = fakeStore({
+    threads: [threadRow('reviewer', '', '2026-11-01T00:00:00.000Z')],
     messages: {
-      reviewer: [{ role: 'assistant', type: 'assistant', content: { format: 2, parts: [{ type: 'text', text: 'I reviewed JUL-307 and it fails.' }] } }],
+      reviewer: [{ type: 'assistant', content: assistantTurn('I reviewed JUL-307 and it fails.') }],
     },
   });
-  assert.equal(await findBuilderThread({ session, repoRoot: ROOT, card: 'JUL-307' }), null);
+  assert.equal(await findBuilderThread({ client: store.client, repoRoot: ROOT, card: 'JUL-307' }), null);
 });
 
 test('a title that names the card is enough, without reading the thread at all', async () => {
-  const session = fakeSession({
-    threads: [{ id: 'titled', title: 'Ship JUL-307', updatedAt: '2026-11-01T00:00:00.000Z', metadata: { projectPath: ROOT } }],
+  const store = fakeStore({
+    threads: [threadRow('titled', 'Ship JUL-307', '2026-11-01T00:00:00.000Z')],
     messages: {},
   });
-  const found = await findBuilderThread({ session, repoRoot: ROOT, card: 'JUL-307' });
+  const found = await findBuilderThread({ client: store.client, repoRoot: ROOT, card: 'JUL-307' });
   assert.equal(found.threadId, 'titled');
-  assert.deepEqual(session.asked, []);
+  assert.deepEqual(store.asked.filter(query => /from mastra_messages/.test(query.sql)), []);
 });
 
 test('no thread naming the card means no builder to go back to', async () => {
-  const session = fakeSession({
-    threads: [{ id: 'other', title: '', updatedAt: '2026-11-01T00:00:00.000Z', metadata: { projectPath: ROOT } }],
-    messages: { other: [textMessage('Something else entirely.')] },
+  const store = fakeStore({
+    threads: [threadRow('other', '', '2026-11-01T00:00:00.000Z')],
+    messages: { other: [{ type: 'user', content: userTurn('Something else entirely.') }] },
   });
-  assert.equal(await findBuilderThread({ session, repoRoot: ROOT, card: 'JUL-307' }), null);
+  assert.equal(await findBuilderThread({ client: store.client, repoRoot: ROOT, card: 'JUL-307' }), null);
+});
+
+test('threads are read newest first, because the newest is the one a boot would take', async () => {
+  const store = fakeStore({ threads: [threadRow('any', '', '2026-11-01T00:00:00.000Z')], messages: {} });
+  const found = await findBuilderThread({ client: store.client, repoRoot: ROOT, card: 'JUL-999' });
+  assert.equal(found, null);
+  assert.match(store.asked[0].sql, /order by updatedAt desc/);
 });
 
 test('the remediation order quotes the FAIL, names the playbook, and stops before the review', () => {

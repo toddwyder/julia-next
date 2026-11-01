@@ -224,7 +224,7 @@ test('a FAIL when the builder session is gone starts a fresh builder and says so
   assert.equal(record.builder.threadId, 'thread-of-a-fresh-builder');
   assert.equal(calls.posts.length, 1, 'the card is told a fresh builder was started');
   assert.equal(calls.posts[0].card, 'JUL-999');
-  assert.match(calls.posts[0].body, /could not be found/);
+  assert.match(calls.posts[0].body, /could not be taken/);
   assert.match(calls.posts[0].body, /thread-of-a-fresh-builder/);
   assert.equal(record.reviews.length, 2);
 });

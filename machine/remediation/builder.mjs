@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { bootHarness, stopHarness } from '../shipping/harness.mjs';
+import { bootHarness, loadMastra, stopHarness } from '../shipping/harness.mjs';
 import { repoRoot } from '../shipping/run-parts.mjs';
 
 export const BUG_FIX_PLAYBOOK = '.agents/skills/poteto-mode/playbooks/bug-fix.md';
@@ -21,16 +21,8 @@ function cardPattern(card) {
   return new RegExp(`(?<![A-Za-z0-9])${escaped}(?![0-9])`, 'i');
 }
 
-function metadataOf(thread) {
-  const metadata = thread?.metadata;
-  if (!metadata || typeof metadata !== 'string') return metadata ?? {};
-  try {
-    return JSON.parse(metadata);
-  } catch {
-    return {};
-  }
-}
-
+// The store keeps a thread's metadata as JSON bytes, not as text, so a row read
+// straight from it has to be decoded before anything can be asked of it.
 function textOf(message) {
   const content = message?.content;
   if (typeof content === 'string') return content;
@@ -41,23 +33,44 @@ function textOf(message) {
     .join('\n');
 }
 
-// The store keeps a user's turn with role `signal` and type `user`, so the
-// role field alone finds nothing. Only the title and the user's own turns are
-// read: an agent naming a neighbouring card must not claim it for this one.
-export async function findBuilderThread({ session, repoRoot: root = repoRoot, card, limit = 500 }) {
+// The store keeps a user's turn with role `signal` and type `user`, so the role
+// field alone finds nothing. Only the title and the user's own turns are read: an
+// agent naming a neighbouring card must not claim it for this one.
+//
+// The store is read directly, without booting a harness, because a boot claims the
+// newest thread in the store: booting first would either fail on a live session or
+// bind the wrong thread before this one could be chosen.
+export async function findBuilderThread({ client, repoRoot: root = repoRoot, card }) {
   const pattern = cardPattern(card);
-  const threads = await session.thread.list({});
-  const inProject = threads.filter(thread => metadataOf(thread)?.projectPath === root);
-  let newest = null;
-  for (const thread of inProject) {
-    const namedInTitle = pattern.test(String(thread.title ?? ''));
-    if (!namedInTitle) {
-      const messages = await session.thread.listMessages({ threadId: thread.id, limit });
-      if (!messages.some(message => message?.type === 'user' && pattern.test(textOf(message)))) continue;
-    }
-    if (!newest || String(thread.updatedAt ?? '') > String(newest.updatedAt ?? '')) newest = thread;
+  // The project name is filtered in the query rather than in code: the store
+  // keeps a thread's metadata encoded, and the path's bytes sit inside it as-is.
+  const threads = await client.execute({
+    sql: 'select id, title, updatedAt from mastra_threads where instr(metadata, ?) > 0 order by updatedAt desc',
+    args: [Buffer.from(root, 'utf8')],
+  });
+  for (const thread of threads.rows) {
+    if (pattern.test(String(thread.title ?? ''))) return found(thread);
+    const named = await client.execute({
+      sql: "select content from mastra_messages where thread_id = ? and type = 'user' and content like ? limit 20",
+      args: [thread.id, `%${card}%`],
+    });
+    if (named.rows.some(row => pattern.test(String(row.content ?? '')))) return found(thread);
   }
-  return newest ? { threadId: newest.id, title: newest.title ?? '', updatedAt: newest.updatedAt ?? null } : null;
+  return null;
+}
+
+function found(thread) {
+  return { threadId: thread.id, title: thread.title ?? '', updatedAt: thread.updatedAt ?? null };
+}
+
+// A boot takes the newest thread in the store, so the thread a caller wants has to
+// be made the newest one first. The column the store orders by is the honest place
+// to say "this thread is the live one now".
+async function makeNewest(client, threadId) {
+  await client.execute({
+    sql: 'update mastra_threads set updatedAt = ? where id = ?',
+    args: [new Date().toISOString(), threadId],
+  });
 }
 
 export function pullRequestUrl(pr) {
@@ -90,7 +103,7 @@ export function remediationOrder({ card, pr, sha, determination, playbookText, p
 
 export function freshBuilderOrder({ card, pr, sha, determination, playbookText, criteria = [], playbook = BUG_FIX_PLAYBOOK }) {
   return [
-    `You are a fresh builder. The session that wrote pull request #${pr} (${pullRequestUrl(pr)}) cannot be found, so nothing of that session is here.`,
+    `You are a fresh builder. The session that wrote pull request #${pr} (${pullRequestUrl(pr)}) could not be taken: it is gone from the store, or another process was still writing it. Nothing of that session is here.`,
     '',
     `The card is ${card.identifier}, quoted below, and Shipping judged commit ${sha} against it.`,
     '',
@@ -104,7 +117,7 @@ export function freshBuilderOrder({ card, pr, sha, determination, playbookText, 
     '',
     ...criteria.map((criterion, index) => `${index + 1}. ${criterion}`),
     '',
-    'The checkout is in front of you and the pull request branch is the one to fix. Shipping failed it with this determination, quoted word for word.',
+    `Run \`gh pr checkout ${pr}\` first, so the pull request's branch is the one you change. Shipping failed it with this determination, quoted word for word.`,
     '',
     ...quote('determination', determination),
     '',
@@ -166,52 +179,98 @@ async function lastAssistantText(session, threadId) {
   return '';
 }
 
-async function freshSession({ root = repoRoot, order, modelId, log = console.log }) {
-  const { session, booted } = await bootHarness({ cwd: root, createInitialThread: true });
+async function freshSession({ root = repoRoot, runDir, storeName = 'session', order, modelId, log = console.log }) {
+  // A fresh session keeps its own store. The shared store already holds the
+  // builder's thread, and a boot against it would claim that thread instead of
+  // starting a new one.
+  fs.mkdirSync(runDir, { recursive: true });
+  const store = path.join(runDir, `${storeName}.db`);
+  const storage = { backend: 'libsql', url: `file:${store}`, isRemote: false };
+  const { session, booted } = await bootHarness({ cwd: root, createInitialThread: true, storage });
   try {
     const threadId = session.thread.getId();
     if (modelId) await session.model.switch(modelId);
     log(`Started a fresh session ${threadId}${modelId ? ` on ${modelId}` : ''}.`);
     await session.sendMessage({ content: order });
-    return { threadId, answer: await lastAssistantText(session, threadId) };
+    return { threadId, answer: await lastAssistantText(session, threadId), store };
   } finally {
     await stopHarness(booted);
   }
 }
 
 // The resumed thread keeps the model it was built on, so no model is chosen here.
-export async function handToBuilder({ root = repoRoot, card, pr, sha, determination, playbookText, criteria = [], log = console.log }) {
-  const { session, booted } = await bootHarness({ cwd: root, createInitialThread: false });
+export async function handToBuilder({ root = repoRoot, card, pr, sha, determination, playbookText, log = console.log }) {
+  const tools = await loadMastra();
+  const client = tools.createClient({ url: `file:${tools.databasePath()}` });
+  let target;
+  let busy = null;
   try {
-    const found = await findBuilderThread({ session, repoRoot: root, card: card.identifier });
+    const found = await findBuilderThread({ client, repoRoot: root, card: card.identifier });
     if (!found) {
       log(`No builder session names ${card.identifier}, so the FAIL goes to a fresh one.`);
       return null;
     }
-    await session.thread.switch({ threadId: found.threadId });
-    log(`Resumed the builder's own session ${found.threadId} (${found.title}).`);
-    await session.sendMessage({
+    busy = tools.threadLockOwner(found.threadId);
+    if (busy) {
+      log(`The builder session ${found.threadId} is still being written by process ${busy}, so the FAIL goes to a fresh one.`);
+      return null;
+    }
+    await makeNewest(client, found.threadId);
+    target = found.threadId;
+  } finally {
+    client.close();
+  }
+
+  const booted = await bootOnThread(tools, { root, threadId: target });
+  try {
+    if (booted.session.thread.getId() !== target) await booted.session.thread.switch({ threadId: target });
+    log(`Resumed the builder's own session ${target}.`);
+    await booted.session.sendMessage({
       content: remediationOrder({ card, pr, sha, determination, playbookText }),
     });
-    return { threadId: found.threadId, resumed: true };
+    return { threadId: target, resumed: true, store: tools.databasePath() };
   } finally {
-    await stopHarness(booted);
+    await stopHarness(booted.booted);
   }
 }
 
-export async function startFreshBuilder({ root = repoRoot, card, pr, sha, determination, playbookText, criteria = [], modelId, log = console.log }) {
-  const { threadId } = await freshSession({
+// Another session can become the newest thread between the touch and the boot. A
+// second attempt re-touches, so the loop settles once no run is writing the store.
+async function bootOnThread(tools, { root, threadId, attempts = 3 }) {
+  for (let attempt = 1; ; attempt++) {
+    const client = tools.createClient({ url: `file:${tools.databasePath()}` });
+    try {
+      await makeNewest(client, threadId);
+    } finally {
+      client.close();
+    }
+    try {
+      return await bootHarness({ cwd: root, createInitialThread: false });
+    } catch (error) {
+      if (error?.name !== 'ThreadLockError' || attempt >= attempts) throw error;
+      await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+    }
+  }
+}
+
+export async function startFreshBuilder({ root = repoRoot, runDir, card, pr, sha, determination, playbookText, criteria = [], modelId, log = console.log }) {
+  const { threadId, store } = await freshSession({
     root,
+    runDir,
+    storeName: 'fresh-builder',
     modelId,
     log,
     order: freshBuilderOrder({ card, pr, sha, determination, playbookText, criteria }),
   });
-  return { threadId, resumed: false };
+  return { threadId, resumed: false, store };
 }
 
-export async function investigate({ root = repoRoot, card, pr, determinations, playbookText, mayPost = true, modelId, log = console.log }) {
+export async function investigate({ root = repoRoot, checkout, runDir, card, pr, determinations, playbookText, mayPost = true, modelId, log = console.log }) {
   return freshSession({
-    root,
+    // Read the code the review read: the checkout of the pull request head.
+    root: checkout ?? root,
+    runDir,
+    storeName: 'investigation',
     modelId,
     log,
     order: investigationOrder({ card, pr, determinations, playbookText, mayPost }),

@@ -99,8 +99,7 @@ async function main() {
     reviewRound: args => reviewRound({ ...args, runDir, modelId, post, log: console.log }),
     handToBuilder: async material => {
       process.env.MASTRA_OBSERVABILITY_DB_PATH = traceFor('remediation-builder');
-      const resumed = await handToBuilder({ ...material, modelId: builderModel, log: console.log });
-      return resumed;
+      return handToBuilder({ ...material, log: console.log });
     },
     startFreshBuilder: async material => {
       process.env.MASTRA_OBSERVABILITY_DB_PATH = traceFor('remediation-fresh-builder');

@@ -67,9 +67,10 @@ export function stopMessage(record) {
 
 export function cardNoteForFreshBuilder(record, builder) {
   return [
-    `The Shipping agent failed this card and the builder's own session could not be found in the store, so the machine started a fresh builder with the same determination.`,
+    `The Shipping agent failed this card and the builder's own session could not be taken: it is gone from the store, or another process was still writing it. The machine started a fresh builder with the same determination.`,
     '',
     `Fresh session: ${builder?.threadId ?? 'unknown'}`,
+    `Its store: ${builder?.store ?? 'unknown'}`,
     `Determination: review ${record.reviews.length} on commit ${record.head}`,
   ].join('\n');
 }
@@ -101,6 +102,7 @@ export async function createRemediationWorkflow({ mastra, deps, log = console.lo
   const builderSchema = z.object({
     threadId: z.string().nullable().default(null),
     resumed: z.boolean().default(false),
+    store: z.string().nullable().default(null),
   });
 
   const stopSchema = z.object({
@@ -210,6 +212,7 @@ export async function createRemediationWorkflow({ mastra, deps, log = console.lo
         criteria: record.criteria,
         playbookText: deps.readPlaybook(BUG_FIX_PLAYBOOK),
         modelId: deps.builderModel,
+        runDir: deps.runDir,
       };
       log('Handing the FAIL to the builder.');
       let builder = await deps.handToBuilder(material);
@@ -240,6 +243,8 @@ export async function createRemediationWorkflow({ mastra, deps, log = console.lo
         playbookText: deps.readPlaybook(INVESTIGATION_PLAYBOOK),
         mayPost: deps.mayPost,
         modelId: deps.builderModel,
+        runDir: deps.runDir,
+        checkout: record.checkout,
       });
       const rootCause = rootCauseFrom(findings.answer);
       return persist({

@@ -19,13 +19,16 @@ async function load(relative) {
 export const harness = { programDir, modules };
 
 export async function loadMastra() {
-  const [codeSdk, workflows, requestContext, zod, core, libsql] = await Promise.all([
+  const [codeSdk, project, threadLock, workflows, requestContext, zod, core, libsql, libsqlClient] = await Promise.all([
     load('@mastra/code-sdk/dist/index.js'),
+    load('@mastra/code-sdk/dist/utils/project.js'),
+    load('@mastra/code-sdk/dist/utils/thread-lock.js'),
     load('@mastra/core/dist/workflows/index.js'),
     load('@mastra/core/dist/request-context/index.js'),
     load('zod/index.js'),
     load('@mastra/core/dist/index.js'),
     load('@mastra/libsql/dist/index.js'),
+    load('@libsql/client/lib-esm/node.js'),
   ]);
   return {
     bootLocalAgentController: codeSdk.bootLocalAgentController,
@@ -35,6 +38,12 @@ export async function loadMastra() {
     Mastra: core.Mastra,
     LibSQLStore: libsql.LibSQLStore,
     z: zod.z,
+    // The store the harness defaults to, and who is writing it, for callers that
+    // need to find a thread before booting: a boot claims the newest thread, so
+    // the thread a caller wants has to be chosen in the store first.
+    databasePath: project.getDatabasePath,
+    threadLockOwner: threadLock.getThreadLockOwner,
+    createClient: libsqlClient.createClient,
   };
 }
 
