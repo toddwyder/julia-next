@@ -15,6 +15,7 @@ import { FREE_MODEL } from '../shipping/workflow.mjs';
 import { prepareCheckout, repoRoot, traceFileFor } from '../shipping/run-parts.mjs';
 import { reviewRound } from './reviews.mjs';
 import { alreadyFinished, readRecord, seedFrom, writeRecord } from './record.mjs';
+import { readCardFile } from './card-file.mjs';
 import { handToBuilder, investigate, readPlaybook, startFreshBuilder } from './builder.mjs';
 import { BUILDER_MODEL, createRemediationWorkflow } from './workflow.mjs';
 
@@ -26,14 +27,16 @@ const USAGE = `Usage: node machine/remediation/run.mjs --pr <n> --card <JUL-n> [
   --builder-model <id> model for a fresh builder or the investigation (default ${BUILDER_MODEL})
   --no-post           write the determinations and the stop in the run folder, post nothing
   --force             ignore a saved record and start the loop again
+  --card-file <path>  read the card from this JSON file instead of Linear, for practice runs
 `;
 
 function parseArgs(argv) {
-  const options = { pr: null, card: null, model: null, builderModel: null, post: true, force: false };
+  const options = { pr: null, card: null, model: null, builderModel: null, post: true, force: false, cardFile: null };
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
     if (arg === '--pr') options.pr = Number(argv[++index]);
     else if (arg === '--card') options.card = argv[++index];
+    else if (arg === '--card-file') options.cardFile = argv[++index];
     else if (arg === '--model') options.model = argv[++index];
     else if (arg === '--builder-model') options.builderModel = argv[++index];
     else if (arg === '--no-post') options.post = false;
@@ -55,7 +58,7 @@ async function main() {
     process.exitCode = 2;
     return;
   }
-  if (!process.env.LINEAR_API_KEY) {
+  if (!options.cardFile && !process.env.LINEAR_API_KEY) {
     throw new Error('LINEAR_API_KEY is required, because the criteria come from the card.');
   }
 
@@ -95,7 +98,14 @@ async function main() {
     runDir,
     mayPost: post,
     builderModel,
-    getIssue: identifier => getIssue(identifier, { apiKey: process.env.LINEAR_API_KEY }),
+    getIssue: async identifier => {
+      if (!options.cardFile) return getIssue(identifier, { apiKey: process.env.LINEAR_API_KEY });
+      const card = readCardFile(options.cardFile);
+      if (card.identifier !== identifier) {
+        throw new Error(`${options.cardFile} holds ${card.identifier}, but the run is for ${identifier}.`);
+      }
+      return card;
+    },
     readPlaybook,
     reviewRound: args => reviewRound({ ...args, runDir, modelId, post, log: console.log }),
     handToBuilder: async material => {
@@ -112,14 +122,22 @@ async function main() {
     },
     prepareCheckout: ({ pr, runDir: dir, checkout: tree }) => prepareCheckout(pr, dir, tree),
     postCardComment: async ({ card, body }) => {
-      if (!post) {
+      // A card note that Linear refuses must not take the loop down with it: the
+      // note is the evidence for the step that just ran, so it is kept on disk.
+      const keep = why => {
         const kept = path.join(runDir, 'card-note.md');
         fs.mkdirSync(runDir, { recursive: true });
         fs.writeFileSync(kept, body);
-        console.log(`Left the card note unposted at ${kept}`);
+        console.log(`${why} It is kept at ${kept}`);
         return null;
+      };
+      if (!post) return keep('Left the card note unposted.');
+      let comment;
+      try {
+        comment = await postCardComment(card, body, { apiKey: process.env.LINEAR_API_KEY });
+      } catch (error) {
+        return keep(`Could not post the note on ${card}: ${error.message}.`);
       }
-      const comment = await postCardComment(card, body, { apiKey: process.env.LINEAR_API_KEY });
       return comment.url;
     },
     ping: async ({ record, message }) => {

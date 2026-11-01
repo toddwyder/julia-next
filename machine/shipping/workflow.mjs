@@ -58,7 +58,7 @@ export function reviewTask({ pr, sha, checkout, card, criteria }) {
   ].join('\n');
 }
 
-export async function runShipping({ pr, sha, checkout, card, modelId = FREE_MODEL, storage, log = console.log }) {
+export async function runShipping({ pr, sha, checkout, card, cardRecord = null, modelId = FREE_MODEL, storage, log = console.log }) {
   const { z, createWorkflow, createStep } = await loadMastra();
   const traceFile = process.env.MASTRA_OBSERVABILITY_DB_PATH ?? null;
   const { booted, session, mastra, requestContext, subagent } = await bootHarness({ cwd: checkout, storage });
@@ -78,9 +78,14 @@ export async function runShipping({ pr, sha, checkout, card, modelId = FREE_MODE
     inputSchema,
     outputSchema: contextSchema,
     execute: async ({ inputData }) => {
-      const apiKey = process.env.LINEAR_API_KEY;
-      if (!apiKey) throw new Error('LINEAR_API_KEY is not set, so the machine cannot read the card.');
-      const issue = await getIssue(inputData.card, { apiKey });
+      // A caller that already read the card hands it over, so the review can run
+      // on a machine whose Linear key is gone. Otherwise the card is read here.
+      let issue = cardRecord;
+      if (!issue) {
+        const apiKey = process.env.LINEAR_API_KEY;
+        if (!apiKey) throw new Error('LINEAR_API_KEY is not set, so the machine cannot read the card.');
+        issue = await getIssue(inputData.card, { apiKey });
+      }
       if (!issue) throw new Error(`Linear returned no card for ${inputData.card}`);
       const criteria = criteriaFromCard(issue.description);
       if (criteria.length === 0) throw new Error(`${inputData.card} names no criteria, so there is nothing to judge.`);

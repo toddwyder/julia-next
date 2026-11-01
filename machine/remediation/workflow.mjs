@@ -170,7 +170,7 @@ export async function createRemediationWorkflow({ mastra, deps, log = console.lo
       if (criteria.length === 0) {
         throw new Error(`${inputData.card} names no acceptance criteria, so there is nothing for Shipping to judge.`);
       }
-      log(`Read ${inputData.card} from Linear: ${criteria.length} criteria.`);
+      log(`Read ${inputData.card}: ${criteria.length} criteria.`);
       return persist({
         pr: inputData.pr,
         card: {
