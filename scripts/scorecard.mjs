@@ -501,6 +501,12 @@ export function renderScorecard(s, generatedAt = new Date()) {
   const verdict = !s.windows ? 'not decided yet (no matching run records)' : s.success === undefined ? 'not decided yet (no UAT yes recorded)' : s.success ? 'yes' : 'no';
   const uat = s.uat ? `${utc(Date.parse(s.uat.yesAt))} ("${cell(s.uat.said)}")` : 'not recorded';
   lines.push(`- Success: **${verdict}**. Stops before Todd's UAT yes: ${s.stopsBeforeUat}. Todd's UAT yes: ${uat}.`);
+  // A card is judged against Todd's yes, and on 1 November 2026 it took grepping this file to
+  // learn where that yes is written down. The scorecard now says it beside the answer it cannot
+  // give yet, which is where the reader already is.
+  if (s.windows && s.success === undefined && !s.uat) {
+    lines.push(`- To record it: write \`"${s.card}": {"yesAt": "<UTC time>", "said": "<his words>"}\` into docs/scorecards/uat.json, then run this scorecard again.`);
+  }
   // Rows with no token detail cannot add up to a number, so say unknown rather
   // than print $0.00 for a card that plainly cost something.
   const measured = s.cost.some(c => Object.keys(c.tokens ?? {}).length);

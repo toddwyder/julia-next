@@ -19,8 +19,60 @@ function fakeFetch(responses) {
   };
 }
 
+// 1 November 2026: the Shipping machine read `getIssue('JUL-305')` with no options, and the
+// refusal it would hit says "pass LINEAR_API_KEY" while the variable was set all along. The key
+// came only from the `apiKey` field, so a run with a working key died in 28 ms. The client now
+// reads the variable too, which means these tests must not inherit one.
+async function withoutKey(run) {
+  const before = process.env.LINEAR_API_KEY;
+  delete process.env.LINEAR_API_KEY;
+  try {
+    return await run();
+  } finally {
+    if (before === undefined) delete process.env.LINEAR_API_KEY;
+    else process.env.LINEAR_API_KEY = before;
+  }
+}
+
 test('linearGraphQL refuses to run without an API key', async () => {
-  await assert.rejects(() => linearGraphQL('query {}', {}, {}), /apiKey is required/);
+  await withoutKey(() => assert.rejects(() => linearGraphQL('query {}', {}, {}), /apiKey is required/));
+});
+
+test('linearGraphQL reads the key from LINEAR_API_KEY when the caller passes none', async () => {
+  let capturedHeaders;
+  const fetchImpl = async (url, opts) => {
+    capturedHeaders = opts.headers;
+    return { ok: true, status: 200, json: async () => ({ data: {} }) };
+  };
+  await withoutKey(async () => {
+    process.env.LINEAR_API_KEY = 'lin_api_from_the_variable';
+    await linearGraphQL('query {}', {}, { fetchImpl });
+  });
+  assert.equal(capturedHeaders.Authorization, 'lin_api_from_the_variable');
+});
+
+test('a key the caller passes wins over the variable', async () => {
+  let capturedHeaders;
+  const fetchImpl = async (url, opts) => {
+    capturedHeaders = opts.headers;
+    return { ok: true, status: 200, json: async () => ({ data: {} }) };
+  };
+  await withoutKey(async () => {
+    process.env.LINEAR_API_KEY = 'lin_api_from_the_variable';
+    await linearGraphQL('query {}', {}, { apiKey: 'lin_api_from_the_caller', fetchImpl });
+  });
+  assert.equal(capturedHeaders.Authorization, 'lin_api_from_the_caller');
+});
+
+test('getIssue works with no key argument, which is how the Shipping machine calls it', async () => {
+  const fetchImpl = fakeFetch([
+    { body: { data: { viewer: { id: 'actor-1', name: 'Julia' }, issue: { id: 'uuid-301', identifier: 'JUL-301', title: 'Ship it', url: 'https://linear.app/x' } } } },
+  ]);
+  const issue = await withoutKey(async () => {
+    process.env.LINEAR_API_KEY = 'lin_api_from_the_variable';
+    return getIssue('JUL-301', { fetchImpl });
+  });
+  assert.equal(issue.identifier, 'JUL-301');
 });
 
 test('linearGraphQL sends the key as the Authorization header, not a Bearer-prefixed one -- Linear expects the raw key', async () => {
