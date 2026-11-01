@@ -7,7 +7,7 @@ export default function PracticePage() {
     <main className="vintage-column py-10">
       <h1 className="text-2xl font-semibold tracking-tight">The kitchen bench</h1>
       <p className="mt-2 max-w-prose text-base leading-relaxed text-stone-700">
-        This corner of the cookbook is where the kitchen keeps its working notes.
+        Ready to cook. This corner of the cookbook is where the kitchen keeps its working notes.
       </p>
     </main>
   );
