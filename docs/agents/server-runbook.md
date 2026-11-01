@@ -126,3 +126,18 @@ Four facts that cost failed runs on 30 October: `connection.runAndReadAll(sql).g
 ## GitHub boundaries
 
 Use ordinary signed-in GitHub access for authorized cards. Keep authentication material inside its trusted process. Evidence and notes belong on the card branch and pull request.
+
+## The runner's own GitHub identity
+
+The runner is a GitHub App named **Julia Runner**, slug `julia-runner`, id `5561742`, installed on `julia-next` only. Its credentials came from GitHub's manifest flow on 1 November 2026 and sit in `/home/ubuntu/.config/julia-runner` at 0600 in a 0700 directory.
+
+- `app.json` holds the app id, client id and client secret.
+- `private-key.pem` holds the App's private key.
+- `installation.json` holds installation `177375308`.
+- `setup-status.json` holds the four steps of the setup run.
+
+GitHub granted it checks write, statuses write, pull requests write, contents write and metadata read. Anything it opens is authored `julia-runner[bot]`: pull request 399 was the first, on `runner/identity-proof`.
+
+To act as the runner, sign an RS256 JWT with `private-key.pem` (issuer is the app id, expiry within ten minutes), trade it for an installation token at `POST /app/installations/177375308/access_tokens`, and call the API with that token. A personal token cannot do this: `POST /check-runs` answers 403 for one.
+
+The page that created the App was a one-off script, never a service. It ran on 1 November 2026, wrote these four files and stopped; nothing on the server starts it, and its code lived only in the closed pull request 398.
