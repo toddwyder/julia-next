@@ -228,14 +228,16 @@ async function main() {
       },
     });
   } catch (error) {
-    writeRecord(runDir, { pr: args.pr, card: args.card, status: 'refused', runId: run.runId, startedAt, reason: error.message });
+    // The steps save their record after each one; a refusal keeps what the last
+    // step reached so the next run can pick it up instead of starting over.
+    writeRecord(runDir, { ...(readRecord(runDir) ?? {}), pr: args.pr, card: args.card, status: 'refused', runId: run.runId, startedAt, reason: error.message });
     console.error(`The merge machine refused: ${error.message}`);
     return 1;
   }
 
   const record = result?.result ?? null;
   const finished = result?.status === 'success' && record;
-  writeRecord(runDir, { ...(record ?? {}), pr: args.pr, card: args.card, status: finished ? 'finished' : result?.status ?? 'failed', runId: run.runId, startedAt, updatedAt: new Date().toISOString(), error: result?.error?.message ?? null });
+  writeRecord(runDir, { ...(record ?? readRecord(runDir) ?? {}), pr: args.pr, card: args.card, status: finished ? 'finished' : result?.status ?? 'failed', runId: run.runId, startedAt, updatedAt: new Date().toISOString(), error: result?.error?.message ?? null });
 
   if (!finished) {
     console.error(`The merge machine stopped: ${result?.error?.message ?? result?.status ?? 'no result'}`);
