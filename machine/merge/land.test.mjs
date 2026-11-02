@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import {
@@ -233,6 +236,11 @@ test('the record is published as a pull request the machine watches and merges',
     mergeCommit: 'beef1234',
     mergedAt: '2026-11-02T03:00:00Z',
   };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-test-'));
+  const checkout = path.join(dir, 'main');
+  const retro = path.join(checkout, 'docs/retros/jul-310.md');
+  fs.mkdirSync(path.dirname(retro), { recursive: true });
+  fs.writeFileSync(retro, '# What JUL-310 taught\n');
   const git = (args, options = {}) => {
     gitCalls.push({ args, cwd: options.cwd });
     if (args[0] === 'status') return 'A docs/retros/jul-310.md';
@@ -240,12 +248,12 @@ test('the record is published as a pull request the machine watches and merges',
     return '';
   };
   const published = await publishDocs({
-    checkout: '/repo/main',
+    checkout,
     branch: 'docs/jul-310-landing',
     title: 'Record how JUL-310 went (JUL-310)',
     body: 'No card: the machine recording a merged card.',
     bodyPath: '/repo/.artifacts/merge/pr-417/publish-body.md',
-    files: ['/repo/main/docs/retros/jul-310.md'],
+    files: [retro],
     git,
     forge: {
       openPr: () => {
@@ -276,19 +284,61 @@ test('the record is published as a pull request the machine watches and merges',
   assert.deepEqual(gitCalls[1].args, ['checkout', '--quiet', '-B', 'docs/jul-310-landing', 'origin/main']);
   assert.deepEqual(gitCalls.find(call => call.args[0] === 'add').args, ['add', '--', 'docs/retros/jul-310.md']);
   assert.deepEqual(gitCalls.find(call => call.args[0] === 'push').args, ['push', '--quiet', '-u', 'origin', 'docs/jul-310-landing']);
-  assert.ok(gitCalls.every(call => call.cwd === '/repo/main'));
+  assert.ok(gitCalls.every(call => call.cwd === checkout));
+  // The file was held in memory while the branch changed and put back after.
+  assert.equal(fs.readFileSync(retro, 'utf8'), '# What JUL-310 taught\n');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('a record main already holds is not published a second time', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-test-'));
+  const checkout = path.join(dir, 'main');
+  const retro = path.join(checkout, 'docs/retros/jul-310.md');
+  fs.mkdirSync(path.dirname(retro), { recursive: true });
+  fs.writeFileSync(retro, '# What JUL-310 taught\n');
+  const gitCalls = [];
+  const git = (args, options = {}) => {
+    gitCalls.push({ args, cwd: options.cwd });
+    return args[0] === 'status' ? '' : '';
+  };
+  try {
+    const published = await publishDocs({
+      checkout,
+      branch: 'docs/jul-310-landing',
+      title: 's',
+      body: 'b',
+      bodyPath: path.join(dir, 'body.md'),
+      files: [retro],
+      git,
+      forge: {
+        openPr: () => {
+          throw new Error('no pull request is opened for a record main already holds');
+        },
+      },
+    });
+    assert.deepEqual(published, { url: null, branch: null, commit: null, sha: null, files: [] });
+    assert.equal(gitCalls.some(call => call.args[0] === 'push'), false);
+    assert.equal(fs.readFileSync(retro, 'utf8'), '# What JUL-310 taught\n');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('a record whose checks come back red is never merged', async () => {
   let merged = false;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-test-'));
+  const checkout = path.join(dir, 'main');
+  const retro = path.join(checkout, 'docs/retros/jul-310.md');
+  fs.mkdirSync(path.dirname(retro), { recursive: true });
+  fs.writeFileSync(retro, '# What JUL-310 taught\n');
   await assert.rejects(
     publishDocs({
-      checkout: '/repo/main',
+      checkout,
       branch: 'docs/jul-310-landing',
       title: 's',
       body: 'b',
       bodyPath: '/repo/body.md',
-      files: ['/repo/main/docs/retros/jul-310.md'],
+      files: [retro],
       git: args => (args[0] === 'status' ? 'A file' : args[0] === 'rev-parse' ? 'abc1234' : ''),
       forge: {
         openPr: () => 'https://example.test/pull/501',
@@ -303,6 +353,7 @@ test('a record whose checks come back red is never merged', async () => {
     /repository-hygiene FAILURE/
   );
   assert.equal(merged, false);
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 test('a record with nothing in it is a fault, not a push', async () => {

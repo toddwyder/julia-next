@@ -230,6 +230,9 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
         metrics: record.metrics ? `${record.metrics.duration.human}, ${record.metrics.reviews.rounds} Shipping rounds` : null,
       });
       if (!outcome.ok) {
+        // The agent's last words are the only clue when it returns without a
+        // file, and a stopped run should not need the trace to explain itself.
+        if (outcome.answer) log(`The retro agent ended with: ${String(outcome.answer).trim().slice(-600)}`);
         return persist({
           ...record,
           retro: { ok: false, reason: outcome.reason, file: null, commit: null },

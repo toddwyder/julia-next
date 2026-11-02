@@ -41,6 +41,14 @@ function recordPath(runDir) {
   return path.join(runDir, 'record.json');
 }
 
+// The card stays the object the gather step read from Linear. A run that stops
+// before it (or a refusal) still writes a record, and a bare identifier there
+// would make the next run think it was resuming a different card.
+function cardFor(runDir, identifier) {
+  const card = readRecord(runDir)?.card;
+  return card && typeof card === 'object' ? card : { identifier, title: '', description: '', url: null };
+}
+
 function readRecord(runDir) {
   try {
     return JSON.parse(fs.readFileSync(recordPath(runDir), 'utf8'));
@@ -216,7 +224,7 @@ async function main() {
   const startedAt = new Date().toISOString();
   const run = await workflow.createRun();
   deps.runId = run.runId;
-  writeRecord(runDir, { pr: args.pr, card: args.card, status: 'running', runId: run.runId, startedAt, resume: saved ?? null });
+  writeRecord(runDir, { pr: args.pr, card: cardFor(runDir, args.card), status: 'running', runId: run.runId, startedAt, resume: saved ?? null });
 
   let result;
   try {
@@ -230,14 +238,14 @@ async function main() {
   } catch (error) {
     // The steps save their record after each one; a refusal keeps what the last
     // step reached so the next run can pick it up instead of starting over.
-    writeRecord(runDir, { ...(readRecord(runDir) ?? {}), pr: args.pr, card: args.card, status: 'refused', runId: run.runId, startedAt, reason: error.message });
+    writeRecord(runDir, { ...(readRecord(runDir) ?? {}), pr: args.pr, card: cardFor(runDir, args.card), status: 'refused', runId: run.runId, startedAt, reason: error.message });
     console.error(`The merge machine refused: ${error.message}`);
     return 1;
   }
 
   const record = result?.result ?? null;
   const finished = result?.status === 'success' && record;
-  writeRecord(runDir, { ...(record ?? readRecord(runDir) ?? {}), pr: args.pr, card: args.card, status: finished ? 'finished' : result?.status ?? 'failed', runId: run.runId, startedAt, updatedAt: new Date().toISOString(), error: result?.error?.message ?? null });
+  writeRecord(runDir, { ...(record ?? readRecord(runDir) ?? {}), pr: args.pr, card: cardFor(runDir, args.card), status: finished ? 'finished' : result?.status ?? 'failed', runId: run.runId, startedAt, updatedAt: new Date().toISOString(), error: result?.error?.message ?? null });
 
   if (!finished) {
     console.error(`The merge machine stopped: ${result?.error?.message ?? result?.status ?? 'no result'}`);

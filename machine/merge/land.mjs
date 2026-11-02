@@ -285,11 +285,28 @@ export async function publishDocs({
   const sleep = forge.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
 
   const relative = files.map(file => path.relative(checkout, file));
+  // The files were just written into a worktree of the merge commit, and main
+  // may already hold them from an earlier run. Switching branches refuses to
+  // overwrite them, so they are held in memory and put back on the new branch.
+  const written = relative
+    .map(file => ({ file, body: fs.existsSync(path.join(checkout, file)) ? fs.readFileSync(path.join(checkout, file), 'utf8') : null }))
+    .filter(entry => entry.body !== null);
+  if (!written.length) throw new Error(`nothing was written at ${relative.join(', ')}, so there is nothing to publish`);
+  for (const entry of written) fs.rmSync(path.join(checkout, entry.file), { force: true });
   git(['fetch', '--no-tags', '--quiet', 'origin', 'main'], { cwd: checkout });
   git(['checkout', '--quiet', '-B', branch, 'origin/main'], { cwd: checkout });
+  for (const entry of written) {
+    fs.mkdirSync(path.dirname(path.join(checkout, entry.file)), { recursive: true });
+    fs.writeFileSync(path.join(checkout, entry.file), entry.body);
+  }
   for (const file of relative) git(['add', '--', file], { cwd: checkout });
   const status = git(['status', '--porcelain', '--', ...relative], { cwd: checkout });
-  if (!status) throw new Error(`nothing was written at ${relative.join(', ')}, so there is nothing to publish`);
+  if (!status) {
+    // Main already holds this record, so a run that stopped after the record's
+    // own pull request merged has nothing left to publish.
+    log(`The record is already on main, so there is nothing to publish for ${branch}.`);
+    return { url: null, branch: null, commit: null, sha: null, files: [] };
+  }
   git(['commit', '-q', '-m', title, '-m', body], { cwd: checkout });
   git(['push', '--quiet', '-u', 'origin', branch], { cwd: checkout });
   const sha = git(['rev-parse', 'HEAD'], { cwd: checkout });
