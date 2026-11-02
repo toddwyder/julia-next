@@ -24,3 +24,16 @@ Things found while building the merge machine. None of them is in this change.
 5. **No issued practice card existed, so the practice run creates one.** The sweep and the
    machine both key on a card id; the plan for this card says practice cards and pull
    requests are listed in the pull request that ships the machine.
+
+6. A canceled card's branch was blocking every pull request. JUL-308 was canceled
+   and its pull request (#415) closed on 2 November, which left
+   `feat/jul-308-preview-smoke-test` pushed with no open pull request, so
+   `check-branch-pr` failed `repository-hygiene` for every branch in the
+   repository, and the practice run could not land. The 20 commits are kept on
+   the tag `canceled-jul-308-preview-smoke` (8246851) and the branch is deleted.
+   Nothing of JUL-308's work was changed or thrown away; restoring the branch is
+   `git push origin canceled-jul-308-preview-smoke:refs/heads/feat/jul-308-preview-smoke-test`.
+7. `gh` colourises its JSON when the terminal forces colour, so the machine's
+   first practice merge read `Unexpected token '\u001b'`. `land.mjs` now runs
+   `gh` with `NO_COLOR`/`FORCE_COLOR=0`/`CLICOLOR` off and strips the escapes
+   before parsing. A `GH_FORCE_TTY` style fix belongs upstream, not here.

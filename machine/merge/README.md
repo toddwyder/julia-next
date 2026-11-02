@@ -22,13 +22,23 @@ before touching the forge again.
 1. `run.mjs` reads the card, the pull request, and the pull request's comments,
    and points `MASTRA_OBSERVABILITY_DB_PATH` at a new trace file per run and
    `MASTRA_DB_PATH` at a state database inside the run folder.
-2. `workflow.mjs` builds the stock Mastra workflow `merge` with seven steps.
-   `gather` decides the gate, `land` merges, `ci` waits for main, `metrics`
-   writes the landing facts, `retro` writes the retro, `sweep` removes the
-   leftovers, `complete` moves the card.
+2. `workflow.mjs` builds the stock Mastra workflow `merge` with eight steps.
+   `gather` decides the gate, `checks` waits for the pull request's own checks,
+   `land` merges, `ci` waits for main, `metrics` writes the landing facts,
+   `retro` writes the retro, `sweep` removes the leftovers, `complete` moves the
+   card.
 3. Every step saves the run record before it hands on. A crash leaves the
    finished steps in `record.json`, and a rerun continues from there instead of
    merging twice.
+
+## The pull request's own checks
+
+Branch protection refuses a merge until the pull request's checks are done, and
+a refusal reads like a fault. So `checks` reads the rollup first and waits:
+`SUCCESS`, `NEUTRAL` and `SKIPPED` are green, a `FAILURE` is named and stops the
+run before anything merges, and a check that never finishes stops it after
+fifteen minutes. The merge is left to the forge so branch protection stays the
+thing that enforces the checks.
 
 ## The gate
 

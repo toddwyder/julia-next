@@ -4,13 +4,16 @@ import test from 'node:test';
 import {
   alreadyCompleted,
   assertLandable,
+  checkRollup,
   commitToMain,
   completeCard,
   completionComment,
+  gh,
   mainRunsFor,
   mergePullRequest,
   waitForMainCi,
   waitForMerged,
+  waitForPullChecks,
 } from './land.mjs';
 
 const noSleep = async () => {};
@@ -29,6 +32,18 @@ const PULL = {
 };
 
 const PASS = { pass: true, verdict: 'PASS', head: PULL.headSha, rounds: 1, verdicts: ['PASS'], commentUrl: 'https://github.com/julia/next/pull/420#issuecomment-1' };
+
+test('the answer gh prints is read even when a terminal colours it', () => {
+  const printed = '\u001b[1m{"state":"MERGED"}\u001b[0m\n';
+  const seen = [];
+  const answer = gh(['pr', 'view', '42', '--json', 'state'], {
+    execImpl: (file, args, options) => { seen.push([file, args, options.env]); return printed; },
+    env: { FORCE_COLOR: '1' },
+  });
+  assert.deepEqual(JSON.parse(answer), { state: 'MERGED' });
+  assert.equal(seen[0][2].FORCE_COLOR, '0', 'the child is asked for no colour');
+  assert.equal(seen[0][2].NO_COLOR, '1');
+});
 
 test('a change is not merged when the pull request or the verdict says it should not be', () => {
   assert.equal(assertLandable({ pull: PULL, decision: PASS }), true);
@@ -244,4 +259,82 @@ test('a commit with nothing in it is a fault, not a push', () => {
       }),
     /nothing was written at docs\/retros\/jul-310\.md/
   );
+});
+
+test('the pull request checks are read from the rollup, whichever shape the forge gives them', () => {
+  const answer = JSON.stringify({
+    statusCheckRollup: [
+      { __typename: 'CheckRun', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: 'https://example.test/check/1' },
+      { __typename: 'CheckRun', name: 'web', status: 'IN_PROGRESS', conclusion: null, detailsUrl: 'https://example.test/check/2' },
+      { __typename: 'StatusContext', context: 'Vercel', state: 'PENDING', targetUrl: 'https://example.test/vercel' },
+    ],
+  });
+  const calls = [];
+  const checks = checkRollup(420, { execImpl: (command, args) => { calls.push([command, ...args]); return answer; } });
+  assert.deepEqual(calls, [['gh', 'pr', 'view', '420', '--json', 'statusCheckRollup']]);
+  assert.deepEqual(checks, [
+    { name: 'checks', state: 'SUCCESS', done: true, url: 'https://example.test/check/1' },
+    { name: 'web', state: 'IN_PROGRESS', done: false, url: 'https://example.test/check/2' },
+    { name: 'Vercel', state: 'PENDING', done: false, url: 'https://example.test/vercel' },
+  ]);
+});
+
+test('the machine waits for the pull request checks and only merges on a green rollup', async () => {
+  const rolls = [
+    [{ name: 'checks', state: 'IN_PROGRESS', done: false }],
+    [{ name: 'checks', state: 'SUCCESS', done: true }, { name: 'Vercel', state: 'SUCCESS', done: true }],
+  ];
+  const lines = [];
+  const green = await waitForPullChecks({
+    pr: 420,
+    list: () => rolls.shift(),
+    sleep: noSleep,
+    log: line => lines.push(line),
+  });
+  assert.equal(green.green, true);
+  assert.match(green.reason, /checks on pull request #420 are green/);
+  assert.deepEqual(lines, ['Waiting for checks on pull request #420.']);
+});
+
+test('a failing pull request check is named, and the machine does not wait for the rest', async () => {
+  let reads = 0;
+  const red = await waitForPullChecks({
+    pr: 420,
+    list: () => {
+      reads += 1;
+      return [
+        { name: 'repository-hygiene', state: 'FAILURE', done: true },
+        { name: 'web', state: 'IN_PROGRESS', done: false },
+      ];
+    },
+    sleep: noSleep,
+  });
+  assert.equal(reads, 1);
+  assert.equal(red.green, false);
+  assert.deepEqual(red.failed.map(check => check.name), ['repository-hygiene']);
+  assert.match(red.reason, /pull request #420 has a failing check: repository-hygiene FAILURE/);
+});
+
+test('a pull request with no checks is green, and one that never finishes says so', async () => {
+  const none = await waitForPullChecks({ pr: 420, list: () => [], sleep: noSleep });
+  assert.equal(none.green, true);
+  assert.match(none.reason, /pull request #420 has no checks/);
+
+  const stuck = await waitForPullChecks({
+    pr: 420,
+    list: () => [{ name: 'web', state: 'IN_PROGRESS', done: false }],
+    tries: 2,
+    waitMs: 30_000,
+    sleep: noSleep,
+  });
+  assert.equal(stuck.green, false);
+  assert.match(stuck.reason, /did not finish within 1 minutes/);
+
+  const unclear = await waitForPullChecks({
+    pr: 420,
+    list: () => [{ name: 'web', state: 'STALE', done: true }],
+    sleep: noSleep,
+  });
+  assert.equal(unclear.green, false);
+  assert.match(unclear.reason, /has a check with no verdict: web STALE/);
 });

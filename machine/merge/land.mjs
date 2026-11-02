@@ -11,9 +11,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const GH_TIMEOUT = 120_000;
+// A terminal that sets FORCE_COLOR makes gh colour its JSON, and JSON.parse then reads the
+// escape byte and refuses the answer. The answer is for a program, so ask for no colour and
+// take out any that arrives anyway.
+const ANSI = /\u001b\[[0-9;]*m/g;
 
-export function gh(args, { cwd, execImpl = execFileSync } = {}) {
-  return execImpl('gh', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: GH_TIMEOUT }).trim();
+export function gh(args, { cwd, execImpl = execFileSync, env = process.env } = {}) {
+  const colourless = { ...env, NO_COLOR: '1', FORCE_COLOR: '0', CLICOLOR: '0', CLICOLOR_FORCE: '0' };
+  const out = execImpl('gh', args, { cwd, env: colourless, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: GH_TIMEOUT });
+  return String(out).replace(ANSI, '').trim();
 }
 
 export function readPullRequest(pr, options = {}) {
@@ -71,6 +77,54 @@ export async function waitForMerged({ pr, read, tries = 15, waitMs = 4000, sleep
     await sleep(waitMs);
   }
   throw new Error(`Pull request #${pr} did not report MERGED; its last state was ${last?.state ?? 'unknown'}.`);
+}
+
+// Branch protection refuses a merge until the pull request's own checks are done, so the
+// machine reads them first and can say which one failed instead of reporting a refusal.
+const BAD_CHECK = new Set(['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE']);
+const GOOD_CHECK = new Set(['SUCCESS', 'NEUTRAL', 'SKIPPED']);
+
+export function checkRollup(pr, options = {}) {
+  const raw = gh(['pr', 'view', String(pr), '--json', 'statusCheckRollup'], options);
+  return (JSON.parse(raw).statusCheckRollup ?? []).map(node => {
+    const context = typeof node.state === 'string';
+    return {
+      name: node.name ?? node.context ?? 'a check',
+      state: context ? node.state : node.conclusion ?? node.status ?? 'UNKNOWN',
+      done: context ? node.state !== 'PENDING' : node.status === 'COMPLETED',
+      url: node.detailsUrl ?? node.targetUrl ?? null,
+    };
+  });
+}
+
+export async function waitForPullChecks({
+  pr,
+  options = {},
+  list = checkRollup,
+  tries = 60,
+  waitMs = 15_000,
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  log = () => {},
+}) {
+  let last = [];
+  for (let attempt = 0; attempt < tries; attempt++) {
+    last = list(pr, options);
+    const failed = last.filter(check => BAD_CHECK.has(String(check.state).toUpperCase()));
+    if (failed.length > 0) {
+      return { green: false, checks: last, failed, reason: `pull request #${pr} has a failing check: ${failed.map(check => `${check.name} ${check.state}`).join(', ')}` };
+    }
+    const waiting = last.filter(check => !check.done);
+    if (waiting.length === 0) {
+      const unclear = last.filter(check => !GOOD_CHECK.has(String(check.state).toUpperCase()));
+      if (unclear.length === 0) {
+        return { green: true, checks: last, failed: [], reason: last.length === 0 ? `pull request #${pr} has no checks` : `the checks on pull request #${pr} are green` };
+      }
+      return { green: false, checks: last, failed: unclear, reason: `pull request #${pr} has a check with no verdict: ${unclear.map(check => `${check.name} ${check.state}`).join(', ')}` };
+    }
+    log(waiting.length === 0 ? `Pull request #${pr} has checks with no verdict yet: ${last.map(check => `${check.name} ${check.state}`).join(', ')}.` : `Waiting for ${waiting.map(check => check.name).join(', ')} on pull request #${pr}.`);
+    await sleep(waitMs);
+  }
+  return { green: false, checks: last, failed: [], reason: `the checks on pull request #${pr} did not finish within ${Math.round((tries * waitMs) / 60_000)} minutes` };
 }
 
 export function mainRunsFor(sha, options = {}) {

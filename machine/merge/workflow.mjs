@@ -38,6 +38,7 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
     head: z.string(),
     decision: object,
     changed: z.array(z.string()).default([]),
+    checks: object.nullable().default(null),
     merge: object.nullable().default(null),
     ci: object.nullable().default(null),
     metrics: object.nullable().default(null),
@@ -86,6 +87,7 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
         head: pull.headSha,
         decision,
         changed,
+        checks: saved?.checks ?? null,
         merge: saved?.merge ?? null,
         ci: saved?.ci ?? null,
         metrics: saved?.metrics ?? null,
@@ -98,11 +100,32 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
     },
   });
 
+  // Branch protection is the forge's job, and a refusal reads like a fault. The machine
+  // reads the pull request's own checks first, so a failing check is a result it can name.
+  const checks = createStep({
+    ...withRecord,
+    id: 'checks',
+    execute: async ({ inputData }) => {
+      const record = inputData;
+      if (record.merge || record.checks?.green) return persist(record);
+      const outcome = await deps.waitChecks({ pr: record.pr });
+      log(outcome.reason);
+      const kept = {
+        green: outcome.green,
+        reason: outcome.reason,
+        failed: (outcome.failed ?? []).map(check => `${check.name} ${check.state}`),
+      };
+      if (outcome.green) return persist({ ...record, checks: kept });
+      return persist({ ...record, checks: kept, failed: outcome.reason, stop: { reason: outcome.reason } });
+    },
+  });
+
   const land = createStep({
     ...withRecord,
     id: 'land',
     execute: async ({ inputData }) => {
       const record = inputData;
+      if (record.stop) return persist(record);
       if (record.merge) {
         deps.prepareMain({ sha: record.merge.commit });
         return persist(record);
@@ -260,6 +283,7 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
 
   const workflow = createWorkflow({ id: WORKFLOW_ID, inputSchema: startSchema, outputSchema: recordSchema })
     .then(gather)
+    .then(checks)
     .then(land)
     .then(ci)
     .then(metrics)

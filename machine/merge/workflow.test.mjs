@@ -105,6 +105,10 @@ function fakeDeps({ comments = [determination()] } = {}) {
       order.push(`prepareMain ${sha}`);
       return deps.checkout;
     },
+    waitChecks: async ({ pr }) => {
+      order.push(`waitChecks #${pr}`);
+      return { green: true, checks: [{ name: 'checks', state: 'SUCCESS' }], failed: [], reason: `the checks on pull request #${pr} are green` };
+    },
     waitCi: async ({ sha }) => {
       order.push(`waitCi ${sha}`);
       return { green: true, reason: `main CI is green on ${sha}.`, runs: [{ name: 'checks', conclusion: 'success' }] };
@@ -195,6 +199,7 @@ test('a passing change lands, is recorded, retros, sweeps and completes the card
       'readPull',
       'readComments',
       'changedFiles',
+      'waitChecks #42',
       'merge #42 at a1b2c3d4e5f6a7b8c9d0',
       'waitMerged',
       `prepareMain ${MERGE}`,
@@ -285,6 +290,31 @@ test('red main CI leaves the card in progress and asks the retro for a reflectio
     assert.equal(record.failed, 'main CI failed on feedface: web failure');
     assert.equal(record.retro.ok, true);
     assert.equal(record.completion, null);
+    assert.equal(order.some(step => step === 'completeCard JUL-999'), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a failing check on the pull request stops the machine before it merges', withoutProgram, async () => {
+  const { deps, order } = fakeDeps();
+  deps.waitChecks = async ({ pr }) => {
+    order.push(`waitChecks #${pr}`);
+    return {
+      green: false,
+      checks: [{ name: 'repository-hygiene', state: 'FAILURE' }],
+      failed: [{ name: 'repository-hygiene', state: 'FAILURE' }],
+      reason: 'pull request #42 has a failing check: repository-hygiene FAILURE',
+    };
+  };
+  const { started, dir } = await runMerge(deps);
+  try {
+    assert.equal(started.status, 'success', started.error);
+    const record = started.result;
+    assert.equal(record.merge, null);
+    assert.equal(record.stop.reason, 'pull request #42 has a failing check: repository-hygiene FAILURE');
+    assert.deepEqual(record.checks.failed, ['repository-hygiene FAILURE']);
+    assert.equal(order.some(step => step.startsWith('merge ')), false);
     assert.equal(order.some(step => step === 'completeCard JUL-999'), false);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
