@@ -1,0 +1,24 @@
+{
+  "card": "JUL-316",
+  "pullRequest": 417,
+  "mergeCommit": "90e27da703c6c76f8b8d3095359291e47023d191",
+  "mergedAt": "2026-11-02T02:22:49Z",
+  "startedAt": "2026-11-02T02:04:52Z",
+  "startedFrom": "the pull request’s first commit",
+  "duration": {
+    "minutes": 18,
+    "human": "18m"
+  },
+  "reviews": {
+    "rounds": 3,
+    "verdicts": [
+      "PASS",
+      "PASS",
+      "PASS"
+    ]
+  },
+  "model": null,
+  "workflowRunId": "d2913048-3ad0-4008-812c-3588f4ba1faf",
+  "landingUrl": null,
+  "recordedAt": "2026-11-02T02:47:06.572Z"
+}
