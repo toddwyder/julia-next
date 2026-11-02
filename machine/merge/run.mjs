@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getIssue, postComment, setIssueState } from '../../scripts/linear-cli.mjs';
-import { alreadyCompleted, completeCard, gh, mainRunsFor, mergePullRequest, prepareMainCheckout, pullRequestComments, readPullRequest, waitForMainCi, waitForMerged, waitForPullChecks } from './land.mjs';
+import { alreadyCompleted, completeCard, deleteRemoteBranch, gh, mainRunsFor, mergePullRequest, prepareMainCheckout, pullRequestComments, readPullRequest, waitForMainCi, waitForMerged, waitForPullChecks } from './land.mjs';
 import { runRetro } from './retro.mjs';
 import { deadTestFiles, runSweep, sweepPlan, sweepSummary } from './sweep.mjs';
 
@@ -157,6 +157,7 @@ async function main() {
     changedFiles,
     firstCommitAt,
     merge: ({ pr, head }) => mergePullRequest({ pr, head }),
+    deleteBranch: ({ ref }) => deleteRemoteBranch(ref),
     waitMerged: async ({ pr }) => waitForMerged({ pr, read: readPullRequest, log: console.log }),
     prepareMain: ({ sha }) => prepareMainCheckout({ root, runDir, sha, git }),
     waitChecks: ({ pr }) => waitForPullChecks({ pr, log: console.log }),

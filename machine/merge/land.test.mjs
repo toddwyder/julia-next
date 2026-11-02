@@ -8,6 +8,7 @@ import {
   commitToMain,
   completeCard,
   completionComment,
+  deleteRemoteBranch,
   gh,
   mainRunsFor,
   mergePullRequest,
@@ -343,4 +344,20 @@ test('a pull request a previous run already merged is not refused', () => {
   const decision = { pass: true, reason: 'PASS' };
   assert.equal(assertLandable({ pull: { ...PULL, state: 'MERGED', mergeCommit: 'f00dfeed' }, decision }), true);
   assert.throws(() => assertLandable({ pull: { ...PULL, state: 'CLOSED' }, decision }), /the pull request is CLOSED/);
+});
+
+test('a merged branch is deleted through the forge, and a branch already gone is not an error', () => {
+  const calls = [];
+  const gone = deleteRemoteBranch('practice/jul-316', { execImpl: (command, args) => { calls.push([command, ...args]); return ''; } });
+  assert.equal(gone, true);
+  assert.deepEqual(calls, [['gh', 'api', '-X', 'DELETE', 'repos/{owner}/{repo}/git/refs/heads/practice/jul-316']]);
+
+  const missing = deleteRemoteBranch('practice/gone', {
+    execImpl: () => { throw new Error('gh: Not Found (HTTP 404)'); },
+  });
+  assert.equal(missing, false);
+
+  assert.throws(() => deleteRemoteBranch('practice/jul-316', {
+    execImpl: () => { throw new Error('gh: Server Error (HTTP 502)'); },
+  }), /HTTP 502/);
 });

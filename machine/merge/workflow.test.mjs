@@ -97,6 +97,10 @@ function fakeDeps({ comments = [determination()] } = {}) {
       order.push(`merge #${pr} at ${head}`);
       return MERGE;
     },
+    deleteBranch: ({ ref }) => {
+      order.push(`deleteBranch ${ref}`);
+      return true;
+    },
     waitMerged: async () => {
       order.push('waitMerged');
       return mergedPull();
@@ -202,6 +206,7 @@ test('a passing change lands, is recorded, retros, sweeps and completes the card
       'waitChecks #42',
       'merge #42 at a1b2c3d4e5f6a7b8c9d0',
       'waitMerged',
+      'deleteBranch feat/jul-999-practice',
       `prepareMain ${MERGE}`,
       `waitCi ${MERGE}`,
       'firstCommitAt',
@@ -268,6 +273,7 @@ test('a rerun continues from the saved record instead of merging a second time',
       'readPull',
       'readComments',
       'changedFiles',
+      'deleteBranch feat/jul-999-practice',
       `prepareMain ${MERGE}`,
     ]);
     assert.equal(order.some(step => step.startsWith('merge ')), false);

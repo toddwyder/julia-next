@@ -71,6 +71,19 @@ export function mergePullRequest({ pr, head, options = {}, execImpl }) {
   return gh(['pr', 'merge', String(pr), '--squash', '--match-head-commit', head], { ...options, execImpl });
 }
 
+// A merged pull request's branch has to go before main's CI runs: repository
+// hygiene fails any pushed branch with no open pull request, and a card's branch
+// stops having one the moment it merges.
+export function deleteRemoteBranch(ref, options = {}) {
+  try {
+    gh(['api', '-X', 'DELETE', `repos/{owner}/{repo}/git/refs/heads/${ref}`], options);
+    return true;
+  } catch (error) {
+    if (/404|Not Found/i.test(String(error.message))) return false;
+    throw error;
+  }
+}
+
 export async function waitForMerged({ pr, read, tries = 15, waitMs = 4000, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), log = () => {} }) {
   let last = null;
   for (let attempt = 0; attempt < tries; attempt++) {

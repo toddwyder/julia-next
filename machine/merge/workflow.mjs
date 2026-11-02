@@ -127,6 +127,10 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
       const record = inputData;
       if (record.stop) return persist(record);
       if (record.merge) {
+        if (record.pull?.head) {
+          const gone = await deps.deleteBranch({ ref: record.pull.head });
+          if (gone) log(`Deleted ${record.pull.head}, which the merge left behind.`);
+        }
         deps.prepareMain({ sha: record.merge.commit });
         return persist(record);
       }
@@ -139,6 +143,10 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
         pull = await deps.waitMerged({ pr: record.pr });
       }
       if (pull.base !== 'main') throw new Error(`pull request #${record.pr} merged into ${pull.base}, not main`);
+      if (pull.head) {
+        const gone = await deps.deleteBranch({ ref: pull.head });
+        log(gone ? `Deleted ${pull.head} so repository hygiene still passes on main.` : `${pull.head} was already gone.`);
+      }
       const checkout = deps.prepareMain({ sha: pull.mergeCommit });
       log(`The main line is checked out at ${pull.mergeCommit} in ${checkout}.`);
       const merge = { commit: pull.mergeCommit, mergedAt: pull.mergedAt, url: pull.url, checkout };
