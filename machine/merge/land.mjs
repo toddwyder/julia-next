@@ -54,7 +54,8 @@ export function pullRequestComments(pr, options = {}) {
 
 export function assertLandable({ pull, decision }) {
   const problems = [];
-  if (pull.state !== 'OPEN') problems.push(`the pull request is ${pull.state}`);
+  // A merged pull request is a rerun picking up where the last run stopped, not a refusal.
+  if (pull.state !== 'OPEN' && pull.state !== 'MERGED') problems.push(`the pull request is ${pull.state}`);
   if (pull.draft) problems.push('the pull request is a draft');
   if (pull.base !== 'main') problems.push(`it is based on ${pull.base}, not main`);
   if (!decision.pass) problems.push(decision.reason);

@@ -338,3 +338,9 @@ test('a pull request with no checks is green, and one that never finishes says s
   assert.equal(unclear.green, false);
   assert.match(unclear.reason, /has a check with no verdict: web STALE/);
 });
+
+test('a pull request a previous run already merged is not refused', () => {
+  const decision = { pass: true, reason: 'PASS' };
+  assert.equal(assertLandable({ pull: { ...PULL, state: 'MERGED', mergeCommit: 'f00dfeed' }, decision }), true);
+  assert.throws(() => assertLandable({ pull: { ...PULL, state: 'CLOSED' }, decision }), /the pull request is CLOSED/);
+});
