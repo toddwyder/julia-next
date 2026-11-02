@@ -258,42 +258,54 @@ export function landingPathFor(card) {
   return `docs/scorecards/${card}.landing.json`;
 }
 
-// One commit onto main, confirmed by the push returning. A refused push is
-// replayed on top of the main line once, because two machines can land within
-// the same minute and the second one's commit is still true.
-export function commitToMain({ checkout, files, subject, body, git, log = () => {}, tries = 2 }) {
+// Main is protected by a ruleset that requires the checks to pass, so the
+// machine cannot push its own record straight to it. The record travels as a
+// pull request the machine opens, watches and merges itself: the checks run, the
+// forge enforces them, and the main line stays a line of reviewed commits.
+export async function publishDocs({
+  checkout,
+  branch,
+  title,
+  body,
+  bodyPath,
+  files,
+  git,
+  log = () => {},
+  forge = {},
+  tries = 60,
+  waitMs = 15_000,
+}) {
+  const openPr = forge.openPr ?? (() => gh(['pr', 'create', '--base', 'main', '--head', branch, '--title', title, '--body-file', bodyPath], { cwd: checkout }).trim());
+  const listChecks = forge.listChecks ?? (pr => checkRollup(pr, { cwd: checkout }));
+  const mergePr = forge.mergePr ?? (pr => mergePullRequest({ pr, head: sha, options: { cwd: checkout } }));
+  const readPr = forge.readPr ?? (pr => readPullRequest(pr, { cwd: checkout }));
+  const dropBranch = forge.dropBranch ?? (ref => deleteRemoteBranch(ref, { cwd: checkout }));
+  const sleep = forge.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
+
   const relative = files.map(file => path.relative(checkout, file));
+  git(['fetch', '--no-tags', '--quiet', 'origin', 'main'], { cwd: checkout });
+  git(['checkout', '--quiet', '-B', branch, 'origin/main'], { cwd: checkout });
   for (const file of relative) git(['add', '--', file], { cwd: checkout });
   const status = git(['status', '--porcelain', '--', ...relative], { cwd: checkout });
-  if (!status) throw new Error(`nothing was written at ${relative.join(', ')}, so there is nothing to commit`);
-  git(['commit', '-q', '-m', subject, '-m', body], { cwd: checkout });
-  for (let attempt = 1; ; attempt++) {
-    try {
-      git(['push', '--quiet', 'origin', 'HEAD:main'], { cwd: checkout });
-      break;
-    } catch (error) {
-      if (attempt >= tries) throw error;
-      log('The push to main was refused; fetching the main line and replaying this commit on top of it.');
-      git(['fetch', '--no-tags', '--quiet', 'origin', 'main'], { cwd: checkout });
-      git(['pull', '--rebase', '--quiet', 'origin', 'main'], { cwd: checkout });
-    }
-  }
-  const pushed = git(['rev-parse', 'HEAD'], { cwd: checkout });
-  log(`Committed to main as ${pushed}: ${subject}`);
-  return pushed;
+  if (!status) throw new Error(`nothing was written at ${relative.join(', ')}, so there is nothing to publish`);
+  git(['commit', '-q', '-m', title, '-m', body], { cwd: checkout });
+  git(['push', '--quiet', '-u', 'origin', branch], { cwd: checkout });
+  const sha = git(['rev-parse', 'HEAD'], { cwd: checkout });
+
+  const url = String(openPr()).trim();
+  const pr = numberFromUrl(url);
+  log(`Opened ${url} for the record of this run.`);
+  const checks = await waitForPullChecks({ pr, list: listChecks, tries, waitMs, sleep, log });
+  if (!checks.green) throw new Error(checks.reason);
+  mergePr(pr);
+  const merged = await waitForMerged({ pr, read: readPr, sleep, log });
+  dropBranch(branch);
+  log(`The record is on main as ${merged.mergeCommit}: ${url}`);
+  return { url, branch, commit: merged.mergeCommit, sha };
 }
 
-export function commitRetro({ checkout, card, file, git, log = () => {} }) {
-  return commitToMain({
-    checkout,
-    files: [file],
-    subject: `Write down what ${card} taught the machine (${card})`,
-    body: [
-      `The retro ran on ${card} after its change landed.`,
-      '',
-      'Co-Authored-By: mastracode <284800079+mastra-platform[bot]@users.noreply.github.com>',
-    ].join('\n'),
-    git,
-    log,
-  });
+function numberFromUrl(url) {
+  const match = /\/pull\/(\d+)/.exec(url);
+  if (!match) throw new Error(`could not read a pull request number out of ${url}`);
+  return Number(match[1]);
 }

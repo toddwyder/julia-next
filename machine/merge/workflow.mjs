@@ -6,11 +6,13 @@
 // left behind. Every step saves the run record first, so a crash leaves the
 // finished steps on disk and a rerun continues instead of merging twice.
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { loadMastra } from '../shipping/harness.mjs';
 import { FREE_MODEL } from '../shipping/workflow.mjs';
 import { decideLanding, gateNote, parseShippingComment } from './gate.mjs';
 import { landingLines, landingPath, landingRecord, writeLanding } from './metrics.mjs';
-import { assertLandable, commitRetro, commitToMain, completionComment, retroPathFor } from './land.mjs';
+import { assertLandable, completionComment, retroPathFor } from './land.mjs';
 
 export const WORKFLOW_ID = 'merge';
 export const MERGE_MODEL = FREE_MODEL;
@@ -43,6 +45,7 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
     ci: object.nullable().default(null),
     metrics: object.nullable().default(null),
     retro: object.nullable().default(null),
+    publish: object.nullable().default(null),
     sweep: object.nullable().default(null),
     completion: object.nullable().default(null),
     failed: z.string().nullable().default(null),
@@ -92,6 +95,7 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
         ci: saved?.ci ?? null,
         metrics: saved?.metrics ?? null,
         retro: saved?.retro ?? null,
+        publish: saved?.publish ?? null,
         sweep: saved?.sweep ?? null,
         completion: saved?.completion ?? null,
         failed: saved?.failed ?? null,
@@ -189,20 +193,8 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
       });
       const file = landingPath(record.merge.checkout, record.card.identifier);
       writeLanding({ root: record.merge.checkout, record: entry });
-      const commit = commitToMain({
-        checkout: record.merge.checkout,
-        files: [file],
-        subject: `Record how ${record.card.identifier} went beside its scorecard (${record.card.identifier})`,
-        body: [
-          'How long the card took and how many Shipping rounds it ran, written by the merge machine.',
-          '',
-          'Co-Authored-By: mastracode <284800079+mastra-platform[bot]@users.noreply.github.com>',
-        ].join('\n'),
-        git: deps.git,
-        log,
-      });
       log(landingLines(entry).join(' '));
-      return persist({ ...record, metrics: { ...entry, file, commit } });
+      return persist({ ...record, metrics: { ...entry, file } });
     },
   });
 
@@ -236,8 +228,39 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
           stop: record.stop ?? { reason: outcome.reason },
         });
       }
-      const commit = commitRetro({ checkout: record.merge.checkout, card: record.card.identifier, file: outcome.file, git: deps.git, log });
-      return persist({ ...record, retro: { ok: true, reason: outcome.reason, file: retroPath, commit } });
+      log(`The retro is written at ${retroPath}.`);
+      return persist({ ...record, retro: { ok: true, reason: outcome.reason, file: retroPath } });
+    },
+  });
+
+  // Main is protected, so the record cannot be pushed straight onto it. One
+  // pull request carries the landing facts and the retro, the machine waits for
+  // its checks and merges it, and the card's own branch is left to the sweep.
+  const publish = createStep({
+    ...withRecord,
+    id: 'publish',
+    execute: async ({ inputData }) => {
+      const record = inputData;
+      if (!record.merge || record.publish) return persist(record);
+      const files = [record.metrics?.file, record.retro?.file && path.join(record.merge.checkout, record.retro.file)];
+      const present = files.filter(file => file && fs.existsSync(file));
+      if (!present.length) {
+        log('Nothing was written about this run, so there is nothing to publish.');
+        return persist({ ...record, publish: { url: null, branch: null, commit: null, files: [] } });
+      }
+      const branch = `docs/${String(record.card.identifier).toLowerCase()}-landing`;
+      // The title carries no card id on purpose: a pull request that names a card
+      // must also carry that card's scorecard, and this one records rather than ships.
+      const title = `Record how the card went: ${record.metrics?.duration?.human ?? 'duration unmeasured'}, ${record.metrics?.reviews?.rounds ?? 0} Shipping rounds`;
+      const body = [
+        'The merge machine writes down how long a card took, how many Shipping rounds it ran, and what the retro found.',
+        '',
+        'No card: this is the merge machine recording a card that is already merged.',
+      ].join('\n');
+      const bodyPath = path.join(deps.runDir, 'publish-body.md');
+      fs.writeFileSync(bodyPath, `${body}\n`);
+      const done = await deps.publish({ checkout: record.merge.checkout, branch, title, body, bodyPath, files: present, git: deps.git, log });
+      return persist({ ...record, publish: done });
     },
   });
 
@@ -296,6 +319,7 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
     .then(ci)
     .then(metrics)
     .then(retro)
+    .then(publish)
     .then(sweep)
     .then(complete)
     .commit();

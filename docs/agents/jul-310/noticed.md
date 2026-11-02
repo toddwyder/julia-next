@@ -37,3 +37,13 @@ Things found while building the merge machine. None of them is in this change.
    first practice merge read `Unexpected token '\u001b'`. `land.mjs` now runs
    `gh` with `NO_COLOR`/`FORCE_COLOR=0`/`CLICOLOR` off and strips the escapes
    before parsing. A `GH_FORCE_TTY` style fix belongs upstream, not here.
+
+## 8. Main refuses a direct push, so the record travels as a pull request
+
+`gh pr merge 417` succeeded and then main's CI ran; the first attempt to record
+the landing facts pushed `HEAD:main` and the forge refused it with `GH013:
+Repository rule violations found for refs/heads/main ... Required status check
+"checks" is expected`. Main is protected by a ruleset, so no process can put a
+commit on it without a pull request and a green `checks` run. The machine now
+opens its own pull request for the record and the retro, waits for that pull
+request's checks, merges it on the commit it opened, and deletes the branch.

@@ -134,6 +134,10 @@ function fakeDeps({ comments = [determination()] } = {}) {
       fs.writeFileSync(file, `# ${material.card}\n\n## Findings\n\n1. Nothing went wrong.\n`);
       return { ok: true, reason: 'written', file, answer: `RETRO: written ${material.retroPath}` };
     },
+    publish: async ({ branch, files }) => {
+      order.push(`publish ${branch} ${files.length}`);
+      return { url: 'https://example.test/pull/501', branch, commit: 'beef1234', sha: '0123456789abcdef' };
+    },
     sweep: async () => {
       order.push('sweep');
       return { summary: '1 leftover to remove, 0 kept, 0 for the noticed list.', removed: [], errors: [], noticed: [] };
@@ -157,6 +161,7 @@ async function runMerge(deps, { resume = null } = {}) {
   const checkout = path.join(dir, 'main');
   fs.mkdirSync(checkout, { recursive: true });
   deps.checkout = checkout;
+  deps.runDir = dir;
   const { Mastra, LibSQLStore } = await loadMastra();
   const mastra = new Mastra({
     storage: new LibSQLStore({ id: `merge-test-${path.basename(dir)}`, url: `file:${path.join(dir, 'state.db')}` }),
@@ -212,14 +217,17 @@ test('a passing change lands, is recorded, retros, sweeps and completes the card
       'firstCommitAt',
       'readComments',
       'retro',
+      'publish docs/jul-999-landing 2',
       'sweep',
       'cardComments',
       'completeCard JUL-999',
     ]);
 
+    assert.equal(record.publish.url, 'https://example.test/pull/501');
+    assert.equal(record.publish.commit, 'beef1234');
+
     const pushes = gitCalls.filter(call => call.args[0] === 'push');
-    assert.equal(pushes.length, 2, 'the landing record and the retro each go to main');
-    assert.deepEqual(pushes.map(call => call.args.at(-1)), ['HEAD:main', 'HEAD:main']);
+    assert.equal(pushes.length, 0, 'nothing is pushed at main, which a ruleset protects');
     assert.ok(gitCalls.every(call => call.cwd === checkout || call.cwd === null));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

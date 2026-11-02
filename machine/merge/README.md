@@ -22,11 +22,12 @@ before touching the forge again.
 1. `run.mjs` reads the card, the pull request, and the pull request's comments,
    and points `MASTRA_OBSERVABILITY_DB_PATH` at a new trace file per run and
    `MASTRA_DB_PATH` at a state database inside the run folder.
-2. `workflow.mjs` builds the stock Mastra workflow `merge` with eight steps.
+2. `workflow.mjs` builds the stock Mastra workflow `merge` with nine steps.
    `gather` decides the gate, `checks` waits for the pull request's own checks,
-   `land` merges, `ci` waits for main, `metrics` writes the landing facts,
-   `retro` writes the retro, `sweep` removes the leftovers, `complete` moves the
-   card.
+   `land` merges and deletes the merged branch, `ci` waits for main, `metrics`
+   writes the landing facts, `retro` writes the retro, `publish` puts both on
+   main through a pull request, `sweep` removes the leftovers, `complete` moves
+   the card.
 3. Every step saves the run record before it hands on. A crash leaves the
    finished steps in `record.json`, and a rerun continues from there instead of
    merging twice.
@@ -91,9 +92,13 @@ When the card failed at least one review, the retro must also carry a section
 headed `## Reflection: why the card failed`. That heading is checked, not
 trusted.
 
-The retro and the landing facts are committed straight to `main`, because a pull
-request for the documentation would need its own merge and its own retro. A
-push that is refused is fetched, rebased once, and retried.
+Main is protected by a ruleset that requires the checks, so nothing is pushed
+straight at it. `publish` cuts one branch, commits the landing facts and the
+retro to it, opens a pull request, waits for that pull request's checks, merges
+it on the commit it opened, and deletes the branch. The title and body name no
+card, because a pull request that names one must also carry that card's
+scorecard and this one records rather than ships. Both files land in one merge,
+so the record and the retro it describes are never out of step.
 
 ## The sweep
 

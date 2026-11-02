@@ -5,7 +5,7 @@ import {
   alreadyCompleted,
   assertLandable,
   checkRollup,
-  commitToMain,
+  publishDocs,
   completeCard,
   completionComment,
   deleteRemoteBranch,
@@ -222,42 +222,100 @@ test('with posting off the note is kept on disk instead of written to the card',
   assert.deepEqual(result, { posted: null, state: null, keptAt: '/run/card-note.md (14 bytes)' });
 });
 
-test('a commit lands on main, and a refused push is replayed once on top of main', () => {
-  const calls = [];
-  let pushes = 0;
+test('the record is published as a pull request the machine watches and merges', async () => {
+  const gitCalls = [];
+  const forgeCalls = [];
+  const pr = {
+    number: 501,
+    state: 'MERGED',
+    base: 'main',
+    head: 'docs/jul-310-landing',
+    mergeCommit: 'beef1234',
+    mergedAt: '2026-11-02T03:00:00Z',
+  };
   const git = (args, options = {}) => {
-    calls.push({ args, cwd: options.cwd });
-    if (args[0] === 'status') return 'M docs/scorecards/JUL-310.landing.json';
-    if (args[0] === 'push') {
-      pushes += 1;
-      if (pushes === 1) throw new Error('rejected: fetch first');
-      return '';
-    }
-    if (args[0] === 'rev-parse') return 'feedface';
+    gitCalls.push({ args, cwd: options.cwd });
+    if (args[0] === 'status') return 'A docs/retros/jul-310.md';
+    if (args[0] === 'rev-parse') return 'abc1234';
     return '';
   };
-  const sha = commitToMain({
+  const published = await publishDocs({
     checkout: '/repo/main',
-    files: ['/repo/main/docs/scorecards/JUL-310.landing.json'],
-    subject: 'Record the landing numbers (JUL-310)',
-    body: 'body',
+    branch: 'docs/jul-310-landing',
+    title: 'Record how JUL-310 went (JUL-310)',
+    body: 'No card: the machine recording a merged card.',
+    bodyPath: '/repo/.artifacts/merge/pr-417/publish-body.md',
+    files: ['/repo/main/docs/retros/jul-310.md'],
     git,
+    forge: {
+      openPr: () => {
+        forgeCalls.push('open');
+        return 'https://example.test/pull/501\n';
+      },
+      listChecks: () => {
+        forgeCalls.push('checks');
+        return [{ name: 'checks', state: 'SUCCESS', done: true, url: null }];
+      },
+      mergePr: number => {
+        forgeCalls.push(`merge ${number}`);
+      },
+      readPr: number => {
+        forgeCalls.push(`read ${number}`);
+        return pr;
+      },
+      dropBranch: ref => {
+        forgeCalls.push(`drop ${ref}`);
+      },
+    },
   });
-  assert.equal(sha, 'feedface');
-  assert.deepEqual(calls.filter(call => call.args[0] === 'add')[0].args, ['add', '--', 'docs/scorecards/JUL-310.landing.json']);
-  assert.deepEqual(calls.filter(call => call.args[0] === 'pull')[0].args, ['pull', '--rebase', '--quiet', 'origin', 'main']);
+
+  assert.equal(published.url, 'https://example.test/pull/501');
+  assert.equal(published.commit, 'beef1234');
+  assert.deepEqual(forgeCalls, ['open', 'checks', 'merge 501', 'read 501', 'drop docs/jul-310-landing']);
+  assert.deepEqual(gitCalls[0].args, ['fetch', '--no-tags', '--quiet', 'origin', 'main']);
+  assert.deepEqual(gitCalls[1].args, ['checkout', '--quiet', '-B', 'docs/jul-310-landing', 'origin/main']);
+  assert.deepEqual(gitCalls.find(call => call.args[0] === 'add').args, ['add', '--', 'docs/retros/jul-310.md']);
+  assert.deepEqual(gitCalls.find(call => call.args[0] === 'push').args, ['push', '--quiet', '-u', 'origin', 'docs/jul-310-landing']);
+  assert.ok(gitCalls.every(call => call.cwd === '/repo/main'));
 });
 
-test('a commit with nothing in it is a fault, not a push', () => {
-  assert.throws(
-    () =>
-      commitToMain({
-        checkout: '/repo/main',
-        files: ['/repo/main/docs/retros/jul-310.md'],
-        subject: 's',
-        body: 'b',
-        git: args => (args[0] === 'status' ? '' : ''),
-      }),
+test('a record whose checks come back red is never merged', async () => {
+  let merged = false;
+  await assert.rejects(
+    publishDocs({
+      checkout: '/repo/main',
+      branch: 'docs/jul-310-landing',
+      title: 's',
+      body: 'b',
+      bodyPath: '/repo/body.md',
+      files: ['/repo/main/docs/retros/jul-310.md'],
+      git: args => (args[0] === 'status' ? 'A file' : args[0] === 'rev-parse' ? 'abc1234' : ''),
+      forge: {
+        openPr: () => 'https://example.test/pull/501',
+        listChecks: () => [{ name: 'repository-hygiene', state: 'FAILURE', done: true, url: null }],
+        mergePr: () => {
+          merged = true;
+        },
+      },
+      tries: 1,
+      waitMs: 1,
+    }),
+    /repository-hygiene FAILURE/
+  );
+  assert.equal(merged, false);
+});
+
+test('a record with nothing in it is a fault, not a push', async () => {
+  await assert.rejects(
+    publishDocs({
+      checkout: '/repo/main',
+      branch: 'docs/jul-310-landing',
+      title: 's',
+      body: 'b',
+      bodyPath: '/repo/body.md',
+      files: ['/repo/main/docs/retros/jul-310.md'],
+      git: args => (args[0] === 'status' ? '' : ''),
+    }),
     /nothing was written at docs\/retros\/jul-310\.md/
   );
 });

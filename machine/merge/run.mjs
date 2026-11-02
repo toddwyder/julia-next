@@ -149,6 +149,7 @@ async function main() {
   };
 
   const deps = {
+    runDir,
     runId: null,
     modelId: args.model ?? undefined,
     getIssue: readCard,
@@ -163,6 +164,7 @@ async function main() {
     waitChecks: ({ pr }) => waitForPullChecks({ pr, log: console.log }),
     waitCi: ({ sha }) => waitForMainCi({ sha, list: mainRunsFor, log: console.log }),
     git,
+    publish: publishDocs,
     saveRecord: async record => writeRecord(runDir, { ...record, updatedAt: new Date().toISOString() }),
     retro: async input => {
       process.env.MASTRA_OBSERVABILITY_DB_PATH = traceFileFor(args.pr, 'merge-retro');
