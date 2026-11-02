@@ -64,8 +64,10 @@ export function assertLandable({ pull, decision }) {
 
 export function mergePullRequest({ pr, head, options = {}, execImpl }) {
   // --match-head-commit makes the forge refuse if the branch moved after the
-  // verdict: the commit Shipping judged is the commit that lands.
-  return gh(['pr', 'merge', String(pr), '--squash', '--delete-branch', '--match-head-commit', head], { ...options, execImpl });
+  // verdict: the commit Shipping judged is the commit that lands. The branch is
+  // left alone: `--delete-branch` also deletes the local branch, which fails on
+  // any checkout holding it, and the sweep is where a card's branches go.
+  return gh(['pr', 'merge', String(pr), '--squash', '--match-head-commit', head], { ...options, execImpl });
 }
 
 export async function waitForMerged({ pr, read, tries = 15, waitMs = 4000, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), log = () => {} }) {

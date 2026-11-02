@@ -56,10 +56,12 @@ for this card and pull request is one round, so `FAIL` then `PASS` reads as two.
 
 ## Landing
 
-`land.mjs` runs `gh pr merge <n> --squash --delete-branch
---match-head-commit <head>`, so the forge itself refuses when the branch moved
-after the verdict. It then reads the pull request back until the state is
-`MERGED` with a merge commit, and checks the base was `main`.
+`land.mjs` runs `gh pr merge <n> --squash --match-head-commit <head>`, so the
+forge itself refuses when the branch moved after the verdict. The branch is left
+to `sweep`: `--delete-branch` deletes the local branch too, which fails on any
+checkout holding it, and a merge that succeeded would read as a fault. It then
+reads the pull request back until the state is `MERGED` with a merge commit, and
+checks the base was `main`.
 
 `ci` polls `gh run list --commit <sha>` filtered to `main` for about ten
 minutes. Green means every run on that commit finished `success`, `skipped` or

@@ -70,7 +70,7 @@ test('the merge names the commit Shipping judged, so a moved branch is refused b
       return '';
     },
   });
-  assert.deepEqual(seen[0], ['gh', 'pr', 'merge', '420', '--squash', '--delete-branch', '--match-head-commit', PULL.headSha]);
+  assert.deepEqual(seen[0], ['gh', 'pr', 'merge', '420', '--squash', '--match-head-commit', PULL.headSha]);
 });
 
 test('the merge is believed only when the pull request reports MERGED with a commit', async () => {
