@@ -87,10 +87,18 @@ node scripts/trace-store.mjs fold [--quiet]
 
 `fold` copies each finished file's `metric_events` rows, the per-call tokens and cost a scorecard
 prices from, into `traces/archive.duckdb`, then deletes the file. `archive.duckdb` holds cost rows
-and nothing else: no prompt payloads, no spans. A file a running session still holds cannot be
-attached, so it is skipped and its PID reported. Folding the same file name twice replaces its rows
-instead of adding a second copy, so an interrupted fold is safe to re-run; a file left as
-`<name>.folding` is picked up by the next fold. The single store the launcher replaced,
+and nothing else: no prompt payloads, no spans. A file a running session still holds is skipped and
+its PID reported, because that session holds it for writing. A finished file is only ever attached
+`READ_ONLY`: attaching one for writing and detaching it checkpointed the file, and on 2 November that
+rewrote a 14.2 GiB trace to 18.1 GiB, filled the disk and failed. Folding the same file name twice
+replaces its rows instead of adding a second copy, so an interrupted fold is safe to re-run; a file
+left as `<name>.folding` is picked up by the next fold. One file that cannot be folded is recorded in
+`traces/left-behind.json` with its reason and the run carries on with the rest: on 2 November one
+trace stopped every fold behind it for two days, so the traces of 31 October to 2 November all waited
+on the one that had failed. `status` lists what is still left behind and why, and the scorecard of a
+card whose threads such a file answers says its cost may be short, until a later fold clears it.
+
+The single store the launcher replaced,
 `~/.local/share/mastracode/observability.duckdb`, is folded and deleted the same way; that happened
 on 30 October, 5,955,137,536 B into a 3,158,016 B archive holding 44,408 cost rows.
 
@@ -103,7 +111,10 @@ card from every file in that directory, the archive included, and the archive is
 the cost rows.
 
 `fold` prints one JSON answer and exits 0. When the traces directory is over 15 GB after a fold it
-prints a loud warning and exits 1: at that size a round was too big and Todd needs to know.
+prints a loud warning and exits 1, and it also exits 1 when it left a trace behind: at either size a
+round was too big or half done, and Todd needs to know. The launcher runs it with `--quiet`, which
+prints only those notes and goes to stderr, so a failed cleanup is said out loud in the session's own
+output instead of vanishing.
 
 DuckDB's default memory limit is 85% of the machine, which on this 7 GB server is 6 GB, and on
 30 October the kernel killed a run at 6.15 GB before it deleted a row. `fold` opens each file with a

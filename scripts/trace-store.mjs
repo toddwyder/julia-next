@@ -330,11 +330,12 @@ async function main(argv) {
   const leftBehindNote = answer.leftBehind?.length
     ? `left behind: ${answer.leftBehind.map(entry => `${entry.file} (${entry.reason})`).join('; ')}`
     : null;
+  const unfinished = answer.overAlarm || Boolean(answer.leftBehind?.length);
   if (flags.quiet) {
     // Quiet is what the launcher runs, and a failure there is otherwise invisible.
     if (leftBehindNote) console.error(leftBehindNote);
     if (answer.overAlarm) console.error(`the trace files are ${answer.size} in ${answer.dir}, over the ${gb(ALARM_BYTES)} they are allowed to reach: a session is not being folded`);
-    return answer.overAlarm || answer.leftBehind?.length ? 1 : 0;
+    return unfinished ? 1 : 0;
   }
   if (answer.status === 'busy') answer.note = `another fold holds ${answer.archive}${answer.pid ? ` (PID ${answer.pid})` : ''}; nothing was changed`;
   if (answer.folded?.length) answer.note = `folded ${answer.folded.map(f => `${f.file} (${f.metrics} cost rows)`).join(', ')}`;
@@ -342,7 +343,7 @@ async function main(argv) {
   if (leftBehindNote) answer.note = [answer.note, leftBehindNote].filter(Boolean).join('; ');
   if (answer.overAlarm) answer.note = [answer.note, `still over ${gb(ALARM_BYTES)}`].filter(Boolean).join('; ');
   console.log(JSON.stringify(answer, null, 2));
-  return answer.overAlarm ? 1 : 0;
+  return unfinished ? 1 : 0;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
