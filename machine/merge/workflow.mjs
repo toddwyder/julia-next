@@ -135,8 +135,8 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
           const gone = await deps.deleteBranch({ ref: record.pull.head });
           if (gone) log(`Deleted ${record.pull.head}, which the merge left behind.`);
         }
-        deps.prepareMain({ sha: record.merge.commit });
-        return persist(record);
+        const checkout = deps.prepareMain({ sha: record.merge.commit });
+        return persist({ ...record, merge: { ...record.merge, checkout } });
       }
       let pull = record.pull;
       if (pull.state === 'MERGED' && pull.mergeCommit) {
@@ -177,7 +177,12 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
     id: 'metrics',
     execute: async ({ inputData }) => {
       const record = inputData;
-      if (!record.merge || record.metrics) return persist(record);
+      if (!record.merge) return persist(record);
+      // A rerun recreates the main worktree, which drops a file an earlier run
+      // wrote. The numbers are still in the record, so they are written again —
+      // unless they already went to main with the record's own pull request.
+      if (record.publish?.commit) return persist(record);
+      if (record.metrics && fs.existsSync(record.metrics.file)) return persist(record);
       const first = deps.firstCommitAt(record.pr);
       const entry = landingRecord({
         card: record.card.identifier,
@@ -203,7 +208,10 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
     id: 'retro',
     execute: async ({ inputData }) => {
       const record = inputData;
-      if (!record.merge || record.retro?.ok) return persist(record);
+      if (!record.merge) return persist(record);
+      if (record.publish?.commit) return persist(record);
+      const written = record.retro?.file && path.join(record.merge.checkout, record.retro.file);
+      if (record.retro?.ok && written && fs.existsSync(written)) return persist(record);
       const retroPath = retroPathFor(record.card.identifier);
       const determinations = deps
         .readComments(record.pr)

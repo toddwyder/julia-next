@@ -179,7 +179,7 @@ async function main() {
     },
     cardComments: async card => {
       const issue = await getIssue(card, { includeComments: true });
-      return (issue.comments ?? []).map(comment => ({ body: comment.body ?? '' }));
+      return (issue.comments?.nodes ?? []).map(comment => ({ body: comment.body ?? '' }));
     },
     alreadyCompleted,
     completeCard: async ({ card, comment }) => {

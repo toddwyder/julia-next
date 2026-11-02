@@ -263,7 +263,9 @@ test('a rerun continues from the saved record instead of merging a second time',
   const saved = {
     pr: 42,
     card: { identifier: CARD.identifier, title: CARD.title, description: CARD.description, url: CARD.url },
-    merge: { commit: MERGE, mergedAt: '2026-11-01T11:00:00Z', url: 'https://example.test/pull/42', checkout: '/tmp/practice/main' },
+    // A worktree the last run held. This run has just made its own, so the two
+    // files that record promised are written again here.
+    merge: { commit: MERGE, mergedAt: '2026-11-01T11:00:00Z', url: 'https://example.test/pull/42', checkout: path.join(os.tmpdir(), `merge-saved-${process.pid}-${Date.now()}`, 'main') },
     ci: { green: true, reason: `main CI is green on ${MERGE}.`, runs: [] },
     metrics: { duration: { human: '1h 30m' }, reviews: { rounds: 1, verdicts: ['PASS'] } },
     retro: { ok: true, reason: 'written', file: 'docs/retros/jul-999.md' },
@@ -276,6 +278,7 @@ test('a rerun continues from the saved record instead of merging a second time',
     assert.equal(started.status, 'success', started.error);
     assert.equal(started.result.merge.commit, MERGE);
     assert.equal(started.result.retro.ok, true);
+    // The merge, the sweep and the card do not repeat.
     assert.deepEqual(order.filter(step => step !== 'saveRecord'), [
       'getIssue',
       'readPull',
@@ -283,8 +286,40 @@ test('a rerun continues from the saved record instead of merging a second time',
       'changedFiles',
       'deleteBranch feat/jul-999-practice',
       `prepareMain ${MERGE}`,
+      'firstCommitAt',
+      'readComments',
+      'retro',
+      'publish docs/jul-999-landing 2',
     ]);
     assert.equal(order.some(step => step.startsWith('merge ')), false);
+    assert.equal(order.some(step => step === 'sweep'), false);
+    assert.equal(order.some(step => step.startsWith('completeCard')), false);
+    assert.equal(started.result.completion.state, 'completed');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a rerun after the record went to main does not write it again', withoutProgram, async () => {
+  const saved = {
+    pr: 42,
+    card: { identifier: CARD.identifier, title: CARD.title, description: CARD.description, url: CARD.url },
+    merge: { commit: MERGE, mergedAt: '2026-11-01T11:00:00Z', url: 'https://example.test/pull/42', checkout: '/tmp/gone/main' },
+    ci: { green: true, reason: `main CI is green on ${MERGE}.`, runs: [] },
+    metrics: { duration: { human: '1h 30m' }, reviews: { rounds: 1, verdicts: ['PASS'] }, file: '/tmp/gone/main/docs/scorecards/JUL-999.landing.json' },
+    retro: { ok: true, reason: 'written', file: 'docs/retros/jul-999.md' },
+    publish: { url: 'https://example.test/pull/501', branch: 'docs/jul-999-landing', commit: 'beef1234', files: [] },
+    sweep: { summary: 'nothing left to sweep.' },
+    completion: { state: 'completed' },
+  };
+  const { deps, order } = fakeDeps();
+  const { started, dir } = await runMerge(deps, { resume: saved });
+  try {
+    assert.equal(started.status, 'success', started.error);
+    assert.equal(order.some(step => step === 'retro'), false);
+    assert.equal(order.some(step => step.startsWith('firstCommitAt')), false);
+    assert.equal(order.some(step => step.startsWith('publish')), false);
+    assert.equal(started.result.publish.commit, 'beef1234');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
