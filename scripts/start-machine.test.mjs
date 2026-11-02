@@ -57,6 +57,25 @@ test('a second run continues after the stage that stopped and does not build aga
   assert.deepEqual(w.ran(), ['build', 'remediation', 'merge']);
 });
 
+test('a retry after a stopped review loop tells the loop to start again', () => {
+  const w = workspace();
+  const marks = path.join(w.root, 'marks');
+  const failing = w.program('remediation-fails', 'exit 1');
+  startMachine({ card: 'JUL-906' }, { root: w.root, env: { ...w.env, START_MACHINE_REMEDIATION: failing }, log: () => {} });
+  const argsFile = path.join(w.root, 'args');
+  const recording = w.program('remediation-records', `echo "$@" > ${argsFile}\necho remediation >> ${marks}`);
+  startMachine({ card: 'JUL-906' }, { root: w.root, env: { ...w.env, START_MACHINE_REMEDIATION: recording }, log: () => {} });
+  assert.match(fs.readFileSync(argsFile, 'utf8'), /--force/);
+});
+
+test('the first review run does not carry the force flag', () => {
+  const w = workspace();
+  const argsFile = path.join(w.root, 'args');
+  const recording = w.program('remediation-records', `echo "$@" > ${argsFile}`);
+  startMachine({ card: 'JUL-907' }, { root: w.root, env: { ...w.env, START_MACHINE_REMEDIATION: recording }, log: () => {} });
+  assert.doesNotMatch(fs.readFileSync(argsFile, 'utf8'), /--force/);
+});
+
 test('a finished card is not merged twice', () => {
   const w = workspace();
   startMachine({ card: 'JUL-903' }, { root: w.root, env: w.env, log: () => {} });

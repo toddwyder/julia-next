@@ -76,17 +76,18 @@ export function writeState(state, root = repoRoot) {
 // Every stage is a command line. The defaults are the repository's own stage
 // programs; the environment can replace any of them with another program that
 // takes the same arguments and answers with the same exit codes.
-export function stageCommands({ card, pr, model }, env = process.env) {
+export function stageCommands({ card, pr, model, retry = false }, env = process.env) {
   const agents = ['node', ['scripts/julia-agents.mjs', '--']];
   const withAgents = tail => [agents[0], [...agents[1], ...tail]];
   const modelArgs = model ? ['--model', model] : [];
+  const retryArgs = retry ? ['--force'] : [];
   return {
     build: env.START_MACHINE_BUILD
       ? [env.START_MACHINE_BUILD, [card, kickoffPrompt(card)]]
       : ['mastracode', ['-p', kickoffPrompt(card)]],
     remediation: env.START_MACHINE_REMEDIATION
-      ? [env.START_MACHINE_REMEDIATION, ['--pr', String(pr), '--card', card, ...modelArgs]]
-      : withAgents(['node', 'machine/remediation/run.mjs', '--pr', String(pr), '--card', card, ...modelArgs]),
+      ? [env.START_MACHINE_REMEDIATION, ['--pr', String(pr), '--card', card, ...modelArgs, ...retryArgs]]
+      : withAgents(['node', 'machine/remediation/run.mjs', '--pr', String(pr), '--card', card, ...modelArgs, ...retryArgs]),
     merge: env.START_MACHINE_MERGE
       ? [env.START_MACHINE_MERGE, ['--pr', String(pr), '--card', card]]
       : withAgents(['node', 'machine/merge/run.mjs', '--pr', String(pr), '--card', card]),
@@ -162,7 +163,9 @@ export function startMachine(options, { root = repoRoot, env = process.env, log 
 
   if (state.remediation?.status !== 'done') {
     log(`start-machine: review and remediation of #${state.pr}`);
-    const reviewed = run(stageCommands({ card, pr: state.pr, model: options.model }, env).remediation, { root });
+    // A loop that stopped the card refuses to start again unless it is told to; the card is read afresh on a retry.
+    const retry = state.remediation?.status === 'stopped';
+    const reviewed = run(stageCommands({ card, pr: state.pr, model: options.model, retry }, env).remediation, { root });
     if (reviewed.code !== 0) return stop('remediation', `the review loop stopped the card (exit code ${reviewed.code}); its record is in .artifacts/remediation/pr-${state.pr}`);
     state.remediation = { status: 'done', at: new Date().toISOString() };
     save();
