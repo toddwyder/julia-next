@@ -415,6 +415,11 @@ test('a merged branch is deleted through the forge, and a branch already gone is
   });
   assert.equal(missing, false);
 
+  const vanished = deleteRemoteBranch('practice/jul-316', {
+    execImpl: () => { throw new Error('gh: Reference does not exist (HTTP 422)'); },
+  });
+  assert.equal(vanished, false);
+
   assert.throws(() => deleteRemoteBranch('practice/jul-316', {
     execImpl: () => { throw new Error('gh: Server Error (HTTP 502)'); },
   }), /HTTP 502/);

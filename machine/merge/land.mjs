@@ -79,7 +79,9 @@ export function deleteRemoteBranch(ref, options = {}) {
     gh(['api', '-X', 'DELETE', `repos/{owner}/{repo}/git/refs/heads/${ref}`], options);
     return true;
   } catch (error) {
-    if (/404|Not Found/i.test(String(error.message))) return false;
+    // The forge answers 404 for an unknown ref and 422 "Reference does not exist";
+    // either way the branch is gone, which is what this was asking for.
+    if (/404|Not Found|Reference does not exist/i.test(String(error.message))) return false;
     throw error;
   }
 }
