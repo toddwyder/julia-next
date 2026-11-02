@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getIssue, postComment, setIssueState } from '../../scripts/linear-cli.mjs';
-import { alreadyCompleted, completeCard, deleteRemoteBranch, gh, mainRunsFor, mergePullRequest, prepareMainCheckout, pullRequestComments, readPullRequest, waitForMainCi, waitForMerged, waitForPullChecks } from './land.mjs';
+import { alreadyCompleted, completeCard, deleteRemoteBranch, gh, mainRunsFor, mergePullRequest, prepareMainCheckout, publishDocs, pullRequestComments, readPullRequest, waitForMainCi, waitForMerged, waitForPullChecks } from './land.mjs';
 import { runRetro } from './retro.mjs';
 import { deadTestFiles, runSweep, sweepPlan, sweepSummary } from './sweep.mjs';
 
