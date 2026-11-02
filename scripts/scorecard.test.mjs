@@ -355,6 +355,43 @@ test('a trace file that is not a database is reported, not passed over in silenc
   assert.match(tracing.skipped, /this card’s cost is unknown$/);
 });
 
+// A trace a failed cleanup left on disk holds rows that never reached the archive, so a card
+// whose threads it answers must say so. It is named rather than priced: a fold may already
+// have copied its rows, and reading them again would count the card's cost twice.
+test('a trace a failed cleanup left behind is named on the card it carries', { skip: duckdbDir ? false : 'no @duckdb/node-api on this machine' }, async t => {
+  const { DuckDBInstance } = duckdb;
+  const dir = mkdtempSync(join(tmpdir(), 'scorecard-left-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const thread = '9f1c0a2e-0d36-42f1-a43b-6e1d016cfa3f';
+  const metric = `create table metric_events (timestamp timestamp, threadId varchar, entityName varchar, provider varchar,
+    model varchar, name varchar, value double, estimatedCost double)`;
+  const write = async (file, rows) => {
+    const instance = await DuckDBInstance.create(file);
+    const connection = await instance.connect();
+    try {
+      await connection.run(metric);
+      for (const [id, value] of rows) {
+        await connection.run(`insert into metric_events values (timestamp '2026-10-30 03:00:00', '${id}', 'Code Agent',
+          'commandcode.chat', 'deepseek/deepseek-v4.1-flash', 'mastra_model_total_input_tokens', ${value}, 0.15)`);
+      }
+    } finally {
+      connection.closeSync();
+      instance.closeSync();
+    }
+  };
+  await write(join(dir, 'session.duckdb'), [[thread, 1000]]);
+  await write(join(dir, 'left.duckdb.folding'), [[thread, 77]]);
+  const files = [{ path: join(dir, 'session.duckdb'), name: 'session.duckdb' }];
+  const leftBehind = [{ path: join(dir, 'left.duckdb.folding'), name: 'left.duckdb.folding', reason: 'could not fold left.duckdb: No space left on device' }];
+
+  const tracing = await readTracing(REPO, files, [thread], leftBehind);
+  assert.deepEqual(tracing.metrics.map(m => m.value), [1000], 'its rows are not counted a second time');
+  assert.match(tracing.skipped, /^left\.duckdb\.folding is still on disk because its cleanup failed \(could not fold left\.duckdb: No space left on device\), so part of this card’s cost is missing$/);
+
+  const unrelated = await readTracing(REPO, files, ['55555555-5555-4555-8555-555555555555'], leftBehind);
+  assert.equal(unrelated.skipped, null, 'a card it does not carry is not told about it');
+});
+
 // The launcher is what gives each session its own trace file. A session started any other way
 // records nothing at all, and nothing else on the machine notices, so the card has to say so.
 test('a session that started after the launcher and recorded nothing makes the cost incomplete', () => {
