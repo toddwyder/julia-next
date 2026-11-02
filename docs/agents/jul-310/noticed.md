@@ -14,7 +14,7 @@ Things found while building the merge machine. None of them is in this change.
    file it could read before; it removes the copy, not the cost. Recorded in the decisions
    log, and the fold's own out-of-memory failure is still open (see 3).
 3. **The trace store is over its 15 GB alarm and the fold cannot shrink it.**
-   `node scripts/trace-store.mjs status` reports 16.2 GB with 11.1 GB free, and
+   `node scripts/trace-store.mjs status` reported 19.2 GB with 8.1 GB free at the end of this card (16.2 GB with 11.1 GB free when the card started; each machine run adds a trace file), and
    `node scripts/trace-store.mjs fold` fails with `Out of Memory Error: failed to offload data
    block ... max_temp_directory_size`. That is the trace store's own limit, not a card's
    business, and it wants its own card.
@@ -47,3 +47,54 @@ Repository rule violations found for refs/heads/main ... Required status check
 commit on it without a pull request and a green `checks` run. The machine now
 opens its own pull request for the record and the retro, waits for that pull
 request's checks, merges it on the commit it opened, and deletes the branch.
+
+## 9. The practice run, in full
+
+The machine was proved with a throwaway card and a throwaway pull request, both
+still visible:
+
+- Practice card **JUL-316** in Linear, Complete, with the merge commit,
+  the verdict, the numbers and the retro in its comment.
+  https://linear.app/julia-next/issue/JUL-316/practice-jul-310-merge-machine-one-card-end-to-end
+- Practice pull request **#417**, one file (`docs/practice/README.md`), merged
+  as `90e27da703c6c76f8b8d3095359291e47023d191`.
+  https://github.com/toddwyder/julia-next/pull/417
+- The machine's own record pull requests: **#418** (closed by hand when the
+  dry run lost its files), **#419** (the record's first landing), **#420** (the
+  record the finished run published, merged as `237e63c`).
+
+The practice note stays in the repository as `docs/practice/README.md`; it is
+the thing the practice pull request changed, and deleting it would delete the
+evidence.
+
+## 10. A pull request that names a card carries that card's scorecard
+
+`check-branch-pr` collects cards from the title and the body together, so a
+`No card: ...` line does not clear a card named in the title. The practice
+pull request needed two metadata-only commits to become cardless, and every
+Shipping round then reviewed the same one-sentence note. The retro at
+`docs/retros/jul-316.md` sets this out with the line numbers.
+
+## 11. `gh pr edit` cannot change a body in this repository
+
+`gh pr edit <n> --body-file` fails with `GraphQL: Projects (classic) is being
+deprecated` because it asks for project cards. The working form is
+`gh api -X PATCH repos/{owner}/{repo}/pulls/<n> --input -` with a JSON body.
+Not the machine's problem, but it cost a step in the practice run.
+
+## 12. Compaction takes the card's name out of the scorecard's reach
+
+`scripts/scorecard.mjs` finds a card's cost by the kickoff line that opened the
+session (`Card:`, `Start` or `Run` followed by `JUL-<n>`), with a fallback to a
+thread title or an opening turn that names exactly one card. This session's own
+history was compacted while the card was being built, so the kickoff message is
+no longer in `mastra.db`, and the title the summariser wrote names the practice
+card. Run again, the scorecard reports `Cost: unknown. No usage records found
+for this card` for JUL-310.
+
+The scorecard committed here was generated before that happened: `$0.15` at
+published API prices, with 10.67M cache-read tokens no price list rates, so the
+total is a floor. Nothing was rewritten by hand to make the number appear.
+
+A real fix widens how a card is attributed, and that changes every historical
+scorecard, so it belongs on the hardening card rather than in this one.
