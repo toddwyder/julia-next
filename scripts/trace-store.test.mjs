@@ -107,11 +107,11 @@ test('a fold keeps the cost rows of finished sessions and deletes their files', 
 // A file a running session still holds is the one thing a fold must not touch: renaming it
 // would take the session's own rows with it. DuckDB takes its lock per process, so the only
 // honest holder is a second process. It keeps the file open until its stdin closes.
-function holdOpen(file) {
+function holdOpen(file, mode = '') {
   const script = [
     "import { createRequire } from 'node:module';",
     `const { DuckDBInstance } = createRequire(${JSON.stringify(join(duckdbDir, 'package.json'))})('@duckdb/node-api');`,
-    `const instance = await DuckDBInstance.create(${JSON.stringify(file)});`,
+    `const instance = await DuckDBInstance.create(${JSON.stringify(file)}${mode ? `, { access_mode: ${JSON.stringify(mode)} }` : ''});`,
     'await instance.connect();',
     "process.stdin.on('end', () => process.exit(0));",
     'process.stdin.resume();',
@@ -154,6 +154,56 @@ test('a fold leaves a file a session still holds', { skip: duckdbDir ? false : '
   const later = await foldTraces({ dir: traces, legacy });
   assert.equal(later.folded.length, 1, 'the next fold takes it once the session has gone');
   assert.equal(existsSync(live), false);
+});
+
+// On 2 Nov 2026 a fold attached an old trace for writing, and detaching it checkpointed
+// 14.2 GiB into 18.1 GiB, filled the disk and failed: the fold only ever reads an old trace
+// before deleting it. Read-only, it takes no write lock, so a trace another process is only
+// reading is still cleaned up instead of being left for the next run.
+test('a fold cleans a trace another process is reading', { skip: duckdbDir ? false : 'no @duckdb/node-api on this machine' }, async t => {
+  const { traces, legacy } = await scratch(t);
+  const session = join(traces, '20261031T200023Z-419718.duckdb');
+  await writeSession(session, [['m1', 5, SLICE]], []);
+  const reader = holdOpen(session, 'READ_ONLY');
+  await reader.ready;
+  try {
+    const answer = await foldTraces({ dir: traces, legacy });
+    assert.deepEqual(answer.folded, [{ file: '20261031T200023Z-419718.duckdb', metrics: 1 }], 'the fold does not take a write lock on an old trace');
+    assert.deepEqual(answer.leftBehind, []);
+  } finally {
+    await reader.stop();
+  }
+  assert.equal(existsSync(session), false);
+});
+
+// One trace that cannot be cleaned must not hold back the ones after it: from 31 Oct to
+// 2 Nov 2026 the oldest failure blocked every later trace in the folder.
+test('a trace that cannot be cleaned is named and the rest are still cleaned', { skip: duckdbDir ? false : 'no @duckdb/node-api on this machine' }, async t => {
+  const { traces, legacy } = await scratch(t);
+  const broken = join(traces, '20261030T090000Z-111.duckdb');
+  writeFileSync(broken, 'not a database, and it never was');
+  const after = join(traces, '20261031T090000Z-222.duckdb');
+  await writeSession(after, [['m1', 5, SLICE]], []);
+
+  const answer = await foldTraces({ dir: traces, legacy });
+
+  assert.deepEqual(answer.folded, [{ file: '20261031T090000Z-222.duckdb', metrics: 1 }], 'the trace behind the failure is still cleaned');
+  assert.equal(existsSync(after), false);
+  assert.equal(answer.leftBehind.length, 1);
+  assert.equal(answer.leftBehind[0].file, '20261030T090000Z-111.duckdb');
+  assert.match(answer.leftBehind[0].reason, /not a valid DuckDB database file/);
+  assert.equal(statSync(broken).size, 'not a database, and it never was'.length, 'a trace left behind keeps its size');
+
+  const report = status({ dir: traces, legacy });
+  assert.deepEqual(report.leftBehind.map(entry => [entry.file, entry.reason.match(/not a valid DuckDB database file/) ? 'reason' : entry.reason]), [
+    ['20261030T090000Z-111.duckdb', 'reason'],
+  ], 'the status report names the trace it left behind, and why');
+
+  // Once the trace is cleanable, the cleanup clears its own record.
+  rmSync(broken);
+  const cleared = await foldTraces({ dir: traces, legacy });
+  assert.deepEqual(cleared.leftBehind, []);
+  assert.deepEqual(status({ dir: traces, legacy }).leftBehind, []);
 });
 
 // `status` answers while a session holds the store, so it asks the filesystem and nothing else.

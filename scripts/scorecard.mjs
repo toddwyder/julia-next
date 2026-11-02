@@ -13,7 +13,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { launcherPath } from './install-launcher.mjs';
 
-import { isLockedMessage, legacyStoreFile, traceFiles, tracesDir } from './trace-store.mjs';
+import { isLockedMessage, leftBehindTraces, legacyStoreFile, traceFiles, tracesDir } from './trace-store.mjs';
 
 const KICKOFF = /\b(?:Card:|Start|Run)\s+(JUL-\d+)\b/;
 const CACHE_WRITE_1H_FACTOR = 1.6; // Mastra prices 1-hour cache writes at 1.6x the 5-minute rate (2x vs 1.25x input).
@@ -306,6 +306,12 @@ export function tracedFiles(env = process.env) {
   return traceFiles(tracesDir(env), legacyStoreFile(env)).map(path => ({ path, name: basename(path) }));
 }
 
+// Files a failed cleanup left behind. They are not priced here: a fold may already have put
+// their rows in the archive, and reading them again would count a card's cost twice.
+export function leftBehindFiles(env = process.env) {
+  return leftBehindTraces({ dir: tracesDir(env) });
+}
+
 // The trace store can be larger than the room left on disk — this machine's was
 // 22 GB against 20 GB free. Copying then fails with ENOSPC and takes the whole
 // scorecard with it, so check first and report the skip in the card instead.
@@ -315,8 +321,8 @@ export function traceCopyFits(size, room) {
   return size + TRACE_COPY_MARGIN <= room;
 }
 
-export async function readTracing(dir, files, threadIds) {
-  if (!files.length || !threadIds.length) return { metrics: [], requested: [], skipped: null };
+export async function readTracing(dir, files, threadIds, leftBehind = []) {
+  if (!files.length || !threadIds.length) return { metrics: [], requested: [], skipped: null, leftBehind: [] };
   const { DuckDBInstance } = createRequire(join(dir, 'package.json'))('@duckdb/node-api');
   const metrics = [];
   const requested = [];
@@ -387,8 +393,27 @@ export async function readTracing(dir, files, threadIds) {
       rmSync(copy, { recursive: true, force: true });
     }
   }
-  const skipped = missed.length ? `${missed.join('; ')}, so ${metrics.length ? 'part of this card’s cost is missing' : 'this card’s cost is unknown'}` : null;
-  return { metrics, requested, skipped };
+  // A file a failed cleanup left behind is named on any card whose threads it answers, so the
+  // card never reads as complete while part of its cost sits in a file nobody cleaned.
+  const carried = [];
+  for (const file of leftBehind) {
+    if (!existsSync(file.path)) continue;
+    let instance;
+    try {
+      instance = await DuckDBInstance.create(file.path, { access_mode: 'READ_ONLY' });
+      const connection = await instance.connect();
+      const own = (await connection.runAndReadAll(`select count(*) as n from metric_events where threadId in (${ids})`)).getRowObjectsJson()[0].n;
+      if (Number(own)) carried.push(`${file.name} is still on disk because its cleanup failed (${file.reason})`);
+      continue;
+    } catch (error) {
+      carried.push(`${file.name} is still on disk because its cleanup failed (${file.reason}), and it cannot be read to tell whether it carries this card (${error.message})`);
+    } finally {
+      instance?.closeSync?.();
+    }
+  }
+  const notes = [...missed, ...carried];
+  const skipped = notes.length ? `${notes.join('; ')}, so ${metrics.length ? 'part of this card’s cost is missing' : 'this card’s cost is unknown'}` : null;
+  return { metrics, requested, skipped, leftBehind: carried };
 }
 
 
@@ -635,7 +660,7 @@ async function main() {
   const data = appDataDir();
   const threads = readThreads(join(data, 'mastra.db'));
   const ids = threads.filter(t => cardWindows(t, t.events).some(w => w.card === card)).map(t => t.id);
-  const tracing = { ...(await readTracing(dir, tracedFiles(), ids)), launcher: launcherRecord() };
+  const tracing = { ...(await readTracing(dir, tracedFiles(), ids, leftBehindFiles())), launcher: launcherRecord() };
   const uatFile = fileURLToPath(new URL('../docs/scorecards/uat.json', import.meta.url));
   const uat = existsSync(uatFile) ? JSON.parse(readFileSync(uatFile, 'utf8'))[card] : undefined;
   const scorecard = buildScorecard({ card, threads, prices: loadPrices(dir), catalogue: loadCatalogue(), tracing, pulls: readPulls(card), pings: readPings(stopsFile()), uat });

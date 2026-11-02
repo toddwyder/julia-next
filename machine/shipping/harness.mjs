@@ -4,6 +4,11 @@
 // program because that is the only copy whose version matches the harness that
 // made the changes this machine reviews (see docs/plans/path-forward.md and
 // the deviation rows in docs/pstack-deviations.md).
+//
+// The next build stopped registering subagents unless the caller asked for
+// them, so the harness asks, passing the three stock definitions to the boot.
+// It reads them file by file because the package root only re-exports them on
+// some versions.
 
 import { existsSync } from 'node:fs';
 import os from 'node:os';
@@ -13,6 +18,15 @@ import { pathToFileURL } from 'node:url';
 const programDir = process.env.MASTRACODE_PROGRAM_DIR || path.join(os.homedir(), '.local', 'lib', 'mastracode-program');
 const modules = path.join(programDir, 'node_modules');
 const NEEDED = ['@mastra/code-sdk', '@mastra/core', '@mastra/libsql', '@libsql/client', 'zod'];
+
+// The stock definitions the machine's stages hand work to, each with the file
+// under dist/agents/subagents/ that exports it. One list, so the file name and
+// the export cannot drift apart.
+const SUBAGENTS = [
+  ['explore', 'exploreSubagent'],
+  ['plan', 'planSubagent'],
+  ['execute', 'executeSubagent'],
+];
 
 async function load(relative) {
   return import(pathToFileURL(path.join(modules, relative)).href);
@@ -60,8 +74,11 @@ export async function loadMastra() {
 // A caller that supplies storage owns the database the harness reads and writes,
 // so a run can be given its own file instead of the one the store defaults to.
 export async function bootHarness({ cwd, storage, createInitialThread = true, modes }) {
-  const mastraTools = await loadMastra();
-  const config = { cwd, createInitialThread };
+  const [mastraTools, subagents] = await Promise.all([
+    loadMastra(),
+    Promise.all(SUBAGENTS.map(async ([file, name]) => (await load(`@mastra/code-sdk/dist/agents/subagents/${file}.js`))[name])),
+  ]);
+  const config = { cwd, createInitialThread, subagents };
   if (storage) config.storage = storage;
   if (modes !== undefined) config.modes = modes;
   const booted = await mastraTools.bootLocalAgentController(config);
@@ -70,7 +87,7 @@ export async function bootHarness({ cwd, storage, createInitialThread = true, mo
   const requestContext = new mastraTools.RequestContext();
   const toolsets = await session.machinery.buildToolsets(requestContext);
   const subagent = Object.values(toolsets).find(toolset => toolset && typeof toolset === 'object' && toolset.subagent)?.subagent;
-  if (!subagent) throw new Error('The harness built no subagent tool, so the machine cannot start a Shipping agent.');
+  if (!subagent) throw new Error('The harness built no subagent tool, so the machine cannot start a review, retro or fix agent.');
   return { ...mastraTools, booted, session, mastra, requestContext, subagent };
 }
 
