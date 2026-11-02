@@ -1,0 +1,229 @@
+// Criterion 1 of JUL-310: once Shipping passes, the change is on the main line
+// and the card is Complete in Linear with a comment naming the change. This
+// module does the three writes that means, and reads each one back: the merge
+// is confirmed by the pull request's own state, the main line is confirmed by
+// the commit being reachable from origin/main, and the card is confirmed by
+// asking Linear for it again after the update. A step that only says it worked
+// is not evidence.
+
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const GH_TIMEOUT = 120_000;
+
+export function gh(args, { cwd, execImpl = execFileSync } = {}) {
+  return execImpl('gh', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: GH_TIMEOUT }).trim();
+}
+
+export function readPullRequest(pr, options = {}) {
+  const fields = 'number,title,state,isDraft,baseRefName,headRefName,headRefOid,url,mergedAt,mergeCommit,createdAt,author';
+  const raw = gh(['pr', 'view', String(pr), '--json', fields], options);
+  const pull = JSON.parse(raw);
+  return {
+    number: pull.number,
+    title: pull.title,
+    state: pull.state,
+    draft: Boolean(pull.isDraft),
+    base: pull.baseRefName,
+    head: pull.headRefName,
+    headSha: pull.headRefOid,
+    url: pull.url,
+    mergedAt: pull.mergedAt ?? null,
+    mergeCommit: pull.mergeCommit?.oid ?? null,
+    createdAt: pull.createdAt ?? null,
+    author: pull.author?.login ?? null,
+  };
+}
+
+export function pullRequestComments(pr, options = {}) {
+  const raw = gh(['pr', 'view', String(pr), '--json', 'comments'], options);
+  return JSON.parse(raw).comments.map(comment => ({
+    body: comment.body,
+    url: comment.url,
+    createdAt: comment.createdAt,
+    author: comment.author?.login ?? null,
+  }));
+}
+
+export function assertLandable({ pull, decision }) {
+  const problems = [];
+  if (pull.state !== 'OPEN') problems.push(`the pull request is ${pull.state}`);
+  if (pull.draft) problems.push('the pull request is a draft');
+  if (pull.base !== 'main') problems.push(`it is based on ${pull.base}, not main`);
+  if (!decision.pass) problems.push(decision.reason);
+  if (problems.length > 0) throw new Error(`Not merging #${pull.number}: ${problems.join('; ')}.`);
+  return true;
+}
+
+export function mergePullRequest({ pr, head, options = {}, execImpl }) {
+  // --match-head-commit makes the forge refuse if the branch moved after the
+  // verdict: the commit Shipping judged is the commit that lands.
+  return gh(['pr', 'merge', String(pr), '--squash', '--delete-branch', '--match-head-commit', head], { ...options, execImpl });
+}
+
+export async function waitForMerged({ pr, read, tries = 15, waitMs = 4000, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), log = () => {} }) {
+  let last = null;
+  for (let attempt = 0; attempt < tries; attempt++) {
+    last = read(pr);
+    if (last.state === 'MERGED' && last.mergeCommit) return last;
+    log(`Pull request #${pr} is ${last.state}; waiting for the merge to show.`);
+    await sleep(waitMs);
+  }
+  throw new Error(`Pull request #${pr} did not report MERGED; its last state was ${last?.state ?? 'unknown'}.`);
+}
+
+export function mainRunsFor(sha, options = {}) {
+  const raw = gh(['run', 'list', '--commit', sha, '--limit', '30', '--json', 'name,status,conclusion,headBranch,event,url'], options);
+  return JSON.parse(raw).filter(run => run.headBranch === 'main');
+}
+
+// A merge commit is on main before CI has had its say. The card is not finished
+// until the runs on that commit are done and green, so the machine waits.
+export async function waitForMainCi({
+  sha,
+  options = {},
+  list = mainRunsFor,
+  tries = 40,
+  waitMs = 15_000,
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
+  log = () => {},
+}) {
+  const bad = new Set(['failure', 'cancelled', 'timed_out', 'action_required', 'startup_failure']);
+  let last = [];
+  for (let attempt = 0; attempt < tries; attempt++) {
+    last = list(sha, options);
+    if (last.length > 0 && last.every(run => run.status === 'completed')) {
+      const failed = last.filter(run => bad.has(run.conclusion));
+      if (failed.length > 0) {
+        return { green: false, runs: last, failed, reason: `main CI failed on ${sha}: ${failed.map(run => `${run.name} ${run.conclusion}`).join(', ')}` };
+      }
+      return { green: true, runs: last, failed: [], reason: `main CI is green on ${sha}` };
+    }
+    log(last.length === 0 ? `No main CI run has started on ${sha} yet.` : `Main CI on ${sha}: ${last.map(run => `${run.name} ${run.status}`).join(', ')}.`);
+    await sleep(waitMs);
+  }
+  return { green: false, runs: last, failed: [], reason: `main CI on ${sha} did not finish within ${Math.round((tries * waitMs) / 60_000)} minutes` };
+}
+
+export function completionComment({ card, title, pr, mergeCommit, decision, record, mergeUrl }) {
+  const lines = [];
+  lines.push(`Merged ${card}: ${title}`, '');
+  lines.push(`- Commit \`${mergeCommit}\` is on main (squash of pull request #${pr}${mergeUrl ? `, ${mergeUrl}` : ''})`);
+  lines.push(`- Shipping said ${decision.verdict} on \`${decision.head}\`${decision.commentUrl ? ` (${decision.commentUrl})` : ''}`);
+  for (const line of record ? landingCommentLines(record) : []) lines.push(line);
+  if (record?.landingUrl) lines.push(`- The landing record: ${record.landingUrl}`);
+  lines.push('', `The card is Complete because the merge commit is on main and main CI is green on it.`);
+  return lines.join('\n');
+}
+
+function landingCommentLines(record) {
+  const took = record.duration ? `**${record.duration.human}**` : 'not measurable';
+  const started = record.startedAt ? ` from ${record.startedAt}` : '';
+  const rounds = record.reviews?.rounds ?? 0;
+  const ran = record.reviews?.verdicts?.join(' -> ') || 'no Shipping round recorded';
+  return [
+    `- Took ${took}${started} to ${record.mergedAt}`,
+    `- ${rounds} Shipping round${rounds === 1 ? '' : 's'}: ${ran}`,
+    `- Both numbers are in docs/scorecards/${record.card}.landing.json, beside the scorecard`,
+  ];
+}
+
+export function alreadyCompleted(comments, { card, mergeCommit }) {
+  const needle = String(mergeCommit ?? '').toLowerCase();
+  return (comments ?? []).some(comment => String(comment.body ?? '').toLowerCase().includes(needle) && String(comment.body ?? '').includes(`Merged ${card}`));
+}
+
+// Posting and moving the card, then reading the card back. Linear is asked for
+// the card again because a mutation that returns success is not the same thing
+// as a card in Complete.
+export async function completeCard({
+  card,
+  comment,
+  getIssue,
+  postComment,
+  setIssueState,
+  mayPost,
+  keep,
+  log = () => {},
+}) {
+  if (!mayPost) {
+    const file = keep(comment);
+    log(`Left the card note unposted; it is kept at ${file}.`);
+    return { posted: null, state: null, keptAt: file };
+  }
+  const posted = await postComment(card, comment);
+  log(`Posted the merge comment on ${card}: ${posted.url}`);
+  await setIssueState(card, 'Complete');
+  const issue = await getIssue(card);
+  const type = issue?.state?.type ?? null;
+  if (type !== 'completed') {
+    throw new Error(`${card} was set to Complete but Linear returned state ${issue?.state?.name ?? 'unknown'} (${type ?? 'no type'}).`);
+  }
+  log(`${card} reads back as ${issue.state.name}.`);
+  return { posted: posted.url, state: issue.state.name, keptAt: null };
+}
+
+// The retro needs a checkout of the main line, which is what the merge just
+// changed. It is a detached worktree on the merge commit, so the retro doc can
+// be committed straight onto main without touching anyone else's working tree.
+export function prepareMainCheckout({ root, runDir, sha, git }) {
+  git(['fetch', '--no-tags', '--quiet', 'origin', 'main']);
+  const dir = path.join(runDir, 'main');
+  try {
+    git(['worktree', 'remove', '--force', dir]);
+  } catch {
+    // Nothing there yet.
+  }
+  fs.mkdirSync(runDir, { recursive: true });
+  git(['worktree', 'add', '--detach', '--quiet', dir, sha]);
+  return dir;
+}
+
+export function retroPathFor(card) {
+  return `docs/retros/${String(card).toLowerCase()}.md`;
+}
+
+export function landingPathFor(card) {
+  return `docs/scorecards/${card}.landing.json`;
+}
+
+// One commit onto main, confirmed by the push returning. A refused push is
+// replayed on top of the main line once, because two machines can land within
+// the same minute and the second one's commit is still true.
+export function commitToMain({ checkout, files, subject, body, git, log = () => {}, tries = 2 }) {
+  const relative = files.map(file => path.relative(checkout, file));
+  for (const file of relative) git(['add', '--', file], { cwd: checkout });
+  const status = git(['status', '--porcelain', '--', ...relative], { cwd: checkout });
+  if (!status) throw new Error(`nothing was written at ${relative.join(', ')}, so there is nothing to commit`);
+  git(['commit', '-q', '-m', subject, '-m', body], { cwd: checkout });
+  for (let attempt = 1; ; attempt++) {
+    try {
+      git(['push', '--quiet', 'origin', 'HEAD:main'], { cwd: checkout });
+      break;
+    } catch (error) {
+      if (attempt >= tries) throw error;
+      log('The push to main was refused; fetching the main line and replaying this commit on top of it.');
+      git(['fetch', '--no-tags', '--quiet', 'origin', 'main'], { cwd: checkout });
+      git(['pull', '--rebase', '--quiet', 'origin', 'main'], { cwd: checkout });
+    }
+  }
+  const pushed = git(['rev-parse', 'HEAD'], { cwd: checkout });
+  log(`Committed to main as ${pushed}: ${subject}`);
+  return pushed;
+}
+
+export function commitRetro({ checkout, card, file, git, log = () => {} }) {
+  return commitToMain({
+    checkout,
+    files: [file],
+    subject: `Write down what ${card} taught the machine (${card})`,
+    body: [
+      `The retro ran on ${card} after its change landed.`,
+      '',
+      'Co-Authored-By: mastracode <284800079+mastra-platform[bot]@users.noreply.github.com>',
+    ].join('\n'),
+    git,
+    log,
+  });
+}

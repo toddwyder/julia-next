@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -284,6 +285,74 @@ test('a folded archive with no span rows still prices the cost rows it holds', a
   assert.equal(tracing.skipped, null, 'a file with no spans is not an unreadable file');
   assert.deepEqual(tracing.metrics.map(m => m.value), [1000, 2000], 'both files price the card');
   assert.equal(tracing.requested.length, 1, 'only the session file can name the model that answered');
+});
+
+// DuckDB takes its lock per process, so the only honest holder of a live trace file is a
+// second process. It keeps the file open until its stdin closes.
+function holdOpen(file) {
+  const script = [
+    "import { createRequire } from 'node:module';",
+    `const { DuckDBInstance } = createRequire(${JSON.stringify(join(duckdbDir, 'package.json'))})('@duckdb/node-api');`,
+    `const instance = await DuckDBInstance.create(${JSON.stringify(file)});`,
+    'await instance.connect();',
+    "process.stdin.on('end', () => process.exit(0));",
+    'process.stdin.resume();',
+    "console.log('holding');",
+  ].join('\n');
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script], { stdio: ['pipe', 'pipe', 'pipe'] });
+  let errors = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', chunk => { errors += chunk; });
+  const ready = new Promise((ok, fail) => {
+    let out = '';
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', chunk => { out += chunk; if (out.includes('holding')) ok(); });
+    child.on('exit', code => fail(new Error(`the holder exited with ${code} before it held the file: ${errors.trim()}`)));
+  });
+  const stop = async () => {
+    child.stdin.end();
+    await new Promise(ok => child.on('exit', ok));
+  };
+  return { ready, stop };
+}
+
+// A session still running holds its file, so that one file is the only one worth copying.
+// If the lock is not recognised the card's cost quietly loses those rows instead.
+test('a trace file a running session holds is copied, and its cost still counts', { skip: duckdbDir ? false : 'no @duckdb/node-api on this machine' }, async t => {
+  const { DuckDBInstance } = duckdb;
+  const dir = mkdtempSync(join(tmpdir(), 'scorecard-live-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const thread = '9f1c0a2e-0d36-42f1-a43b-6e1d016cfa3f';
+  const file = join(dir, 'live.duckdb');
+  const instance = await DuckDBInstance.create(file);
+  const connection = await instance.connect();
+  await connection.run(`create table metric_events (timestamp timestamp, threadId varchar, entityName varchar, provider varchar,
+    model varchar, name varchar, value double, estimatedCost double)`);
+  await connection.run(`insert into metric_events values (timestamp '2026-10-30 03:00:00', '${thread}', 'Code Agent',
+    'commandcode.chat', 'deepseek/deepseek-v4.1-flash', 'mastra_model_total_input_tokens', 1000, 0.15)`);
+  connection.closeSync();
+  instance.closeSync();
+
+  const holder = holdOpen(file);
+  await holder.ready;
+  let tracing;
+  try {
+    tracing = await readTracing(REPO, [{ path: file, name: 'live.duckdb' }], [thread]);
+  } finally {
+    await holder.stop();
+  }
+  assert.equal(tracing.skipped, null, 'a held file is read, not reported as unreadable');
+  assert.deepEqual(tracing.metrics.map(m => m.value), [1000]);
+});
+
+test('a trace file that is not a database is reported, not passed over in silence', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'scorecard-junk-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(join(dir, 'junk.duckdb'), 'this is not a database');
+  const tracing = await readTracing(REPO, [{ path: join(dir, 'junk.duckdb'), name: 'junk.duckdb' }], ['some-thread']);
+  assert.deepEqual(tracing.metrics, []);
+  assert.match(tracing.skipped, /^junk\.duckdb could not be read \(/);
+  assert.match(tracing.skipped, /this card’s cost is unknown$/);
 });
 
 // The launcher is what gives each session its own trace file. A session started any other way
