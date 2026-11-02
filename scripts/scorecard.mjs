@@ -13,7 +13,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { launcherPath } from './install-launcher.mjs';
 
-import { legacyStoreFile, traceFiles, tracesDir } from './trace-store.mjs';
+import { isLockedMessage, legacyStoreFile, traceFiles, tracesDir } from './trace-store.mjs';
 
 const KICKOFF = /\b(?:Card:|Start|Run)\s+(JUL-\d+)\b/;
 const CACHE_WRITE_1H_FACTOR = 1.6; // Mastra prices 1-hour cache writes at 1.6x the 5-minute rate (2x vs 1.25x input).
@@ -322,7 +322,44 @@ export async function readTracing(dir, files, threadIds) {
   const requested = [];
   const missed = [];
   const ids = threadIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',');
+  // Reads one file's rows for these threads. The rows go to the caller, not into the totals,
+  // so a read that fails half way cannot leave half a file's cost counted.
+  const collect = async instance => {
+    const rows = { metrics: [], requested: [] };
+    const connection = await instance.connect();
+    const sql = async statement => (await connection.runAndReadAll(statement)).getRowObjectsJson();
+    rows.metrics.push(...await sql(`select threadId, epoch_ms(timestamp) as at, entityName, provider, model, name, value, estimatedCost
+      from metric_events where threadId in (${ids}) and name like 'mastra_model_%tokens'`));
+    // A folded file keeps the cost rows and nothing else, so it has no spans to ask
+    // which model answered. Only a session file does.
+    const [{ tables }] = await sql("select count(*) as tables from duckdb_tables() where table_name = 'span_events'");
+    if (Number(tables)) {
+      rows.requested.push(...await sql(`select threadId, epoch_ms(timestamp) as at, entityName, json_extract_string(attributes, '$.model') as model,
+        json_extract_string(attributes, '$.provider') as provider from span_events where threadId in (${ids}) and spanType = 'model_generation' and endedAt is null`));
+    }
+    return rows;
+  };
   for (const file of files) {
+    // A session that has ended no longer holds its file, so read it where it lies: copying
+    // 15 GB of trace to price a card needs room this machine may not have, and the copy was
+    // the only reason a card's cost came out short.
+    try {
+      const instance = await DuckDBInstance.create(file.path, { access_mode: 'READ_ONLY' });
+      try {
+        const rows = await collect(instance);
+        metrics.push(...rows.metrics);
+        requested.push(...rows.requested);
+      } finally {
+        instance.closeSync?.();
+      }
+      continue;
+    } catch (error) {
+      if (!isLockedMessage(error.message)) {
+        missed.push(`${file.name} could not be read (${error.message})`);
+        continue;
+      }
+    }
+    // A running Mastra Code holds its file's lock, so read a copy.
     const fileSize = statSync(file.path).size + (existsSync(`${file.path}.wal`) ? statSync(`${file.path}.wal`).size : 0);
     const free = statfsSync(tmpdir());
     const room = Number(free.bavail) * Number(free.bsize);
@@ -330,24 +367,15 @@ export async function readTracing(dir, files, threadIds) {
       missed.push(`${file.name} is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it`);
       continue;
     }
-    // A running Mastra Code holds its file's lock, so read a copy.
     const copy = mkdtempSync(join(tmpdir(), 'scorecard-'));
     try {
       copyFileSync(file.path, join(copy, 'o.duckdb'));
       if (existsSync(`${file.path}.wal`)) copyFileSync(`${file.path}.wal`, join(copy, 'o.duckdb.wal'));
       const instance = await DuckDBInstance.create(join(copy, 'o.duckdb'));
       try {
-        const connection = await instance.connect();
-        const rows = async sql => (await connection.runAndReadAll(sql)).getRowObjectsJson();
-        metrics.push(...await rows(`select threadId, epoch_ms(timestamp) as at, entityName, provider, model, name, value, estimatedCost
-          from metric_events where threadId in (${ids}) and name like 'mastra_model_%tokens'`));
-        // A folded file keeps the cost rows and nothing else, so it has no spans to ask
-        // which model answered. Only a session file does.
-        const [{ tables }] = await rows("select count(*) as tables from duckdb_tables() where table_name = 'span_events'");
-        if (Number(tables)) {
-          requested.push(...await rows(`select threadId, epoch_ms(timestamp) as at, entityName, json_extract_string(attributes, '$.model') as model,
-            json_extract_string(attributes, '$.provider') as provider from span_events where threadId in (${ids}) and spanType = 'model_generation' and endedAt is null`));
-        }
+        const rows = await collect(instance);
+        metrics.push(...rows.metrics);
+        requested.push(...rows.requested);
       } finally {
         instance.closeSync?.();
       }
