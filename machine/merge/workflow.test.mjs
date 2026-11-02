@@ -250,6 +250,27 @@ test('a change whose newest verdict is a FAIL is never merged', withoutProgram, 
   }
 });
 
+test('a card that failed one round and passed the next is asked to reflect', withoutProgram, async () => {
+  const { deps } = fakeDeps({
+    comments: [determination({ verdict: 'FAIL', round: 1, of: 2 }), determination({ verdict: 'PASS', round: 2, of: 2 })],
+  });
+  const asked = [];
+  const retro = deps.retro;
+  deps.retro = material => {
+    asked.push(material);
+    return retro(material);
+  };
+  const { started, dir } = await runMerge(deps);
+  try {
+    assert.equal(started.status, 'success', started.error);
+    assert.deepEqual(started.result.decision.verdicts, ['FAIL', 'PASS']);
+    assert.equal(asked.length, 1);
+    assert.match(String(asked[0].failed), /a Shipping round came back FAIL/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a PASS that judged an older commit does not let a moved branch land', withoutProgram, async () => {
   const { deps, order } = fakeDeps({ comments: [determination({ sha: 'bbbbbbb' })] });
   const { started, dir } = await runMerge(deps);

@@ -213,6 +213,9 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
       const written = record.retro?.file && path.join(record.merge.checkout, record.retro.file);
       if (record.retro?.ok && written && fs.existsSync(written)) return persist(record);
       const retroPath = retroPathFor(record.card.identifier);
+      // A card can fail a round and pass the next one. The reflection is owed to
+      // the failed round, not only to a red main, so a verdict of FAIL counts.
+      const failed = record.failed ?? (record.decision?.verdicts?.includes('FAIL') ? 'a Shipping round came back FAIL' : null);
       const determinations = deps
         .readComments(record.pr)
         .map(comment => ({ ...parseShippingComment(comment), body: comment.body }))
@@ -226,7 +229,7 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
         retroPath,
         determinations,
         changed: record.changed,
-        failed: record.failed,
+        failed,
         metrics: record.metrics ? `${record.metrics.duration.human}, ${record.metrics.reviews.rounds} Shipping rounds` : null,
       });
       if (!outcome.ok) {
