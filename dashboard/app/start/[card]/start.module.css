@@ -141,3 +141,21 @@ button:disabled { opacity: 0.55; cursor: default; }
   .brains { font-size: 0.95rem; letter-spacing: 0; }
   .section { padding: 16px; }
 }
+
+.status { margin: 20px 0; font-variant-numeric: tabular-nums; }
+
+.statusList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+
+.statusItem { min-width: 0; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; }
+
+.statusName { margin: 0 0 8px; font-size: 1rem; }
+
+.statusLine { margin: 6px 0 0; overflow-wrap: anywhere; }
+
+.statusReadAt { margin: 0 0 12px; color: #475569; font-size: 0.9rem; }
+
+.warn { padding: 8px 10px; border-radius: 12px; color: #b45309; background: #fffbeb; }
+
+.out { padding: 8px 10px; border-radius: 12px; color: #be123c; background: #fff1f2; }
+
+.pickWarning { margin: 0 2px; padding: 6px 8px; border-radius: 12px; font-size: 0.85rem; color: #b45309; background: #fffbeb; }

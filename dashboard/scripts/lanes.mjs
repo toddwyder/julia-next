@@ -1,5 +1,6 @@
-// Ten live lanes plus a slow-start guard for the Start screen controls. Each lane boots its own
-// server and state folder, then clicks every control the way a person does on a phone or desktop.
+// Thirteen live lanes: the Start screen controls, a slow-start guard, and the account rows. Each lane
+// boots its own server and state folder, then clicks every control the way a person does on a phone
+// or desktop.
 // Run one lane: node scripts/lanes.mjs 3
 // Drive an address that is already running (the one handed to Todd): node scripts/lanes.mjs --url http://host:4313
 //
@@ -53,6 +54,9 @@ function staleBuildReason() {
 
 const baseFor = number => `http://127.0.0.1:${PORT_BASE + number}`;
 const stateFor = number => join(LANES, `lane-${number}`);
+// Lane 13 proves the screen when a key is missing, so its server must not be handed the keys the
+// agent launcher supplies.
+const NO_KEY_LANES = new Set([13]);
 const modelName = value => value.replace(/\s+/g, ' ').replace(/^[▸▾]\s*/, '').replace(/\s*(?:↓\$|Free\b).*$/, '').trim();
 
 async function healthy(base) {
@@ -72,12 +76,21 @@ async function startServer(number) {
   copyFileSync(MODELS, join(state, 'state/models.json'));
   if (await healthy(base)) throw new Error(`port ${PORT_BASE + number} already serving`);
 
-  const child = spawn('node', ['../scripts/julia-agents.mjs', '--', 'node', 'server.js'], {
-    cwd: ROOT,
-    detached: true,
-    stdio: 'ignore',
-    env: { ...process.env, DASHBOARD_HOST: '127.0.0.1', DASHBOARD_PORT: String(PORT_BASE + number), DASHBOARD_STATE_DIR: state },
-  });
+  const env = { ...process.env, DASHBOARD_HOST: '127.0.0.1', DASHBOARD_PORT: String(PORT_BASE + number), DASHBOARD_STATE_DIR: state };
+  let child;
+  if (NO_KEY_LANES.has(number)) {
+    // A person who never added the key, not a person whose key was refused: the key is gone from
+    // the environment the screen's sweep runs in, and the launcher is what would put it back.
+    delete env.COMMANDCODE_API_KEY;
+    child = spawn('node', ['server.js'], { cwd: ROOT, detached: true, stdio: 'ignore', env });
+  } else {
+    child = spawn('node', ['../scripts/julia-agents.mjs', '--', 'node', 'server.js'], {
+      cwd: ROOT,
+      detached: true,
+      stdio: 'ignore',
+      env,
+    });
+  }
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (await healthy(base)) return { child, base, state };
     await sleep(250);
@@ -317,6 +330,43 @@ lane(11, 'show a clear wait instead of dropping early taps', 'phone', async page
   return 'before the page was ready the controls were off with a plain wait cue; the first tap after that selected Large';
 });
 
+lane(12, 'read every account number beside what it is measured against', 'phone', async page => {
+  const section = page.locator('section[aria-labelledby="accounts-heading"]');
+  await section.waitFor();
+  const headings = (await section.locator('h3').allInnerTexts()).map(text => text.trim());
+  assert.ok(headings.includes('CommandCode grant'), `the grant should have a heading, saw ${headings}`);
+  const lines = (await section.locator('li p').allInnerTexts()).map(text => text.trim()).filter(Boolean);
+  // A measurement line is "label: the numbers". A warning has no label, and the read-at line is not a row.
+  const measured = lines.filter(line => /^[^:]+: /.test(line));
+  assert.ok(measured.length >= 6, `expected a line per account number, saw ${measured.length}: ${lines.join(' | ')}`);
+  // Anything spent must be measured against a figure, or the row must say the provider publishes none.
+  const spent = measured.filter(line => /[\d.]\s+(?:credits?\s+)?used/.test(line));
+  const floating = spent.filter(line => !/\bof [\d.,]+/.test(line) && !/does not publish/.test(line));
+  assert.deepEqual(floating, [], `a number with no base to measure it against: ${floating.join(' | ')}`);
+  const grant = measured.filter(line => line.startsWith('Last 5 hours:') || line.startsWith('This week:'));
+  assert.ok(grant.some(line => /\bof [\d.,]+ credits? used/.test(line) && line.includes('Resets')), `the grant should show a window against its cap: ${grant.join(' | ')}`);
+  return `${headings.length} accounts, every spent figure beside its base: ${measured.join(' | ')}`;
+});
+
+lane(13, "say a number can't be read when its key is missing", 'phone', async page => {
+  const section = page.locator('section[aria-labelledby="accounts-heading"]');
+  await section.waitFor();
+  const items = await section.locator('li').evaluateAll(nodes => nodes.map(node => ({
+    name: node.querySelector('h3')?.innerText.trim(),
+    lines: [...node.querySelectorAll('p')].map(line => line.innerText.trim()).filter(Boolean),
+  })));
+  const grant = items.find(item => item.name === 'CommandCode grant');
+  assert.ok(grant, `the grant row should be on screen, saw ${items.map(item => item.name)}`);
+  assert.ok(grant.lines.some(line => line.includes("can't be read")),
+    `a row with no key must use the card's words, saw ${grant.lines.join(' | ')}`);
+  assert.ok(grant.lines.some(line => /no sign-in or key for CommandCode grant/.test(line) && /Todd needs to add it/.test(line)),
+    `a row with no key must name the missing key, saw ${grant.lines.join(' | ')}`);
+  const everyLine = items.flatMap(item => item.lines).join(' | ');
+  assert.ok(!/No number/.test(everyLine), `the old wording is back on the screen: ${everyLine}`);
+  assert.ok(items.length >= 3, `every account should still get a row, saw ${everyLine}`);
+  return `the grant row with no key: ${grant.lines.join(' | ')}`;
+});
+
 const args = process.argv.slice(2);
 const urlIndex = args.indexOf('--url');
 const target = urlIndex === -1 ? null : args[urlIndex + 1];
@@ -333,6 +383,10 @@ async function openLane(number) {
 
 async function run(number, title, kind, body) {
   if (only && Number(only) !== number) return;
+  if (target && NO_KEY_LANES.has(number)) {
+    console.log(`lane ${number} SKIP  ${title}\n        this lane needs a server it can boot without the key`);
+    return;
+  }
   const { child, base, state } = await openLane(number);
   const browser = await chromium.launch();
   const context = await browser.newContext(contextOptions(kind));

@@ -1,0 +1,152 @@
+export const PROBLEMS = Object.freeze(Object.fromEntries([
+  'no-credential', 'sign-in-expired', 'refused', 'unreachable', 'shape-changed', 'not-published', 'key-refused',
+].map(code => [code, code])));
+
+export class ProblemError extends Error {
+  constructor(problem, status) {
+    super(PROBLEMS[problem] ?? PROBLEMS['unreachable']);
+    this.problem = this.message;
+    if (Number.isInteger(status) && status >= 100 && status <= 599) this.status = status;
+  }
+}
+
+const number = value => Number.isFinite(value) && value >= 0;
+const date = value => typeof value === 'string' && Number.isFinite(Date.parse(value));
+const unreadable = (key, label, problem = 'not-published', status) => ({
+  key, label, kind: 'unreadable', problem,
+  ...(status === undefined ? {} : { status }),
+});
+const failed = (key, label, error) => unreadable(key, label,
+  error instanceof ProblemError ? error.problem : 'unreachable',
+  error instanceof ProblemError ? error.status : undefined);
+
+export function levelOf({ used, allowance }, signal) {
+  if (signal === 'out' || used >= allowance) return 'out';
+  if (signal === 'nearly-out' || used / allowance >= 0.9) return 'nearly-out';
+  return 'plenty';
+}
+
+// A reset the provider did not send keeps the row readable: the number is the point, and the
+// view says the reset time was not given. Only a reset we cannot parse is a shape change.
+function windowRow(key, label, used, allowance, unit, resetsAt, signal) {
+  if (!number(used) || !number(allowance) || allowance === 0) return unreadable(key, label);
+  if (resetsAt !== null && resetsAt !== undefined && !date(resetsAt)) return unreadable(key, label, 'shape-changed');
+  return { key, label, kind: 'window', used, allowance, unit, resetsAt: resetsAt ?? null,
+    level: levelOf({ used, allowance }, signal) };
+}
+
+export function parseAnthropic(payload, { readAt } = {}) {
+  if (!Array.isArray(payload?.limits)) throw new ProblemError('shape-changed');
+  return [['session', 'hours', 'Last 5 hours'], ['weekly_all', 'week', 'This week']].map(([kind, suffix, label]) => {
+    const limit = payload.limits.find(item => item?.kind === kind);
+    const signal = ['warning', 'critical', 'danger', 'error', 'exceeded'].includes(limit?.severity) ? 'nearly-out' : undefined;
+    return windowRow(`claude:${suffix}`, label, limit?.percent, 100, 'percent', limit?.resets_at, signal);
+  });
+}
+
+export function parseChatgpt(payload, { readAt } = {}) {
+  if (!payload?.rate_limit || typeof payload.rate_limit !== 'object') throw new ProblemError('shape-changed');
+  const limits = payload.rate_limit;
+  const windows = [limits.primary_window, limits.secondary_window];
+  return [[18000, 'hours', 'Last 5 hours'], [604800, 'week', 'This week']].map(([seconds, suffix, label]) => {
+    const window = windows.find(item => item?.limit_window_seconds === seconds);
+    // A window the provider leaves out is a number nobody published, so the row stays on screen
+    // and says so. Dropping it would hide a limit the account may still be bound by.
+    if (!window) return unreadable(`chatgpt:${suffix}`, label);
+    const reset = number(window.reset_at) && Number.isFinite(new Date(window.reset_at * 1000).getTime())
+      ? new Date(window.reset_at * 1000).toISOString() : undefined;
+    return windowRow(`chatgpt:${suffix}`, label, window.used_percent, 100, 'percent', reset,
+      limits.limit_reached === true ? 'out' : undefined);
+  });
+}
+
+// CommandCode publishes what the month has used and what is left, but it publishes no monthly
+// allowance, so this row shows the two provider numbers and never a total we worked out ourselves.
+function spendRow(key, label, used, left, unit, resetsAt, signal) {
+  if (!number(used) || !number(left)) return unreadable(key, label);
+  if (resetsAt !== null && resetsAt !== undefined && !date(resetsAt)) return unreadable(key, label, 'shape-changed');
+  return { key, label, kind: 'spend', used, left, unit, resetsAt: resetsAt ?? null,
+    level: signal === 'out' || left === 0 ? 'out' : signal === 'nearly-out' ? 'nearly-out' : 'plenty' };
+}
+
+// CommandCode stops a plan at two rolling caps, one over 5 hours and one over a week, and those
+// caps are the only base it publishes. It sends them in credits, the unit its own limits doc names,
+// not in dollars: the same 14-credit cap is worth up to $20 on a $100 model and $14 on a $70 one.
+function creditWindow(key, label, limit, purchased) {
+  if (!limit || typeof limit !== 'object') return unreadable(key, label);
+  const resetsAt = Number.isFinite(limit.resetAt) && Number.isFinite(new Date(limit.resetAt).getTime())
+    ? new Date(limit.resetAt).toISOString() : null;
+  const row = windowRow(key, label, limit.used, limit.cap, 'credit', resetsAt, limit.exceeded === true ? 'out' : undefined);
+  // A spent window stops the month's included credit, not the bought credit: the provider spends
+  // bought credit first and lets the request through, so a grant holding some is not used up.
+  return row.kind === 'window' && row.level === 'out' && number(purchased) && purchased > 0
+    ? { ...row, level: 'nearly-out', note: 'Your bought credit still works.' }
+    : row;
+}
+
+export function parseCommandCode({ credits, summary, subscription }, { readAt } = {}) {
+  const plan = credits?.credits;
+  const purchased = plan?.purchasedCredits;
+  const month = spendRow('commandcode:month', 'This month', summary?.totalMonthlyCredits, plan?.monthlyCredits, 'usd',
+    subscription?.data?.currentPeriodEnd,
+    plan?.belowThreshold === true ? 'nearly-out' : undefined);
+  return [
+    month.kind === 'spend' ? { ...month, note: "CommandCode does not publish the month's total credit." } : month,
+    creditWindow('commandcode:hours', 'Last 5 hours', credits?.windowLimits?.fiveHour, purchased),
+    creditWindow('commandcode:week', 'This week', credits?.windowLimits?.weekly, purchased),
+    number(purchased)
+      ? { key: 'commandcode:credit', label: 'Bought credit', kind: 'balance', remaining: purchased, unit: 'usd', level: 'plenty' }
+      : unreadable('commandcode:credit', 'Bought credit'),
+  ];
+}
+
+const endpoints = {
+  claude: ['https://api.anthropic.com/api/oauth/usage'],
+  chatgpt: ['https://chatgpt.com/backend-api/wham/usage'],
+  commandcode: ['https://api.commandcode.ai/alpha/billing/credits',
+    'https://api.commandcode.ai/alpha/usage/summary', 'https://api.commandcode.ai/alpha/billing/subscriptions'],
+};
+
+const creditsKeys = new Set(['commandcode:hours', 'commandcode:week', 'commandcode:credit']);
+
+async function readEndpoint(url, headers, fetchImpl, authProblem = 'sign-in-expired') {
+  let response;
+  try { response = await fetchImpl(url, { headers, cache: 'no-store', signal: AbortSignal.timeout(8000) }); }
+  catch { throw new ProblemError('unreachable'); }
+  if (!response.ok) throw new ProblemError(response.status === 401 || response.status === 403 ? authProblem : 'refused', response.status);
+  try { return await response.json(); }
+  catch (error) { throw new ProblemError(error?.name === 'SyntaxError' ? 'shape-changed' : 'unreachable'); }
+}
+
+export async function readAccountStatus({ accounts, getHeaders, fetchImpl = fetch, now = () => new Date() }) {
+  return Promise.all(accounts.map(async ({ id, name }) => {
+    const readAt = now().toISOString();
+    try {
+      if (!endpoints[id]) throw new ProblemError('shape-changed');
+      const headers = await getHeaders(id);
+      const authProblem = id === 'commandcode' ? 'key-refused' : 'sign-in-expired';
+      let rows;
+      if (id === 'commandcode') {
+        const results = await Promise.allSettled(endpoints[id].map(url => readEndpoint(url, headers, fetchImpl, authProblem)));
+        if (results.every(result => result.status === 'rejected')) throw results[0].reason;
+        const [credits, summary, subscription] = results.map(result => result.value);
+        rows = parseCommandCode({ credits, summary, subscription }, { readAt });
+        // One reply failing names the rows it feeds and leaves the rest readable: the month comes
+        // from usage/summary, the two window caps and the bought-credit balance from billing/credits.
+        if (results[1].status === 'rejected') {
+          rows = rows.map(row => row.key === 'commandcode:month' ? failed('commandcode:month', 'This month', results[1].reason) : row);
+        }
+        if (results[0].status === 'rejected') {
+          rows = rows.map(row => creditsKeys.has(row.key) ? failed(row.key, row.label, results[0].reason) : row);
+        }
+      } else {
+        const payload = await readEndpoint(endpoints[id][0], headers, fetchImpl, authProblem);
+        rows = (id === 'claude' ? parseAnthropic : parseChatgpt)(payload, { readAt });
+      }
+      if (!rows.length) rows = [unreadable(id, name)];
+      return { id, name, readAt, rows };
+    } catch (error) {
+      return { id, name, readAt, rows: [failed(id, name, error)] };
+    }
+  }));
+}
