@@ -11,6 +11,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { loadMastra, missingProgram } from '../shipping/harness.mjs';
+import { alreadyCompleted } from './land.mjs';
 import { createMergeWorkflow } from './workflow.mjs';
 
 const programGap = missingProgram();
@@ -146,7 +147,9 @@ function fakeDeps({ comments = [determination()] } = {}) {
       order.push('cardComments');
       return [];
     },
-    alreadyCompleted: () => false,
+    // The real reader, so a promise handed in where the card's comments belong
+    // fails here the way it failed on the practice run.
+    alreadyCompleted: (comments, want) => alreadyCompleted(comments, want),
     completeCard: async ({ card, comment }) => {
       order.push(`completeCard ${card}`);
       deps.comment = comment;

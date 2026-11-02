@@ -300,7 +300,7 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
         log(`The card stays in progress: ${record.stop.reason}`);
         return persist(record);
       }
-      const comments = deps.cardComments(record.card.identifier);
+      const comments = await deps.cardComments(record.card.identifier);
       if (deps.alreadyCompleted(comments, { card: record.card.identifier, mergeCommit: record.merge.commit })) {
         log(`${record.card.identifier} already carries a merge comment for ${record.merge.commit}.`);
         return persist(record);
