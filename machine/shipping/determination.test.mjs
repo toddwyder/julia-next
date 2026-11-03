@@ -33,6 +33,39 @@ test('criteria come from the card, and only from its criteria section', () => {
   assert.deepEqual(criteriaFromCard('No headings here\n\n- a bullet'), []);
 });
 
+test('a slice card written as "Done means:" yields the same criteria as a heading', () => {
+  const slice = `Outcome: one page shows what the machine is doing.
+
+Done means:
+
+* One page lists card runs with a status of running, succeeded, failed or stalled.
+* A new run appears on the page within one minute.
+`;
+  const asHeading = `Outcome: one page shows what the machine is doing.
+
+## Acceptance criteria
+
+* One page lists card runs with a status of running, succeeded, failed or stalled.
+* A new run appears on the page within one minute.
+`;
+  const wanted = [
+    'One page lists card runs with a status of running, succeeded, failed or stalled.',
+    'A new run appears on the page within one minute.',
+  ];
+  assert.deepEqual(criteriaFromCard(slice), wanted);
+  assert.deepEqual(criteriaFromCard(asHeading), wanted);
+});
+
+test('an empty Done means line yields no criteria rather than every bullet after it', () => {
+  const card = `Done means:
+
+## What we know
+
+* a note, not a criterion
+`;
+  assert.deepEqual(criteriaFromCard(card), []);
+});
+
 test('the verdict is read per criterion, with the reason beside it', () => {
   const verdict = parseVerdict(ANSWER);
   assert.equal(verdict.verdict, 'PASS');

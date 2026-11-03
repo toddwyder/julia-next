@@ -5,9 +5,17 @@
 
 const VERDICT = /(PASS\+NOTES|PASS|FAIL)/i;
 
+// A slice card carries its done-means under "Done means:", the house wording from
+// docs/advisor-notes/linear/front-door-process.md, where the parent card carries
+// them under an "Acceptance criteria" heading. Reading only the heading left every
+// slice unreviewable: "JUL-330 names no acceptance criteria, so there is nothing
+// for Shipping to judge." Both shapes are read here so a card is judged as written.
+const CRITERIA_HEADING =
+  /^(?:#{1,6}[ \t]*(?:acceptance[ \t]+)?criteria[ \t]*|\**[ \t]*done[ \t]+means[ \t]*\**:?[ \t]*)$/im;
+
 export function criteriaFromCard(description) {
   const text = String(description ?? '');
-  const heading = /^#{1,6}[ \t]*(?:acceptance[ \t]+)?criteria[ \t]*$/im.exec(text);
+  const heading = CRITERIA_HEADING.exec(text);
   if (!heading) return [];
   const after = text.slice(heading.index + heading[0].length);
   const next = /^#{1,6}[ \t]+\S/m.exec(after);
