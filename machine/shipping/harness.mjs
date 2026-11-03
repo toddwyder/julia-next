@@ -28,6 +28,22 @@ const SUBAGENTS = [
   ['execute', 'executeSubagent'],
 ];
 
+// The agent controller gives a subagent definition no limit of its own and then
+// stops the run at 50 steps (`definition.maxSteps ?? (definition.stopWhen ? void
+// 0 : 50)`), and a stopped run writes no answer. The stock definitions name no
+// limit, so a review of a long change spent all 50 steps on reading and came
+// back empty: six attempts on PR #433, each ending at `stopReason: max_steps`,
+// each with no verdict. Interactive runs in the same program stream with
+// `maxSteps: 1e3` (@mastra/code-sdk/dist/index.js, the session's own run
+// options), so a review gets that same ceiling instead of the default.
+export const SUBAGENT_MAX_STEPS = 1000;
+
+// A definition that already names its own limit keeps it; the stock ones get the
+// interactive limit written down so no stage depends on the controller default.
+export function subagentDefinitions(loaded) {
+  return loaded.map(definition => ({ ...definition, maxSteps: definition.maxSteps ?? SUBAGENT_MAX_STEPS }));
+}
+
 async function load(relative) {
   return import(pathToFileURL(path.join(modules, relative)).href);
 }
@@ -78,7 +94,7 @@ export async function bootHarness({ cwd, storage, createInitialThread = true, mo
     loadMastra(),
     Promise.all(SUBAGENTS.map(async ([file, name]) => (await load(`@mastra/code-sdk/dist/agents/subagents/${file}.js`))[name])),
   ]);
-  const config = { cwd, createInitialThread, subagents };
+  const config = { cwd, createInitialThread, subagents: subagentDefinitions(subagents) };
   if (storage) config.storage = storage;
   if (modes !== undefined) config.modes = modes;
   const booted = await mastraTools.bootLocalAgentController(config);
@@ -92,6 +108,12 @@ export async function bootHarness({ cwd, storage, createInitialThread = true, mo
 }
 
 export async function stopHarness(booted) {
+  // The boot starts a notification timer that ticks every 10s and reads thread
+  // rows. Shutdown has to stop it before the storage goes: a tick that lands on
+  // a closed libsql client throws CLIENT_CLOSED, and the delivery pass it is in
+  // aborts the rest of the pass, so no notification — including a stop ping —
+  // reaches anyone from this process after that.
+  await booted.stopNotificationDispatch?.();
   await booted.observability?.flush?.();
   await new Promise(resolve => setTimeout(resolve, 2000));
   await booted.observability?.shutdown?.();
