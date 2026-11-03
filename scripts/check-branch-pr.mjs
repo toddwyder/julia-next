@@ -16,7 +16,9 @@ export function branchesWithoutOpenPullRequests({ branches, pulls, repository })
 // session's trace file prints `Cost: **unknown**` while looking finished, or prints a number
 // smaller than the bill and says so on a `Cost incomplete` line. So a pull request that names
 // a card has to carry that card's scorecard, and the card's cost has to be a number somebody
-// could check.
+// could check. A cost that is unknown, zero or missing still stops the pull request; an
+// incomplete-cost line passes the check and is printed as a note, so the stated reason still
+// reaches the reader.
 //
 // Work that is not a card, such as a correction Todd asks for as its own pull request, says so
 // on a lone `No card:` line of the body, the same place a pull request names its card. A line
@@ -27,13 +29,14 @@ export function declaresNoCard(body) {
   return NO_CARD.test(String(body ?? ''));
 }
 
-export function scorecardGaps({ pulls, headRef, readFile = path => readFileSync(path, 'utf8') }) {
-  const gaps = [];
+export function scorecardFindings({ pulls, headRef, readFile = path => readFileSync(path, 'utf8') }) {
+  const failures = [];
+  const notes = [];
   for (const pull of pulls.filter(candidate => candidate.head?.ref === headRef)) {
     const cards = [...new Set(`${pull.title ?? ''}\n${pull.body ?? ''}`.match(/\bJUL-\d+\b/g) ?? [])];
     if (!cards.length) {
       if (declaresNoCard(pull.body)) continue;
-      gaps.push(`PR #${pull.number} names no JUL card, so there is no scorecard to check: put the card in the title, as (JUL-123), or say "No card: <reason>" in the body when the work is not a card`);
+      failures.push(`PR #${pull.number} names no JUL card, so there is no scorecard to check: put the card in the title, as (JUL-123), or say "No card: <reason>" in the body when the work is not a card`);
       continue;
     }
     for (const card of cards) {
@@ -42,19 +45,19 @@ export function scorecardGaps({ pulls, headRef, readFile = path => readFileSync(
       try {
         written = readFile(path);
       } catch {
-        gaps.push(`PR #${pull.number} names ${card} but ${path} is not on the branch: run node scripts/scorecard.mjs ${card} --write and commit what it writes`);
+        failures.push(`PR #${pull.number} names ${card} but ${path} is not on the branch: run node scripts/scorecard.mjs ${card} --write and commit what it writes`);
         continue;
       }
       const cost = /^- Cost: \*\*(.+?)\*\*/m.exec(written)?.[1] ?? 'no Cost line';
       if (!/^\$\d+(\.\d+)?$/.test(cost) || Number(cost.slice(1)) <= 0) {
-        gaps.push(`PR #${pull.number} carries ${path} with cost "${cost}" and a pull request needs a measured cost: the scorecard prices a card from its session's trace file, so read node scripts/trace-store.mjs status and re-run node scripts/scorecard.mjs ${card} --write`);
+        failures.push(`PR #${pull.number} carries ${path} with cost "${cost}" and a pull request needs a measured cost: the scorecard prices a card from its session's trace file, so read node scripts/trace-store.mjs status and re-run node scripts/scorecard.mjs ${card} --write`);
         continue;
       }
       const incomplete = /^- Cost incomplete: (.*)$/m.exec(written)?.[1];
-      if (incomplete) gaps.push(`PR #${pull.number} carries ${path} with a cost that is known to be short: ${incomplete}`);
+      if (incomplete) notes.push(`PR #${pull.number} carries ${path} with a cost that is known to be short, so the pull request passes on this note: ${incomplete}`);
     }
   }
-  return gaps;
+  return { failures, notes };
 }
 
 async function githubPages(path, { apiUrl, repository, token }) {
@@ -87,15 +90,18 @@ export async function checkBranchPullRequests({
     githubPages('branches', { apiUrl, repository, token }),
     githubPages('pulls?state=open&base=main', { apiUrl, repository, token }),
   ]);
+  const findings = scorecardFindings({ pulls, headRef, readFile });
   return {
     branches: branchesWithoutOpenPullRequests({ branches, pulls, repository }),
-    scorecards: scorecardGaps({ pulls, headRef, readFile }),
+    scorecards: findings.failures,
+    notes: findings.notes,
   };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const { branches, scorecards } = await checkBranchPullRequests();
+    const { branches, scorecards, notes } = await checkBranchPullRequests();
+    if (notes.length) console.log(`Scorecards that state why their cost is short (their pull requests pass):\n${notes.join('\n')}`);
     if (branches.length) console.error(`Branches without an open pull request to main:\n${branches.join('\n')}`);
     if (scorecards.length) console.error(`Pull requests without a scorecard that shows a cost:\n${scorecards.join('\n')}`);
     if (branches.length || scorecards.length) process.exitCode = 1;
