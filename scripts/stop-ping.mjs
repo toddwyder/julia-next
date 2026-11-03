@@ -157,8 +157,12 @@ export function resolveThread(payload, db, { exists = threadExists, resume = res
 
 // Linear never notifies Todd about a comment written with his own key, but an issue
 // reminder he sets for himself is delivered like any notification, phone included.
+// `viewer` lives on the query root, so it is asked for separately: a mutation that
+// selects it is rejected whole ("Cannot query field viewer on type Mutation"), which
+// cost the comment's reminder and left the record saying nothing was posted.
 const REMINDER_LEAD_MS = 30_000;
-const REMINDER_MUTATION = `mutation Remind($id: String!, $at: DateTime!) { viewer { name } issueReminder(id: $id, reminderAt: $at) { success } }`;
+const VIEWER_QUERY = `query Whoami { viewer { name } }`;
+const REMINDER_MUTATION = `mutation Remind($id: String!, $at: DateTime!) { issueReminder(id: $id, reminderAt: $at) { success } }`;
 const TODD_NAME = 'Todd Wyder';
 
 function record(file, entry) {
@@ -195,7 +199,8 @@ export async function handleStop(payload, env = process.env, {
     const opts = { apiKey: env.LINEAR_API_KEY };
     const comment = await post(card, stopComment({ reason: payload.reason, message: payload.message, thread, projectPath }), opts);
     const remindAt = new Date(Date.now() + REMINDER_LEAD_MS).toISOString();
-    const { viewer, issueReminder } = await remind(REMINDER_MUTATION, { id: card, at: remindAt }, opts);
+    const { viewer } = await remind(VIEWER_QUERY, {}, opts);
+    const { issueReminder } = await remind(REMINDER_MUTATION, { id: card, at: remindAt }, opts);
     // Linear never notifies you about your own comment, so the reminder was how a
     // comment written as Todd reached him. A comment written as the Julia controller
     // app is somebody else's comment: the mention that opens it is the notification,
