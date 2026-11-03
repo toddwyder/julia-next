@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { branchesWithoutOpenPullRequests, scorecardGaps } from './check-branch-pr.mjs';
+import { branchesWithoutOpenPullRequests, scorecardFindings } from './check-branch-pr.mjs';
 
 const repository = 'toddwyder/julia-next';
 
@@ -28,54 +28,75 @@ function pull({ number = 7, title = 'Do a thing (JUL-282)', body = '', ref = 'fe
 }
 
 test('a card pull request passes with a scorecard that shows a cost', () => {
-  const gaps = scorecardGaps({
+  const { failures } = scorecardFindings({
     pulls: [pull()],
     headRef: 'feat/jul-282',
     readFile: path => { assert.equal(path, 'docs/scorecards/JUL-282.md'); return scorecard('**$1.69**'); },
   });
-  assert.deepEqual(gaps, []);
+  assert.deepEqual(failures, []);
 });
 
 test('a scorecard whose cost could not be measured fails the pull request', () => {
-  const gaps = scorecardGaps({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => scorecard('**unknown**') });
-  assert.equal(gaps.length, 1);
-  assert.match(gaps[0], /docs\/scorecards\/JUL-282\.md with cost "unknown"/);
-  assert.match(gaps[0], /node scripts\/scorecard\.mjs JUL-282 --write/, 'the gap says what to run');
+  const { failures } = scorecardFindings({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => scorecard('**unknown**') });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /docs\/scorecards\/JUL-282\.md with cost "unknown"/);
+  assert.match(failures[0], /node scripts\/scorecard\.mjs JUL-282 --write/, 'the gap says what to run');
+});
+
+test('an unknown cost with an incomplete-cost line still fails only on the cost', () => {
+  const written = `${scorecard('**unknown**')}- Cost incomplete: 1 session of this card started after the launcher and recorded no trace rows.\n`;
+  const { failures, notes } = scorecardFindings({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => written });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /docs\/scorecards\/JUL-282\.md with cost "unknown"/);
+  assert.deepEqual(notes, []);
 });
 
 test('a card pull request with no scorecard on the branch fails', () => {
-  const gaps = scorecardGaps({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => { throw new Error('ENOENT'); } });
-  assert.equal(gaps.length, 1);
-  assert.match(gaps[0], /is not on the branch/);
+  const { failures } = scorecardFindings({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => { throw new Error('ENOENT'); } });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /is not on the branch/);
 });
 
-test('a cost the scorecard says is short fails the pull request even though it is a number', () => {
+test('a cost the scorecard says is short passes the pull request and is printed as a note', () => {
   const written = `${scorecard('**$1.69**')}- Cost incomplete: 1 session of this card started after the launcher and recorded no trace rows.\n`;
-  const gaps = scorecardGaps({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => written });
-  assert.equal(gaps.length, 1);
-  assert.match(gaps[0], /known to be short: 1 session of this card started after the launcher and recorded no trace rows/);
+  const { failures, notes } = scorecardFindings({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => written });
+  assert.deepEqual(failures, []);
+  assert.equal(notes.length, 1);
+  assert.match(notes[0], /1 session of this card started after the launcher and recorded no trace rows/);
+  assert.match(notes[0], /PR #7/);
+  assert.match(notes[0], /docs\/scorecards\/JUL-282\.md/);
+});
+
+test('a real scorecard that says why its cost is short passes and is printed as a note', () => {
+  const { failures, notes } = scorecardFindings({
+    pulls: [pull({ title: 'Do a thing (JUL-319)', ref: 'fix/jul-319-machine-subagents' })],
+    headRef: 'fix/jul-319-machine-subagents',
+  });
+  assert.deepEqual(failures, []);
+  assert.equal(notes.length, 1);
+  assert.match(notes[0], /4 sessions of this card started after the launcher and recorded no trace rows/);
 });
 
 test('a pull request that names no card, or is another branch, is not checked', () => {
-  assert.equal(scorecardGaps({ pulls: [pull({ title: 'Fix the font flake' })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }).length, 1);
-  assert.deepEqual(scorecardGaps({ pulls: [pull({ ref: 'other' })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }), []);
+  assert.equal(scorecardFindings({ pulls: [pull({ title: 'Fix the font flake' })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }).failures.length, 1);
+  assert.deepEqual(scorecardFindings({ pulls: [pull({ ref: 'other' })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }), { failures: [], notes: [] });
 });
 
 test('work that is not a card passes when the body says so and gives a reason', () => {
   const body = 'Todd asked for this correction as its own pull request, with no card.\n\nNo card: a correction Todd asked for, not a card.\n';
-  assert.deepEqual(scorecardGaps({ pulls: [pull({ title: 'Require a verdict before green', body })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }), []);
+  assert.deepEqual(scorecardFindings({ pulls: [pull({ title: 'Require a verdict before green', body })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') }), { failures: [], notes: [] });
 });
 
 test('a No card line with no reason does not pass', () => {
   const body = 'No card:\n';
-  const gaps = scorecardGaps({ pulls: [pull({ title: 'Require a verdict before green', body })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') });
-  assert.equal(gaps.length, 1);
-  assert.match(gaps[0], /say "No card: <reason>" in the body/);
+  const { failures } = scorecardFindings({ pulls: [pull({ title: 'Require a verdict before green', body })], headRef: 'feat/jul-282', readFile: () => scorecard('**$3.00**') });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /say "No card: <reason>" in the body/);
 });
 
 test('a pull request that names a card still needs that card\'s scorecard, whatever its body says', () => {
   const body = 'No card: this is not a card.\n';
-  const gaps = scorecardGaps({ pulls: [pull({ body })], headRef: 'feat/jul-282', readFile: () => { throw new Error('ENOENT'); } });
-  assert.equal(gaps.length, 1);
-  assert.match(gaps[0], /names JUL-282 but docs\/scorecards\/JUL-282\.md is not on the branch/);
+  const { failures } = scorecardFindings({ pulls: [pull({ body })], headRef: 'feat/jul-282', readFile: () => { throw new Error('ENOENT'); } });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /names JUL-282 but docs\/scorecards\/JUL-282\.md is not on the branch/);
 });
