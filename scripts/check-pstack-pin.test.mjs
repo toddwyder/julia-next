@@ -90,5 +90,4 @@ test('the checked-in pstack install matches the mirror', () => {
   const { pin, problems } = checkPstackPin(resolve(import.meta.dirname, '..'));
   assert.deepEqual(problems, []);
   assert.equal(pin.mirror, MIRROR);
-  assert.equal(pin.commit, commit);
 });

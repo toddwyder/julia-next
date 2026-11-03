@@ -3,10 +3,16 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { JULIA_SKILLS } from './check-pstack-pin.mjs';
+
+function vendored(path) {
+  if (!path.startsWith('.agents/')) return false;
+  return !JULIA_SKILLS.has(path.split('/')[2]);
+}
 
 export function testOwners(root = process.cwd()) {
   const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: root, encoding: 'utf8' })
-    .split('\0').filter(path => path && existsSync(join(root, path)));
+    .split('\0').filter(path => path && existsSync(join(root, path)) && !vendored(path));
   const paths = new Set(files);
   const owners = files.filter(path => path === 'package.json' || path.endsWith('/package.json')).map(manifest => {
     const directory = dirname(manifest).replaceAll('\\', '/');
