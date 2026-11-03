@@ -10,8 +10,25 @@ import { missingProgram } from './shipping/harness.mjs';
 import { parseArgs } from './run.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const evidence = path.join(root, '.artifacts', 'machine');
 const missing = missingProgram();
 const skip = missing ? `the installed Mastra Code program is incomplete: ${missing}` : false;
+
+// A run keeps its evidence under .artifacts/machine/<run id>. Test files in
+// this suite start runs of their own at the same time, so a test removes the
+// runs for its own cards and leaves every other card's evidence alone.
+function removeRunsFor(cards) {
+  const endings = cards.map(card => `-${card}`);
+  let names;
+  try {
+    names = readdirSync(evidence);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (endings.some(ending => name.endsWith(ending))) rmSync(path.join(evidence, name), { recursive: true, force: true });
+  }
+}
 
 // Each stage is a real program on disk that exits with a code, so a run here
 // exercises the entry point, the workflow and the record together.
@@ -89,7 +106,7 @@ test('one run of the machine records build, review and landing in that order', {
     ]);
     assert.ok(record.workflowRunId, 'the run points at the workflow run that produced it');
   } finally {
-    rmSync(path.join(root, '.artifacts', 'machine'), { recursive: true, force: true });
+    removeRunsFor(['JUL-330']);
   }
 });
 
@@ -115,6 +132,6 @@ test('a stage that stops the card ends the run, and the later stages never start
       ['landing', 'pending'],
     ]);
   } finally {
-    rmSync(path.join(root, '.artifacts', 'machine'), { recursive: true, force: true });
+    removeRunsFor(['JUL-330']);
   }
 });
