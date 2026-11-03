@@ -34,7 +34,9 @@ export function runId({ card, now = new Date() }) {
   return `${stamp}-${card}`;
 }
 
-const step = id => ({ id, status: 'pending', startedAt: null, endedAt: null, elapsedMs: null, detail: null, usage: null });
+// Each step names its own card, so a step read without the run around it still
+// says which card it belongs to.
+const step = (id, card) => ({ id, card, status: 'pending', startedAt: null, endedAt: null, elapsedMs: null, detail: null, usage: null });
 
 export function writeRun(record, folder = runsFolder()) {
   mkdirSync(folder, { recursive: true });
@@ -122,7 +124,7 @@ export function createStore(folder = runsFolder(), { idleLimit = idleLimitMs() }
         endedAt: null,
         pingedAt: null,
         pingedReason: null,
-        steps: STEP_IDS.map(step),
+        steps: STEP_IDS.map(id => step(id, card)),
       });
     },
 

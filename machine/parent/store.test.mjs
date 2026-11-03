@@ -32,7 +32,8 @@ test('a run record is one file, written whole, with every stage in it', () => {
 });
 
 test('the card identity is on the run and on every stage of it', () => {
-  const store = createStore(folder(), { idleLimit: 60_000 });
+  const dir = folder();
+  const store = createStore(dir, { idleLimit: 60_000 });
   let record = store.start({ card: 'JUL-331' });
   record = store.begin(record, 'build');
   record = store.end(record, 'build', { status: 'succeeded', pr: 7 });
@@ -45,6 +46,11 @@ test('the card identity is on the run and on every stage of it', () => {
   const read = store.read(record.id);
   assert.equal(read.error, '');
   assert.deepEqual(read.record, record);
+
+  // The dashboard and the watcher read the file, so the check runs on the file.
+  const onDisk = JSON.parse(readFileSync(path.join(dir, `${record.id}.json`), 'utf8'));
+  assert.deepEqual(onDisk.steps.map(step => step.id), ['build', 'remediation', 'landing']);
+  for (const step of onDisk.steps) assert.equal(step.card, 'JUL-331', `${step.id} names no card`);
 });
 
 test('a run nobody has heard from for longer than its own idle limit is stalled', () => {
