@@ -15,6 +15,7 @@ import path from 'node:path';
 
 import { createStore, idleLimitMs, runId, writeRun } from './parent/store.mjs';
 import { createStages, repoRoot, stageCommand } from './parent/stages.mjs';
+import { failedMessage, pingCard } from './parent/ping.mjs';
 
 const USAGE = `Usage: node machine/run.mjs <JUL-n> [options]
 
@@ -85,6 +86,7 @@ async function main() {
     store,
     holder,
     model: options.model,
+    runDir,
     runStage: createStages({ env, log: console.log }),
   });
 
@@ -109,6 +111,11 @@ async function main() {
     clearInterval(beat);
     const stopped = store.finish(holder.record, 'failed', { detail: error.message });
     console.error(`machine: ${stopped.id} stopped: ${error.message}`);
+    await pingCard(options.card, failedMessage({
+      record: stopped,
+      step: stopped.steps.find(step => step.status === 'running') ?? { id: 'the run', detail: error.message },
+      limitMinutes: Math.round(store.idleLimit / 60_000),
+    }));
     return 1;
   }
   clearInterval(beat);
@@ -122,6 +129,13 @@ async function main() {
 
   if (!succeeded) {
     console.error(`machine: ${finished.id} failed at ${failedStep?.id ?? 'an unknown stage'}: ${detail}`);
+    // A stage that ends badly is news within the minute: the parent saw the
+    // exit, so it says so on the card rather than leaving it for the watcher.
+    await pingCard(options.card, failedMessage({
+      record: finished,
+      step: failedStep ?? { id: 'the run', detail },
+      limitMinutes: Math.round(store.idleLimit / 60_000),
+    }));
     return 1;
   }
   console.log(`machine: ${options.card} finished run ${finished.id}; every stage passed.`);

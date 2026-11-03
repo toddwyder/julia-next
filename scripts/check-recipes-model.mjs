@@ -20,7 +20,7 @@ const toolsDir = join(root, 'formal', '.tools');
 
 const TLA_VERSION = '1.8.0';
 const TLA_URL = `https://github.com/tlaplus/tlaplus/releases/download/v${TLA_VERSION}/tla2tools.jar`;
-const TLA_SHA256 = '78f7e2c6bf9a8b65eda665a23e94431255587e0b43a834a4e2af1723562d9b4a';
+const TLA_SHA256 = 'c57d4d7bbee3ed2c89c32cb9c60cac728f751e80e2570bc4b7368ae39291fc21';
 const TLA_JAR = join(toolsDir, `tla2tools-${TLA_VERSION}.jar`);
 
 const CHECKS = [

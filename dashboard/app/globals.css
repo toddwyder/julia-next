@@ -38,6 +38,7 @@ a:focus-visible { outline: 3px solid var(--iris); outline-offset: 4px; }
 .steps th, .steps td { text-align: left; padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: .9rem; vertical-align: top; }
 .steps th { color: #475569; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; }
 .steps tr:last-child td { border-bottom: none; }
+.steps .warning { display: block; margin-top: 6px; color: #92400e; font-size: .8rem; }
 
 @media (max-width: 480px) {
   main { padding: 28px 20px 48px; }

@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { bootHarness, loadMastra, stopHarness } from '../shipping/harness.mjs';
+import { agentContext, bootHarness, loadMastra, stopHarness } from '../shipping/harness.mjs';
 import { FREE_MODEL, reviewLimitNote, runWithinTimeLimit } from '../shipping/workflow.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -115,12 +115,18 @@ export async function runRetro({
   const { LibSQLStore } = await loadMastra();
   const file = path.join(checkout, retroPath);
   const storage = new LibSQLStore({ id: storageName, url: `file:${path.join(root, '.artifacts', 'merge', `pr-${pr}`, `${storageName}.db`)}` });
-  const { booted, session, mastra, requestContext, subagent } = await bootHarness({ cwd: checkout, storage });
+  const { booted, session, mastra, requestContext, subagent, getCurrentSpan } = await bootHarness({ cwd: checkout, storage });
   try {
     const task = retroTask({ card, pr, title, mergeCommit, checkout, retroPath, determinations, changed, failed, metrics });
     log(`Starting a fresh Execute subagent on ${modelId} for the retro on ${card}.`);
     const answer = await runWithinTimeLimit(
-      () => ask(subagent, { agentType: 'execute', task, modelId }, { workspace: session.getWorkspace(), requestContext, mastra }, { log }),
+      () => ask(
+        subagent,
+        { agentType: 'execute', task, modelId },
+        // The retro agent's records belong in this step's trace tree, not beside it.
+        agentContext({ workspace: session.getWorkspace(), requestContext, mastra }, getCurrentSpan()),
+        { log }
+      ),
       { limitMs: timeLimitMs, log, onLimit: () => stopHarness(booted) }
     );
     if (answer.timedOut) {

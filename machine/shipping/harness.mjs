@@ -59,7 +59,7 @@ export function missingProgram() {
 }
 
 export async function loadMastra() {
-  const [codeSdk, project, threadLock, workflows, requestContext, zod, core, libsql, libsqlClient] = await Promise.all([
+  const [codeSdk, project, threadLock, workflows, requestContext, zod, core, libsql, libsqlClient, contextStorage] = await Promise.all([
     load('@mastra/code-sdk/dist/index.js'),
     load('@mastra/code-sdk/dist/utils/project.js'),
     load('@mastra/code-sdk/dist/utils/thread-lock.js'),
@@ -69,7 +69,11 @@ export async function loadMastra() {
     load('@mastra/core/dist/index.js'),
     load('@mastra/libsql/dist/index.js'),
     load('@libsql/client/lib-esm/node.js'),
+    load('@mastra/core/dist/observability/context-storage.js'),
   ]);
+  // The package is marked side-effect free, so the span context the workflow
+  // runner reads and writes has to be switched on by the caller.
+  contextStorage.initContextStorage();
   return {
     bootLocalAgentController: codeSdk.bootLocalAgentController,
     createWorkflow: workflows.createWorkflow,
@@ -81,6 +85,7 @@ export async function loadMastra() {
     // The store the harness defaults to, and who is writing it, for callers that
     // need to find a thread before booting: a boot claims the newest thread, so
     // the thread a caller wants has to be chosen in the store first.
+    getCurrentSpan: contextStorage.getCurrentSpan,
     databasePath: project.getDatabasePath,
     threadLockOwner: threadLock.getThreadLockOwner,
     createClient: libsqlClient.createClient,
@@ -105,6 +110,16 @@ export async function bootHarness({ cwd, storage, createInitialThread = true, mo
   const subagent = Object.values(toolsets).find(toolset => toolset && typeof toolset === 'object' && toolset.subagent)?.subagent;
   if (!subagent) throw new Error('The harness built no subagent tool, so the machine cannot start a review, retro or fix agent.');
   return { ...mastraTools, booted, session, mastra, requestContext, subagent };
+}
+
+// A workflow step runs inside an observability span. The stock subagent tool
+// forwards `context.tracingContext` to the agent it starts, so a stage that names
+// the step's span puts the agent's records inside the step's trace tree instead
+// of a second root beside it. Proven by spikes/stock-workflow-proof/trace-tree.mjs:
+// without the span the agent run sits in its own trace with no parent, with it the
+// run nests under the workflow step in the workflow's trace.
+export function agentContext(base, span) {
+  return span ? { ...base, tracingContext: { currentSpan: span } } : base;
 }
 
 export async function stopHarness(booted) {

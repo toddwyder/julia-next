@@ -18,6 +18,80 @@ node scripts/julia-agents.mjs -- <command> [args...]
 
 The wrapper reads `/home/ubuntu/.config/julia-agents/service-account-token`, clears inherited 1Password authentication overrides, and invokes `op run --env-file=scripts/julia-agents.env`. It then runs the command through `scripts/linear-token.mjs`, which trades the "Julia controller" app's client pair for a Linear access token at the start of every run and passes it as `LINEAR_API_KEY` in the form `Bearer <token>`, so no long-lived Linear key sits on the machine. Never print credentials, OAuth links or codes, pairing material, or raw credential-bearing subprocess output.
 
+## Running a card
+
+One program runs a card: `machine/run.mjs`. Start it on the server from the repository root, through
+the wrapper, because the stages comment on Linear:
+
+```sh
+node scripts/julia-agents.mjs -- node machine/run.mjs JUL-<n>
+node scripts/julia-agents.mjs -- node machine/run.mjs JUL-<n> --pr <n>
+```
+
+`--pr <n>` starts at review for a pull request that already exists and records the build as skipped.
+`--model <id>` passes a review model to the review loop. `--dry-run` prints the three stage commands
+and runs none of them, and `--help` prints the usage. Exit `0` means every stage passed, `1` means
+the run stopped and the last line names the stage and the reason, and `2` means the arguments were
+wrong.
+
+The run is one stock Mastra workflow, id `machine`, with three steps in a row. Each step runs the
+program that already owns that stage, as a process of its own:
+
+1. `build` runs `mastracode -p <kickoff prompt>`, which builds the card and opens its pull request.
+2. `remediation` runs `machine/remediation/run.mjs` on that pull request: the Shipping review, a
+   FAIL handed back to the builder, and the next review, until it passes or stops.
+3. `landing` runs `machine/merge/run.mjs`, which merges the pull request and finishes the card.
+
+A stage that fails ends the run there: the later stages stay `pending`, the record says `failed`,
+and the process exits `1`. A rerun of the same card is a new run and the old one stays on the page.
+
+### Where a run keeps its files
+
+The run record is a single JSON file, `/var/lib/julia-dashboard/state/machine-runs/<run-id>.json`,
+overridable with `MACHINE_RUNS_DIR`. The run id is the UTC start stamp and the card, so it sorts by
+start time and reads in a URL. The machine is the only writer, and every write is a temporary file
+renamed into place, so a reader never sees half a record. The record carries the run's own idle
+limit (default ten minutes, `MACHINE_IDLE_LIMIT_MIN`), a `heartbeatAt` the process beats every thirty
+seconds, one step per stage with its times, detail and cost, and `pingedAt` once Todd has been told.
+
+Each stage's trace files go under the checkout the machine ran from, in
+`.artifacts/machine/<run-id>/traces/<stage>/`, beside that run's state database at
+`.artifacts/machine/<run-id>/state.db`. Every stage is given its own `JULIA_TRACES_DIR` and never
+inherits the parent's `MASTRA_OBSERVABILITY_DB_PATH`: the parent holds that file open, and a second
+writer to it records nothing at all. Once a stage exits, the parent reads its trace files and writes
+the tokens, cost and elapsed time into that stage's step.
+
+### What the dashboard shows
+
+The dashboard reads that folder directly, so `/runs` lists every run newest first with its status
+and `/runs/<id>` is the one run page: each stage's status, start, end, elapsed time, tokens and cost,
+what happened to it, and the run's own total. A stage that succeeded but left no model rows in its
+trace file is called out on the page rather than shown as free, because free and unrecorded are not
+the same thing. A run that has already been announced says `Todd was told once` with the time.
+
+### The watcher
+
+`machine/watch.mjs` compares each running run's last heartbeat against that run's own idle limit. A
+run past its limit is marked stalled in the record and Todd is told once; the mark is written before
+the comment is sent, and a run that carries a ping is skipped, so a second pass never repeats the
+message. `dashboard/ops/julia-machine-watch.service` and `.timer` run one pass every minute, and
+`node dashboard/scripts/install-service.mjs` installs them along with the dashboard units.
+`node machine/watch.mjs --dry-run` prints what a pass would mark and says, and changes nothing.
+
+Nothing marks a stalled run on the page except time: `/runs` and `/runs/<id>` show `stalled` for a
+`running` record that has been silent longer than its own idle limit, which is why a slow build
+reads as running and a vanished process reads as stalled without either side guessing at the other's
+timeout.
+
+### What Todd sees
+
+A stage that fails is news within the minute: the parent saw the stage's exit, so it finishes the
+record as failed and comments on the card itself, naming the stage, what happened, the run id, and
+that nothing more will happen until the card is started again. A run that goes quiet is the
+watcher's job, and its comment says the process behind the run is gone and that this is the message
+for it. Both comments point at the run page, and a comment Linear refuses is a line on the console
+and not a reason to take anything down.
+
 ## The dashboard service
 
 The dashboard runs here as `julia-dashboard.service` from `/home/ubuntu/julia-dashboard`, a

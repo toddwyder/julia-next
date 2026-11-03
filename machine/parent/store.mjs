@@ -34,7 +34,7 @@ export function runId({ card, now = new Date() }) {
   return `${stamp}-${card}`;
 }
 
-const step = id => ({ id, status: 'pending', startedAt: null, endedAt: null, detail: null });
+const step = id => ({ id, status: 'pending', startedAt: null, endedAt: null, elapsedMs: null, detail: null, usage: null });
 
 export function writeRun(record, folder = runsFolder()) {
   mkdirSync(folder, { recursive: true });
@@ -120,6 +120,8 @@ export function createStore(folder = runsFolder(), { idleLimit = idleLimitMs() }
         updatedAt: at,
         heartbeatAt: at,
         endedAt: null,
+        pingedAt: null,
+        pingedReason: null,
         steps: STEP_IDS.map(step),
       });
     },
@@ -128,15 +130,21 @@ export function createStore(folder = runsFolder(), { idleLimit = idleLimitMs() }
       const at = now.toISOString();
       const index = stepIndex(record, id);
       if (index < 0) throw new Error(`run ${record.id} has no step named ${id}`);
-      return save({ ...record, steps: replace(record, index, { status: 'running', startedAt: at, endedAt: null, detail: null }), updatedAt: at, heartbeatAt: at });
+      return save({ ...record, steps: replace(record, index, { status: 'running', startedAt: at, endedAt: null, elapsedMs: null, detail: null, usage: null, warning: null }), updatedAt: at, heartbeatAt: at });
     },
 
-    end(record, id, { status, detail = null, pr, now = new Date() }) {
+    end(record, id, { status, detail = null, pr, usage = null, now = new Date() }) {
       const at = now.toISOString();
       const index = stepIndex(record, id);
       if (index < 0) throw new Error(`run ${record.id} has no step named ${id}`);
       if (!STEP_STATUSES.includes(status)) throw new Error(`${status} is not a step status`);
-      const steps = replace(record, index, { status, endedAt: at, detail });
+      const startedAt = record.steps[index].startedAt;
+      const elapsedMs = startedAt && Number.isFinite(Date.parse(startedAt)) ? Date.parse(at) - Date.parse(startedAt) : null;
+      // A stage that succeeded and left no model rows behind is the fault the
+      // spike found: the session got no tracing and said nothing about it. The
+      // flag is written next to the usage so the page has to show it.
+      const warning = status === 'succeeded' && usage?.empty ? 'this stage ran but its trace file holds no model rows' : null;
+      const steps = replace(record, index, { status, endedAt: at, elapsedMs, detail, usage, warning });
       return save({ ...record, steps, pr: pr ?? record.pr, updatedAt: at, heartbeatAt: at });
     },
 
@@ -151,6 +159,22 @@ export function createStore(folder = runsFolder(), { idleLimit = idleLimitMs() }
       if (!RUN_STATUSES.includes(status)) throw new Error(`${status} is not a run status`);
       const at = now.toISOString();
       return save({ ...record, status, endedAt: at, updatedAt: at, heartbeatAt: at, detail });
+    },
+
+    // The watcher marks a run the moment its heartbeat is too old, before it
+    // sends anything: the mark is what makes the ping a once-only event, so a
+    // second pass over the same folder finds the run already spoken for.
+    stall(record, { reason, now = new Date() }) {
+      if (record.pingedAt) return null;
+      const at = now.toISOString();
+      const index = record.steps.findIndex(candidate => candidate.status === 'running');
+      const steps = index < 0 ? record.steps : replace(record, index, {
+        status: 'failed',
+        endedAt: at,
+        elapsedMs: record.steps[index].startedAt ? Date.parse(at) - Date.parse(record.steps[index].startedAt) : null,
+        detail: reason,
+      });
+      return save({ ...record, steps, pingedAt: at, pingedReason: reason, updatedAt: at });
     },
 
     read(id) {

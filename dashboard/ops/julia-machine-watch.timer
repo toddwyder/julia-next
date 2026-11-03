@@ -1,0 +1,11 @@
+[Unit]
+Description=Watch card runs every minute
+
+[Timer]
+Unit=julia-machine-watch.service
+OnBootSec=60s
+OnUnitInactiveSec=1min
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

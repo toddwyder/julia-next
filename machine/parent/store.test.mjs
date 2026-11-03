@@ -91,3 +91,43 @@ test('a run id is safe in a URL and on a file name', () => {
   assert.equal(runId({ card: 'JUL-330', now: new Date('2026-11-03T06:41:22Z') }), '20261103T064122Z-JUL-330');
   assert.match(runId({ card: 'JUL-330' }), /^[0-9TZ]+-JUL-330$/);
 });
+
+test('a stage records how long it took and what it spent', () => {
+  const store = createStore(folder(), { idleLimit: 60_000 });
+  const usage = { modelCalls: 8, inputTokens: 132_095, outputTokens: 675, cacheReadTokens: 111_616, costUsd: 0.42, models: ['some/paid-model'], empty: false };
+  let record = store.start({ card: 'JUL-330', now: new Date('2026-11-03T06:41:22Z') });
+  record = store.begin(record, 'build', new Date('2026-11-03T06:41:30Z'));
+  record = store.end(record, 'build', { status: 'succeeded', pr: 431, usage, now: new Date('2026-11-03T06:49:30Z') });
+
+  assert.equal(record.steps[0].elapsedMs, 8 * 60_000);
+  assert.deepEqual(record.steps[0].usage, usage);
+  assert.equal(record.steps[0].warning, null);
+});
+
+test('a stage that ran and recorded no model rows says so, a stage that failed does not', () => {
+  const store = createStore(folder(), { idleLimit: 60_000 });
+  let record = store.start({ card: 'JUL-330' });
+  record = store.begin(record, 'build');
+  record = store.end(record, 'build', { status: 'succeeded', pr: 431, usage: { empty: true, files: [] } });
+  record = store.begin(record, 'remediation');
+  record = store.end(record, 'remediation', { status: 'failed', detail: 'the review loop stopped the card', usage: { empty: true, files: [] } });
+
+  assert.match(record.steps[0].warning, /no model rows/);
+  assert.equal(record.steps[1].warning, null);
+});
+
+test('a stalled run marks its live stage failed and is told to Todd only once', () => {
+  const store = createStore(folder(), { idleLimit: 10 * 60_000 });
+  let record = store.start({ card: 'JUL-330', now: new Date('2026-11-03T06:41:22Z') });
+  record = store.begin(record, 'build', new Date('2026-11-03T06:41:30Z'));
+
+  record = store.stall(record, { reason: 'nothing has written to this run since 06:41:30', now: new Date('2026-11-03T07:00:00Z') });
+  assert.equal(record.pingedAt, '2026-11-03T07:00:00.000Z');
+  assert.equal(record.pingedReason, 'nothing has written to this run since 06:41:30');
+  assert.equal(record.steps[0].status, 'failed');
+  assert.equal(record.steps[0].detail, 'nothing has written to this run since 06:41:30');
+  assert.equal(record.status, 'running', 'a stalled run is still the run someone has to clean up');
+
+  const second = store.stall(record, { reason: 'again', now: new Date('2026-11-03T08:00:00Z') });
+  assert.equal(second, null, 'a second pass sends nothing');
+});

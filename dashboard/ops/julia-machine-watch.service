@@ -1,0 +1,17 @@
+[Unit]
+Description=Mark a card run that has gone quiet and tell Todd once
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/julia-dashboard
+EnvironmentFile=/etc/julia-dashboard.env
+Environment=HOME=/home/ubuntu
+Environment=MACHINE_RUNS_DIR=/var/lib/julia-dashboard/state/machine-runs
+# The ping is a Linear comment, and LINEAR_API_KEY is resolved from 1Password by the vault
+# wrapper, so the key never reaches disk or a unit file.
+TimeoutStartSec=120
+ExecStart=/usr/local/bin/node /home/ubuntu/julia-mastra/scripts/julia-agents.mjs -- /usr/local/bin/node /home/ubuntu/julia-dashboard/machine/watch.mjs

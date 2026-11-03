@@ -7,8 +7,10 @@
 // one.
 
 import { spawn, spawnSync } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readStageUsage, stageEnvironment, stageTraceFolder, traceFiles } from './usage.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const repoRoot = path.resolve(here, '../..');
@@ -68,7 +70,7 @@ export function findPullRequest(card, { root = repoRoot, env = process.env, run 
   return { error: matches.length === 0 ? `the builder left no open pull request for ${card}` : `more than one open pull request names ${card}: ${matches.map(pull => `#${pull.number}`).join(', ')}` };
 }
 
-function spawnCommand([command, args], { root, spawnImpl }) {
+function spawnCommand([command, args], { root, spawnImpl, env }) {
   return new Promise(resolve => {
     let settled = false;
     const done = value => {
@@ -77,14 +79,32 @@ function spawnCommand([command, args], { root, spawnImpl }) {
         resolve(value);
       }
     };
-    const child = spawnImpl(command, args, { cwd: root, stdio: 'inherit', env: process.env });
+    const child = spawnImpl(command, args, { cwd: root, stdio: 'inherit', env });
     child.on('error', error => done({ code: 127, error: error.message }));
     child.on('close', code => done({ code: code ?? 1 }));
   });
 }
 
-export function createStages({ root = repoRoot, env = process.env, spawnImpl = spawn, find = findPullRequest, log = console.log } = {}) {
-  return async function runStage(stage, { card, pr = null, model = null }) {
+export function createStages({
+  root = repoRoot,
+  env = process.env,
+  spawnImpl = spawn,
+  find = findPullRequest,
+  readUsage = readStageUsage,
+  log = console.log,
+} = {}) {
+  // Every stage gets a folder of its own and is told to put its trace files
+  // there. The parent's observability file is removed from the child's
+  // environment: the parent holds that file open, so a child writing to it
+  // would record nothing at all.
+  const usageFor = async (stage, runDir) => {
+    if (!runDir) return null;
+    const folder = stageTraceFolder(runDir, stage);
+    mkdirSync(folder, { recursive: true });
+    return readUsage(traceFiles(folder));
+  };
+
+  return async function runStage(stage, { card, pr = null, model = null, runDir = null }) {
     if (stage === 'build' && pr) {
       return { status: 'skipped', pr, detail: `pull request #${pr} was given, so the build was skipped` };
     }
@@ -93,21 +113,28 @@ export function createStages({ root = repoRoot, env = process.env, spawnImpl = s
     }
 
     const [command, args] = stageCommand(stage, { card, pr, model }, env);
+    const folder = runDir ? stageTraceFolder(runDir, stage) : null;
+    if (folder) mkdirSync(folder, { recursive: true });
     log(`machine: ${stage} on ${card}${pr ? ` (pull request #${pr})` : ''}`);
-    const result = await spawnCommand([command, args], { root, spawnImpl });
+    const result = await spawnCommand([command, args], {
+      root,
+      spawnImpl,
+      env: folder ? stageEnvironment(env, folder) : env,
+    });
+    const usage = await usageFor(stage, runDir);
     if (result.code !== 0) {
       const why = result.error ? `${result.error}` : `exit code ${result.code}`;
-      return { status: 'failed', pr, detail: `${stage} ended with ${why}` };
+      return { status: 'failed', pr, detail: `${stage} ended with ${why}`, usage };
     }
 
     if (stage === 'build') {
       const found = find(card, { root, env });
-      if (found.error) return { status: 'failed', pr: null, detail: found.error };
-      return { status: 'succeeded', pr: found.pr, detail: `the builder opened pull request #${found.pr}` };
+      if (found.error) return { status: 'failed', pr: null, detail: found.error, usage };
+      return { status: 'succeeded', pr: found.pr, detail: `the builder opened pull request #${found.pr}`, usage };
     }
     if (stage === 'remediation') {
-      return { status: 'succeeded', pr, detail: `the review loop passed pull request #${pr}` };
+      return { status: 'succeeded', pr, detail: `the review loop passed pull request #${pr}`, usage };
     }
-    return { status: 'succeeded', pr, detail: `pull request #${pr} merged` };
+    return { status: 'succeeded', pr, detail: `pull request #${pr} merged`, usage };
   };
 }

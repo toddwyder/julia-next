@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { isStalled, listRuns, readRun, shownStatus, stamp } from './machine-runs.js';
+import { elapsedLabel, isStalled, listRuns, readRun, shownStatus, stamp, usageCells } from './machine-runs.js';
 
 const folder = () => mkdtempSync(path.join(tmpdir(), 'dashboard-machine-runs-'));
 
@@ -69,4 +69,27 @@ test('times are shown in UTC and say so', () => {
   assert.equal(stamp('2026-11-03T06:41:22.000Z'), '3 Nov 2026, 06:41:22 UTC');
   assert.equal(stamp(null), 'unknown');
   assert.equal(stamp('whenever'), 'unknown');
+});
+
+test('a stage shows how long it took and what it spent', () => {
+  assert.deepEqual(
+    usageCells({ elapsedMs: 8 * 60_000 + 4_000, usage: { inputTokens: 132_095, outputTokens: 675, costUsd: 0.42, models: ['some/paid-model'] } }),
+    { elapsed: '8m 4s', tokens: '132095 in / 675 out', cost: '$0.42', warning: '' }
+  );
+  assert.equal(elapsedLabel(900), '900ms');
+  assert.equal(elapsedLabel(9_000), '9s');
+  assert.equal(elapsedLabel(60_000), '1m');
+  assert.equal(elapsedLabel(null), '');
+});
+
+test('a free model is named as free rather than priced at zero', () => {
+  assert.equal(usageCells({ usage: { inputTokens: 1, outputTokens: 2, costUsd: 0, models: ['reflection/beam:free'] } }).cost, 'free model');
+  assert.equal(usageCells({ usage: { costUsd: 0, models: ['reflection/beam'] } }).cost, 'cost unknown');
+  assert.equal(usageCells({ usage: { costUsd: 0, models: ['reflection/beam:free', 'some/paid-model'] } }).cost, 'cost unknown');
+});
+
+test('a stage that ran but left no model rows says so instead of showing a zero', () => {
+  assert.equal(usageCells({ elapsedMs: 5_000, usage: { empty: true, files: ['a.duckdb'] } }).warning, 'no model rows in this stage’s trace file');
+  assert.equal(usageCells({ usage: { empty: true, files: [] } }).warning, 'no trace file: this stage recorded nothing');
+  assert.deepEqual(usageCells({ elapsedMs: 5_000 }), { elapsed: '5s', tokens: '', cost: '', warning: '' });
 });

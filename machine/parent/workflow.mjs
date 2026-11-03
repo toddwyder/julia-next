@@ -3,15 +3,18 @@
 // each step writes itself into the run's record before it starts and after it
 // ends, so the page Todd opens reads the same store the workflow is writing.
 //
-// A step that fails stops the workflow: the record keeps the steps that ran,
-// and the run is finished as failed.
+// A step also writes down what the stage cost (tokens, money, elapsed time, and
+// the trace files it left behind), because the stage runs in its own process and
+// the run record is the only thing that outlives it. A step that fails stops the
+// workflow: the record keeps the steps that ran, the run is finished as failed,
+// and the caller tells Todd.
 
 import { loadMastra } from '../shipping/harness.mjs';
 import { STEP_IDS } from './store.mjs';
 
 export const WORKFLOW_ID = 'machine';
 
-export async function createMachineWorkflow({ mastra, store, holder, runStage, model = null, log = console.log }) {
+export async function createMachineWorkflow({ mastra, store, holder, runStage, model = null, runDir = null, log = console.log }) {
   const { z, createWorkflow, createStep } = await loadMastra();
 
   const state = z.object({ card: z.string(), pr: z.number().nullable().default(null) });
@@ -25,7 +28,7 @@ export async function createMachineWorkflow({ mastra, store, holder, runStage, m
         holder.record = store.begin(holder.record, id);
         let outcome;
         try {
-          outcome = await runStage(id, { card: inputData.card, pr: inputData.pr, model });
+          outcome = await runStage(id, { card: inputData.card, pr: inputData.pr, model, runDir });
         } catch (error) {
           outcome = { status: 'failed', pr: inputData.pr, detail: error.message };
         }

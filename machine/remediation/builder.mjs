@@ -63,16 +63,6 @@ function found(thread) {
   return { threadId: thread.id, title: thread.title ?? '', updatedAt: thread.updatedAt ?? null };
 }
 
-// A boot takes the newest thread in the store, so the thread a caller wants has to
-// be made the newest one first. The column the store orders by is the honest place
-// to say "this thread is the live one now".
-async function makeNewest(client, threadId) {
-  await client.execute({
-    sql: 'update mastra_threads set updatedAt = ? where id = ?',
-    args: [new Date().toISOString(), threadId],
-  });
-}
-
 export function pullRequestUrl(pr) {
   return `https://github.com/toddwyder/julia-next/pull/${pr}`;
 }
@@ -218,15 +208,13 @@ export async function handToBuilder({ root = repoRoot, card, pr, sha, determinat
       log(`The builder session ${found.threadId} is still being written by process ${busy}, so the FAIL goes to a fresh one.`);
       return null;
     }
-    await makeNewest(client, found.threadId);
     target = found.threadId;
   } finally {
     client.close();
   }
 
-  const booted = await bootOnThread(tools, { root, threadId: target });
+  const booted = await bootOnThread({ root, threadId: target });
   try {
-    if (booted.session.thread.getId() !== target) await booted.session.thread.switch({ threadId: target });
     log(`Resumed the builder's own session ${target}.`);
     await booted.session.sendMessage({
       content: remediationOrder({ card, pr, sha, determination, playbookText }),
@@ -237,19 +225,24 @@ export async function handToBuilder({ root = repoRoot, card, pr, sha, determinat
   }
 }
 
-// Another session can become the newest thread between the touch and the boot. A
-// second attempt re-touches, so the loop settles once no run is writing the store.
-async function bootOnThread(tools, { root, threadId, attempts = 3 }) {
+// A boot takes the newest thread, so the stock switch is what points the session at
+// the thread this run wants; the switch also moves that thread to the front of the
+// store, so a later boot finds it too. No caller edits the thread table.
+// Another session can take the store between the boot and the switch, which surfaces
+// as a ThreadLockError. A second attempt settles once no run is writing the store.
+async function bootOnThread({ root, threadId, attempts = 3 }) {
   for (let attempt = 1; ; attempt++) {
-    const client = tools.createClient({ url: `file:${tools.databasePath()}` });
+    let booted = null;
     try {
-      await makeNewest(client, threadId);
-    } finally {
-      client.close();
-    }
-    try {
-      return await bootHarness({ cwd: root, createInitialThread: false });
+      booted = await bootHarness({ cwd: root, createInitialThread: false });
+      await booted.session.thread.switch({ threadId });
+      const current = booted.session.thread.getId();
+      if (current !== threadId) {
+        throw new Error(`The stock thread switch left the session on ${current} instead of ${threadId}.`);
+      }
+      return booted;
     } catch (error) {
+      if (booted) await stopHarness(booted.booted);
       if (error?.name !== 'ThreadLockError' || attempt >= attempts) throw error;
       await new Promise(resolve => setTimeout(resolve, 500 * attempt));
     }

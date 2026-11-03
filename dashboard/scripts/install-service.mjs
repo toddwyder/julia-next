@@ -23,11 +23,14 @@ export const UNITS = Object.freeze([
   'julia-dashboard-watchdog.timer',
   'julia-dashboard-sweep.service',
   'julia-dashboard-sweep.timer',
+  'julia-machine-watch.service',
+  'julia-machine-watch.timer',
 ]);
 export const TIMERS = Object.freeze([
   'julia-dashboard-update.timer',
   'julia-dashboard-watchdog.timer',
   'julia-dashboard-sweep.timer',
+  'julia-machine-watch.timer',
 ]);
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -89,7 +92,7 @@ export function installService({ host = '127.0.0.1', port = '4313', ref = 'origi
     log(`${name}${detail ? ` ${detail}` : ''}`);
   };
 
-  for (const directory of [stateDir, join(stateDir, 'state'), join(stateDir, 'state', 'runs')]) {
+  for (const directory of [stateDir, join(stateDir, 'state'), join(stateDir, 'state', 'runs'), join(stateDir, 'state', 'machine-runs')]) {
     mkdirSync(directory, { recursive: true });
     chmodSync(directory, 0o755);
   }

@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SUBAGENT_MAX_STEPS, subagentDefinitions, stopHarness } from './harness.mjs';
+import { agentContext, SUBAGENT_MAX_STEPS, subagentDefinitions, stopHarness } from './harness.mjs';
 
 // The controller stops a definition that names no limit at 50 steps
 // (`definition.maxSteps ?? 50` in the installed agent controller).
@@ -41,6 +41,25 @@ test('the definitions are stamped without being changed in place', () => {
   const loaded = [stock('execute', 'Execute')];
   subagentDefinitions(loaded);
   assert.equal(loaded[0].maxSteps, undefined, 'the loaded stock definition is left as it came');
+});
+
+// A workflow step runs inside a span. The stock subagent tool forwards
+// `context.tracingContext` to the agent it starts (`agent-controller-UmAUfVvn.js`),
+// which is what puts an agent's records under the workflow run instead of beside
+// it. spikes/stock-workflow-proof/trace-tree.mjs recorded both shapes: without the
+// span the agent run is its own root, with it the run nests under the step span.
+test('an agent started by a step is handed that step’s span', () => {
+  const base = { workspace: {}, requestContext: {}, mastra: {} };
+  const span = { traceId: 't1', spanId: 's1' };
+
+  assert.deepEqual(agentContext(base, span), { ...base, tracingContext: { currentSpan: span } });
+});
+
+test('a step outside any span hands the agent nothing rather than a broken context', () => {
+  const base = { workspace: {} };
+
+  assert.deepEqual(agentContext(base, null), base);
+  assert.equal(agentContext(base, undefined).tracingContext, undefined);
 });
 
 test('teardown stops notification dispatch before it closes storage', async () => {

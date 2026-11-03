@@ -74,3 +74,39 @@ export async function listRuns(folder = runsFolder()) {
   runs.sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
   return { dir: folder, runs, listError: null };
 }
+
+// What a stage cost (JUL-331). The machine reads each stage's trace files and
+// writes the numbers into the step; this module only puts them into words. A
+// stage that ran but left no model rows is the fault the record already flags,
+// so the page repeats the flag instead of showing a zero it cannot defend.
+export function elapsedLabel(ms) {
+  if (!Number.isFinite(ms) || ms < 0) return '';
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
+}
+
+export function usageCells(step) {
+  const usage = step?.usage;
+  const elapsed = elapsedLabel(step?.elapsedMs);
+  if (!usage) return { elapsed, tokens: '', cost: '', warning: step?.warning ?? '' };
+  if (usage.empty) {
+    return {
+      elapsed,
+      tokens: '',
+      cost: '',
+      warning: usage.files?.length ? 'no model rows in this stage’s trace file' : 'no trace file: this stage recorded nothing',
+    };
+  }
+  const free = Array.isArray(usage.models) && usage.models.length > 0 && usage.models.every(model => /:free$/i.test(String(model)));
+  const cost = usage.costUsd > 0 ? `$${usage.costUsd.toFixed(usage.costUsd < 0.01 ? 4 : 2)}` : free ? 'free model' : 'cost unknown';
+  return {
+    elapsed,
+    tokens: `${usage.inputTokens} in / ${usage.outputTokens} out`,
+    cost,
+    warning: step?.warning ?? '',
+  };
+}

@@ -4,7 +4,7 @@
 // anything: the answer comes back as text and the machine writes it down.
 
 import { getIssue } from '../../scripts/linear-cli.mjs';
-import { bootHarness, loadMastra, stopHarness } from './harness.mjs';
+import { agentContext, bootHarness, loadMastra, stopHarness } from './harness.mjs';
 import { criteriaFromCard, parseVerdict } from './determination.mjs';
 
 export const WORKFLOW_ID = 'shipping';
@@ -87,7 +87,7 @@ export function reviewTask({ pr, sha, checkout, card, criteria }) {
 export async function runShipping({ pr, sha, checkout, card, cardRecord = null, modelId = FREE_MODEL, storage, timeLimitMs = REVIEW_TIME_LIMIT_MS, log = console.log }) {
   const { z, createWorkflow, createStep } = await loadMastra();
   const traceFile = process.env.MASTRA_OBSERVABILITY_DB_PATH ?? null;
-  const { booted, session, mastra, requestContext, subagent } = await bootHarness({ cwd: checkout, storage });
+  const { booted, session, mastra, requestContext, subagent, getCurrentSpan } = await bootHarness({ cwd: checkout, storage });
 
   const inputSchema = z.object({ pr: z.number(), sha: z.string(), checkout: z.string(), card: z.string() });
   const contextSchema = z.object({
@@ -138,10 +138,12 @@ export async function runShipping({ pr, sha, checkout, card, cardRecord = null, 
     execute: async ({ inputData }) => {
       const task = reviewTask(inputData);
       log(`Starting a fresh Execute subagent on ${modelId}.`);
+      // The reviewer's records belong in this step's trace tree, not beside it.
+      const base = { workspace: session.getWorkspace(), requestContext, mastra };
       const answer = await askVerifier(
         subagent,
         { agentType: 'execute', task, modelId },
-        { workspace: session.getWorkspace(), requestContext, mastra },
+        agentContext(base, getCurrentSpan()),
         { log }
       );
       log(`The Shipping agent answered: ${answer.text.split(/\r?\n/)[0]}`);
