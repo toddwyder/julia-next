@@ -271,3 +271,32 @@ test('a comment written as Todd still needs the reminder, and the record says so
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// `viewer` is a query-root field. A reminder mutation that selects it is rejected whole
+// ("Cannot query field viewer on type Mutation"), so the stop lost its reminder and its
+// record said the comment was not posted. The author is a separate query now, and the
+// mutation carries only the reminder.
+test('the reminder mutation does not select the viewer', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'stop-ping-shape-'));
+  try {
+    const env = { XDG_STATE_HOME: root, MASTRA_APP_DATA_DIR: root, LINEAR_API_KEY: 'test' };
+    const calls = [];
+    const result = await handleStop({ session_id: 'thread-shape', cwd: '/home/ubuntu/repo', reason: 'agent_done' }, env, {
+      threadCardFor: () => 'JUL-313',
+      projectPathFor: () => undefined,
+      post: async () => ({ url: 'https://linear/313' }),
+      remind: async (query, variables) => {
+        calls.push({ query, variables });
+        return { viewer: { name: 'Julia controller' }, issueReminder: { success: true } };
+      },
+    });
+    const mutation = calls.find(call => call.query.trim().startsWith('mutation'));
+    assert.ok(mutation, 'the reminder mutation is sent');
+    assert.doesNotMatch(mutation.query, /viewer/);
+    assert.equal(mutation.variables.id, 'JUL-313');
+    assert.equal(result.posted, true);
+    assert.equal(result.notify, 'mention');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
