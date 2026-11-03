@@ -51,6 +51,22 @@ test('an unknown cost with an incomplete-cost line still fails only on the cost'
   assert.deepEqual(notes, []);
 });
 
+test('a cost of zero fails the pull request even with an incomplete-cost line', () => {
+  const written = `${scorecard('**$0.00**')}- Cost incomplete: 1 session of this card started after the launcher and recorded no trace rows.\n`;
+  const { failures, notes } = scorecardFindings({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => written });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /with cost "\$0\.00"/);
+  assert.deepEqual(notes, []);
+});
+
+test('a scorecard with no Cost line fails the pull request', () => {
+  const written = '# JUL-282\n\n- Cost incomplete: nothing in this card was priced.\n';
+  const { failures, notes } = scorecardFindings({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => written });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0], /with cost "no Cost line"/);
+  assert.deepEqual(notes, []);
+});
+
 test('a card pull request with no scorecard on the branch fails', () => {
   const { failures } = scorecardFindings({ pulls: [pull()], headRef: 'feat/jul-282', readFile: () => { throw new Error('ENOENT'); } });
   assert.equal(failures.length, 1);
