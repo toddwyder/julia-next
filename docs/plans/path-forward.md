@@ -26,7 +26,7 @@ Revised 30 Oct 2026; the details are in [30 October decisions](#30-october-decis
 |---|---|---|
 | Idea | Talk it through with `wayfinder` (big work), `grill-with-docs` (sharpen a plan; writes glossary/ADRs) or `triage` (writes the card, including its UAT steps); `/recall` first to catch up on past attempts | Todd + planner agent |
 | Settle | Todd reads the card and says "settled"; it moves to Ready | Todd |
-| Build | One pstack session builds, reviews code (`/interrogate`) and runs Prove It Works against the card's UAT steps, then opens the PR | Machine |
+| Build | One pstack session builds, reviews code (`/interrogate`, whose adversaries must prove each finding by running it) and runs Prove It Works against the card's UAT steps, then opens the PR | Machine |
 | Shipping | Independent per-criterion verdict on the Prove It Works evidence; a FAIL goes to Remediation | Machine (Shipping model) |
 | Preview | The candidate runs where Todd can try it | Machine |
 | Smoke test | The whole regression suite runs on the preview | Machine |
@@ -61,7 +61,7 @@ Revised 30 Oct 2026; the details are in [30 October decisions](#30-october-decis
 - **Is the evidence right** (does it prove each criterion where Todd uses it): **kept** (Todd, 12:12; inputs settled 24 Oct). Wrong-but-present evidence got past pstack and the builder's report twice on 23 Oct and was stopped only by the advisor's human review. The machine starts a review after each build, by a model from a different company than the builder; input is only the card's criteria and the proof folder; per-criterion verdict (proven / not proven / wrong thing tested), each verdict naming its proof file. A first failure moves the card to **Remediation** for one round of defect fixing, then a fresh review; a second failed review runs poteto's **Investigation** playbook for the root cause, then the card stops. At most two reviews. This is JUL-252's job.
 - **Playbook adherence (Todd, 25 Oct):** every build and remediation run records the playbook it must follow (a build: the playbook named by its card label; first remediation: Bug fix; second: Investigation). The evidence review receives the required playbook's text with the run's checklist and candidate diff. A run whose checklist follows a different playbook, or whose work skips its steps, is marked unproven and takes the ordinary failed-review path. A step the host scoped out, such as publishing, is not skipped work. The evidence review reads the card's current text from Linear each round, not the copy saved at Start.
 - **Checkpoint (Todd, 12:12):** after five cards have been through the review, look at what it actually caught (real catches vs noise, cost) and decide again whether to keep it. Todd's later decision over the saved review results; JUL-252 delivers no report. (Todd, 24 Oct)
-- `/interrogate` stays inside the build as pstack's code review (it reviews the diff, not the evidence).
+- `/interrogate` stays inside the build as pstack's code review (it reviews the diff, not the evidence). Its adversaries must prove every finding with a run against the real code, so a finding it reports comes with the command and the output that shows the break, and it still applies nothing itself.
 
 ## UAT (11:40–12:13)
 - A card gets UAT **only if it changes something Todd uses directly**. Julia app cards always do. Machine cards usually don't, and they merge once the staging proof passes. The card says whether it has household or control-page steps for Todd to try; none = no UAT.
