@@ -27,6 +27,18 @@ a:focus-visible { outline: 3px solid var(--iris); outline-offset: 4px; }
 .back { color: #4338ca; display: inline-block; padding: 12px 0; margin-bottom: 24px; min-height: 48px; }
 .problem { border-left: 4px solid var(--rose); background: #fff1f2; color: #9f1239; padding: 20px; border-radius: 8px; overflow-wrap: anywhere; }
 .empty, .loading { padding: 24px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; color: #475569; }
+.run-line { color: #475569; font-size: .9rem; }
+.pill { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border: 1px solid; flex-shrink: 0; }
+.pill.running, .pill.pending { border-color: var(--iris); background: #eef2ff; color: #3730a3; }
+.pill.succeeded { border-color: #059669; background: #ecfdf5; color: #065f46; }
+.pill.failed { border-color: var(--rose); background: #fff1f2; color: #9f1239; }
+.pill.stalled { border-color: var(--amber); background: #fffbeb; color: #92400e; }
+.pill.skipped { border-color: #cbd5e1; background: #f8fafc; color: var(--slate); }
+.steps { width: 100%; border-collapse: collapse; background: white; border: 1px solid #e2e8f0; border-radius: 12px; }
+.steps th, .steps td { text-align: left; padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: .9rem; vertical-align: top; }
+.steps th { color: #475569; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; }
+.steps tr:last-child td { border-bottom: none; }
+
 @media (max-width: 480px) {
   main { padding: 28px 20px 48px; }
   .card { align-items: flex-start; flex-direction: column; gap: 16px; padding: 20px; }
