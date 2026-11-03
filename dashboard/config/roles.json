@@ -111,7 +111,7 @@
           "id": "arena-cross-judge-pool",
           "name": "arena cross-judge pool",
           "default": ["commandcode/deepseek/deepseek-v4.1-flash", "openai/gpt-6.1-sol"],
-          "explanation": "Models that may judge those attempts."
+          "explanation": "Models that may judge those attempts; the judge is never from the parent chat's model family."
         },
         {
           "id": "architect-runners",
@@ -123,7 +123,7 @@
           "id": "interrogate-reviewers",
           "name": "interrogate reviewers",
           "default": ["commandcode/deepseek/deepseek-v4.1-flash", "openai/gpt-6.1-sol"],
-          "explanation": "Models that try to break the change."
+          "explanation": "Models that try to break the change, and must prove each finding by running it."
         }
       ]
     },

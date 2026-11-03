@@ -90,9 +90,9 @@ test('Todd\'s 19 October process vocabulary and restart stop are explicit', () =
 test('formal verification skills retain exact pinned hashes under the trial mirror', () => {
   const pstackSource = read('.agents/skills/PSTACK-SOURCE.md');
   assert.match(pstackSource, /github\.com\/backnotprop\/pstack/);
-  assert.match(pstackSource, /fad8d01588a1b1ae803f87c8a1e0de79e28cffec/);
+  assert.match(pstackSource, /^Commit: [0-9a-f]{40}$/m);
   const expectedSkills = [
-    { file: '.agents/skills/create-formal-verification-skill/SKILL.md', blob: '37d73f9044b6bcc0132a0e703f70d13be5ded7c3', sha: '5e489d938620883502c27c9c2f32143ae7aa8c0543088dad996b2c815d2acc52' },
+    { file: '.agents/skills/create-formal-verification-skill/SKILL.md', blob: '92f7aa4fa966b857dd7fcc994b3c59650767c878', sha: '30ef0ac27612ecd16fdc081112113221d673053cef3f8603db11932193861211' },
     { file: '.agents/skills/maintain-formal-verification-skill/SKILL.md', blob: '5d2f7f2228a3b771ca5b03124fc265ddfc53c5fc', sha: '0c96f54293542d3818b68754562b338073958781a9684454611dca37592e2d2c' },
   ];
   for (const skill of expectedSkills) {

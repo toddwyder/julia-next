@@ -29,17 +29,26 @@ test('new tests inherit the nearest locked dependency owner and server execution
   f.owner('ops/new-owner');
   f.write('ops/new-owner/test/unlisted.test.mjs', '');
   f.write('ops/new-owner/test/server/live.test.mjs', '');
-  f.write('.agents/skills/example/own.test.mjs', '');
+  f.write('.agents/skills/verify-julia/own.test.mjs', '');
   let result = f.run('--plan');
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(JSON.parse(result.stdout).owners, [
-    { directory: '.', lockfile: 'package-lock.json', runtime: 'node', tests: { local: ['.agents/skills/example/own.test.mjs'], server: [], browser: [] } },
+    { directory: '.', lockfile: 'package-lock.json', runtime: 'node', tests: { local: ['.agents/skills/verify-julia/own.test.mjs'], server: [], browser: [] } },
     { directory: 'ops/new-owner', lockfile: 'ops/new-owner/package-lock.json', runtime: 'node', tests: { local: ['ops/new-owner/test/unlisted.test.mjs'], server: ['ops/new-owner/test/server/live.test.mjs'], browser: [] } },
   ]);
-  rmSync(join(f.root, '.agents/skills/example'), { recursive: true });
+  rmSync(join(f.root, '.agents/skills/verify-julia'), { recursive: true });
   result = f.run('--plan');
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(JSON.parse(result.stdout).owners[0].tests.local, []);
+});
+
+test('a vendored pstack skill owns neither a dependency install nor a test run', t => {
+  const f = fixture(t);
+  f.write('.agents/skills/statechart/scripts/package.json', '{"type":"module"}');
+  f.write('.agents/skills/statechart/scripts/test/chart.test.ts', '');
+  const result = f.run('--plan');
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout).owners.map(owner => owner.directory), ['.']);
 });
 
 test('new tests execute with their owner dependencies and isolated Git process state', t => {

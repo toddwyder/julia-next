@@ -136,3 +136,15 @@ test('a corrupt or empty draft returns the fresh choice instead of throwing', ()
   assert.equal(merged.effort, 'large');
   assert.equal(merged.groups.building.roles['bug-fix'], fallback.groups.building.model);
 });
+
+test('the review panels describe the review pstack now runs', () => {
+  const panels = config.groups.find(group => group.id === 'panels');
+  const role = id => panels.roles.find(entry => entry.id === id);
+  assert.equal(role('arena-cross-judge-pool').explanation,
+    "Models that may judge those attempts; the judge is never from the parent chat's model family.");
+  assert.equal(role('interrogate-reviewers').explanation,
+    'Models that try to break the change, and must prove each finding by running it.');
+  const judge = role('arena-cross-judge-pool');
+  assert.ok(judge.default.some(model => !model.startsWith('openai/')),
+    'the cross-judge pool can still supply a judge outside the parent chat\'s openai family');
+});
