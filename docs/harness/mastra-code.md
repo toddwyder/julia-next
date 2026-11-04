@@ -8,8 +8,8 @@ Mastra Code's stock coding agent and stock subagents are used. There are no cust
 
 | Cursor | Mastra Code |
 | --- | --- |
-| `Task` | The built-in `subagent` tool. Input is `{ agentType, task, modelId?, forked? }` (`@mastra/core@1.78.0 dist/agent-controller/tools.d.ts:62-71`). |
-| `subagent_type: generalPurpose` | `agentType: "execute"`. The stock subagents are `explore`, `plan`, and `execute` (`@mastra/code-sdk@1.14.0 dist/index.d.ts:37-38`). |
+| `Task` | The built-in `subagent` tool. Input is `{ agentType, task, modelId?, forked? }` (`@mastra/core@1.82.0 dist/agent-controller/tools.d.ts:67-70`). |
+| `subagent_type: generalPurpose` | `agentType: "execute"`. The stock subagents are `explore`, `plan`, and `execute` (`@mastra/code-sdk@1.18.0 dist/index.d.ts:38-41`). |
 | `readonly: true` | `agentType: "explore"` (`explore.md` in `dist/agents/subagents/explore.js:4-8`: read-only, `view`, `find_files`, `search_content`, `file_stat`). Use `plan` for read-only planning (`plan.js:4-8`). |
 | `readonly: false` | `agentType: "execute"` (`execute.js:3-8`: edits files and runs commands). |
 | `environment: "cloud"`, a Cursor cloud agent, or the Shipping verifier | `agentType: "execute"`, non-forked, working in its own worktree checked out at the PR head (`skills/poteto-mode/SKILL.md:108`). Never `explore` or `plan`: they have no `execute_command`, so a verifier spawned that way cannot run the change and can only return an inconclusive read (PR #355). The verifier is a fresh agent that did not write the code (`playbooks/shipping.md:5`): give it the PR number and the control skill, not the author's results, and require the commands it ran and their exit codes in its verdict. |
@@ -52,7 +52,7 @@ Because the root `AGENTS.md` wins over `.mastracode/AGENTS.md`, Julia names this
 
 ## Shell environment
 
-Every `execute_command` shell gets `FORCE_COLOR=1` and `CLICOLOR_FORCE=1` on top of the parent environment (`@mastra/code-sdk@1.14.0 dist/agents/workspace.js:12-20`). `CLICOLOR_FORCE=1` makes `gh` colour `--json` output even into a pipe, so a JSON parser sees an escape byte. `NO_COLOR=1` does not override it.
+Every `execute_command` shell gets `FORCE_COLOR=1` and `CLICOLOR_FORCE=1` on top of the parent environment (`@mastra/code-sdk@1.18.0 dist/agents/workspace.js:14-17`). `CLICOLOR_FORCE=1` makes `gh` colour `--json` output even into a pipe, so a JSON parser sees an escape byte. `NO_COLOR=1` does not override it.
 
 | pstack command | Run it in Mastra Code as |
 | --- | --- |
