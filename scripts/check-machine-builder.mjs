@@ -6,7 +6,10 @@
 //
 // Whoever installs or upgrades the program the machine borrows runs this:
 //
-//   node scripts/check-machine-builder.mjs --program-dir ~/.local/lib/mastracode-program-0482
+//   node scripts/check-machine-builder.mjs
+//
+// `--program-dir` points the check at a different install, such as a copy
+// staged beside the live one before a swap.
 //
 // One boot per process. Two copies of @mastra/core must never share a process,
 // so the check takes one program directory and stops there.
