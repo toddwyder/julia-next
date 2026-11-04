@@ -72,8 +72,8 @@ jobs:
         run: node scripts/test-owners.mjs --install browser
       - name: Install each browser owner's Chromium
         run: node scripts/test-owners.mjs --install-browsers browser
-      - name: Lint framework code
-        run: npm run lint:framework
+      - name: Guard the workflow folder
+        run: npm run guard:flow
       - name: Build application
         run: npm run build
 

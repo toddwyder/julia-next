@@ -41,6 +41,7 @@ After a slice merges, run the retro skill on that slice's session and put its fi
 | Current agent-read files point only at paths that exist. | `node scripts/check-agent-links.mjs` checks the entry points, pstack skills, and `ask-matt`. |
 | Every branch except `main` has an open pull request to `main`. | `node scripts/check-branch-pr.mjs` audits GitHub branches and open pull requests in CI. |
 | A pull request that names a card carries that card's scorecard with a measured cost. | `node scripts/check-branch-pr.mjs` fails the branch when the scorecard is missing, its cost is unknown, or its cost is zero. A scorecard that states a measured cost and says on a `- Cost incomplete:` line why that cost is short passes, and the check prints the reason so it stays on the record. A pull request that names no card passes on a `No card: <reason>` line in its body. |
+| The workflow folder keeps the stock shape: no old stage, no library outside the allowed set, no piece the entry cannot reach, no timer or retry loop, no hand-built progress file, no comment that switches a guard off. | `npm run guard:flow` runs ESLint and dependency-cruiser on `machine/flow` as the one CI guard check. `machine/guards/guard.test.mjs` plants one violation per kind and fails if a rule stops catching it. |
 
 <!-- BEGIN:nextjs-agent-rules -->
 
