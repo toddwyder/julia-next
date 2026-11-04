@@ -7,7 +7,7 @@ import { resolve,dirname } from 'node:path'
 export const agentsTokenPath='/home/ubuntu/.config/julia-agents/service-account-token'
 const referencesPath=fileURLToPath(new URL('./julia-agents.env',import.meta.url))
 const tokenScript=fileURLToPath(new URL('./linear-token.mjs',import.meta.url))
-const fields=new Set(['COMMANDCODE_API_KEY','LINEAR_API_KEY','LINEAR_CLIENT_ID','LINEAR_CLIENT_SECRET','LINEAR_OAUTH_SCOPE','SENTRY_AUTH_TOKEN','NEXT_PUBLIC_SENTRY_DSN','SENTRY_ORG','SENTRY_PROJECT','AXIOM_TOKEN','AXIOM_DATASET','STITCH_API_KEY'])
+const fields=new Set(['CMD_API_KEY','COMMANDCODE_API_KEY','LINEAR_API_KEY','LINEAR_CLIENT_ID','LINEAR_CLIENT_SECRET','LINEAR_OAUTH_SCOPE','SENTRY_AUTH_TOKEN','NEXT_PUBLIC_SENTRY_DSN','SENTRY_ORG','SENTRY_PROJECT','AXIOM_TOKEN','AXIOM_DATASET','STITCH_API_KEY'])
 export function runAgentsCommand(argv,{tokenPath=agentsTokenPath,environment=process.env}={}){
  try{
   if(!Array.isArray(argv)||!argv.length||argv.some(s=>typeof s!=='string'||!s))throw Error()
