@@ -27,8 +27,13 @@
     "@duckdb/node-api": "1.5.2-r.2",
     "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
     "@firebase/rules-unit-testing": "6.0.0",
+    "@mastra/core": "1.81.0",
+    "@mastra/duckdb": "1.17.0",
+    "@mastra/libsql": "1.28.0",
+    "@mastra/observability": "1.23.0",
     "@playwright/test": "1.63.0",
     "eslint": "^10.11.0",
-    "firebase-tools": "15.34.1"
+    "firebase-tools": "15.34.1",
+    "zod": "4.6.7"
   }
 }
