@@ -107,6 +107,16 @@ export async function bootHarness({ cwd, storage, createInitialThread = true, mo
   return { ...mastraTools, booted, session, mastra, requestContext, subagent };
 }
 
+// A workflow step runs inside an observability span. The stock subagent tool and
+// the session's send both forward `tracingContext` to the run they start, so a
+// stage that names the step's span puts the agent's records inside the step's
+// trace tree instead of a second root beside it. Proven by
+// spikes/build-step-proof: without the span the run sits in its own trace with no
+// parent, with it the run nests under the workflow step in the workflow's trace.
+export function agentContext(base, span) {
+  return span ? { ...base, tracingContext: { currentSpan: span } } : base;
+}
+
 export async function stopHarness(booted) {
   // The boot starts a notification timer that ticks every 10s and reads thread
   // rows. Shutdown has to stop it before the storage goes: a tick that lands on

@@ -6,7 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SUBAGENT_MAX_STEPS, subagentDefinitions, stopHarness } from './harness.mjs';
+import { agentContext, SUBAGENT_MAX_STEPS, subagentDefinitions, stopHarness } from './harness.mjs';
 
 // The controller stops a definition that names no limit at 50 steps
 // (`definition.maxSteps ?? 50` in the installed agent controller).
@@ -41,6 +41,20 @@ test('the definitions are stamped without being changed in place', () => {
   const loaded = [stock('execute', 'Execute')];
   subagentDefinitions(loaded);
   assert.equal(loaded[0].maxSteps, undefined, 'the loaded stock definition is left as it came');
+});
+
+test('a stage that names the step’s span nests the agent run inside the step', () => {
+  const base = { workspace: { root: '/repo' } };
+  const span = { id: 'step-span' };
+
+  assert.deepEqual(agentContext(base, span), { ...base, tracingContext: { currentSpan: span } });
+});
+
+test('a step outside any span hands the agent nothing rather than a broken context', () => {
+  const base = { workspace: {} };
+
+  assert.deepEqual(agentContext(base, null), base);
+  assert.equal(agentContext(base, undefined).tracingContext, undefined);
 });
 
 test('teardown stops notification dispatch before it closes storage', async () => {
