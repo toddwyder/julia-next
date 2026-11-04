@@ -1,0 +1,77 @@
+# Todd's detailed working preferences, archived 1 Nov 2026
+
+The ten-rule short list replaced this file in Claude's memory on 1 Nov 2026. Nothing below was removed from what Todd said; it is kept here in full so the detail is not lost. Dates are as Todd stated them.
+
+- Do not do code work (writing, cloning, reading or digging through code) without his permission first; conserve Claude's tokens
+- When asking an agent for a root-cause analysis, don't narrow it to Claude's own hypothesis; give the symptom and evidence only and have it use the diagnose-bugs skill rather than Claude's guessing
+- Before designing or fixing anything built on a framework (e.g. Mastra), thoroughly read its official documentation (via its docs MCP server) first; do that research with a cheap Codex agent (20 Oct 2026: a read-only paste into his Codex window, not Claude or a Claude subagent; he wishes Claude had used cheap agents for research instead of acting on things it doesn't understand)
+- Rule: all new issues go through Triage; new cards (including ones Claude drafts) enter via Triage
+- Don't recommend options where Claude (the chat advisor) performs a recurring step in the delivery process; Claude isn't part of the machine; solutions must run inside the machine
+- Stop offering "do nothing" / park-it options when presenting choices to unblock work
+- Mocks never really mimic reality: prove fixes with a real (live) run, not a stand-in/fake-model test
+- Find the root cause from recorded evidence (e.g. temporary Mastra tracing/logging, deleted after the RCA) instead of guessing and coding more
+- Called out Claude's default of "walking away": proposing to drop or strip out a feature when it breaks instead of fixing its actual cause
+- Objects to an endless stream of fixes where code that didn't work never gets deleted and rots
+- Wants a solid plan of where the work is going and how to get there, not more piecemeal instructions and changes
+- A failed live run must get a root-cause analysis before stopping, not just stop
+- Called out Claude for continually discounting off-the-shelf options in favor of custom code; prefer the stock/off-the-shelf option
+- Doesn't accept "wait for more evidence" when the case is already made by problems already seen (e.g. Mastra workflows)
+- Hates agent-written docs (e.g. the Mastra design doc) being treated as laws he never wrote; don't present agent interpretations or design choices as his rules
+- His Oct 10 trace rule was "don't keep huge amounts of traces for two weeks", not "don't use databases"
+- Card-edit rule (13 Oct 2026): Claude may edit an existing Linear card only to record a decision Todd made in conversation (dated, labelled as his, nothing else changed). Anything that adds or reshapes requirements, acceptance criteria, seams or scope goes through triage / to-spec, as does every new card; Claude never hand-edits. Corrected 14 Oct 2026: Todd never said Claude runs triage; he said "we need to do triage"
+- Permanent rule (13 Oct 2026): never write agent briefs that tell the agent to "stop and report", "stop and ask" or wait for approval partway. The goal is to finish work. Give agents their limits up front (spend cap, scope, no push) and have them work through to the end and report once.
+- Existing-first rule (13 Oct 2026): before proposing anything, Claude first answers "what decision, card, rule or mechanism already covers this?", names it and uses it; only if nothing exists does Claude propose something new, and says it checked.
+- Called out Claude for calling subscription work "free" (13 Oct 2026): time and subscription quota are both limited resources; weigh them in every tradeoff, not just cash spend
+- Uses Pocock's grill-with-docs for planning instead of Claude because it yields a half-page bullet list; called out Claude for turning a plan into a 13-page document too complex to follow (13 Oct 2026); keep plans to a short bullet list
+- Acceptance criteria must be checkable outcomes, not process steps; rejected a drafted criterion with "that isn't acceptance criteria, that is a process" (13 Oct 2026)
+- Called out (14 Oct 2026): "you add tons of unnecessary stuff to everything you touch"; prompts, cards and triage should contain exactly what he asked for and nothing more
+- No docs-only runs (repeated 14 Oct 2026): documentation changes ride along inside real work, never as their own agent run
+- Settled-means-said rule (14 Oct 2026): nothing counts as decided until he says "settled" or "decided" in so many words; a "yes" to Claude's question is just an answer, never to be relabelled "settled" or "Todd approved" on a card or elsewhere
+- Cards aren't a good place to look for what he decided; Claude and agents add many things to cards that he never said
+- To approve seams he needs an architecture diagram, not code; Mermaid rather than ASCII (14 Oct 2026)
+- Don't change a card while it is being coded (14 Oct 2026): a gap found mid-build goes on a separate follow-up card, not into the card in progress
+- Called out a recurring Claude pattern (14 Oct 2026): rushing off to start coding instead of ensuring the agent's success; Claude is "super meticulous with rules, except when they apply to you"
+- Doesn't like a giant rule list (15 Oct 2026): rejected Claude's proposed new approval rule as "more stupid rules"; sees bad rules as a main reason work drags on. Fix problems with the rules that already exist instead of adding new ones.
+- Settled 15 Oct 2026: a card is done when its finish conditions are met. Reviews check the finish conditions only. Other things noticed go on a noticed list, with no card and no fix round, and are worked on only when they get in the way of a future card.
+- Cards scoped so big that agents run out of context window and compact repeatedly is a recurring problem (15 Oct 2026)
+- 17 Oct 2026: when a Claude session's context fills up, wants a handoff (saved to the project) instead of auto-compacting
+- 17 Oct 2026: reserve Claude's quota for planning and advising, not doing the actual work; execution goes to other agents such as Codex/Astra, not Claude Code on Claude quota
+- Called out (17 Oct 2026): splitting cards adds a lot of overhead and cost; most factory frameworks use a chief-of-staff/supervisor pattern, and Claude is "always adamantly against that pattern"
+- 17 Oct 2026: a key problem with long unattended agent runs is he has no window into what's happening; likes DeepSeek in CommandCode's on-screen plan checklist showing what's done and what's left
+- 17 Oct 2026: when he says "retro" he means having an agent (e.g. Codex) run Pocock's `retro` skill; don't relabel it "review" or a generic retro
+- 17 Oct 2026: "stop recommending solutions on things you are guessing at": until a root cause exists, state only the problem, what the evidence shows and what's unknown; no proposed fixes
+- 17 Oct 2026: called out Claude for repeatedly putting off a decision he'd asked about several times (the Codex subscription); when he asks for a decision, give it
+- 17 Oct 2026: called Claude "myopic" for weighing a single subscription in isolation; budget questions start from what the needs are, then how the budget covers them
+- 17 Oct 2026: when he says "approve" on a plan he means approving the draft, not authorizing implementation
+- 18 Oct 2026: doesn't want an agent to do triage by itself; triage drafts proposed card text only, writes nothing to Linear, and it goes into Linear after he approves
+- 18 Oct 2026: called out Claude's "preserve code at all costs" nature; judge existing work by what is best for the app, not by how much has already been built
+- 18 Oct 2026: objects to being a "copy and paste monkey" in perpetual back-and-forth relaying small prompts between Claude and agents; also called out Claude spending its scarce quota on browser/web work; also hates digging around in text files; put links/actions he must do directly in chat, not in files
+- 18 Oct 2026: clears the agent session before pasting every prompt, so each agent prompt must be complete on its own; never written as a correction to an earlier pass
+- 18 Oct 2026: called out Claude for overcomplicating a fix and then splitting and sub-splitting it over and over; keep a fix to its purpose
+- 18 Oct 2026: corrections to a triage draft start with reviewing it together with him, card by card ("we review it together, you don't just give orders")
+- 18 Oct 2026: research unknowns before creating cards; open questions found while reviewing a triage draft get answered first, then the cards are written from the answers
+- 18 Oct 2026: after a triage draft is approved, Codex (not Claude) creates the cards in Linear from it word for word
+- 19 Oct 2026: don't change third-party skills (e.g. Pocock's triage); wrap them in a Julia-owned skill instead
+- 19 Oct 2026: card creation must be one flow, not separate steps to remember; going with pre-plan as that single flow
+- 19 Oct 2026, "for the hundredth time": never recommend stopping, pausing, ending for the day, or walking away from work, not as a recommendation, not as an option. When a card stops or a run fails, the recommendation is always the next concrete step forward.
+- 19 Oct 2026: called out Claude for "NEVER" using reverting; when a change is wrong or unapproved, consider reverting it before layering fixes on top
+- 19 Oct 2026: "stop tossing around cards like I have them memorized": don't refer to work by card number alone; say in plain words what the piece of work is. Repeated 21 Oct 2026: leave issue/card numbers out of replies to him entirely and name the work in plain words
+- 20 Oct 2026: called out Claude (again) for dismissing a tool GPT suggested without looking it up; look up and verify a suggested tool/option before giving any verdict on it
+- 20 Oct 2026: to check whether a card is done, examine the evidence files in the repo instead of making token-expensive Chrome/browser calls. If the evidence doesn't exist the card fails and goes back to the agent.
+- 20 Oct 2026: dislikes Claude jamming Linear card comments with research output; research results go in their own Linear document, which must name its project
+- 20 Oct 2026: called out Claude for working "in the weeds" on one-off pieces without an architecture of how the pieces fit together; architecture and design are Claude's to work out with him in conversation, and cheap Codex agents supply only raw facts. Keep discussion at the product/architecture level; engineers settle implementation details.
+- 21 Oct 2026: when a skill an agent is told to use isn't installed on the server, have the agent install it rather than fall back to a substitute method
+- 25 Oct 2026: recurring problem: Claude doesn't read or follow third-party framework docs and guesses or works around intended use; follow a framework's guide in its own order. Also called out Claude for being "easily moved off the goal" by asking row-level detail questions while working toward an agreed outcome.
+- 25 Oct 2026: doesn't like Claude making decisions without discussing them; surface each such choice for him before it goes into an instruction
+- 26 Oct 2026: wants something that proactively prods him on how to use pstack effectively while work is happening; said Claude promising to do it won't work, because Claude keeps a commitment briefly then forgets unless he prods it
+- 26 Oct 2026: wary of adding rules to AGENTS.md; every agent loads it each turn, which bloats context
+- 26 Oct 2026: he only steers agents at a stop, and he is working toward eliminating stops; so pstack coaching belongs in Claude's julia-route-check replies at those stops, not inside the harness
+- 26 Oct 2026, repeated ("memorize"): ask him questions one at a time, never several questions or judgment items in one reply, even inside a UAT or a review
+- 26 Oct 2026: "we can't constantly move things to the front": new items found mid-work join the agreed list in their place rather than jumping ahead of the agreed order of work
+- 31 Oct 2026: called out Claude for "always" taking what an agent reports as true; independently verify the substance (re-run checks, read the source docs, test claims against earlier findings) before relaying an agent report or building on it
+- 31 Oct 2026: don't make him hunt through the conversation for links; every message that asks him to review something carries the links to it
+- 31 Oct 2026: called out Claude for giving up when a route failed (browser extension disconnected) and for sending an agent back to him twice over secrets; solve blockers ahead of time, try the other routes before stopping, and batch the work into one pass
+- 1 Nov 2026: hates tables; present items one at a time in plain prose
+- 1 Nov 2026: called out Claude's tendency to turn a general rule into a specific, fragile one ("I didn't decide that helpers use Beam; I decided helpers use a free model"); record each decision at the level he made it
+- 1 Nov 2026: later to-dos get forgotten on a closed card or in a list nobody checks; attach each deferred item to a card that will certainly be built, under "Before this card starts". Also: when a problem keeps recurring (e.g. a new key needed every round), solve the whole class once, not the single instance
+- 1 Nov 2026: asked that the advisor skill be loaded before Claude replies about Julia work
