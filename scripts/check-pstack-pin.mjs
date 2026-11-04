@@ -8,6 +8,7 @@ export const MIRROR = 'https://github.com/backnotprop/pstack';
 export const JULIA_SKILLS = new Set([
   'adversarial-review',
   'playwright-cli',
+  'tighten',
   'verify-julia',
   'verify-recipes-formally',
 ]);
