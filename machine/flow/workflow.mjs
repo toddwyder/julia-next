@@ -27,8 +27,10 @@ const schema = { inputSchema: flowData, outputSchema: flowData, stateSchema: car
 
 // `.branch()` hands on its output keyed by the id of every branch step, with the
 // ones that did not run left undefined, and Mastra documents `.map()` for
-// reshaping that before the next element (docs-workflows-control-flow.md,
-// "Output structure" and "Parallel and Branch outputs"). This mapper takes the
+// reshaping that before the next element (docs-workflows-control-flow.md:428,
+// :497). That every arm's key appears, and the arms that did not run are
+// undefined, is what a probe on this engine showed — the docs say only that the
+// output is keyed by each executed step's id (":316"). This mapper takes the
 // arm that ran, so the loop condition and the next stage read card data.
 const unfold = async ({ inputData }) => {
   if (typeof inputData.card === 'string') return inputData;

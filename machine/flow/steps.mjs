@@ -139,14 +139,15 @@ export function createStages({ agents, dir }) {
   const smoke = step('smoke', async ({ inputData, state, setState }) => {
     const answer = nextVerdict(dir, 'smoke');
     const failCount = answer === 'FAIL' ? state.failCount + 1 : state.failCount;
-    const twice = answer === 'FAIL' && failCount >= 2;
     await setState({
       ...state,
       failCount,
-      stopPart: twice ? 'live smoke test' : state.stopPart,
-      stopWhy: twice
-        ? `The live smoke test failed with ${failCount} failures counted, so the card stops.`
-        : state.stopWhy,
+      ...(answer === 'FAIL'
+        ? {
+            stopPart: 'live smoke test',
+            stopWhy: `The live smoke test failed with ${failCount} failures counted.`,
+          }
+        : {}),
     });
     return { ...inputData, smoke: answer, failCount, detail: `live smoke test returned ${answer}` };
   });
