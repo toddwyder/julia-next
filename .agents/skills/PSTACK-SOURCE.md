@@ -26,7 +26,7 @@ Three more trees come from the same commit because the documented install does n
 
 `scripts/check-pstack-pin.mjs` fails CI if any of these installed files differs from that commit; `scripts/check-pstack-pin.test.mjs` runs the full check in the existing `package-tests` job.
 
-Julia's own skills are not pstack files and were left in place: `verify-julia`, `adversarial-review`, `playwright-cli`.
+Julia's own skills are not pstack files and were left in place: `verify-julia`, `adversarial-review`, `playwright-cli`, `tighten`.
 
 ## Not installed
 
