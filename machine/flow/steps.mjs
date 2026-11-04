@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- plant for JUL-337 */
 // The stages. An agent stage runs one plain agent and keeps whatever it wrote.
 // A plain stage is a fixed rule: it reads the run's state or the scratch
 // folder and returns a value. Landing, Todd's answer and the stop report are
