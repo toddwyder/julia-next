@@ -29,13 +29,14 @@ Each piece of flow logic and the Mastra feature that carries it:
 
 | Flow logic | Mastra feature | Where |
 | --- | --- | --- |
-| Stage order | `.then()` | `workflow.mjs` throughout |
-| Choose remediation, a stop report, land, or the wait | `.branch()` with mutually exclusive conditions | `workflow.mjs` |
-| Rounds of Shipping and of live smoke, and the whole card | `.dountil()` | `workflow.mjs` |
-| One FAIL count across Shipping and live smoke | workflow state (`stateSchema`, `setState`) | `schema.mjs`, `steps.mjs` |
-| The FAIL count survives a wait and a resume of the same run | state is part of the saved snapshot | `docs-workflows-workflow-state.md` |
-| Waiting for Todd, and continuing on his answer | `suspend()` / `resume()`, `suspendSchema`, `resumeSchema` | `steps.mjs` `acceptance` |
-| A run killed while it waits comes back at the same stage | snapshot stored per run in the state store | `docs-workflows-snapshots.md` |
+| Stage order | `.then()` | `workflow.mjs`; `docs-workflows-control-flow.md:18` |
+| Choose remediation, a stop report, land, the wait, or the machine card's own way past the wait | `.branch()` with mutually exclusive conditions | `workflow.mjs`; `docs-workflows-control-flow.md:226`, `:316` |
+| Rounds of Shipping and of live smoke, and the whole card | `.dountil()` | `workflow.mjs`; `docs-workflows-control-flow.md:503` |
+| Reading a branch's output back into the flow | `.map()`, the documented reshape after `.branch()` | `workflow.mjs` `unfold`; `docs-workflows-control-flow.md:316`, `:460` |
+| One FAIL count across Shipping and live smoke | workflow state (`stateSchema`, `setState`) | `schema.mjs`, `steps.mjs`; `docs-workflows-workflow-state.md:14` |
+| The FAIL count survives a wait and a resume of the same run | state is part of the saved snapshot | `docs-workflows-workflow-state.md:14` |
+| Waiting for Todd, and continuing on his answer | `suspend()` / `resume()`, `suspendSchema`, `resumeSchema` | `steps.mjs` `acceptance`; `docs-workflows-suspend-and-resume.md:9`, `:58` |
+| A run killed while it waits comes back at the same stage | snapshot stored per run in the state store | `docs-workflows-snapshots.md:84` |
 | A stale answer, or another run's answer, is refused | the stage re-suspends while `resumeData.request` differs | `steps.mjs` `acceptance` |
 | Two retries of a model-call stage | step `retries: 2` | `reference-workflows-step.md:245` |
 | Each stage start and end nested under the one run | `tracingContext` passed into `generate()` | `reference-agents-generate.md:199` |
@@ -49,11 +50,13 @@ These are the choices the card left to the builder, with the fact each rests on.
 
 **The wait sits two levels deep, not three.** Todd's acceptance began inside `attempt → deliver → acceptance`. Resuming a suspension that deep restarts the outermost suspended step: the run went back to build, took a new request, and asked its question again. A suspension one level deeper (`attempt → acceptance`) resumes where it stopped, and a probe showed the position survives the process dying. So `deliver` was deleted and land and smoke moved after the loop.
 
-**The stage after a branch unfolds the branch's output.** `.branch()` hands on an object keyed by the id of every arm (`docs-workflows-control-flow.md:316`), including the arms that did not run, whose keys are undefined. The `unwrap` stage takes the arm that produced card data. Without it every later stage failed its own input check.
+**A mapper after each branch unfolds its output.** `.branch()` hands on an object keyed by the id of every arm (`docs-workflows-control-flow.md:316`), including the arms that did not run, whose keys are undefined, and Mastra documents `.map()` for reshaping that before the next element (`:428`, `:497`). `workflow.mjs`'s `unfold` mapper takes the arm that produced card data. Without it every later stage failed its own input check. A `map` is graph wiring rather than a stage, which is why no stage reshapes data for the graph.
 
-**A second FAIL from either part gets its own branch arm.** Stopping is decided by the FAIL count, and both Shipping arms are false at that count, so `.branch()` produced nothing for `unwrap` to read. Each decision point now has an arm that leads to the stop report, so exactly one arm is always true.
+**A second FAIL from either part gets its own branch arm.** Stopping is decided by the FAIL count, and both the remediation arm and the pass arm are false at that count, so `.branch()` produced nothing for the mapper to read. Each decision point has an arm of its own that leads to the stop report, so exactly one arm is always true. The live smoke test keeps no stopping rule of its own: it records the verdict and the count, and the stop is the graph's arm.
 
-**The stop report is written by the stage that stopped.** A report is part of that stage's result, not a later step's job, so the wording lives in one helper and both stopping points use it.
+**A machine card leaves the path by a branch, not by an `if` inside the wait.** Which cards wait for Todd is flow logic, so it lives in the graph: three arms at the wait, one for a stop, one for a machine card's own fixed stage, one for the acceptance that suspends. The acceptance stage no longer knows what kind of card it is.
+
+**One stage writes every stop report.** Both stop arms lead there, and the part that failed and the reason are already in saved state by then, so the wording lives in one helper instead of once per stopping point.
 
 **The cost record is written after Mastra has flushed.** Mastra's exporter buffers spans, and the first runs ended with a trace that lost the last stages and a cost record that counted fewer model calls than the run made. The command line now shuts the instance down and only then totals the trace. A run killed while it waits never reaches that point, so its cost is totalled when the run is resumed.
 
@@ -76,4 +79,5 @@ These are the choices the card left to the builder, with the fact each rests on.
 
 - The stages are stand-ins on purpose. A later card replaces one stage's stand-in and leaves the rest of the graph alone.
 - The free model is the only model here, so the cost record proves counting, not pricing. A priced model makes the same record report dollars.
+- The cost record totals a trace file, not a run id: two runs sharing one trace store would be added together. The command line gives each run its own folder, so today they never do.
 - The acceptance wait cannot move deeper into the graph without losing its place. A card that needs a wait deeper than two levels has to bring the work that follows it back up to the same level.

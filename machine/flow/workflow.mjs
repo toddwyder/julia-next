@@ -25,6 +25,18 @@ import { createStages } from './steps.mjs';
 
 const schema = { inputSchema: flowData, outputSchema: flowData, stateSchema: cardState };
 
+// `.branch()` hands on its output keyed by the id of every branch step, with the
+// ones that did not run left undefined, and Mastra documents `.map()` for
+// reshaping that before the next element (docs-workflows-control-flow.md,
+// "Output structure" and "Parallel and Branch outputs"). This mapper takes the
+// arm that ran, so the loop condition and the next stage read card data.
+const unfold = async ({ inputData }) => {
+  if (typeof inputData.card === 'string') return inputData;
+  const ran = Object.values(inputData).find((value) => value && typeof value === 'object');
+  if (!ran) throw new Error('No branch step produced card data, so the flow cannot go on.');
+  return ran;
+};
+
 const passed = async ({ inputData }) => inputData.verdict === 'PASS' || inputData.failCount >= 2;
 const smokeDone = async ({ inputData }) => inputData.smoke === 'PASS' || inputData.stopped === true;
 const answered = async ({ inputData }) => inputData.accepted === true || inputData.stopped === true;
@@ -40,7 +52,7 @@ export function buildCardPath({ agents, dir }) {
       [async ({ inputData }) => inputData.verdict === 'PASS', stage.passNote],
       [async ({ inputData }) => inputData.verdict === 'FAIL' && inputData.failCount >= 2, stage.hold],
     ])
-    .then(stage.unwrap)
+    .map(unfold)
     .commit();
 
   const fixAndLand = createWorkflow({ ...schema, id: FIX_AND_LAND })
@@ -51,17 +63,17 @@ export function buildCardPath({ agents, dir }) {
       [async ({ inputData }) => inputData.stopped === true, stage.stopReport],
       [async ({ inputData }) => inputData.stopped !== true, stage.land],
     ])
-    .then(stage.unwrap)
+    .map(unfold)
     .commit();
 
   const smokeRound = createWorkflow({ ...schema, id: SMOKE_ROUND })
     .then(stage.smoke)
     .branch([
       [async ({ inputData }) => inputData.smoke === 'FAIL' && inputData.failCount < 2, fixAndLand],
+      [async ({ inputData }) => inputData.smoke === 'FAIL' && inputData.failCount >= 2, stage.stopReport],
       [async ({ inputData }) => inputData.smoke === 'PASS', stage.smokePass],
-      [async ({ inputData }) => inputData.smoke === 'FAIL' && inputData.failCount >= 2, stage.hold],
     ])
-    .then(stage.unwrap)
+    .map(unfold)
     .commit();
 
   const landAndSmoke = createWorkflow({ ...schema, id: SMOKE_LOOP })
@@ -75,9 +87,10 @@ export function buildCardPath({ agents, dir }) {
     .then(stage.gate)
     .branch([
       [async ({ inputData }) => inputData.stopped === true, stage.stopReport],
-      [async ({ inputData }) => inputData.stopped !== true, stage.acceptance],
+      [async ({ inputData }) => inputData.stopped !== true && inputData.kind === 'machine', stage.machineAccept],
+      [async ({ inputData }) => inputData.stopped !== true && inputData.kind === 'product', stage.acceptance],
     ])
-    .then(stage.unwrap)
+    .map(unfold)
     .commit();
 
   return createWorkflow({ ...schema, id: CARD_PATH })
@@ -86,13 +99,13 @@ export function buildCardPath({ agents, dir }) {
       [async ({ inputData }) => inputData.stopped === true, stage.hold],
       [async ({ inputData }) => inputData.stopped !== true, landAndSmoke],
     ])
-    .then(stage.unwrap)
+    .map(unfold)
     .branch([
       [async ({ inputData }) => inputData.stopped === true, stage.hold],
       [async ({ inputData }) => inputData.stopped !== true && inputData.landed === true, stage.retro],
       [async ({ inputData }) => inputData.stopped !== true && inputData.landed !== true, stage.hold],
     ])
-    .then(stage.unwrap)
+    .map(unfold)
     .then(stage.cleanup)
     .commit();
 }

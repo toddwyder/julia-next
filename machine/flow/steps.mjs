@@ -102,11 +102,6 @@ export function createStages({ agents, dir }) {
   const acceptance = step(
     'acceptance',
     async ({ inputData, state, setState, resumeData, suspend, suspendData }) => {
-      if (state.kind === 'machine') {
-        await setState({ ...state, answer: 'machine card, no acceptance' });
-        return { ...inputData, accepted: true, detail: 'machine card, so no acceptance is asked' };
-      }
-
       const open = suspendData?.request ?? state.requestId;
 
       if (!resumeData) {
@@ -131,6 +126,11 @@ export function createStages({ agents, dir }) {
     },
   );
 
+  const machineAccept = step('machine-accept', async ({ inputData, state, setState }) => {
+    await setState({ ...state, answer: 'machine card, no acceptance' });
+    return { ...inputData, accepted: true, detail: 'machine card, so no acceptance is asked' };
+  });
+
   const land = step('land', async ({ inputData, state }) => {
     writeLanding(dir, state.card, `Landing after ${state.reviewRound} shipping rounds.`);
     return { ...inputData, landed: true, detail: 'landed on main' };
@@ -139,24 +139,16 @@ export function createStages({ agents, dir }) {
   const smoke = step('smoke', async ({ inputData, state, setState }) => {
     const answer = nextVerdict(dir, 'smoke');
     const failCount = answer === 'FAIL' ? state.failCount + 1 : state.failCount;
-    const stopped = answer === 'FAIL' && failCount >= 2;
-    const next = {
+    const twice = answer === 'FAIL' && failCount >= 2;
+    await setState({
       ...state,
       failCount,
-      stopPart: stopped ? 'live smoke test' : state.stopPart,
-      stopWhy: stopped
+      stopPart: twice ? 'live smoke test' : state.stopPart,
+      stopWhy: twice
         ? `The live smoke test failed with ${failCount} failures counted, so the card stops.`
         : state.stopWhy,
-    };
-    await setState(next);
-    const path = stopped ? writeReport(dir, state.card, reportText(next, `live smoke test returned ${answer}`)) : '';
-    return {
-      ...inputData,
-      smoke: answer,
-      failCount,
-      stopped,
-      detail: `live smoke test returned ${answer}${path ? `; stop report at ${path}` : ''}`,
-    };
+    });
+    return { ...inputData, smoke: answer, failCount, detail: `live smoke test returned ${answer}` };
   });
 
   const smokePass = step('smoke-pass', async ({ inputData }) => ({
@@ -185,23 +177,6 @@ export function createStages({ agents, dir }) {
 
   const hold = step('hold', async ({ inputData }) => inputData);
 
-  // `.branch()` hands on its output keyed by the id of every branch step, with
-  // the ones that did not run left undefined (docs-workflows-control-flow.md,
-  // "Output structure"). This stage takes the one that ran, so the loop
-  // condition and the next stage read card data.
-  const unwrap = createStep({
-    id: 'unwrap',
-    inputSchema: z.object({}).passthrough(),
-    outputSchema: flowData,
-    stateSchema: cardState,
-    execute: async ({ inputData }) => {
-      if (typeof inputData.card === 'string') return inputData;
-      const ran = Object.values(inputData).find((value) => value && typeof value === 'object');
-      if (!ran) throw new Error('No branch step produced card data, so the flow cannot go on.');
-      return ran;
-    },
-  });
-
   return {
     build,
     shipping,
@@ -216,7 +191,7 @@ export function createStages({ agents, dir }) {
     stopReport,
     retro,
     hold,
-    unwrap,
+    machineAccept,
     cleanup,
   };
 }
