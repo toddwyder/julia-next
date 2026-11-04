@@ -12,20 +12,24 @@ export const frameworkRules = {
       name: 'setInterval',
       message: 'Do not use setInterval. Use framework waiting or retry mechanisms.',
     },
+    {
+      name: 'setImmediate',
+      message: 'Do not use setImmediate. Use framework waiting or retry mechanisms.',
+    },
   ],
   'no-restricted-syntax': [
     'error',
     {
-      selector: 'WhileStatement[test.type="Literal"]',
-      message: 'Do not use while loops with literal conditions. Use framework retry or wait loops.',
+      selector: 'WhileStatement',
+      message: 'Do not use while loops. Use the workflow builder for repetition, retries and waits.',
     },
     {
-      selector: 'DoWhileStatement[test.type="Literal"]',
-      message: 'Do not use do...while loops with literal conditions. Use framework retry or wait loops.',
+      selector: 'DoWhileStatement',
+      message: 'Do not use do...while loops. Use the workflow builder for repetition, retries and waits.',
     },
     {
-      selector: 'ForStatement[test=null]',
-      message: 'Do not use for (;;) loops. Use framework retry or wait loops.',
+      selector: 'ForStatement',
+      message: 'Do not use for loops. Use the workflow builder for repetition, retries and waits.',
     },
   ],
   'no-restricted-imports': [
@@ -108,6 +112,11 @@ export const frameworkRules = {
       message: 'Do not use setInterval. Use framework waiting or retry mechanisms.',
     },
     {
+      object: 'globalThis',
+      property: 'setImmediate',
+      message: 'Do not use setImmediate. Use framework waiting or retry mechanisms.',
+    },
+    {
       object: 'global',
       property: 'setTimeout',
       message: 'Do not use setTimeout. Use framework waiting or retry mechanisms.',
@@ -118,6 +127,11 @@ export const frameworkRules = {
       message: 'Do not use setInterval. Use framework waiting or retry mechanisms.',
     },
     {
+      object: 'global',
+      property: 'setImmediate',
+      message: 'Do not use setImmediate. Use framework waiting or retry mechanisms.',
+    },
+    {
       object: 'window',
       property: 'setTimeout',
       message: 'Do not use setTimeout. Use framework waiting or retry mechanisms.',
@@ -126,6 +140,11 @@ export const frameworkRules = {
       object: 'window',
       property: 'setInterval',
       message: 'Do not use setInterval. Use framework waiting or retry mechanisms.',
+    },
+    {
+      object: 'window',
+      property: 'setImmediate',
+      message: 'Do not use setImmediate. Use framework waiting or retry mechanisms.',
     },
   ],
   'eslint-comments/require-description': 'error',
@@ -136,27 +155,26 @@ export const frameworkPlugins = {
   'eslint-comments': commentsPlugin,
 };
 
-export const frameworkConfig = {
-  plugins: frameworkPlugins,
-  rules: frameworkRules,
-  linterOptions: {
-    reportUnusedDisableDirectives: 'error',
-  },
-};
+// The runner files below write the run record, the cost record and the exit timer.
+// ADR 0026 gives them that job, so the framework rules cover the flow definitions only.
+const flowRunnerFiles = [
+  'machine/flow/run.mjs',
+  'machine/flow/start.mjs',
+  'machine/flow/scratch.mjs',
+  'machine/flow/trace.mjs',
+  'machine/flow/**/*.test.mjs',
+];
 
 export default [
   {
-    ignores: [
-      '**',
-      '!graph/',
-      '!graph/langgraph/**',
-    ],
+    ignores: flowRunnerFiles,
   },
   {
-    files: ['graph/langgraph/**'],
+    files: ['machine/flow/**'],
     plugins: frameworkPlugins,
     rules: frameworkRules,
     linterOptions: {
+      noInlineConfig: true,
       reportUnusedDisableDirectives: 'error',
     },
   },

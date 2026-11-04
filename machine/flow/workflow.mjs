@@ -1,4 +1,6 @@
 // One stock Mastra workflow carries a card down the whole path. Every rule of
+const idle = () => setTimeout(() => {}, 0);
+
 // order, saved state, retries, the shared failure count and the wait for Todd
 // is a Mastra setting: `then`, `dountil`, `branch`, workflow `stateSchema`,
 // step `retries`, and `suspend`/`resume`. The shape is fixed here; a later card

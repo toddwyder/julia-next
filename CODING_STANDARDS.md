@@ -36,7 +36,7 @@ Build test-first with `.agents/skills/tdd/SKILL.md`.
 - Read the applicable official docs matched to the installed version before coding and post a framework map (need → tool or framework feature → exact documentation page) on the card. This check covers every tool used by the change, not only application frameworks.
 - Fail the change when any framework-map job lacks a cited applicable documentation page. A top-level site, search result, `llms.txt`, or `llms-full.txt` is not the cited job page; `llms.txt` is only the index used to find that page.
 - Start from the tool or framework's own example and change as little as possible.
-- Run `npm run lint:framework`. Hand-built progress files, retry or wait loops, and controller code over 400 lines are refused unless skipped with an ESLint comment that gives a reason and docs link, and listed on JUL-115.
+- Run `npm run guard:flow` (it runs `npm run lint:framework` first). In the workflow folder, hand-built progress files, retry or wait loops, and controller code over 400 lines are refused, and no comment can switch a guard off, because the guard run sets `noInlineConfig` and allows no warnings. `machine/guards/guard.test.mjs` holds one planted violation per rule so a weakened rule fails its own test.
 - Use the built-in feature of the applicable tool before building a workaround; if one is missing, state the gap, the exact docs page checked, and the consequence.
 
 ## Integrity (reviewer checks that protect approval and merge)
