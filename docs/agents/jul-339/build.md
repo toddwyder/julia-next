@@ -50,3 +50,11 @@ The installer created `/home/ubuntu/.config/julia/lead-model` on the server with
 Before the fix, the regression test failed with `Missing expected exception`. After the fix, a missing setting throws `ENOENT` and names the installer, and `npm run check:lead` exits 1 before starting Studio. The corrected regression run passed all 45 focused tests, and `npm run guard:flow` passed.
 
 The existing workflow and trace regression tests passed, as did the setting tests, dependency guard tests, Studio run-form tests, program-list tests, agent-link check, and skill-name check.
+
+## GitHub access from Lead
+
+The first UAT run could not publish because the sandbox lacked `HOME`. The installed Mastra `LocalSandbox` passes only `PATH` unless its environment is set explicitly. Through the actual Lead workspace, `gh api user` exited 4 and Git reported `fatal: $HOME not set`. The server's existing GitHub sign-in was intact.
+
+Lead now passes its user's home directory to the sandbox. This lets `gh` and Git discover the existing credentials and credential helper. It does not copy tokens or unrelated host environment variables. A regression test proves that a child Git command finds global configuration and that an unrelated parent variable stays absent.
+
+Run `node scripts/check-lead-publication.mjs /tmp/lead-publication.json` from the candidate checkout. It uses Lead's actual workspace to read the GitHub identity and repository push permission, then runs a Git push dry run against this PR's branch. It makes no repository write. [The saved result](publication-check.json) records the successful `toddwyder` identity, push access, and dry run.

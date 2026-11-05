@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Agent } from '@mastra/core/agent';
 import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace';
@@ -28,7 +29,7 @@ export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelF
     workspace: new Workspace({
       id: 'machine-repo',
       filesystem: new LocalFilesystem({ basePath: repo }),
-      sandbox: new LocalSandbox({ workingDirectory: repo }),
+      sandbox: new LocalSandbox({ workingDirectory: repo, env: { HOME: homedir() } }),
       skills: ['.agents/skills'],
     }),
     defaultOptions: { maxSteps: 400 },

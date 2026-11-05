@@ -34,6 +34,35 @@ function temporary(t) {
   return dir;
 }
 
+test('Lead shell commands find global Git settings without inheriting unrelated environment variables', async t => {
+  const home = temporary(t);
+  const previous = { HOME: process.env.HOME, JUL339_UNRELATED_SECRET: process.env.JUL339_UNRELATED_SECRET };
+  t.after(() => {
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+  process.env.HOME = home;
+  process.env.JUL339_UNRELATED_SECRET = 'parent-only';
+  writeFileSync(join(home, '.gitconfig'), '[user]\n\tname = Lead test account\n');
+  const leadModelFile = join(home, 'lead-model');
+  installLeadModel(leadModelFile);
+  const workspace = await createAgents({ repo, leadModelFile }).build.getWorkspace();
+  const sandbox = workspace.sandbox;
+  try {
+    await sandbox.start();
+    const git = await sandbox.executeCommand('git', ['config', '--global', '--get', 'user.name']);
+    assert.equal(git.exitCode, 0, git.stderr);
+    assert.equal(git.stdout.trim(), 'Lead test account');
+    const environment = await sandbox.executeCommand(process.execPath, ['-e', 'console.log(JSON.stringify({home:process.env.HOME,unrelatedSecret:!!process.env.JUL339_UNRELATED_SECRET}))']);
+    assert.equal(environment.exitCode, 0, environment.stderr);
+    assert.deepEqual(JSON.parse(environment.stdout), { home, unrelatedSecret: false });
+  } finally {
+    await sandbox.stop();
+  }
+});
+
 test('a missing Lead setting refuses Agent creation and names the installer', t => {
   const file = join(temporary(t), 'lead-model');
   const missing = error => error.code === 'ENOENT' && error.message.includes(file) && error.message.includes('node scripts/install-lead-model.mjs');
