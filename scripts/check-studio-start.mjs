@@ -65,7 +65,7 @@ async function waitForWorkflows(port, child, log, timeoutMs) {
   }
 }
 
-export async function checkStudioStart({ root = process.cwd(), timeoutMs = 180000, env = process.env } = {}) {
+export async function checkStudioStart({ root = process.cwd(), timeoutMs = 180000, env = process.env, onReady } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'studio-check-'));
   const port = await freePort();
   const log = { text: '' };
@@ -83,7 +83,8 @@ export async function checkStudioStart({ root = process.cwd(), timeoutMs = 18000
   try {
     const workflows = await waitForWorkflows(port, child, log, timeoutMs);
     const form = runForm(workflows);
-    return { port, fields: form.fields, failures: form.failures, log: log.text, dir };
+    const checked = onReady ? await onReady({ port, dir }) : undefined;
+    return { port, fields: form.fields, failures: form.failures, log: log.text, dir, checked };
   } finally {
     try {
       process.kill(-child.pid, 'SIGTERM');

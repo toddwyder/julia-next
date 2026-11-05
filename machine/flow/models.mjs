@@ -1,32 +1,29 @@
-// Which model a stage runs on. The pstack settings file holds one line per
-// role, so a model change is a settings change and never an edit of a stage.
-// A machine with no settings file falls back to the free model, which is what
-// a boot of the dev server on a bare machine needs.
-
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { FREE_MODEL } from './schema.mjs';
+import { openaiCodexProvider } from '@mastra/code-sdk/providers/openai-codex';
 
-// The build stage does the work pstack gives to the feature role.
-export const BUILD_ROLE = 'feature, refactoring';
+export const DEFAULT_LEAD_MODEL = 'openai/gpt-6.1-sol';
 
-export function settingsPath() {
-  return join(homedir(), '.agents', 'pstack-models.md');
+export function leadModelPath() {
+  return join(homedir(), '.agents', 'lead-model');
 }
 
-export function modelForRole(role, file = settingsPath()) {
-  if (!existsSync(file)) return null;
-  const line = readFileSync(file, 'utf8')
-    .split('\n')
-    .find((row) => row.toLowerCase().startsWith(`${role.toLowerCase()}:`));
-  if (!line) return null;
-  const value = line.slice(line.indexOf(':') + 1).trim();
-  if (!value || value === 'auto' || value === 'inherit-parent') return null;
-  return value.split(',')[0].trim();
+export function leadModelId(file = leadModelPath()) {
+  let value;
+  try {
+    value = readFileSync(file, 'utf8').trim();
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    value = DEFAULT_LEAD_MODEL;
+  }
+  if (!/^openai\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value)) {
+    throw new Error(`Lead model setting ${file} must contain one openai/<model> value for the ChatGPT subscription.`);
+  }
+  return value;
 }
 
 export function buildModel(file) {
-  return modelForRole(BUILD_ROLE, file) ?? FREE_MODEL;
+  return openaiCodexProvider(leadModelId(file).slice('openai/'.length));
 }

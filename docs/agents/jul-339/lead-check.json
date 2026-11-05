@@ -1,0 +1,47 @@
+{
+  "agent": "Lead",
+  "configuredModel": "openai/gpt-6.1-sol",
+  "instructionsSha256": "70faeea64f157a019b349137f3e8163c5df9a0ec5a2412e4b4e75e50d760b936",
+  "reply": "LEAD_SUBSCRIPTION_OK",
+  "runId": "599f2ad1-64e3-42c0-8c76-f744b8bbad4e",
+  "traceId": "ef81243f410fd3c45e38818ea7f9bc6a",
+  "modelCalls": 1,
+  "usage": [
+    {
+      "inputTokens": 12678,
+      "outputTokens": 19,
+      "inputDetails": {
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "text": 12678
+      },
+      "outputDetails": {
+        "reasoning": 7,
+        "text": 12
+      }
+    }
+  ],
+  "usd": 0.025546,
+  "metrics": [
+    {
+      "name": "mastra_model_total_output_tokens",
+      "value": 19,
+      "estimatedCost": 0.00019,
+      "costUnit": "USD",
+      "model": "gpt-6-1-sol"
+    },
+    {
+      "name": "mastra_model_total_input_tokens",
+      "value": 12678,
+      "estimatedCost": 0.025356,
+      "costUnit": "USD",
+      "model": "gpt-6-1-sol"
+    }
+  ],
+  "checks": {
+    "agentList": "PASS",
+    "fullInstructions": "PASS",
+    "subscriptionModelAndTrace": "PASS"
+  },
+  "shippingRerun": "pending separate Shipping step"
+}
