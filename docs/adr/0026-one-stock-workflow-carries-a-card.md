@@ -110,3 +110,8 @@ server opened.
 fingerprint, and `node scripts/machine-programs.mjs --check` fails a pull request that changes one
 without updating the list or adds a program the list never names. A change to the machine is now a
 reviewable diff of that list, not a sentence in a description.
+
+The flow's own tests drive a real agent step with a stand-in model, so they still name a stand-in for
+a model provider. `scripts/check-no-fakes.mjs` keeps that one folder — `machine/flow/` — and refuses a
+stand-in for an outside service in every other test, because the flow's stand-ins are its design and
+its proof is a real card started in Studio, recorded on the card.

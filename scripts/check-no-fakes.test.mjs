@@ -45,6 +45,13 @@ test('refuses a mocking library used for a named outside service', () => {
   assert.match(result[0], /a mocking library stands in for an outside service named on line 2/);
 });
 
+test('keeps the machine flow tests, whose stage stand-ins are the design', () => {
+  assert.deepEqual(findings('machine/flow/workflow.test.mjs', [
+    "import { createMockModel } from '@mastra/core/test-utils/llm-mock';",
+    "const build = new Agent({ id: 'flow-build', model: createMockModel({ mockText: 'built line' }) });",
+  ].join('\n')), []);
+});
+
 test('keeps a local server test that names no outside service', () => {
   assert.deepEqual(findings('test/control-page.test.mjs', "import { createServer } from 'node:http';\ncreateServer().listen(0);\n"), []);
 });

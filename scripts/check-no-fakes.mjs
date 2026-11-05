@@ -17,6 +17,12 @@ const SKIPPED = new Set([
   'scripts/check-no-fakes.test.mjs',
   'scripts/no-fakes-repository.test.mjs',
 ]);
+// The machine's stages are stand-ins on purpose: the flow was built whole on
+// stand-ins, and each card swaps one stand-in for the real thing (ADR 0026).
+// Its proof is a real card started in Studio and recorded on the card, not a
+// test, so the flow's own tests carry a stand-in model. That folder is the
+// only one excused.
+const STANDINS_BY_DESIGN = /^machine\/flow\//;
 
 const SERVICE_NAMES = 'linear|github|google|firebase|firestore|gmail|vercel|axiom|sentry|openai|anthropic|claude|chatgpt|deepseek|commandcode|tailscale|rclone|supabase|powersync|dropbox|stripe|slack|workos|oauth|provider|llm|reviewer';
 const SERVICE = new RegExp(`\\b(?:${SERVICE_NAMES})\\b`, 'i');
@@ -28,7 +34,7 @@ const LOCAL_SERVER = /\b(?:createServer|createSecureServer)\s*\(|\.listen\s*\(/;
 
 export function isTestFile(path) {
   const file = String(path).replaceAll('\\', '/');
-  return TEST_FILE.test(file) && !SKIPPED.has(file);
+  return TEST_FILE.test(file) && !SKIPPED.has(file) && !STANDINS_BY_DESIGN.test(file);
 }
 
 function lineNumber(lines, index) {
