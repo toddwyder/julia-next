@@ -2,6 +2,8 @@
 
 This separate Next 16.3.5 app reads Julia-next Ready cards from Linear on every request. It never starts a build or changes a card.
 
+[The Ready card journey](ready-card-journey.md) describes what the list, the Start screen and Back show.
+
 1. Run `npm ci` in `dashboard/`.
 2. Run `npm run build` in `dashboard/`.
 3. From the repository root, run `node scripts/julia-agents.mjs -- env DASHBOARD_HOST=<tailnet-address> npm --prefix dashboard start`.
