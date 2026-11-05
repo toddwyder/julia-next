@@ -4,10 +4,8 @@ import { join } from 'node:path';
 
 import { openaiCodexProvider } from '@mastra/code-sdk/providers/openai-codex';
 
-export const DEFAULT_LEAD_MODEL = 'openai/gpt-6.1-sol';
-
 export function leadModelPath() {
-  return join(homedir(), '.agents', 'lead-model');
+  return join(homedir(), '.config', 'julia', 'lead-model');
 }
 
 export function leadModelId(file = leadModelPath()) {
@@ -15,8 +13,10 @@ export function leadModelId(file = leadModelPath()) {
   try {
     value = readFileSync(file, 'utf8').trim();
   } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-    value = DEFAULT_LEAD_MODEL;
+    if (error.code === 'ENOENT') {
+      error.message = `Lead model setting ${file} is missing. Run node scripts/install-lead-model.mjs before starting Studio.`;
+    }
+    throw error;
   }
   if (!/^openai\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value)) {
     throw new Error(`Lead model setting ${file} must contain one openai/<model> value for the ChatGPT subscription.`);

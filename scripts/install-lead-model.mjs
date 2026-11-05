@@ -1,14 +1,15 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { DEFAULT_LEAD_MODEL } from '../machine/flow/models.mjs';
+import { leadModelPath } from '../machine/flow/models.mjs';
 
-export function installLeadModel(file = join(homedir(), '.agents', 'lead-model')) {
+const INITIAL_LEAD_MODEL = 'openai/gpt-6.1-sol';
+
+export function installLeadModel(file = leadModelPath()) {
   mkdirSync(dirname(file), { recursive: true });
   try {
-    writeFileSync(file, `${DEFAULT_LEAD_MODEL}\n`, { flag: 'wx' });
+    writeFileSync(file, `${INITIAL_LEAD_MODEL}\n`, { flag: 'wx' });
     return { file, created: true };
   } catch (error) {
     if (error.code !== 'EEXIST') throw error;

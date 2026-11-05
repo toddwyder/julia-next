@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { leadModelId } from '../machine/flow/models.mjs';
+import { leadModelId, leadModelPath } from '../machine/flow/models.mjs';
 import { checkStudioStart } from './check-studio-start.mjs';
 
 const REPLY = 'LEAD_SUBSCRIPTION_OK';
@@ -100,10 +100,17 @@ export async function checkLead({ root = process.cwd() } = {}) {
   delete env.FLOW_REPO;
   delete env.OPENAI_API_KEY;
   delete env.OPENAI_BASE_URL;
-  const configuredModel = leadModelId();
+  const settingPath = leadModelPath();
+  assert(existsSync(settingPath), `The Lead model setting ${settingPath} is missing. Run node scripts/install-lead-model.mjs before this check.`);
+  const settingText = readFileSync(settingPath, 'utf8');
+  const configuredModel = leadModelId(settingPath);
   const result = await checkStudioStart({ root, env, onReady: ({ port }) => inspect(port, root, configuredModel) });
   assert.deepEqual(result.failures, [], 'The existing Studio workflow run form must remain valid.');
-  return result.checked;
+  assert.equal(readFileSync(settingPath, 'utf8'), settingText, 'The real Lead setting must stay unchanged during the check.');
+  return {
+    ...result.checked,
+    modelSetting: { path: settingPath, value: configuredModel, sha256: createHash('sha256').update(settingText).digest('hex') },
+  };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

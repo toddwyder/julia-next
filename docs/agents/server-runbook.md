@@ -22,7 +22,7 @@ The wrapper reads `/home/ubuntu/.config/julia-agents/service-account-token`, cle
 
 Studio's agent list includes **Lead**, the existing Flow build Agent. Its instructions are the complete repository poteto-mode skill, loaded when Studio creates the Agent. Open Lead's chat and type the task and its stop point. For a build that stops at the pull request, include "Stop when the pull request is open and up to date. Shipping runs separately."
 
-Lead reads its model from `~/.agents/lead-model`, independently of the coder's pstack role. Run `node scripts/install-lead-model.mjs` once to create the initial setting. It preserves an existing file. The setting holds one `openai/<model>` value and uses Mastra Code's ChatGPT login. Restart Studio after editing it. When the file is absent, Lead uses the checked-in initial model. See [the Lead build record](jul-339/build.md) for the dated model choice and acceptance checks.
+Lead reads its model from `~/.config/julia/lead-model`, independently of the coder's pstack role. Run `node scripts/install-lead-model.mjs` once to create the initial setting. It preserves an existing file. The setting holds one `openai/<model>` value and uses Mastra Code's ChatGPT login. Restart Studio after editing it. A missing setting prevents Lead from starting and names the installer command. See [the Lead build record](jul-339/build.md) for the dated model choice and acceptance checks.
 
 The `card-path` workflow begins in Mastra Studio's run form. No script starts a card.
 

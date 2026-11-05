@@ -21,7 +21,9 @@ test('Studio uses the CLI project root when its server works in the public direc
   delete process.env.FLOW_REPO;
   process.env.MASTRA_PROJECT_ROOT = join(repo, '.mastra');
   assert.equal(repoRoot(), repo);
-  assert.equal(createAgents().build.name, 'Lead');
+  const leadModelFile = join(temporary(t), 'lead-model');
+  installLeadModel(leadModelFile);
+  assert.equal(createAgents({ leadModelFile }).build.name, 'Lead');
   process.env.FLOW_REPO = '/explicit/repository';
   assert.equal(repoRoot(), '/explicit/repository');
 });
@@ -32,6 +34,13 @@ function temporary(t) {
   return dir;
 }
 
+test('a missing Lead setting refuses Agent creation and names the installer', t => {
+  const file = join(temporary(t), 'lead-model');
+  const missing = error => error.code === 'ENOENT' && error.message.includes(file) && error.message.includes('node scripts/install-lead-model.mjs');
+  assert.throws(() => leadModelId(file), missing);
+  assert.throws(() => createAgents({ repo, leadModelFile: file }), missing);
+});
+
 test('Lead keeps the build identity and loads the full current poteto-mode file', async t => {
   const root = temporary(t);
   const skills = join(root, '.agents/skills/poteto-mode');
@@ -39,6 +48,7 @@ test('Lead keeps the build identity and loads the full current poteto-mode file'
   const original = readFileSync(join(repo, '.agents/skills/poteto-mode/SKILL.md'), 'utf8');
   writeFileSync(join(skills, 'SKILL.md'), original);
   const options = { repo: root, leadModelFile: join(root, 'lead-model') };
+  installLeadModel(options.leadModelFile);
   const first = createAgents(options).build;
   assert.equal(first.id, 'flow-build');
   assert.equal(first.name, 'Lead');
@@ -52,7 +62,6 @@ test('new Lead instances read their independent model setting', async t => {
   const dir = temporary(t);
   const file = join(dir, 'lead-model');
   writeFileSync(join(dir, 'pstack-models.md'), 'feature, refactoring: commandcode/deepseek/deepseek-v4.1-flash\n');
-  assert.equal(leadModelId(file), 'openai/gpt-6.1-sol');
   writeFileSync(file, 'openai/gpt-6.1-sol\n');
   assert.equal((await createAgents({ repo, leadModelFile: file }).build.getModel()).modelId, 'gpt-6.1-sol');
   writeFileSync(file, 'openai/gpt-5.4\n');
