@@ -163,3 +163,16 @@ test('a missing entry or an empty workflow folder fails the dependency check', (
     }
   }
 });
+
+test('the stock ChatGPT subscription provider passes the dependency check', () => {
+  const result = cruiseFixture('codex-provider');
+  assert.equal(result.status, 0, result.report);
+});
+
+test('the subscription provider exception keeps the rest of Mastra Code forbidden', () => {
+  for (const kind of ['code-sdk-root', 'code-sdk-auth']) {
+    const result = cruiseFixture(kind);
+    assert.notEqual(result.status, 0, result.report);
+    assert.match(result.report, /flow-denies-mastra-code-sdk/);
+  }
+});

@@ -12,8 +12,8 @@ of any size, not only a change to the sentence beside it.
 | `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `b239f12a16969757e4aaa8a8a7fbd8743c836ca3566fbee54c8da62dcd46bfac` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `7501664a0b3774a5ac48b0628c40f9b1157703d1b2c2b94eb589fdde1f0b5e49` |
 | `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `e4a38ba53e9a0180be91361923745ffc7dec12c4c471a5f450eb2eaf3fa3354d` |
-| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `eb85a3b5a6f69de32d1d9e2c2c2b104c631b746af86cf88255a7707d278a53fc` |
-| `machine/flow/models.mjs` | Which model the build runs on, read from the pstack models file. | `b3a9b62835d10c9d7b84e92607e4918d45077789d17f45afc6b3d5e21f2bc007` |
+| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `815434b6d9d8028ce1f6f1f069c96dbee1b25e352acf06126997cff712405a80` |
+| `machine/flow/models.mjs` | The Lead model, read from its independent setting and authenticated through ChatGPT. | `91db53f186b82d73fdf06d98ea22e33dc29e7ad1130108a37e98fdd551a581de` |
 | `machine/flow/schema.mjs` | What the run form asks for and what the run remembers. | `1bb30c353ed7efa0c8526e0833f5ec841e116ba1e21542191cad321e767ebd66` |
 | `machine/flow/scratch.mjs` | The run folder: artifacts, verdicts and the report a stop leaves. | `25c177efa06ece2b499e23421bf8454d1098ae02666d994df26c451f6a1e8abb` |
 | `machine/flow/mastra.mjs` | Storage and tracing, so a run is written down and priced. | `2283953358a234f1ad35c029b8851f347c0303c9ac3e3fa4edcaf2ed842892a1` |

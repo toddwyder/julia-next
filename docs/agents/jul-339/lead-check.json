@@ -1,0 +1,52 @@
+{
+  "agent": "Lead",
+  "configuredModel": "openai/gpt-6.1-sol",
+  "instructionsSha256": "70faeea64f157a019b349137f3e8163c5df9a0ec5a2412e4b4e75e50d760b936",
+  "reply": "LEAD_SUBSCRIPTION_OK",
+  "runId": "055feb5b-46f7-4146-a23d-d6c7e06b4017",
+  "traceId": "21e57376ba236183d09f05063a8e9567",
+  "modelCalls": 1,
+  "usage": [
+    {
+      "inputTokens": 12678,
+      "outputTokens": 10,
+      "inputDetails": {
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "text": 12678
+      },
+      "outputDetails": {
+        "reasoning": 0,
+        "text": 10
+      }
+    }
+  ],
+  "usd": 0.025456,
+  "metrics": [
+    {
+      "name": "mastra_model_total_output_tokens",
+      "value": 10,
+      "estimatedCost": 0.0001,
+      "costUnit": "USD",
+      "model": "gpt-6-1-sol"
+    },
+    {
+      "name": "mastra_model_total_input_tokens",
+      "value": 12678,
+      "estimatedCost": 0.025356,
+      "costUnit": "USD",
+      "model": "gpt-6-1-sol"
+    }
+  ],
+  "checks": {
+    "agentList": "PASS",
+    "fullInstructions": "PASS",
+    "subscriptionModelAndTrace": "PASS"
+  },
+  "shippingRerun": "pending separate Shipping step",
+  "modelSetting": {
+    "path": "/home/ubuntu/.config/julia/lead-model",
+    "value": "openai/gpt-6.1-sol",
+    "sha256": "da34bc64835941269937c246187bf6bd6f8cc1de3d9e93e523d4124f5c36be71"
+  }
+}
