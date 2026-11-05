@@ -28,6 +28,8 @@ jobs:
         run: node scripts/check-skill-names.mjs
       - name: Check agent-read files point at paths that exist
         run: node scripts/check-agent-links.mjs
+      - name: Check the machine program list is up to date
+        run: node scripts/machine-programs.mjs --check
       - name: Check every branch has an open pull request
         env:
           GITHUB_TOKEN: ${{ github.token }}

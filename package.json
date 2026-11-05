@@ -9,6 +9,8 @@
     "start": "next start",
     "lint:framework": "eslint machine/flow --max-warnings 0",
     "guard:flow": "npm run lint:framework && depcruise --config .dependency-cruiser.mjs machine/flow machine/flow/run.mjs",
+    "check:programs": "node scripts/machine-programs.mjs --check",
+    "check:studio": "node scripts/check-studio-start.mjs",
     "check:recipes-model": "node scripts/check-recipes-model.mjs",
     "prove:recipe-events": "node scripts/prove-recipe-events.mjs",
     "prove:household-rules": "node scripts/prove-household-rules.mjs",

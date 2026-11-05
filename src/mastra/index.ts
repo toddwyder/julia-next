@@ -1,29 +1,32 @@
-// The Studio entry. It registers the same card-path workflow against the same
-// LibSQL state file a run writes, so a run started by
-// `node machine/flow/run.mjs` shows up in Studio as the run it is.
+// The Studio entry. Registering the card-path workflow here is what puts it on
+// Studio's run form, and that form is the one place a card is started.
+//
+// `npx mastra dev` is run from the repository root, so the run folder defaults
+// to `.artifacts/flow/studio` there. FLOW_DIR points it somewhere else, and it
+// has to be absolute because the dev server runs from its own output folder.
 
 process.env.CMD_API_KEY ??= process.env.COMMANDCODE_API_KEY;
 
-import { Mastra } from '@mastra/core';
-import { LibSQLStore } from '@mastra/libsql';
+import { resolve } from 'node:path';
 
 import { createAgents } from '../../machine/flow/agents.mjs';
-import { openScratch } from '../../machine/flow/scratch.mjs';
+import { openMastra } from '../../machine/flow/mastra.mjs';
 import { CARD_PATH } from '../../machine/flow/schema.mjs';
+import { openScratch } from '../../machine/flow/scratch.mjs';
 import { buildCardPath } from '../../machine/flow/workflow.mjs';
 
-// The dev server runs from its own output folder, so the run folder is given
-// as an absolute path: FLOW_DIR=$PWD/.artifacts/flow/product.
-const dir = process.env.FLOW_DIR;
-if (!dir || !dir.startsWith('/')) {
-  throw new Error('Set FLOW_DIR to the absolute path of a run folder, e.g. FLOW_DIR=$PWD/.artifacts/flow/product');
-}
+const dir = resolve(process.env.FLOW_DIR ?? '.artifacts/flow/studio');
+
 openScratch(dir);
 const agents = createAgents();
 const workflow = buildCardPath({ agents, dir });
 
-export const mastra = new Mastra({
+// Storage and observability come from the same place a resumed run uses, so the
+// model calls a Studio run makes are written to this run folder's trace file.
+export const mastra = await openMastra({
+  card: process.env.FLOW_CARD ?? '',
   agents,
-  workflows: { [CARD_PATH]: workflow },
-  storage: new LibSQLStore({ id: 'flow-state', url: `file:${dir}/state.db` }),
+  workflow,
+  stateDb: resolve(dir, 'state.db'),
+  traceDb: resolve(dir, 'trace.duckdb'),
 });

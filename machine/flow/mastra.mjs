@@ -11,7 +11,7 @@ import { MastraStorageExporter, Observability } from '@mastra/observability';
 export const cardStamper = card => ({
   name: 'card-stamper',
   process(span) {
-    if (!span) return span;
+    if (!span || !card) return span;
     span.attributes = { ...(span.attributes ?? {}), card };
     return span;
   },

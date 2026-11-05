@@ -1,6 +1,8 @@
-// The flow's outcomes, driven through the real workflow with stand-in agents,
-// so the order, the shared failure count, the wait and the stop are the
-// workflow's own settings rather than a stub of them.
+// The flow's outcomes, driven through the real workflow with real agent steps
+// on a mock model, so the order, the shared failure count, the wait and the
+// stop are the workflow's own settings rather than a stub of them. The run is
+// started the way Studio's run button starts one: a card and its kind, and no
+// saved state.
 
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -10,29 +12,44 @@ import test from 'node:test';
 
 process.env.CMD_API_KEY ??= 'unused-in-tests';
 
+const { Agent } = await import('@mastra/core/agent');
+const { createMockModel } = await import('@mastra/core/test-utils/llm-mock');
 const { buildCardPath } = await import('./workflow.mjs');
 const { openMastra } = await import('./mastra.mjs');
-const { initialState } = await import('./schema.mjs');
+const { BUILD_RETRIES } = await import('./steps.mjs');
 const { openScratch } = await import('./scratch.mjs');
 const { createWorkflowStateReader } = await import('@mastra/core/workflows');
 
 const CARD = 'JUL-336-STANDIN';
+
+const buildOn = model =>
+  new Agent({ id: 'flow-build', name: 'Flow build', instructions: 'Reply with one line.', model });
+
 const stub = text => ({ generate: async () => ({ text }) });
 const agents = {
-  build: stub('built line'),
+  build: buildOn(createMockModel({ mockText: 'built line' })),
   shipping: stub('looked'),
   remediation: stub('fixed line'),
   retro: stub('retro line'),
 };
 
-async function openCase({ kind = 'product', review = ['PASS'], smoke = ['PASS'], answers = ['yes'] }) {
+async function openCase({
+  kind = 'product',
+  review = ['PASS'],
+  smoke = ['PASS'],
+  answers = ['yes'],
+  build,
+  untilFirstWait = false,
+}) {
   const dir = mkdtempSync(join(tmpdir(), 'flow-case-'));
   mkdirSync(dir, { recursive: true });
   openScratch(dir);
-  writeFileSync(join(dir, 'verdicts.json'), JSON.stringify({ review, smoke }));
-  writeFileSync(join(dir, 'cursors.json'), '{}');
+  const caseDir = join(dir, CARD);
+  mkdirSync(caseDir, { recursive: true });
+  writeFileSync(join(caseDir, 'verdicts.json'), JSON.stringify({ review, smoke }));
+  writeFileSync(join(caseDir, 'cursors.json'), '{}');
 
-  const workflow = buildCardPath({ agents, dir });
+  const workflow = buildCardPath({ agents: build ? { ...agents, build } : agents, dir });
   const mastra = await openMastra({
     card: CARD,
     stateDb: join(dir, 'state.db'),
@@ -42,15 +59,13 @@ async function openCase({ kind = 'product', review = ['PASS'], smoke = ['PASS'],
   const wf = mastra.getWorkflow(workflow.id);
   const run = await wf.createRun();
   const trail = [];
-  let result = await run.start({
-    inputData: { card: CARD, kind },
-    initialState: initialState(CARD, kind),
-  });
+  let result = await run.start({ inputData: { card: CARD, kind } });
 
   while (result.status === 'suspended') {
     const state = await wf.getWorkflowRunById(run.runId);
     const open = createWorkflowStateReader(state).getSuspendedStep();
     trail.push({ path: open.path, request: open.suspendPayload.request });
+    if (untilFirstWait) break;
     const answer = answers.shift() ?? 'yes';
     result = await run.resume({
       step: open.stepId,
@@ -59,12 +74,12 @@ async function openCase({ kind = 'product', review = ['PASS'], smoke = ['PASS'],
     assert.ok(trail.length < 8, 'the run should not need more than a few answers');
   }
 
-  const report = join(dir, 'reports', `${CARD}.md`);
-  return { result, trail, dir, report, workflow };
+  const report = join(caseDir, 'reports', `${CARD}.md`);
+  return { result, trail, dir, caseDir, report, workflow };
 }
 
 test('a passing card waits for Todd two levels deep, then lands, retros and cleans up', async () => {
-  const { result, trail, dir, report } = await openCase({});
+  const { result, trail, dir, caseDir, report } = await openCase({});
 
   assert.equal(trail.length, 1);
   assert.deepEqual(trail[0].path, ['attempt', 'acceptance']);
@@ -73,9 +88,40 @@ test('a passing card waits for Todd two levels deep, then lands, retros and clea
   assert.equal(result.result.accepted, true);
   assert.equal(result.result.landed, true);
   assert.equal(result.result.finished, true);
-  assert.equal(existsSync(join(dir, 'retro', `${CARD}.md`)), true);
-  assert.equal(existsSync(join(dir, 'build')), false, 'cleanup sweeps the build folder');
+  assert.equal(existsSync(join(caseDir, 'retro', `${CARD}.md`)), true);
+  assert.equal(existsSync(join(caseDir, 'build')), false, 'cleanup sweeps the build folder');
   assert.equal(existsSync(report), false);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('the build stage runs a real agent step and keeps what the agent wrote', async () => {
+  const asked = [];
+  const build = buildOn(
+    createMockModel({ mockText: 'built line', spyStream: props => asked.push(props) }),
+  );
+  const { trail, dir, caseDir } = await openCase({ build, untilFirstWait: true });
+
+  assert.equal(trail.length, 1, 'the card reaches Todd, so the build finished before the wait');
+  assert.equal(asked.length, 1, 'the build stage makes one model call');
+  assert.match(JSON.stringify(asked[0]), new RegExp(CARD), 'the model is asked about this card');
+  assert.match(readFileSync(join(caseDir, 'build', `${CARD}.md`), 'utf8'), /built line/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('a model failure in the build step gets exactly the attempts its retry setting names', async () => {
+  let attempts = 0;
+  const failing = buildOn(
+    createMockModel({
+      spyStream: () => {
+        attempts += 1;
+        throw new Error('the model is down');
+      },
+    }),
+  );
+  const { result, dir } = await openCase({ build: failing });
+
+  assert.equal(result.status, 'failed');
+  assert.equal(attempts, BUILD_RETRIES + 1, 'the step retries its own setting, no more and no less');
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -153,8 +199,10 @@ test('a machine card walks the same path without asking Todd', async () => {
 test('an answer for another request is refused and the same run still takes the right one', async () => {
   const dirCase = mkdtempSync(join(tmpdir(), 'flow-stale-'));
   openScratch(dirCase);
-  writeFileSync(join(dirCase, 'verdicts.json'), JSON.stringify({ review: ['PASS'], smoke: ['PASS'] }));
-  writeFileSync(join(dirCase, 'cursors.json'), '{}');
+  const caseDir = join(dirCase, CARD);
+  mkdirSync(caseDir, { recursive: true });
+  writeFileSync(join(caseDir, 'verdicts.json'), JSON.stringify({ review: ['PASS'], smoke: ['PASS'] }));
+  writeFileSync(join(caseDir, 'cursors.json'), '{}');
   const caseWorkflow = buildCardPath({ agents, dir: dirCase });
   const mastra = await openMastra({
     card: CARD,
@@ -164,10 +212,7 @@ test('an answer for another request is refused and the same run still takes the 
   });
   const w = mastra.getWorkflow(caseWorkflow.id);
   const run = await w.createRun();
-  const started = await run.start({
-    inputData: { card: CARD, kind: 'product' },
-    initialState: initialState(CARD, 'product'),
-  });
+  const started = await run.start({ inputData: { card: CARD, kind: 'product' } });
   assert.equal(started.status, 'suspended');
 
   const wrong = await run.resume({

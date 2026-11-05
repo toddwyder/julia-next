@@ -13,10 +13,18 @@ export const FIX_AND_LAND = 'fix-and-land';
 
 export const FREE_MODEL = 'commandcode/reflection/beam:free';
 
+// What a run is asked for when it is started. This is the whole form a person
+// fills in: which card, and whether it is a product card or a machine card.
+export const runInput = z.object({
+  card: z.string().min(1),
+  kind: z.enum(['product', 'machine']),
+});
+
 export const flowData = z
   .object({
     card: z.string(),
     kind: z.enum(['product', 'machine']),
+    prompt: z.string().default(''),
     detail: z.string().default(''),
     verdict: z.enum(['PASS', 'FAIL']).nullable().default(null),
     smoke: z.enum(['PASS', 'FAIL']).nullable().default(null),
@@ -29,9 +37,11 @@ export const flowData = z
   })
   .passthrough();
 
+// Every field carries a default, so a run started with no saved state at all
+// still has valid state: the run form only asks for the card and its kind.
 export const cardState = z.object({
-  card: z.string(),
-  kind: z.enum(['product', 'machine']),
+  card: z.string().default(''),
+  kind: z.enum(['product', 'machine']).default('product'),
   failCount: z.number().int().min(0).default(0),
   reviewRound: z.number().int().min(0).default(0),
   buildRounds: z.number().int().min(0).default(0),
@@ -40,17 +50,4 @@ export const cardState = z.object({
   answer: z.string().default(''),
   stopPart: z.string().default(''),
   stopWhy: z.string().default(''),
-});
-
-export const initialState = (card, kind) => ({
-  card,
-  kind,
-  failCount: 0,
-  reviewRound: 0,
-  buildRounds: 0,
-  requestId: '',
-  request: '',
-  answer: '',
-  stopPart: '',
-  stopWhy: '',
 });

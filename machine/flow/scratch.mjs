@@ -7,9 +7,26 @@ import { join } from 'node:path';
 
 const FOLDERS = ['build', 'landing', 'retro', 'reports'];
 
+// A machine card's Shipping stand-in reads no queue, but a product card's does,
+// and a run started from Studio brings no file of its own. One answer each is
+// enough for a stand-in to keep the path moving.
+export const DEFAULT_VERDICTS = { review: ['PASS'], smoke: ['PASS'] };
+
 export function openScratch(dir) {
   for (const folder of FOLDERS) mkdirSync(join(dir, folder), { recursive: true });
   return dir;
+}
+
+// Each card gets its own folder inside the run's folder, so two cards started
+// from Studio keep separate artifacts and separate verdict queues.
+export function openRun(dir, card) {
+  const runDir = join(dir, card);
+  openScratch(runDir);
+  const verdicts = join(runDir, 'verdicts.json');
+  if (!existsSync(verdicts)) writeJson(verdicts, DEFAULT_VERDICTS);
+  const cursors = join(runDir, 'cursors.json');
+  if (!existsSync(cursors)) writeJson(cursors, {});
+  return runDir;
 }
 
 export function readJson(path, fallback) {
@@ -23,7 +40,7 @@ function writeJson(path, value) {
 
 export function writeArtifact(dir, card, text) {
   const path = join(dir, 'build', `${card}.md`);
-  writeFileSync(path, `# ${card} stand-in artifact\n\n${text.trim()}\n`);
+  writeFileSync(path, `# ${card} build\n\n${text.trim()}\n`);
   return path;
 }
 

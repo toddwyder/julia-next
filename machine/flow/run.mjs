@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// The runner. It starts a card down the path, reports where the run is waiting,
-// resumes it with Todd's answer, and writes the run's record and cost record
-// beside the run's own files. It does not decide anything.
+// The runner. It reports where a run is waiting, resumes it with Todd's answer,
+// and writes the run's cost record beside the run's own files. It does not
+// start a card and it does not decide anything: a card begins in Mastra
+// Studio, on the card workflow's own run form.
 
 process.env.CMD_API_KEY ??= process.env.COMMANDCODE_API_KEY;
 
@@ -9,7 +10,6 @@ import { appendFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const usage = `usage:
-  node machine/flow/run.mjs start --card <card> --kind product|machine [--dir <dir>] [--verdicts <file>]
   node machine/flow/run.mjs resume --dir <dir> --run-id <id> [--request <id>] --answer yes|no
   node machine/flow/run.mjs status --dir <dir> --run-id <id>
   node machine/flow/run.mjs cost --dir <dir>`;
@@ -40,10 +40,6 @@ function need(key) {
   return args[key];
 }
 
-function stamp() {
-  return new Date().toISOString().replace(/[:.]/g, '-');
-}
-
 function recordPath(dir) {
   return join(dir, 'record.json');
 }
@@ -61,25 +57,6 @@ async function writeCost(dir) {
   const record = await costRecord(join(dir, 'trace.duckdb'));
   writeFileSync(join(dir, 'cost.json'), `${JSON.stringify(record, null, 2)}\n`);
   return record;
-}
-
-async function start() {
-  const card = need('card');
-  const kind = need('kind');
-  if (kind !== 'product' && kind !== 'machine') throw new Error('--kind must be product or machine');
-  const dir = resolve(args.dir ?? join('.artifacts/flow', `${card}-${stamp()}`));
-
-  const { startCard } = await import('./start.mjs');
-  const run = await startCard({ dir, card, kind, model: args.model, verdicts: args.verdicts });
-
-  keep(dir, { at: new Date().toISOString(), event: 'start', ...run });
-  console.log(JSON.stringify(run, null, 2));
-
-  if (run.status === 'suspended') {
-    console.log(`\nWaiting. Resume with:\n  node machine/flow/run.mjs resume --dir ${dir} --run-id ${run.runId} --request ${run.request} --answer yes`);
-  } else {
-    costWhenDone = dir;
-  }
 }
 
 async function resume() {
@@ -109,7 +86,7 @@ async function cost() {
   console.log(JSON.stringify(await writeCost(dir), null, 2));
 }
 
-const commands = { start, resume, status, cost };
+const commands = { resume, status, cost };
 
 if (!commands[command]) {
   console.error(usage);
@@ -118,7 +95,7 @@ if (!commands[command]) {
 
 commands[command]().then(
   async () => {
-    if (command === 'start' || command === 'resume') {
+    if (command === 'resume') {
       const { closeFlow } = await import('./start.mjs');
       await closeFlow();
     }
