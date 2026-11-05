@@ -20,10 +20,16 @@ import {
   SMOKE_ROUND,
   cardState,
   flowData,
+  runInput,
 } from './schema.mjs';
 import { createStages } from './steps.mjs';
 
 const schema = { inputSchema: flowData, outputSchema: flowData, stateSchema: cardState };
+
+// Mastra builds an agent step from the agent itself: it takes `{ prompt }` and
+// returns `{ text }`. This mapper is the whole of the translation between the
+// stage's card data and the agent step.
+const toPrompt = async ({ inputData }) => ({ prompt: inputData.prompt });
 
 // `.branch()` hands on its output keyed by the id of every branch step, with the
 // ones that did not run left undefined, and Mastra documents `.map()` for
@@ -84,7 +90,10 @@ export function buildCardPath({ agents, dir }) {
     .commit();
 
   const attempt = createWorkflow({ ...schema, id: ATTEMPT })
-    .then(stage.build)
+    .then(stage.startBuild)
+    .map(toPrompt)
+    .then(stage.buildAgent)
+    .then(stage.finishBuild)
     .dountil(reviewRound, passed)
     .then(stage.gate)
     .branch([
@@ -95,7 +104,15 @@ export function buildCardPath({ agents, dir }) {
     .map(unfold)
     .commit();
 
-  return createWorkflow({ ...schema, id: CARD_PATH })
+  // The run form asks for the card and its kind, and nothing else: the first
+  // stage turns those two into the run's saved state.
+  return createWorkflow({
+    id: CARD_PATH,
+    inputSchema: runInput,
+    outputSchema: flowData,
+    stateSchema: cardState,
+  })
+    .then(stage.start)
     .dountil(attempt, answered)
     .branch([
       [async ({ inputData }) => inputData.stopped === true, stage.hold],

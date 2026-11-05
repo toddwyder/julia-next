@@ -18,6 +18,44 @@ node scripts/julia-agents.mjs -- <command> [args...]
 
 The wrapper reads `/home/ubuntu/.config/julia-agents/service-account-token`, clears inherited 1Password authentication overrides, and invokes `op run --env-file=scripts/julia-agents.env`. It then runs the command through `scripts/linear-token.mjs`, which trades the "Julia controller" app's client pair for a Linear access token at the start of every run and passes it as `LINEAR_API_KEY` in the form `Bearer <token>`, so no long-lived Linear key sits on the machine. Never print credentials, OAuth links or codes, pairing material, or raw credential-bearing subprocess output.
 
+## Starting a card in Studio
+
+A card begins in Mastra Studio's run form, and nowhere else. No script starts one.
+
+```sh
+cd /home/ubuntu/julia-builder
+node scripts/julia-agents.mjs -- npx mastra dev
+```
+
+Run it from the repository root: the CLI looks for `src/mastra/index.ts` there. The server answers on
+`:4111` by default. `FLOW_DIR` is where the run's state (`state.db`) and trace (`trace.duckdb`) are
+written, and it defaults to `.artifacts/flow/studio` under the repository; set it to an absolute path
+to keep runs apart. The repository the build agent works in is `FLOW_REPO`, default the working
+directory.
+
+In Studio, pick the `card-path` workflow and press run. The form asks for `card` and `kind`
+(`product` or `machine`) and nothing else; the workflow copies both into saved state and opens
+`<FLOW_DIR>/<card>/` for that card's artifacts, verdict queues and stop report.
+Because the saved state starts empty, a run started here needs no preparation.
+
+A card that waits for Todd is answered from the command line, which reads the card out of the run's
+saved snapshot:
+
+```sh
+node machine/flow/run.mjs status --dir .artifacts/flow/studio --run-id <run id>
+node machine/flow/run.mjs resume --dir .artifacts/flow/studio --run-id <run id> --answer yes
+node machine/flow/run.mjs cost --dir .artifacts/flow/studio
+```
+
+`docs/agents/machine-programs.md` names every program that starts a card or carries a stage, and
+`node scripts/machine-programs.mjs --check` fails a pull request that changes one without updating
+the list. Run `node scripts/machine-programs.mjs --write` and commit the list with the change.
+
+`npm run check:studio` boots its own Studio server on a spare port, reads the run form back from
+`/api/workflows`, and fails unless it asks for `card` and `kind` alone. It needs the project folder to
+itself, so stop any Studio server already running here first; it is not a CI check because it fetches
+the CLI and takes about a minute.
+
 ## The dashboard service
 
 The dashboard runs here as `julia-dashboard.service` from `/home/ubuntu/julia-dashboard`, a

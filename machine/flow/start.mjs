@@ -1,16 +1,15 @@
-// Starting and resuming a card's run. Both ends open the same storage, so a
-// process that was killed while the path waited for Todd can pick the run up
-// where it stood. The card's key name is set before anything imports an agent,
-// because the model registry reads it at import time.
+// Resuming a card's run. Both ends open the same storage, so a process that
+// was killed while the path waited for Todd can pick the run up where it stood.
+// Starting a card is not here on purpose: the run form in Mastra Studio is the
+// one way a card begins, and nothing else sits in front of that agent step.
+// The card's key name is set before anything imports an agent, because the
+// model registry reads it at import time.
 
 process.env.CMD_API_KEY ??= process.env.COMMANDCODE_API_KEY;
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CARD_PATH, initialState } from './schema.mjs';
-
-const DEFAULT_VERDICTS = { review: ['PASS'], smoke: ['PASS'] };
+import { CARD_PATH } from './schema.mjs';
 
 // The instance opened for this process. The run's spans reach the trace file
 // through its exporter, so a process that exits before shutting it down loses
@@ -40,22 +39,32 @@ async function assemble({ dir, card, model, agents: injected }) {
   return { wf: mastra.getWorkflow(CARD_PATH) };
 }
 
-function prepareVerdicts(dir, verdicts) {
-  const target = join(dir, 'verdicts.json');
-  if (verdicts) {
-    copyFileSync(verdicts, target);
-  } else if (!existsSync(target)) {
-    writeFileSync(target, `${JSON.stringify(DEFAULT_VERDICTS, null, 2)}\n`);
+// The card a run belongs to is in the run's saved state, which is the only
+// place it can be: the run was started by the Studio run form, not by a
+// launcher that could have written it down.
+async function cardOfRun(dir, runId) {
+  const { LibSQLStore } = await import('@mastra/libsql');
+  const store = new LibSQLStore({ id: 'flow-state', url: `file:${join(dir, 'state.db')}` });
+  try {
+    await store.init?.();
+    const workflows = await store.getStore('workflows');
+    const run = await workflows.getWorkflowRunById({ runId, workflowName: CARD_PATH });
+    const snapshot = typeof run?.snapshot === 'string' ? JSON.parse(run.snapshot) : run?.snapshot;
+    const card = snapshot?.value?.card ?? '';
+    if (!card) throw new Error(`Run ${runId} in ${dir} names no card, so it cannot be resumed.`);
+    return card;
+  } finally {
+    await store.close?.();
   }
-  writeFileSync(join(dir, 'cursors.json'), '{}\n');
 }
 
 async function waiting(wf, runId) {
   const { createWorkflowStateReader } = await import('@mastra/core/workflows');
   const state = await wf.getWorkflowRunById(runId);
-  if (!state) return { status: 'unknown' };
+  if (!state) return { status: 'unknown', card: '' };
   const suspended = createWorkflowStateReader(state).getSuspendedStep();
   return {
+    card: state.initialState?.card ?? '',
     status: state.status,
     step: suspended?.stepId ?? null,
     path: suspended?.path ?? null,
@@ -69,41 +78,8 @@ export async function closeFlow() {
   if (mastra) await mastra.shutdown();
 }
 
-export function cardFromRecord(dir) {
-  const path = join(dir, 'record.json');
-  const line = readFileSync(path, 'utf8').split('\n').find(Boolean);
-  return JSON.parse(line).card;
-}
-
-export async function startCard({ dir, card, kind, model, verdicts, agents }) {
-  mkdirSync(dir, { recursive: true });
-  prepareVerdicts(dir, verdicts);
-
-  const { wf } = await assemble({ dir, card, model, agents });
-  const run = await wf.createRun();
-  const result = await run.start({
-    inputData: { card, kind },
-    initialState: initialState(card, kind),
-  });
-
-  const wait = result.status === 'suspended' ? await waiting(wf, run.runId) : null;
-
-  return {
-    card,
-    kind,
-    runId: run.runId,
-    status: result.status,
-    suspended: result.suspended ?? null,
-    request: wait?.request ?? null,
-    step: wait?.step ?? null,
-    result: result.result ?? null,
-    traceDb: join(dir, 'trace.duckdb'),
-    dir,
-  };
-}
-
 export async function resumeCard({ dir, runId, request, answer, agents }) {
-  const card = cardFromRecord(dir);
+  const card = await cardOfRun(dir, runId);
   const { wf } = await assemble({ dir, card, agents });
   const open = await waiting(wf, runId);
   const run = await wf.createRun({ runId });
@@ -127,7 +103,7 @@ export async function resumeCard({ dir, runId, request, answer, agents }) {
 }
 
 export async function readState({ dir, runId }) {
-  const card = cardFromRecord(dir);
+  const card = await cardOfRun(dir, runId);
   const { wf } = await assemble({ dir, card });
   return waiting(wf, runId);
 }

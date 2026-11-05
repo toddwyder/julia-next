@@ -2,18 +2,21 @@
 // share, and an unknown price left unknown rather than guessed.
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
 process.env.CMD_API_KEY ??= 'unused-in-tests';
 
+const { Agent } = await import('@mastra/core/agent');
+const { createMockModel } = await import('@mastra/core/test-utils/llm-mock');
 const { costRecord, summarise } = await import('./trace.mjs');
 const { buildCardPath } = await import('./workflow.mjs');
 const { openMastra } = await import('./mastra.mjs');
-const { initialState } = await import('./schema.mjs');
 const { openScratch } = await import('./scratch.mjs');
+
+const CARD = 'JUL-336-STANDIN';
 
 const row = (fields) => ({
   eventType: 'end',
@@ -88,31 +91,45 @@ test('a trace with no model calls says so instead of inventing a price', () => {
 test('the run record on disk answers the same way for a real trace file', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'flow-cost-'));
   openScratch(dir);
-  writeFileSync(join(dir, 'verdicts.json'), JSON.stringify({ review: ['PASS'], smoke: ['PASS'] }));
-  writeFileSync(join(dir, 'cursors.json'), '{}');
+  mkdirSync(join(dir, CARD), { recursive: true });
+  writeFileSync(join(dir, CARD, 'verdicts.json'), JSON.stringify({ review: ['PASS'], smoke: ['PASS'] }));
+  writeFileSync(join(dir, CARD, 'cursors.json'), '{}');
 
-  const stub = (text) => ({ generate: async () => ({ text }) });
+  const stub = text => ({ generate: async () => ({ text }) });
   const workflow = buildCardPath({
-    agents: { build: stub('a'), shipping: stub('b'), remediation: stub('c'), retro: stub('d') },
+    agents: {
+      build: new Agent({
+        id: 'flow-build',
+        name: 'Flow build',
+        instructions: 'Reply with one line.',
+        model: createMockModel({ mockText: 'built line' }),
+      }),
+      shipping: stub('b'),
+      remediation: stub('c'),
+      retro: stub('d'),
+    },
     dir,
   });
   const mastra = await openMastra({
-    card: 'JUL-336-STANDIN',
+    card: CARD,
     stateDb: join(dir, 'state.db'),
     traceDb: join(dir, 'trace.duckdb'),
     workflow,
   });
   const wf = mastra.getWorkflow(workflow.id);
   const run = await wf.createRun();
-  await run.start({
-    inputData: { card: 'JUL-336-STANDIN', kind: 'machine' },
-    initialState: initialState('JUL-336-STANDIN', 'machine'),
-  });
+  await run.start({ inputData: { card: CARD, kind: 'machine' } });
+  await mastra.shutdown();
 
   const record = await costRecord(join(dir, 'trace.duckdb'));
 
-  assert.equal(record.modelCalls, 0, 'stand-in agents make no model call');
-  assert.equal(record.usd, null);
+  assert.equal(record.modelCalls, 1, 'the build agent step made one model call');
+  assert.deepEqual(
+    record.perStage.map(row => row.stage),
+    ['flow-build'],
+    'the call is counted under the build step that made it',
+  );
+  assert.equal(record.usd, null, 'the free mock model has no published price');
   assert.equal(typeof record.costNote, 'string');
   rmSync(dir, { recursive: true, force: true });
 });

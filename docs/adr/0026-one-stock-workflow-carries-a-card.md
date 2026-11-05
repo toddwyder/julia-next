@@ -81,3 +81,32 @@ These are the choices the card left to the builder, with the fact each rests on.
 - The free model is the only model here, so the cost record proves counting, not pricing. A priced model makes the same record report dollars.
 - The cost record totals a trace file, not a run id: two runs sharing one trace store would be added together. The command line gives each run its own folder, so today they never do.
 - The acceptance wait cannot move deeper into the graph without losing its place. A card that needs a wait deeper than two levels has to bring the work that follows it back up to the same level.
+
+## Update (JUL-338): a card begins in Studio, and the build stage is real
+
+The decision above still stands. Two of its stand-ins are now gone, and one way of starting a card
+was removed.
+
+A card starts in Mastra Studio's run form and nowhere else. The run form asks for two things, the
+card key and the kind, and the first stage of the workflow copies both into saved state and opens
+that card's own folder under `FLOW_DIR`. `run.mjs` keeps `resume`, `status` and `cost`; it has no
+`start` command, and `scripts/start-machine.mjs`, the launcher that used to begin a card from the
+command line, is deleted with its test. Answers to a waiting card still come from the command line,
+which reads the card out of the run's saved snapshot instead of a record file.
+
+The build stage is a real agent step. `createStep(agents.build, { retries: 2 })` runs an `Agent` that
+holds the repository as a workspace with the pstack skills and a shell, so the build can read the
+card, branch, commit and open the pull request; the model is read from the pstack models file's
+`feature, refactoring` line. Because the agent step's contract is `{prompt}` in and `{text}` out, two
+plain stages sit either side of it: `startBuild` names the card, counts the round, sets the request
+id and returns the prompt, and `finishBuild` writes what the agent wrote into the card's folder and
+puts the flow data back. Shipping, remediation and retro are still stand-ins.
+
+Every artifact, verdict queue and stop report now lives in that card's folder, so two cards started
+from the same Studio server do not share a queue; the state and trace stores stay at the folder the
+server opened.
+
+`docs/agents/machine-programs.md` names every program that begins a card or carries a stage, with a
+fingerprint, and `node scripts/machine-programs.mjs --check` fails a pull request that changes one
+without updating the list or adds a program the list never names. A change to the machine is now a
+reviewable diff of that list, not a sentence in a description.
