@@ -28,3 +28,7 @@ For real list, Start, and Back proof, launch the built candidate separately with
 The approved design is `origin/pilot/dashboard-d2` at `19f3a31`, under `docs/pilot/dashboard-d2/approved/`. Picture 12 specifies mint #10B981, iris #6366F1, amber #F59E0B, slate #64748B, light mode, and Public Sans. Picture 08 describes the later Start controls, not part of PR-1. Decision 0008 excludes the invented outer navigation.
 
 The 22 decision files and glossary are real Linear exports. Each file records its source URL, Linear update time, and export time. The older snapshots remain untouched outside this PR's ownership.
+
+## Reading a screen while it works, or after it fails
+
+`docs/loading-and-failures.md` names the loading line on each Linear read and every failure sentence the pages can show, with what each one means and what to do. Start there when the dashboard shows a rose line instead of cards.
