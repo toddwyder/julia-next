@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 export const MIRROR = 'https://github.com/backnotprop/pstack';
 export const JULIA_SKILLS = new Set([
   'adversarial-review',
+  'impeccable',
   'playwright-cli',
   'tighten',
   'verify-julia',
