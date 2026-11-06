@@ -47,7 +47,7 @@ Todd approved moving the runtime setting to writable `~/.config/julia/lead-model
 
 The installer created `/home/ubuntu/.config/julia/lead-model` on the server with `openai/gpt-6.1-sol`. A second installer run reported `Kept`. The corrected `npm run check:lead` passed against this file and recorded its SHA-256 as `da34bc64835941269937c246187bf6bd6f8cc1de3d9e93e523d4124f5c36be71`. [The saved result](lead-check.json) includes the actual file path and hash, along with the model name in the Studio trace. The earlier fallback-based result files have been removed.
 
-Before the fix, the regression test failed with `Missing expected exception`. After the fix, a missing setting throws `ENOENT` and names the installer, and `npm run check:lead` exits 1 before starting Studio. The corrected regression run passed all 45 focused tests, and `npm run guard:flow` passed.
+Before the fix, the regression test failed with `Missing expected exception`. After the fix, a missing setting throws `ENOENT` and names the installer, and `npm run check:lead` exits 1 before starting Studio. The corrected `node --test machine/flow/agents.test.mjs` run passed all 7 focused tests, and `npm run guard:flow` passed.
 
 The existing workflow and trace regression tests passed, as did the setting tests, dependency guard tests, Studio run-form tests, program-list tests, agent-link check, and skill-name check.
 
