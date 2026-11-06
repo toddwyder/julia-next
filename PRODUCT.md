@@ -29,6 +29,7 @@ Other recipe apps mainly store recipes. They can't help invent a recipe or plan 
 - Use the glossary's terms (Library, Recipe, Yield, Cook mode, Lab, Menu, Prep list, Shopping list) in the UI and docs.
 
 ## Brand Commitments
-None. Todd: "nothing is sacred." The current name, logo, "The Julia Cookbook · established 1961" line and vintage look are evidence, not requirements.
+- The vintage cookbook feel is fixed: a cookbook that has been used and loved, never new or sterile. No food photos.
+- Julia is named for Julia Child, who inspired Todd to cook; "established 1961" refers to that.
 
 ##
