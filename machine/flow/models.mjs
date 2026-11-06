@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { openaiCodexProvider } from '@mastra/code-sdk/providers/openai-codex';
 
 export function leadModelPath() {
-  return join(homedir(), '.config', 'julia', 'lead-model');
+  return process.env.JULIA_LEAD_MODEL_FILE ?? join(homedir(), '.config', 'julia', 'lead-model');
 }
 
 export function leadModelId(file = leadModelPath()) {

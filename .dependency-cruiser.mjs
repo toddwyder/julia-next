@@ -15,8 +15,8 @@ const allowedPackages = [
 ];
 
 const anyPackage = `(?:${allowedPackages.join('|')})`;
-const codexProviderPattern = '^(?:@mastra/code-sdk/providers/openai-codex)$|(?:^|/)node_modules/@mastra/code-sdk/dist/providers/openai-codex\\.(?:js|cjs)$';
-const allowedPackagePattern = `^(?:${anyPackage})(?:$|/)|(?:^|/)node_modules/(?:${anyPackage})(?:$|/)|${codexProviderPattern}`;
+const subscriptionProviderPattern = '^(?:@mastra/code-sdk/providers/(?:openai-codex|claude-max))$|(?:^|/)node_modules/@mastra/code-sdk/dist/providers/(?:openai-codex|claude-max)\\.(?:js|cjs)$';
+const allowedPackagePattern = `^(?:${anyPackage})(?:$|/)|(?:^|/)node_modules/(?:${anyPackage})(?:$|/)|${subscriptionProviderPattern}`;
 const outsidePackagePattern = '^(?:@|[a-zA-Z])|/node_modules/';
 
 export default {
@@ -43,12 +43,12 @@ export default {
     {
       name: 'flow-denies-mastra-code-sdk',
       severity: 'error',
-      comment: 'The workflow folder uses only Mastra Code\'s stock ChatGPT subscription provider, not its coding agent.',
+      comment: 'The workflow folder uses only Mastra Code subscription providers, not its coding agent.',
       from: { path: FLOW },
       to: {
         dependencyTypesNot: ['core', 'local'],
         path: '^(?:@mastra/code-sdk)(?:$|/)|(?:^|/)node_modules/@mastra/code-sdk(?:$|/)',
-        pathNot: codexProviderPattern,
+        pathNot: subscriptionProviderPattern,
       },
     },
     {

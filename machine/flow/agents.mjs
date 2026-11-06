@@ -5,6 +5,7 @@ import { Agent } from '@mastra/core/agent';
 import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace';
 
 import { buildModel } from './models.mjs';
+import { agentModel, helperKey, readRoleModels } from './role-models.mjs';
 import { FREE_MODEL } from './schema.mjs';
 
 const POTETO_SKILL = '.agents/skills/poteto-mode/SKILL.md';
@@ -20,18 +21,37 @@ export function repoRoot() {
   return process.env.FLOW_REPO ?? repositoryContaining(resolve(process.env.MASTRA_PROJECT_ROOT ?? process.cwd()));
 }
 
-export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelFile } = {}) {
+export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelFile, roleModelsFile } = {}) {
+  const workspace = new Workspace({
+    id: 'machine-repo',
+    filesystem: new LocalFilesystem({ basePath: repo }),
+    sandbox: new LocalSandbox({ workingDirectory: repo, env: { HOME: homedir() } }),
+    skills: ['.agents/skills'],
+  });
+  const helperWorkspace = new Workspace({
+    id: 'machine-repo-helper',
+    filesystem: new LocalFilesystem({ basePath: repo }),
+    sandbox: new LocalSandbox({ workingDirectory: repo, env: { HOME: homedir() } }),
+  });
+  const helpers = Object.fromEntries(readRoleModels(roleModelsFile).flatMap(role => role.models.map((modelId, index) => {
+    const choice = role.models.length > 1 ? `, choice ${index + 1}` : '';
+    return [helperKey(role, index), new Agent({
+      id: `pstack-${role.id}-${index + 1}`,
+      name: role.name,
+      description: `${role.name} pstack role on ${modelId}${choice}. ${role.explanation} Use this helper when delegating ${role.name} work.`,
+      instructions: `You are the ${role.name} pstack helper. ${role.explanation} Complete the task delegated by Lead yourself. Do not delegate it again. Report the result and evidence.`,
+      model: agentModel(modelId),
+      workspace: helperWorkspace,
+      defaultOptions: { maxSteps: 100 },
+    })];
+  })));
   const build = new Agent({
     id: 'flow-build',
     name: 'Lead',
     instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
     model: buildModel(leadModelFile),
-    workspace: new Workspace({
-      id: 'machine-repo',
-      filesystem: new LocalFilesystem({ basePath: repo }),
-      sandbox: new LocalSandbox({ workingDirectory: repo, env: { HOME: homedir() } }),
-      skills: ['.agents/skills'],
-    }),
+    workspace,
+    agents: helpers,
     defaultOptions: { maxSteps: 400 },
   });
 

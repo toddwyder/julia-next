@@ -5,8 +5,11 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { createAgents, repoRoot } from './agents.mjs';
+import { helperKey, readRoleModels } from './role-models.mjs';
 import { leadModelId } from './models.mjs';
 import { installLeadModel } from '../../scripts/install-lead-model.mjs';
+import { ROLE_GROUPS, formatSettings } from '../../dashboard/lib/model-settings.js';
+import { initialChoice } from '../../dashboard/lib/roles.js';
 
 const repo = process.cwd();
 
@@ -96,6 +99,38 @@ test('new Lead instances read their independent model setting', async t => {
   writeFileSync(file, 'openai/gpt-5.4\n');
   assert.equal((await createAgents({ repo, leadModelFile: file }).build.getModel()).modelId, 'gpt-5.4');
   assert.equal(readFileSync(join(dir, 'pstack-models.md'), 'utf8'), 'feature, refactoring: commandcode/deepseek/deepseek-v4.1-flash\n');
+});
+
+test('Lead exposes one stock helper per role and one per saved panel model', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = join(dir, 'lead-role-models.md');
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  writeFileSync(roleModelsFile, 'feature, refactoring: commandcode/deepseek/deepseek-v4.1-flash\narena runners: openai/gpt-6.1-sol, commandcode/deepseek/deepseek-v4.1-flash\n');
+  const helpers = await createAgents({ repo, leadModelFile, roleModelsFile }).build.listAgents();
+  assert.equal(Object.keys(helpers).length, 21);
+  assert.deepEqual(Object.keys(helpers), readRoleModels(roleModelsFile).flatMap(role => role.models.map((_, index) => helperKey(role, index))));
+  assert.equal(helpers.featureRefactoring.name, 'feature, refactoring');
+  assert.equal((await helpers.featureRefactoring.getModel()).modelId, 'deepseek/deepseek-v4.1-flash');
+  assert.equal(helpers.arenaRunners1.name, 'arena runners');
+  assert.equal((await helpers.arenaRunners1.getModel()).modelId, 'gpt-6.1-sol');
+  assert.equal((await helpers.arenaRunners2.getModel()).modelId, 'deepseek/deepseek-v4.1-flash');
+});
+
+test('the role file the Start screen writes reads back with every saved model', async t => {
+  const dir = temporary(t);
+  const roleModelsFile = join(dir, 'lead-role-models.md');
+  const modelIds = ['openai/gpt-6.1-sol', 'commandcode/deepseek/deepseek-v4.1-flash', 'anthropic/claude-opus-5-5'];
+  const models = modelIds.map(id => ({ id, provider: id.split('/')[0] }));
+  const choice = { ...initialChoice({ groups: ROLE_GROUPS, modelIds }), lead: modelIds[0] };
+  choice.groups.building.roles['bug-fix'] = modelIds[2];
+  choice.groups.panels.roles['arena-runners'] = [modelIds[2], modelIds[1]];
+  writeFileSync(roleModelsFile, formatSettings(choice, models).pstack);
+  const saved = readRoleModels(roleModelsFile);
+  assert.equal(saved.length, ROLE_GROUPS.reduce((count, group) => count + group.roles.length, 0));
+  for (const role of saved) {
+    assert.deepEqual(role.models, [choice.groups[role.group].roles[role.id]].flat(), `${role.name} read back a different model.`);
+  }
 });
 
 test('invalid Lead settings fail instead of falling back to an API model', t => {

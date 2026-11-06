@@ -29,6 +29,7 @@ export const PROGRAMS = [
   ['machine/flow/steps.mjs', 'What each stage does, including the build being a real agent step.'],
   ['machine/flow/agents.mjs', 'The agents the stages run, and what the build agent may touch.'],
   ['machine/flow/models.mjs', 'The Lead model, read from its independent setting and authenticated through ChatGPT.'],
+  ['machine/flow/role-models.mjs', 'The Lead helper models, read from the saved role table and routed to account providers.'],
   ['machine/flow/schema.mjs', 'What the run form asks for and what the run remembers.'],
   ['machine/flow/scratch.mjs', 'The run folder: artifacts, verdicts and the report a stop leaves.'],
   ['machine/flow/mastra.mjs', 'Storage and tracing, so a run is written down and priced.'],
