@@ -167,10 +167,12 @@ async function withDashboard(run) {
     const deadline = Date.now() + 120000;
     while (Date.now() < deadline) {
       if (child.exitCode !== null) throw new Error(`Dashboard exited: ${log}`);
+      let ready = false;
       try {
         const response = await fetch(`http://127.0.0.1:${port}/start`, { signal: AbortSignal.timeout(15000) });
-        if (response.ok) return await run(`http://127.0.0.1:${port}/start`);
+        ready = response.ok;
       } catch {}
+      if (ready) return await run(`http://127.0.0.1:${port}/start`);
       await delay(1000);
     }
     throw new Error(`Dashboard did not serve /start: ${log}`);
@@ -181,10 +183,29 @@ async function withDashboard(run) {
 
 async function browserSave(url, current, models, alternateLead, alternateCoder) {
   const browser = await chromium.launch({ headless: true });
-  try {
+  const open = async () => {
     const page = await browser.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Change the Lead model' }).waitFor();
+    return page;
+  };
+  const choose = async (page, label, modelId) => {
+    await page.getByRole('button', { name: label }).click();
+    await page.locator(`[role="dialog"] [data-model-id="${modelId}"]`).click();
+  };
+  const save = async page => {
+    const [response] = await Promise.all([
+      page.waitForResponse(item => item.request().method() === 'POST' && new URL(item.url()).pathname === new URL(url).pathname),
+      page.getByRole('button', { name: 'Save', exact: true }).click(),
+    ]);
+    assert(response.ok(), `Save returned HTTP ${response.status()}.`);
+    await page.waitForTimeout(300);
+    const alerts = page.locator('[role="alert"]:visible');
+    const problem = (await alerts.count()) ? (await alerts.first().innerText()).trim() : '';
+    if (problem) throw new Error(`The Start screen reported a Save problem: ${problem}`);
+  };
+  try {
+    const page = await open();
     const visible = [];
     const leadName = displayName(models.find(model => model.id === current.lead));
     const leadButton = page.getByRole('button', { name: 'Change the Lead model' });
@@ -207,24 +228,30 @@ async function browserSave(url, current, models, alternateLead, alternateCoder) 
           mismatch: mismatched(`${role.name} Start row`, () => assert(actualIds.includes(wrong))) });
       }
     }
-    await page.getByRole('button', { name: 'Change the Lead model' }).click();
-    await page.locator(`[role="dialog"] [data-model-id="${alternateLead}"]`).click();
-    await page.getByRole('button', { name: 'Change the feature, refactoring model' }).click();
-    await page.locator(`[role="dialog"] [data-model-id="${alternateCoder}"]`).click();
+    const stalePage = await open();
+    await choose(page, 'Change the Lead model', alternateLead);
+    await choose(page, 'Change the feature, refactoring model', alternateCoder);
     await page.getByText('Picks are not applied until you press Save. Restart Studio after saving.').waitFor();
-    const [response] = await Promise.all([
-      page.waitForResponse(item => item.request().method() === 'POST' && new URL(item.url()).pathname === new URL(url).pathname),
-      page.getByRole('button', { name: 'Save', exact: true }).click(),
-    ]);
-    assert(response.ok(), `Save returned HTTP ${response.status()}.`);
-    try { await page.getByText('Saved on this machine. Restart Studio in its terminal before the next run.').waitFor({ timeout: 20000 }); }
-    catch { throw new Error(`The Start screen did not confirm the Save. It says: ${await page.locator('[role="alert"]').first().innerText().catch(() => 'no problem')}`); }
+    await save(page);
+    await page.getByText('Saved on this machine. Restart Studio in its terminal before the next run.').waitFor({ timeout: 20000 });
+    await save(stalePage);
+    const afterResave = readSettings({ paths: settingsPaths(), modelIds: models.map(model => model.id) });
+    assert.equal(afterResave.lead, alternateLead, 'A stale Start screen save replaced the Lead pick.');
+    assert.equal(afterResave.groups.building.roles['feature-refactoring'], alternateCoder, 'A stale Start screen save replaced the coding pick.');
+    await choose(stalePage, 'Change the hillclimb model', alternateCoder);
+    await save(stalePage);
+    const afterStale = readSettings({ paths: settingsPaths(), modelIds: models.map(model => model.id) });
+    assert.equal(afterStale.lead, alternateLead, 'A stale Start screen save replaced the Lead pick.');
+    assert.equal(afterStale.groups.building.roles['feature-refactoring'], alternateCoder, 'A stale Start screen save replaced the coding pick.');
+    assert.equal(afterStale.groups.building.roles.hillclimb, alternateCoder, 'The stale Start screen save did not land its own pick.');
     await page.reload();
     assert.equal(await page.getByRole('button', { name: 'Change the Lead model' }).getAttribute('data-current-model-id'), alternateLead);
     assert.equal(await page.getByRole('button', { name: 'Change the feature, refactoring model' }).getAttribute('data-current-model-id'), alternateCoder);
     const screenshot = resolve('docs/agents/jul-340/start-saved.png');
     await page.screenshot({ path: screenshot, fullPage: true });
-    return { url, screenshot, savedLead: alternateLead, savedCoder: alternateCoder, lead: { model: current.lead, savedVerdict: 'PASS', mismatch: leadMismatch }, visibleRoles: visible };
+    return { url, screenshot, savedLead: alternateLead, savedCoder: alternateCoder, lead: { model: current.lead, savedVerdict: 'PASS', mismatch: leadMismatch }, visibleRoles: visible,
+      staleSave: { resaveLead: afterResave.lead, resaveCoder: afterResave.groups.building.roles['feature-refactoring'],
+        ownPick: afterStale.groups.building.roles.hillclimb, lead: afterStale.lead, coder: afterStale.groups.building.roles['feature-refactoring'] } };
   } finally { await browser.close(); }
 }
 
