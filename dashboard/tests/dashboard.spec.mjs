@@ -17,7 +17,8 @@ if (process.env.DASHBOARD_URL) test('fresh real Ready list, Start and Back leave
     await page.getByRole('link', { name: `Start ${before[0].title}`, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/start/${before[0].identifier}$`));
     await expect(page.getByRole('heading', { name: before[0].title, exact: true })).toBeVisible();
-    await expect(page.getByText('This card is still Ready.', { exact: false })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Change the Lead model' })).toBeVisible();
+    await expect(page.getByText('This card is not Ready.', { exact: false })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath(`start-${i}.png`), fullPage: true });
     await page.getByRole('link', { name: 'Back to Ready cards' }).click();
     await expect(page.getByRole('link', { name: /^Start / })).toHaveCount(before.length);

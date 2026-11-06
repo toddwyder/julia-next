@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  EFFORTS, addPanelModel, effortById, isRoleOverride,
+  EFFORTS, addPanelModel, changedRows, effortById, isRoleOverride,
   removePanelModel, setEffort, setGroupModel, setRoleModel,
 } from '../../../lib/roles.js';
 import styles from './start.module.css';
 
-const SAVED_LINE = 'Saved on this machine. A reload, or another card, keeps this choice.';
+const SAVED_LINE = 'Saved on this machine. Restart Studio in its terminal before the next run.';
 
 function ModelName({ model }) {
   if (!model) return <span className={styles.model}>Unknown model</span>;
@@ -50,15 +50,19 @@ function describeChange(prev, next, groups, byId) {
   return '';
 }
 
-export default function StartScreen({ card, groups, models, initial, mainSession, shipping, saveDraft }) {
+export default function StartScreen({ card, groups, models, initial, leadModels, saveDraft }) {
   const [choice, setChoice] = useState(initial);
-  const [expanded, setExpanded] = useState('');
+  // The rows this page loaded, so Save sends only what this page moved.
+  const baseline = useRef(initial);
+  const [expanded, setExpanded] = useState(() => groups.map(group => group.id));
   const [picker, setPicker] = useState(null);
   const [info, setInfo] = useState('');
   const [notice, setNotice] = useState('');
   const [done, setDone] = useState('');
   const [ready, setReady] = useState(false);
   const [saveProblem, setSaveProblem] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(true);
 
   // The page is drawn before this script runs, so for a moment the controls look usable but
   // drop every tap. Keep them off and say so until the handlers are attached.
@@ -78,15 +82,40 @@ export default function StartScreen({ card, groups, models, initial, mainSession
     setNotice('');
     setDone(describeChange(choice, next, groups, byId));
     setSaveProblem('');
+    setSaved(false);
     setChoice(next);
-    saveDraft({ ...next, card, updatedAt: new Date().toISOString() })
-      .catch(() => setSaveProblem('The choice could not be saved to disk. It is still on this screen, but a reload will lose it.'));
+  }
+
+  async function save() {
+    setSaving(true);
+    setSaveProblem('');
+    setSaved(false);
+    try {
+      const patch = changedRows(baseline.current, choice);
+      const result = await saveDraft(patch);
+      if (!result.ok) throw new Error(result.problem);
+      baseline.current = result.choice;
+      setChoice(result.choice);
+      setSaved(true);
+    } catch (error) {
+      setSaveProblem(error.message || 'The models could not be saved. Your picks are still on screen.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function modelFor(id) {
+    return byId.get(id) ?? { name: id || 'Not configured', price: 'Not in the available model list' };
   }
 
   function choose(modelId) {
     const target = picker;
     setPicker(null);
     if (!target) return;
+    if (target.groupId === 'lead') {
+      change(current => ({ ...current, lead: modelId }));
+      return;
+    }
     const group = groups.find(item => item.id === target.groupId);
     if (!group) return;
     if (group.panel) change(current => addPanelModel(current, target.groupId, modelId, target.roleId));
@@ -100,12 +129,12 @@ export default function StartScreen({ card, groups, models, initial, mainSession
 
   function chips(group, roleId, ids, label) {
     return <div className={styles.chips} role="group" aria-label={label}>
-      {ids.map(id => <span className={styles.chip} key={id}>
-        <ModelName model={byId.get(id)} />
-        <button type="button" className={styles.chipCross} aria-label={`Remove ${byId.get(id)?.name ?? id} from ${label}`} disabled={!ready}
+      {ids.map(id => <span className={styles.chip} data-current-model-id={id} key={id}>
+        <ModelName model={modelFor(id)} />
+        <button type="button" className={styles.chipCross} aria-label={`Remove ${byId.get(id)?.name ?? id} from ${label}`} disabled={!ready || saving}
           onClick={() => removeChip(group, roleId, id)}>×</button>
       </span>)}
-      <button type="button" className={styles.addChip} aria-label={`Add a model to ${label}`} disabled={!ready}
+      <button type="button" className={styles.addChip} aria-label={`Add a model to ${label}`} disabled={!ready || saving}
         onClick={() => setPicker({ groupId: group.id, roleId })}>+ Add</button>
     </div>;
   }
@@ -117,8 +146,12 @@ export default function StartScreen({ card, groups, models, initial, mainSession
     <section className={styles.section} aria-labelledby="settings-heading">
       <h2 id="settings-heading">Settings</h2>
       <dl className={styles.summary}>
-        <div className={styles.row}><dt>Main session</dt><dd><ModelName model={mainSession} /></dd></div>
-        <div className={styles.row}><dt>Shipping</dt><dd><ModelName model={shipping} /></dd></div>
+        <div className={styles.row}><dt>Lead</dt><dd>
+          <button type="button" data-current-model-id={choice.lead} className={styles.modelButton} aria-label="Change the Lead model" disabled={!ready || saving}
+            onClick={() => setPicker({ groupId: 'lead', roleId: '' })}>
+            <ModelName model={modelFor(choice.lead)} />
+          </button>
+        </dd></div>
         <div className={styles.row}><dt>Effort</dt><dd>{effort.name}</dd></div>
       </dl>
     </section>
@@ -129,39 +162,39 @@ export default function StartScreen({ card, groups, models, initial, mainSession
         {EFFORTS.map(option => {
           const chosen = option.id === choice.effort;
           return <li key={option.id} className={chosen ? `${styles.effort} ${styles.chosen}` : styles.effort}>
-            <button type="button" className={styles.effortPick} aria-pressed={chosen} disabled={!ready}
+            <button type="button" className={styles.effortPick} aria-pressed={chosen} disabled={!ready || saving}
               onClick={() => change(current => setEffort(current, option.id))}>
               <span className={styles.brains} aria-hidden="true">{'🧠'.repeat(option.brains)}</span>
               <span className={styles.effortName}>{option.name}</span>
             </button>
-            <button type="button" className={styles.infoButton} aria-label={`What ${option.name} means`} disabled={!ready}
+            <button type="button" className={styles.infoButton} aria-label={`What ${option.name} means`} disabled={!ready || saving}
               aria-expanded={info === option.id} onClick={() => setInfo(info === option.id ? '' : option.id)}>ⓘ</button>
             {info === option.id ? <p className={styles.info}>{option.info}</p> : null}
           </li>;
         })}
       </ul>
-      <p className={styles.whyText}>How hard the models think. More brains is slower and costs more.</p>
+      <p className={styles.whyText}>Sets pstack's reasoning budget. Each provider uses the reasoning levels its model supports.</p>
     </section>
 
     <section className={styles.section} aria-labelledby="models-heading">
       <h2 id="models-heading">Models</h2>
-      <p className={styles.hint}>Tap a model name to pick another from the weekly sweep. Tap the group name to see its roles.</p>
+      <p className={styles.hint}>Tap a model name to pick another from your connected accounts. Tap the group name to see its roles.</p>
       {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
       {done ? <p className={styles.done} role="status">{done}</p> : null}
       <ul className={styles.groups}>
         {groups.map(group => {
-          const open = expanded === group.id;
+          const open = expanded.includes(group.id);
           return <li key={group.id} className={styles.group}>
             <div className={styles.groupRow}>
-              <button type="button" className={styles.groupName} aria-expanded={open} disabled={!ready}
-                aria-controls={`roles-${group.id}`} onClick={() => setExpanded(open ? '' : group.id)}>
+              <button type="button" className={styles.groupName} aria-expanded={open} disabled={!ready || saving}
+                aria-controls={`roles-${group.id}`} onClick={() => setExpanded(open ? expanded.filter(id => id !== group.id) : [...expanded, group.id])}>
                 <span className={styles.arrow} aria-hidden="true">{open ? '▾' : '▸'}</span>{group.name}
               </button>
               {group.panel
                 ? chips(group, '', choice.groups[group.id].models, `${group.name} group`)
-                : <button type="button" className={styles.modelButton} aria-label={`Change the ${group.name} group model`} disabled={!ready}
+                : <button type="button" data-current-model-id={choice.groups[group.id].model} className={styles.modelButton} aria-label={`Change the ${group.name} group model`} disabled={!ready || saving}
                   onClick={() => setPicker({ groupId: group.id, roleId: '' })}>
-                  <ModelName model={byId.get(choice.groups[group.id].model)} />
+                  <ModelName model={modelFor(choice.groups[group.id].model)} />
                 </button>}
             </div>
             {open ? <ul className={styles.roles} id={`roles-${group.id}`}>
@@ -170,13 +203,13 @@ export default function StartScreen({ card, groups, models, initial, mainSession
                 const infoKey = `${group.id}:${role.id}`;
                 return <li key={role.id} className={override ? `${styles.role} ${styles.roleOverride}` : styles.role}>
                   <span className={styles.roleName}>{role.name}</span>
-                  <button type="button" className={styles.infoButton} aria-label={`What ${role.name} means`} disabled={!ready}
+                  <button type="button" className={styles.infoButton} aria-label={`What ${role.name} means`} disabled={!ready || saving}
                     aria-expanded={info === infoKey} onClick={() => setInfo(info === infoKey ? '' : infoKey)}>ⓘ</button>
                   {group.panel
                     ? chips(group, role.id, choice.groups[group.id].roles[role.id], `${group.name}: ${role.name}`)
-                    : <button type="button" className={styles.modelButton} aria-label={`Change the ${role.name} model`} disabled={!ready}
+                    : <button type="button" data-current-model-id={choice.groups[group.id].roles[role.id]} className={styles.modelButton} aria-label={`Change the ${role.name} model`} disabled={!ready || saving}
                       onClick={() => setPicker({ groupId: group.id, roleId: role.id })}>
-                      <ModelName model={byId.get(choice.groups[group.id].roles[role.id])} />
+                      <ModelName model={modelFor(choice.groups[group.id].roles[role.id])} />
                     </button>}
                   {override ? <span className={styles.override}>set on its own</span> : null}
                   {info === infoKey ? <p className={styles.info}>{role.explanation}</p> : null}
@@ -186,10 +219,12 @@ export default function StartScreen({ card, groups, models, initial, mainSession
           </li>;
         })}
       </ul>
-      <p className={styles.saved}>{saveProblem || SAVED_LINE}</p>
+      <button type="button" className={styles.modelButton} disabled={!ready || saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</button>
+      {saveProblem ? <p className={styles.notice} role="alert">{saveProblem}</p> : null}
+      <p className={styles.saved} role="status">{saved ? SAVED_LINE : 'Picks are not applied until you press Save. Restart Studio after saving.'}</p>
     </section>
 
-    {picker ? <ModelPicker label={pickerLabel(picker, groups)} models={models}
+    {picker ? <ModelPicker label={pickerLabel(picker, groups)} models={picker.groupId === 'lead' ? leadModels : models}
       current={currentPick(choice, picker, groups)}
       chosen={chosenIds(choice, picker, groups)}
       panel={Boolean(groups.find(group => group.id === picker.groupId)?.panel)}
@@ -198,6 +233,7 @@ export default function StartScreen({ card, groups, models, initial, mainSession
 }
 
 function pickerLabel(picker, groups) {
+  if (picker.groupId === 'lead') return 'Choose a model for Lead';
   const group = groups.find(item => item.id === picker.groupId);
   if (!group) return 'Choose a model';
   const role = picker.roleId ? group.roles.find(item => item.id === picker.roleId) : null;
@@ -205,6 +241,7 @@ function pickerLabel(picker, groups) {
 }
 
 function currentPick(choice, picker, groups) {
+  if (picker.groupId === 'lead') return choice.lead;
   const group = groups.find(item => item.id === picker.groupId);
   if (!group || group.panel) return '';
   if (!group.roles.some(role => role.id === picker.roleId)) return '';
@@ -249,7 +286,7 @@ function ModelPicker({ label, models, current, chosen, panel, onClose, onChoose 
               const picked = model.id === current;
               const added = panel && chosen.includes(model.id);
               return <li key={model.id}>
-                <button type="button" className={picked ? `${styles.pickModel} ${styles.chosen}` : styles.pickModel}
+                <button type="button" data-model-id={model.id} className={picked ? `${styles.pickModel} ${styles.chosen}` : styles.pickModel}
                   aria-pressed={picked} onClick={() => onChoose(model.id)}>
                   <span className={styles.model}>{model.name}</span>
                   <span className={styles.price}>{model.price}</span>

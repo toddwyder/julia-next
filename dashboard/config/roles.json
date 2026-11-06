@@ -6,7 +6,7 @@
       "roles": [
         {
           "id": "feature-refactoring",
-          "name": "feature/refactoring",
+          "name": "feature, refactoring",
           "default": "commandcode/deepseek/deepseek-v4.1-flash",
           "explanation": "Builds new features, or reorganizes code without changing what it does."
         },
@@ -90,7 +90,7 @@
         },
         {
           "id": "reflect-judgment",
-          "name": "reflect judgment",
+          "name": "reflect judgment, divergent, synthesizer",
           "default": "openai/gpt-6.1-sol",
           "explanation": "Reviews the session for lessons about decisions."
         }

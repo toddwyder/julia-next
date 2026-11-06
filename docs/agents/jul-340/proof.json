@@ -1,0 +1,4287 @@
+{
+  "card": "JUL-340",
+  "checkedAt": "2026-11-06T07:57:48.607Z",
+  "originalHashes": {
+    "pstack": null,
+    "lead": "da34bc64835941269937c246187bf6bd6f8cc1de3d9e93e523d4124f5c36be71"
+  },
+  "accountLeadModels": [
+    "anthropic/claude-fable-5",
+    "anthropic/claude-fable-5-1",
+    "anthropic/claude-haiku-4-5",
+    "anthropic/claude-haiku-4-5-20251001",
+    "anthropic/claude-haiku-5-5",
+    "anthropic/claude-opus-4-5",
+    "anthropic/claude-opus-4-5-20251101",
+    "anthropic/claude-opus-4-6",
+    "anthropic/claude-opus-4-7",
+    "anthropic/claude-opus-4-8",
+    "anthropic/claude-opus-5",
+    "anthropic/claude-opus-5-5",
+    "anthropic/claude-sonnet-4-5",
+    "anthropic/claude-sonnet-4-5-20250929",
+    "anthropic/claude-sonnet-4-6",
+    "anthropic/claude-sonnet-5",
+    "anthropic/claude-sonnet-5-5",
+    "commandcode/MiniMaxAI/MiniMax-M2.5",
+    "commandcode/MiniMaxAI/MiniMax-M2.7",
+    "commandcode/MiniMaxAI/MiniMax-M3",
+    "commandcode/Qwen/Qwen3.8-27B",
+    "commandcode/Qwen/Qwen3.8-Flash",
+    "commandcode/Qwen/Qwen3.8-Max",
+    "commandcode/Qwen/Qwen3.8-Max-0902",
+    "commandcode/Qwen/Qwen3.8-Omni-Flash",
+    "commandcode/claude-fable-5",
+    "commandcode/claude-fable-5-1",
+    "commandcode/claude-haiku-4-5-20251001",
+    "commandcode/claude-haiku-5-5",
+    "commandcode/claude-opus-4-7",
+    "commandcode/claude-opus-4-8",
+    "commandcode/claude-opus-5",
+    "commandcode/claude-opus-5-5",
+    "commandcode/claude-sonnet-4-6",
+    "commandcode/claude-sonnet-5",
+    "commandcode/claude-sonnet-5-5",
+    "commandcode/deepseek/deepseek-v4-flash",
+    "commandcode/deepseek/deepseek-v4-flash-fast",
+    "commandcode/deepseek/deepseek-v4-flash-vision-exp",
+    "commandcode/deepseek/deepseek-v4-pro",
+    "commandcode/deepseek/deepseek-v4.1-flash",
+    "commandcode/deepseek/deepseek-v4.1-flash-fast",
+    "commandcode/google/gemini-3.1-flash-lite",
+    "commandcode/google/gemini-3.5-flash",
+    "commandcode/google/gemini-3.5-flash-lite",
+    "commandcode/google/gemini-3.6-flash",
+    "commandcode/google/gemini-3.7-flash",
+    "commandcode/google/gemini-3.8-flash",
+    "commandcode/google/gemini-4-argon",
+    "commandcode/gpt-5.3-codex",
+    "commandcode/gpt-5.4",
+    "commandcode/gpt-5.4-mini",
+    "commandcode/gpt-5.5",
+    "commandcode/gpt-5.6-luna",
+    "commandcode/gpt-5.6-sol",
+    "commandcode/gpt-5.6-terra",
+    "commandcode/gpt-6-astra",
+    "commandcode/gpt-6-luna",
+    "commandcode/gpt-6-sol",
+    "commandcode/gpt-6.1-sol",
+    "commandcode/gpt-6.1-terra",
+    "commandcode/inclusionai/ling-3.1-flash:free",
+    "commandcode/meta/muse-spark-1.1",
+    "commandcode/meta/muse-spark-1.2",
+    "commandcode/meta/muse-spark-1.2-contributor",
+    "commandcode/meta/muse-spark-1.3",
+    "commandcode/meta/muse-spark-1.3-contributor",
+    "commandcode/meta/muse-wonder-1.0",
+    "commandcode/mistral/mistral-large-4",
+    "commandcode/moonshotai/Kimi-K2.7-Code",
+    "commandcode/moonshotai/Kimi-K2.7-Code-Highspeed",
+    "commandcode/moonshotai/Kimi-K3",
+    "commandcode/nvidia/nemotron-3-ultra-550b-a55b",
+    "commandcode/sakana/fugu-ultra",
+    "commandcode/stepfun/Step-3.5-Flash",
+    "commandcode/stepfun/Step-3.7-Flash",
+    "commandcode/stepfun/Step-5-Preview",
+    "commandcode/tencent/hy3-paid",
+    "commandcode/tencent/hy4-preview",
+    "commandcode/thinkingmachines/inkling",
+    "commandcode/thinkingmachines/inkling-small",
+    "commandcode/xai/grok-4.5",
+    "commandcode/xai/grok-4.6",
+    "commandcode/xai/grok-4.7",
+    "commandcode/z-ai/glm-5.3-flash",
+    "commandcode/z-ai/glm-5.3-flashx",
+    "commandcode/zai-org/GLM-5.2",
+    "commandcode/zai-org/GLM-5.2-Fast",
+    "commandcode/zai-org/GLM-5.3",
+    "openai/gpt-6.1-sol",
+    "openai/gpt-6-astra",
+    "openai/gpt-6.1-terra",
+    "openai/gpt-6-sol",
+    "openai/gpt-6-luna",
+    "openai/gpt-5.6-sol",
+    "openai/gpt-5.6-terra",
+    "openai/gpt-5.6-luna",
+    "commandcode/moonshotai/Kimi-K3.1-Pro"
+  ],
+  "criterion1": {
+    "url": "http://127.0.0.1:40917/start",
+    "screenshot": "/home/ubuntu/julia-fix-451/docs/agents/jul-340/start-saved.png",
+    "savedLead": "commandcode/moonshotai/Kimi-K3.1-Pro",
+    "savedCoder": "commandcode/deepseek/deepseek-v4-flash",
+    "lead": {
+      "model": "openai/gpt-6.1-sol",
+      "savedVerdict": "PASS",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "The expression evaluated to a falsy value:\n\n  assert(leadText.includes(wrongLead))\n"
+      }
+    },
+    "visibleRoles": [
+      {
+        "role": "feature, refactoring",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "bug-fix",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "perf-issue",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "hillclimb",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "judgment and prose",
+        "models": [
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "hardest tasks",
+        "models": [
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "how explorer",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "how explainer",
+        "models": [
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "why investigators",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "why synthesizer",
+        "models": [
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "reflect tooling",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "reflect judgment, divergent, synthesizer",
+        "models": [
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "arena runners",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "arena cross-judge pool",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "architect runners",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "interrogate reviewers",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "swarm workers",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "anthropic/claude-fable-5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      }
+    ],
+    "staleSave": {
+      "resaveLead": "commandcode/moonshotai/Kimi-K3.1-Pro",
+      "resaveCoder": "commandcode/deepseek/deepseek-v4-flash",
+      "ownPick": "commandcode/deepseek/deepseek-v4-flash",
+      "lead": "commandcode/moonshotai/Kimi-K3.1-Pro",
+      "coder": "commandcode/deepseek/deepseek-v4-flash"
+    }
+  },
+  "savedHashes": {
+    "pstack": "08867c451fb6c0f7529f0910110b4b52162778279be00623b072ad4dff981821",
+    "lead": "922223ec22e20faaf2f02f3ac206fedd36648a6228c13da5a0ae743470a2e1d3"
+  },
+  "criterion3": {
+    "runId": "cfe165cd-2866-4995-955a-8f306f7d0a78",
+    "traceId": "9b5034999d5935f5c40a77f47ab8394b",
+    "agent": "flow-build",
+    "model": "commandcode/moonshotai/Kimi-K3.1-Pro",
+    "inferenceSpans": [
+      {
+        "spanId": "4b70d4e97e28511f",
+        "provider": "commandcode",
+        "model": "moonshotai/Kimi-K3.1-Pro",
+        "usage": {
+          "inputTokens": 12445,
+          "outputTokens": 216,
+          "inputDetails": {
+            "cacheRead": 0,
+            "text": 12445
+          },
+          "outputDetails": {
+            "reasoning": 196,
+            "text": 20
+          }
+        }
+      }
+    ],
+    "savedVerdict": "PASS",
+    "mismatchedPick": "anthropic/claude-fable-5",
+    "mismatch": {
+      "verdict": "FAIL",
+      "reason": "Studio trace cfe165cd-2866-4995-955a-8f306f7d0a78 used commandcode/moonshotai/Kimi-K3.1-Pro inside flow-build, expected anthropic/claude-fable-5."
+    }
+  },
+  "criterion4": [
+    {
+      "runId": "1f0ebd72-ee3a-4e60-9d12-167ee73d4412",
+      "traceId": "5134124012a6677d9fddf9aabfe3505c",
+      "agent": "pstack-feature-refactoring-1",
+      "model": "commandcode/deepseek/deepseek-v4-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "fddc559614f7b45a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 284,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 58
+            },
+            "outputDetails": {
+              "reasoning": 278,
+              "text": 6
+            }
+          }
+        }
+      ],
+      "role": "feature, refactoring",
+      "helper": "featureRefactoring",
+      "toolSpanId": "8fb953093266a0bb",
+      "answer": "5686detlaboc",
+      "leadInferences": [
+        {
+          "spanId": "5d8a92c970a0ad41",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "fddc559614f7b45a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 284,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 58
+            },
+            "outputDetails": {
+              "reasoning": 278,
+              "text": 6
+            }
+          }
+        },
+        {
+          "spanId": "8f7825fccc799b66",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22918,
+            "outputTokens": 415,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 22918
+            },
+            "outputDetails": {
+              "reasoning": 326,
+              "text": 89
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 1f0ebd72-ee3a-4e60-9d12-167ee73d4412 used commandcode/deepseek/deepseek-v4-flash inside pstack-feature-refactoring-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "14492a25-ed3c-435e-80b3-06a4baec4196",
+      "traceId": "0540efed290cf5c9673e7d4afc1e4945",
+      "agent": "pstack-bug-fix-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "2dacf66cfa2621a7",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17189,
+            "outputTokens": 259,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 198,
+              "text": 61
+            }
+          }
+        },
+        {
+          "spanId": "adced7a356da6e1b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17466,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 314
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "bug-fix",
+      "helper": "bugFix",
+      "toolSpanId": "9381cbb042292b56",
+      "answer": "d43531tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "2dacf66cfa2621a7",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17189,
+            "outputTokens": 259,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 198,
+              "text": 61
+            }
+          }
+        },
+        {
+          "spanId": "47a1d6d861521499",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "e9338706c3c22e2b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22917,
+            "outputTokens": 344,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 22917
+            },
+            "outputDetails": {
+              "reasoning": 261,
+              "text": 83
+            }
+          }
+        },
+        {
+          "spanId": "adced7a356da6e1b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17466,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 314
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 14492a25-ed3c-435e-80b3-06a4baec4196 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-bug-fix-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "b7c5ea28-0356-417b-a9cc-6d974976045a",
+      "traceId": "90293e477f2b3e8494f813ef3f38c6e0",
+      "agent": "pstack-perf-issue-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "71682f834bde11ee",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17187,
+            "outputTokens": 184,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17187
+            },
+            "outputDetails": {
+              "reasoning": 176,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "perf-issue",
+      "helper": "perfIssue",
+      "toolSpanId": "60e88407cfa7a88c",
+      "answer": "fba84etlaboc",
+      "leadInferences": [
+        {
+          "spanId": "4b6b7d2b45778e46",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22918,
+            "outputTokens": 315,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 134
+            },
+            "outputDetails": {
+              "reasoning": 231,
+              "text": 84
+            }
+          }
+        },
+        {
+          "spanId": "71682f834bde11ee",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17187,
+            "outputTokens": 184,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17187
+            },
+            "outputDetails": {
+              "reasoning": 176,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "1808fb82ff9cf916",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace b7c5ea28-0356-417b-a9cc-6d974976045a used commandcode/deepseek/deepseek-v4.1-flash inside pstack-perf-issue-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "8def0b97-636c-45f9-8a0e-eb874d138838",
+      "traceId": "6015e2ee5d757aca9e0a0e091cacf9fd",
+      "agent": "pstack-hillclimb-1",
+      "model": "commandcode/deepseek/deepseek-v4-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "e52b78623364ca6d",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17604,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 452
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "85849273e7388a9c",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17206,
+            "outputTokens": 379,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 54
+            },
+            "outputDetails": {
+              "reasoning": 322,
+              "text": 57
+            }
+          }
+        }
+      ],
+      "role": "hillclimb",
+      "helper": "hillclimb",
+      "toolSpanId": "0ee47b720199262f",
+      "answer": "0f6700tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "1fdc762e38a3e84e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "e52b78623364ca6d",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17604,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 452
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "d67f8a019a332106",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 380,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 295,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "85849273e7388a9c",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17206,
+            "outputTokens": 379,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 54
+            },
+            "outputDetails": {
+              "reasoning": 322,
+              "text": 57
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 8def0b97-636c-45f9-8a0e-eb874d138838 used commandcode/deepseek/deepseek-v4-flash, commandcode/deepseek/deepseek-v4-flash inside pstack-hillclimb-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "20ca87a9-fbfb-47cd-a523-1d7618dbc277",
+      "traceId": "d6099e1f9ae55be0a8b39bdb438c2c36",
+      "agent": "pstack-judgment-and-prose-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "42ec0da5279718ba",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16209,
+            "outputTokens": 67,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16209
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "role": "judgment and prose",
+      "helper": "judgmentAndProse",
+      "toolSpanId": "f706d9acdde53f38",
+      "answer": "00236atlaboc",
+      "leadInferences": [
+        {
+          "spanId": "b8902dd0cddccf7e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 369,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 282,
+              "text": 87
+            }
+          }
+        },
+        {
+          "spanId": "e0522d5f1eaa2622",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23325,
+            "outputTokens": 27,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 541
+            },
+            "outputDetails": {
+              "reasoning": 7,
+              "text": 20
+            }
+          }
+        },
+        {
+          "spanId": "42ec0da5279718ba",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16209,
+            "outputTokens": 67,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16209
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 20ca87a9-fbfb-47cd-a523-1d7618dbc277 used openai.responses/gpt-6.1-sol inside pstack-judgment-and-prose-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "14c9fa84-df5a-42f8-bdc7-bfdf538a0731",
+      "traceId": "acc1d5718c54f35cbd45f1958ef7a38e",
+      "agent": "pstack-hardest-tasks-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "03babbb7619819c5",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16211,
+            "outputTokens": 69,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16211
+            },
+            "outputDetails": {
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        }
+      ],
+      "role": "hardest tasks",
+      "helper": "hardestTasks",
+      "toolSpanId": "34f68852458ad954",
+      "answer": "7a5df6tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "03babbb7619819c5",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16211,
+            "outputTokens": 69,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16211
+            },
+            "outputDetails": {
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        },
+        {
+          "spanId": "dc709066fa6c98b8",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 313,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 243,
+              "text": 70
+            }
+          }
+        },
+        {
+          "spanId": "4a70bfa93ced33d9",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 14c9fa84-df5a-42f8-bdc7-bfdf538a0731 used openai.responses/gpt-6.1-sol inside pstack-hardest-tasks-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "4dd528a4-198e-455c-a9c8-5ad7936f2155",
+      "traceId": "7835a3ccfcee2e70e86c16d8f1efaec9",
+      "agent": "pstack-how-explorer-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "8a2a5f7ef4532f85",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 120,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 113,
+              "text": 7
+            }
+          }
+        }
+      ],
+      "role": "how explorer",
+      "helper": "howExplorer",
+      "toolSpanId": "68610672d1121fba",
+      "answer": "44797atlaboc",
+      "leadInferences": [
+        {
+          "spanId": "8a2a5f7ef4532f85",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 120,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 113,
+              "text": 7
+            }
+          }
+        },
+        {
+          "spanId": "f04a1f1c76cd456f",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "7506c4fe8f264202",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22918,
+            "outputTokens": 464,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 134
+            },
+            "outputDetails": {
+              "reasoning": 381,
+              "text": 83
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 4dd528a4-198e-455c-a9c8-5ad7936f2155 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explorer-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "fcfc02d1-e2f2-4aa5-a13e-f091356047a5",
+      "traceId": "5ee92cce1854cae10280aadf7ee48734",
+      "agent": "pstack-how-explainer-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "aaffa6aab44b2060",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 69,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        }
+      ],
+      "role": "how explainer",
+      "helper": "howExplainer",
+      "toolSpanId": "16f1feb1ec09ea01",
+      "answer": "29b5f1tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "ef15b7ac0754ae42",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22920,
+            "outputTokens": 604,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 136
+            },
+            "outputDetails": {
+              "reasoning": 508,
+              "text": 96
+            }
+          }
+        },
+        {
+          "spanId": "3e9c1b20aa79f233",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "aaffa6aab44b2060",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 69,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace fcfc02d1-e2f2-4aa5-a13e-f091356047a5 used openai.responses/gpt-6.1-sol inside pstack-how-explainer-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "dbdad893-c4e2-4518-bf4e-04daaf00d561",
+      "traceId": "fcd4b663bf7a84570fd8e2e8513da154",
+      "agent": "pstack-why-investigators-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "2ee2251d82f7e95e",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17189,
+            "outputTokens": 134,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 75,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "a3d7d10e4eb872fe",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17342,
+            "outputTokens": 10,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 190
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 10
+            }
+          }
+        }
+      ],
+      "role": "why investigators",
+      "helper": "whyInvestigators",
+      "toolSpanId": "a53c0f04c084c71a",
+      "answer": "0d9fd3tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "9c8ba02a196635e4",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 354,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 268,
+              "text": 86
+            }
+          }
+        },
+        {
+          "spanId": "2ee2251d82f7e95e",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17189,
+            "outputTokens": 134,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 75,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "a3d7d10e4eb872fe",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17342,
+            "outputTokens": 10,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 190
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 10
+            }
+          }
+        },
+        {
+          "spanId": "5cdd015e5c98f30b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace dbdad893-c4e2-4518-bf4e-04daaf00d561 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-investigators-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "2a84f500-9fc2-4ac7-9423-a358a5251462",
+      "traceId": "8b9a0fd3306510d7fb152711c01c1e92",
+      "agent": "pstack-why-synthesizer-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "e05a86ff2864c7fa",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16237,
+            "outputTokens": 70,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16237
+            },
+            "outputDetails": {
+              "reasoning": 57,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "role": "why synthesizer",
+      "helper": "whySynthesizer",
+      "toolSpanId": "a631882386c73ede",
+      "answer": "c8ca79tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "3cddf908c3f72dbf",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "ccf101672efa3f5e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 512,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 395,
+              "text": 117
+            }
+          }
+        },
+        {
+          "spanId": "e05a86ff2864c7fa",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16237,
+            "outputTokens": 70,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16237
+            },
+            "outputDetails": {
+              "reasoning": 57,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 2a84f500-9fc2-4ac7-9423-a358a5251462 used openai.responses/gpt-6.1-sol inside pstack-why-synthesizer-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "5fa2a286-413b-4752-8484-bc7d9c87d1b0",
+      "traceId": "4ce56e5db38fdf1f98e44bfb9e4e3880",
+      "agent": "pstack-reflect-tooling-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "16083c1df503b629",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 74,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 66,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "reflect tooling",
+      "helper": "reflectTooling",
+      "toolSpanId": "b52fb246376195aa",
+      "answer": "547c96tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "c28040ca9146a4cd",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22917,
+            "outputTokens": 514,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 133
+            },
+            "outputDetails": {
+              "reasoning": 446,
+              "text": 68
+            }
+          }
+        },
+        {
+          "spanId": "87083f3071b039d7",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "16083c1df503b629",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 74,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 66,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5fa2a286-413b-4752-8484-bc7d9c87d1b0 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-tooling-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "305a3629-5bc6-42e9-9cf4-b28b5485dbbd",
+      "traceId": "9d0f3ac93185e5134f9998b2e6446a5d",
+      "agent": "pstack-reflect-judgment-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "b72f6f01fc0b2968",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 76,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16232
+            },
+            "outputDetails": {
+              "reasoning": 64,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "reflect judgment, divergent, synthesizer",
+      "helper": "reflectJudgment",
+      "toolSpanId": "e5adba19d005f24e",
+      "answer": "c86eectlaboc",
+      "leadInferences": [
+        {
+          "spanId": "b72f6f01fc0b2968",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 76,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16232
+            },
+            "outputDetails": {
+              "reasoning": 64,
+              "text": 12
+            }
+          }
+        },
+        {
+          "spanId": "1cbc8dc35334bd2c",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23795,
+            "outputTokens": 29,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 1011
+            },
+            "outputDetails": {
+              "reasoning": 8,
+              "text": 21
+            }
+          }
+        },
+        {
+          "spanId": "19fba1ba33b33f89",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22923,
+            "outputTokens": 836,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 139
+            },
+            "outputDetails": {
+              "reasoning": 730,
+              "text": 106
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 305a3629-5bc6-42e9-9cf4-b28b5485dbbd used openai.responses/gpt-6.1-sol inside pstack-reflect-judgment-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "af8774a5-3c07-4dd9-9180-cf765b016752",
+      "traceId": "cd0383c0c3180aeb90d8dd01c1201a5d",
+      "agent": "pstack-arena-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "21bdd10fa244c802",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17822,
+            "outputTokens": 54,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 670
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 54
+            }
+          }
+        },
+        {
+          "spanId": "a635b41de5521e6b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 593,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17210
+            },
+            "outputDetails": {
+              "reasoning": 537,
+              "text": 56
+            }
+          }
+        }
+      ],
+      "role": "arena runners",
+      "helper": "arenaRunners1",
+      "toolSpanId": "d01fc94ac70a3d4e",
+      "answer": "No subagent tool is available in this harness, so I did the job myself.\n\n`2b5ceatlaboc`\n\nEvidence: `echo \"cobaltaec5b2\" | rev` printed `2b5ceatlaboc`.",
+      "leadInferences": [
+        {
+          "spanId": "38a1d9665f955a01",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "21bdd10fa244c802",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17822,
+            "outputTokens": 54,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 670
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 54
+            }
+          }
+        },
+        {
+          "spanId": "84a5020e5448f83e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22941,
+            "outputTokens": 380,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 157
+            },
+            "outputDetails": {
+              "reasoning": 292,
+              "text": 88
+            }
+          }
+        },
+        {
+          "spanId": "a635b41de5521e6b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 593,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17210
+            },
+            "outputDetails": {
+              "reasoning": 537,
+              "text": 56
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace af8774a5-3c07-4dd9-9180-cf765b016752 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-runners-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "7ace979d-9493-45f2-8a53-6c21756a4f55",
+      "traceId": "611a669c0a40a60e96010bda8cd17797",
+      "agent": "pstack-arena-runners-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "127fd635f3c73419",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16223,
+            "outputTokens": 62,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16223
+            },
+            "outputDetails": {
+              "reasoning": 49,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "role": "arena runners",
+      "helper": "arenaRunners2",
+      "toolSpanId": "adb84b2ac6a56767",
+      "answer": "a2125btlaboc",
+      "leadInferences": [
+        {
+          "spanId": "127fd635f3c73419",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16223,
+            "outputTokens": 62,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16223
+            },
+            "outputDetails": {
+              "reasoning": 49,
+              "text": 13
+            }
+          }
+        },
+        {
+          "spanId": "cfe70ab29c0d8a5a",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "7c26d5476909da25",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22935,
+            "outputTokens": 258,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 151
+            },
+            "outputDetails": {
+              "reasoning": 172,
+              "text": 86
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 7ace979d-9493-45f2-8a53-6c21756a4f55 used openai.responses/gpt-6.1-sol inside pstack-arena-runners-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "113e05cd-41b2-4bcc-b345-11b8106a0d3e",
+      "traceId": "1afa366d1fb7cc7c247750fff1843f96",
+      "agent": "pstack-arena-cross-judge-pool-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "69646e8b59e6a34a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17223,
+            "outputTokens": 714,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17223
+            },
+            "outputDetails": {
+              "reasoning": 654,
+              "text": 60
+            }
+          }
+        },
+        {
+          "spanId": "415f3a3781119dcb",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17954,
+            "outputTokens": 99,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 802
+            },
+            "outputDetails": {
+              "reasoning": 36,
+              "text": 63
+            }
+          }
+        }
+      ],
+      "role": "arena cross-judge pool",
+      "helper": "arenaCrossJudgePool1",
+      "toolSpanId": "61d5eb562a891201",
+      "answer": "1784betlaboc\n\n**Evidence.** Helper took the job itself per the brief, no re-delegation. Verified with `printf '%s' \"cobalteb4871\" | rev` → `1784betlaboc`. The reversed string is `1784betlaboc`.",
+      "leadInferences": [
+        {
+          "spanId": "121ec83adc94a5b0",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22943,
+            "outputTokens": 376,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 159
+            },
+            "outputDetails": {
+              "reasoning": 304,
+              "text": 72
+            }
+          }
+        },
+        {
+          "spanId": "69646e8b59e6a34a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17223,
+            "outputTokens": 714,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17223
+            },
+            "outputDetails": {
+              "reasoning": 654,
+              "text": 60
+            }
+          }
+        },
+        {
+          "spanId": "415f3a3781119dcb",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17954,
+            "outputTokens": 99,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 802
+            },
+            "outputDetails": {
+              "reasoning": 36,
+              "text": 63
+            }
+          }
+        },
+        {
+          "spanId": "cbf83499714bce3f",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 113e05cd-41b2-4bcc-b345-11b8106a0d3e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-cross-judge-pool-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "6b1841e6-9ab6-4ffa-8dd6-be3a399c338a",
+      "traceId": "ea14bdd2d744cca18b0bb18a118afa5e",
+      "agent": "pstack-arena-cross-judge-pool-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "3adb2009bfef4d0b",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 34,
+            "inputDetails": {
+              "cacheRead": 3328,
+              "cacheWrite": 0,
+              "text": 12904
+            },
+            "outputDetails": {
+              "reasoning": 23,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "role": "arena cross-judge pool",
+      "helper": "arenaCrossJudgePool2",
+      "toolSpanId": "6dfefdbb7f85d464",
+      "answer": "470414tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "f613d4cbb6f0d2a2",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "4b1d0f250d291ce6",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22936,
+            "outputTokens": 363,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 152
+            },
+            "outputDetails": {
+              "reasoning": 278,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "3adb2009bfef4d0b",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 34,
+            "inputDetails": {
+              "cacheRead": 3328,
+              "cacheWrite": 0,
+              "text": 12904
+            },
+            "outputDetails": {
+              "reasoning": 23,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 6b1841e6-9ab6-4ffa-8dd6-be3a399c338a used openai.responses/gpt-6.1-sol inside pstack-arena-cross-judge-pool-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "5bd38377-8d87-4e16-8e38-2dd20cd0cc0e",
+      "traceId": "04c3e452077bc9fa2961264743638640",
+      "agent": "pstack-architect-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "4be3dd46f689bc30",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17204,
+            "outputTokens": 588,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17204
+            },
+            "outputDetails": {
+              "reasoning": 524,
+              "text": 64
+            }
+          }
+        },
+        {
+          "spanId": "6845345f48af94ce",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17811,
+            "outputTokens": 171,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 659
+            },
+            "outputDetails": {
+              "reasoning": 42,
+              "text": 129
+            }
+          }
+        }
+      ],
+      "role": "architect runners",
+      "helper": "architectRunners1",
+      "toolSpanId": "1657803badc3d5c9",
+      "answer": "I have no subagent tool in this harness, so I could not hand choice 1 to a `poteto-agent` runner, and I could not set the model to `commandcode/deepseek/deepseek-v4.1-flash`. Per the Harness mapping section, a harness without a subagent tool means doing the delegated step myself. So I ran the reversal directly and verified it with `python3`.\n\nEvidence: `python3 -c \"s='cobalt8669a4'; print(s[::-1])\"` printed `4a9668tlaboc`.\n\n4a9668tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "31fa843658fc0487",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "919d89934918d489",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22939,
+            "outputTokens": 298,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 155
+            },
+            "outputDetails": {
+              "reasoning": 228,
+              "text": 70
+            }
+          }
+        },
+        {
+          "spanId": "4be3dd46f689bc30",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17204,
+            "outputTokens": 588,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17204
+            },
+            "outputDetails": {
+              "reasoning": 524,
+              "text": 64
+            }
+          }
+        },
+        {
+          "spanId": "6845345f48af94ce",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17811,
+            "outputTokens": 171,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 659
+            },
+            "outputDetails": {
+              "reasoning": 42,
+              "text": 129
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5bd38377-8d87-4e16-8e38-2dd20cd0cc0e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-architect-runners-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "baf453ad-9aea-4254-ac48-f8fde6b06186",
+      "traceId": "42533fd67bd6f8cc66d8bc6c6578b086",
+      "agent": "pstack-architect-runners-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "5cd05b7920fc2a48",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 68,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "architect runners",
+      "helper": "architectRunners2",
+      "toolSpanId": "7f854c6578b80df7",
+      "answer": "33b016tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "be5bcdd53482116b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22934,
+            "outputTokens": 435,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 150
+            },
+            "outputDetails": {
+              "reasoning": 350,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "5cd05b7920fc2a48",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 68,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 12
+            }
+          }
+        },
+        {
+          "spanId": "3c7ee7c859bc16ae",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace baf453ad-9aea-4254-ac48-f8fde6b06186 used openai.responses/gpt-6.1-sol inside pstack-architect-runners-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "9263dec1-02b0-48d1-8674-de1884bafeae",
+      "traceId": "96a72911afabcc95445e742d8a034f15",
+      "agent": "pstack-interrogate-reviewers-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "61e241615d8d2eff",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17217,
+            "outputTokens": 413,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17217
+            },
+            "outputDetails": {
+              "reasoning": 354,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "3b67830ccfbee922",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17649,
+            "outputTokens": 10,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 497
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 10
+            }
+          }
+        }
+      ],
+      "role": "interrogate reviewers",
+      "helper": "interrogateReviewers1",
+      "toolSpanId": "4bb48320e7c4ccb2",
+      "answer": "5a2a27tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "53e3e42d5f27f48e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22941,
+            "outputTokens": 483,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 157
+            },
+            "outputDetails": {
+              "reasoning": 396,
+              "text": 87
+            }
+          }
+        },
+        {
+          "spanId": "61e241615d8d2eff",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17217,
+            "outputTokens": 413,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17217
+            },
+            "outputDetails": {
+              "reasoning": 354,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "3b67830ccfbee922",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17649,
+            "outputTokens": 10,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 497
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 10
+            }
+          }
+        },
+        {
+          "spanId": "affd63c623884b48",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23463,
+            "outputTokens": 29,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 679
+            },
+            "outputDetails": {
+              "reasoning": 6,
+              "text": 23
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 9263dec1-02b0-48d1-8674-de1884bafeae used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-interrogate-reviewers-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "5e2dc09d-49e9-4f7a-a14a-de09b4db980f",
+      "traceId": "b31168a9e0d01719f03b242376937f88",
+      "agent": "pstack-interrogate-reviewers-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "65ade12b05b04a74",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16230,
+            "outputTokens": 44,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16230
+            },
+            "outputDetails": {
+              "reasoning": 32,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "interrogate reviewers",
+      "helper": "interrogateReviewers2",
+      "toolSpanId": "776fbb0b1aac4b06",
+      "answer": "af4973tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "15eef9734a0e583b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23244,
+            "outputTokens": 29,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 460
+            },
+            "outputDetails": {
+              "reasoning": 8,
+              "text": 21
+            }
+          }
+        },
+        {
+          "spanId": "380cfcf2fe9cf950",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22935,
+            "outputTokens": 272,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 151
+            },
+            "outputDetails": {
+              "reasoning": 200,
+              "text": 72
+            }
+          }
+        },
+        {
+          "spanId": "65ade12b05b04a74",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16230,
+            "outputTokens": 44,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16230
+            },
+            "outputDetails": {
+              "reasoning": 32,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5e2dc09d-49e9-4f7a-a14a-de09b4db980f used openai.responses/gpt-6.1-sol inside pstack-interrogate-reviewers-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "20749b1f-e70c-46cb-8ac6-41f0fb60eb4f",
+      "traceId": "850dd1f3ce176a4c60854ec56e4c2dc2",
+      "agent": "pstack-swarm-workers-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "2835ae7636799961",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17188,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17188
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "swarm workers",
+      "helper": "swarmWorkers",
+      "toolSpanId": "d7907fa805bdd4a3",
+      "answer": "1f283dtlaboc",
+      "leadInferences": [
+        {
+          "spanId": "e0018ba898153fa7",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 503,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 418,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "2835ae7636799961",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17188,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17188
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "c11669dcfa8d674a",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 20749b1f-e70c-46cb-8ac6-41f0fb60eb4f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-swarm-workers-1, expected anthropic/claude-fable-5."
+      }
+    }
+  ],
+  "studioMetrics": [
+    {
+      "name": "mastra_model_total_input_tokens",
+      "model": "deepseek-deepseek-v4-1-flash",
+      "value": 17188,
+      "estimatedCost": 0.0025781999999999997,
+      "costUnit": "USD"
+    },
+    {
+      "name": "mastra_model_total_output_tokens",
+      "model": "deepseek-deepseek-v4-1-flash",
+      "value": 8,
+      "estimatedCost": 0.0000048,
+      "costUnit": "USD"
+    },
+    {
+      "name": "mastra_model_output_text_tokens",
+      "model": "deepseek-deepseek-v4-1-flash",
+      "value": 8,
+      "estimatedCost": 0.0000048,
+      "costUnit": "USD"
+    },
+    {
+      "name": "mastra_model_input_text_tokens",
+      "model": "deepseek-deepseek-v4-1-flash",
+      "value": 17188,
+      "estimatedCost": 0.0025781999999999997,
+      "costUnit": "USD"
+    }
+  ],
+  "criterion2": [
+    {
+      "runId": "cfe165cd-2866-4995-955a-8f306f7d0a78",
+      "traceId": "9b5034999d5935f5c40a77f47ab8394b",
+      "agent": "flow-build",
+      "model": "commandcode/moonshotai/Kimi-K3.1-Pro",
+      "inferenceSpans": [
+        {
+          "spanId": "4b70d4e97e28511f",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 12445,
+            "outputTokens": 216,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 12445
+            },
+            "outputDetails": {
+              "reasoning": 196,
+              "text": 20
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace cfe165cd-2866-4995-955a-8f306f7d0a78 used commandcode/moonshotai/Kimi-K3.1-Pro inside flow-build, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "1f0ebd72-ee3a-4e60-9d12-167ee73d4412",
+      "traceId": "5134124012a6677d9fddf9aabfe3505c",
+      "agent": "pstack-feature-refactoring-1",
+      "model": "commandcode/deepseek/deepseek-v4-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "fddc559614f7b45a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 284,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 58
+            },
+            "outputDetails": {
+              "reasoning": 278,
+              "text": 6
+            }
+          }
+        }
+      ],
+      "role": "feature, refactoring",
+      "helper": "featureRefactoring",
+      "toolSpanId": "8fb953093266a0bb",
+      "answer": "5686detlaboc",
+      "leadInferences": [
+        {
+          "spanId": "5d8a92c970a0ad41",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "fddc559614f7b45a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 284,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 58
+            },
+            "outputDetails": {
+              "reasoning": 278,
+              "text": 6
+            }
+          }
+        },
+        {
+          "spanId": "8f7825fccc799b66",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22918,
+            "outputTokens": 415,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 22918
+            },
+            "outputDetails": {
+              "reasoning": 326,
+              "text": 89
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 1f0ebd72-ee3a-4e60-9d12-167ee73d4412 used commandcode/deepseek/deepseek-v4-flash inside pstack-feature-refactoring-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "14492a25-ed3c-435e-80b3-06a4baec4196",
+      "traceId": "0540efed290cf5c9673e7d4afc1e4945",
+      "agent": "pstack-bug-fix-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "2dacf66cfa2621a7",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17189,
+            "outputTokens": 259,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 198,
+              "text": 61
+            }
+          }
+        },
+        {
+          "spanId": "adced7a356da6e1b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17466,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 314
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "bug-fix",
+      "helper": "bugFix",
+      "toolSpanId": "9381cbb042292b56",
+      "answer": "d43531tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "2dacf66cfa2621a7",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17189,
+            "outputTokens": 259,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 198,
+              "text": 61
+            }
+          }
+        },
+        {
+          "spanId": "47a1d6d861521499",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "e9338706c3c22e2b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22917,
+            "outputTokens": 344,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 22917
+            },
+            "outputDetails": {
+              "reasoning": 261,
+              "text": 83
+            }
+          }
+        },
+        {
+          "spanId": "adced7a356da6e1b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17466,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 314
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 14492a25-ed3c-435e-80b3-06a4baec4196 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-bug-fix-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "b7c5ea28-0356-417b-a9cc-6d974976045a",
+      "traceId": "90293e477f2b3e8494f813ef3f38c6e0",
+      "agent": "pstack-perf-issue-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "71682f834bde11ee",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17187,
+            "outputTokens": 184,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17187
+            },
+            "outputDetails": {
+              "reasoning": 176,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "perf-issue",
+      "helper": "perfIssue",
+      "toolSpanId": "60e88407cfa7a88c",
+      "answer": "fba84etlaboc",
+      "leadInferences": [
+        {
+          "spanId": "4b6b7d2b45778e46",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22918,
+            "outputTokens": 315,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 134
+            },
+            "outputDetails": {
+              "reasoning": 231,
+              "text": 84
+            }
+          }
+        },
+        {
+          "spanId": "71682f834bde11ee",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17187,
+            "outputTokens": 184,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17187
+            },
+            "outputDetails": {
+              "reasoning": 176,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "1808fb82ff9cf916",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace b7c5ea28-0356-417b-a9cc-6d974976045a used commandcode/deepseek/deepseek-v4.1-flash inside pstack-perf-issue-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "8def0b97-636c-45f9-8a0e-eb874d138838",
+      "traceId": "6015e2ee5d757aca9e0a0e091cacf9fd",
+      "agent": "pstack-hillclimb-1",
+      "model": "commandcode/deepseek/deepseek-v4-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "e52b78623364ca6d",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17604,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 452
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "85849273e7388a9c",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17206,
+            "outputTokens": 379,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 54
+            },
+            "outputDetails": {
+              "reasoning": 322,
+              "text": 57
+            }
+          }
+        }
+      ],
+      "role": "hillclimb",
+      "helper": "hillclimb",
+      "toolSpanId": "0ee47b720199262f",
+      "answer": "0f6700tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "1fdc762e38a3e84e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "e52b78623364ca6d",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17604,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 452
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "d67f8a019a332106",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 380,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 295,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "85849273e7388a9c",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17206,
+            "outputTokens": 379,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 54
+            },
+            "outputDetails": {
+              "reasoning": 322,
+              "text": 57
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 8def0b97-636c-45f9-8a0e-eb874d138838 used commandcode/deepseek/deepseek-v4-flash, commandcode/deepseek/deepseek-v4-flash inside pstack-hillclimb-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "20ca87a9-fbfb-47cd-a523-1d7618dbc277",
+      "traceId": "d6099e1f9ae55be0a8b39bdb438c2c36",
+      "agent": "pstack-judgment-and-prose-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "42ec0da5279718ba",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16209,
+            "outputTokens": 67,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16209
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "role": "judgment and prose",
+      "helper": "judgmentAndProse",
+      "toolSpanId": "f706d9acdde53f38",
+      "answer": "00236atlaboc",
+      "leadInferences": [
+        {
+          "spanId": "b8902dd0cddccf7e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 369,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 282,
+              "text": 87
+            }
+          }
+        },
+        {
+          "spanId": "e0522d5f1eaa2622",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23325,
+            "outputTokens": 27,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 541
+            },
+            "outputDetails": {
+              "reasoning": 7,
+              "text": 20
+            }
+          }
+        },
+        {
+          "spanId": "42ec0da5279718ba",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16209,
+            "outputTokens": 67,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16209
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 20ca87a9-fbfb-47cd-a523-1d7618dbc277 used openai.responses/gpt-6.1-sol inside pstack-judgment-and-prose-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "14c9fa84-df5a-42f8-bdc7-bfdf538a0731",
+      "traceId": "acc1d5718c54f35cbd45f1958ef7a38e",
+      "agent": "pstack-hardest-tasks-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "03babbb7619819c5",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16211,
+            "outputTokens": 69,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16211
+            },
+            "outputDetails": {
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        }
+      ],
+      "role": "hardest tasks",
+      "helper": "hardestTasks",
+      "toolSpanId": "34f68852458ad954",
+      "answer": "7a5df6tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "03babbb7619819c5",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16211,
+            "outputTokens": 69,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16211
+            },
+            "outputDetails": {
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        },
+        {
+          "spanId": "dc709066fa6c98b8",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 313,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 243,
+              "text": 70
+            }
+          }
+        },
+        {
+          "spanId": "4a70bfa93ced33d9",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 14c9fa84-df5a-42f8-bdc7-bfdf538a0731 used openai.responses/gpt-6.1-sol inside pstack-hardest-tasks-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "4dd528a4-198e-455c-a9c8-5ad7936f2155",
+      "traceId": "7835a3ccfcee2e70e86c16d8f1efaec9",
+      "agent": "pstack-how-explorer-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "8a2a5f7ef4532f85",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 120,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 113,
+              "text": 7
+            }
+          }
+        }
+      ],
+      "role": "how explorer",
+      "helper": "howExplorer",
+      "toolSpanId": "68610672d1121fba",
+      "answer": "44797atlaboc",
+      "leadInferences": [
+        {
+          "spanId": "8a2a5f7ef4532f85",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 120,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 113,
+              "text": 7
+            }
+          }
+        },
+        {
+          "spanId": "f04a1f1c76cd456f",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "7506c4fe8f264202",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22918,
+            "outputTokens": 464,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 134
+            },
+            "outputDetails": {
+              "reasoning": 381,
+              "text": 83
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 4dd528a4-198e-455c-a9c8-5ad7936f2155 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explorer-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "fcfc02d1-e2f2-4aa5-a13e-f091356047a5",
+      "traceId": "5ee92cce1854cae10280aadf7ee48734",
+      "agent": "pstack-how-explainer-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "aaffa6aab44b2060",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 69,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        }
+      ],
+      "role": "how explainer",
+      "helper": "howExplainer",
+      "toolSpanId": "16f1feb1ec09ea01",
+      "answer": "29b5f1tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "ef15b7ac0754ae42",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22920,
+            "outputTokens": 604,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 136
+            },
+            "outputDetails": {
+              "reasoning": 508,
+              "text": 96
+            }
+          }
+        },
+        {
+          "spanId": "3e9c1b20aa79f233",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "aaffa6aab44b2060",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 69,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace fcfc02d1-e2f2-4aa5-a13e-f091356047a5 used openai.responses/gpt-6.1-sol inside pstack-how-explainer-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "dbdad893-c4e2-4518-bf4e-04daaf00d561",
+      "traceId": "fcd4b663bf7a84570fd8e2e8513da154",
+      "agent": "pstack-why-investigators-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "2ee2251d82f7e95e",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17189,
+            "outputTokens": 134,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 75,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "a3d7d10e4eb872fe",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17342,
+            "outputTokens": 10,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 190
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 10
+            }
+          }
+        }
+      ],
+      "role": "why investigators",
+      "helper": "whyInvestigators",
+      "toolSpanId": "a53c0f04c084c71a",
+      "answer": "0d9fd3tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "9c8ba02a196635e4",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 354,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 268,
+              "text": 86
+            }
+          }
+        },
+        {
+          "spanId": "2ee2251d82f7e95e",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17189,
+            "outputTokens": 134,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 75,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "a3d7d10e4eb872fe",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17342,
+            "outputTokens": 10,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 190
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 10
+            }
+          }
+        },
+        {
+          "spanId": "5cdd015e5c98f30b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace dbdad893-c4e2-4518-bf4e-04daaf00d561 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-investigators-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "2a84f500-9fc2-4ac7-9423-a358a5251462",
+      "traceId": "8b9a0fd3306510d7fb152711c01c1e92",
+      "agent": "pstack-why-synthesizer-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "e05a86ff2864c7fa",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16237,
+            "outputTokens": 70,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16237
+            },
+            "outputDetails": {
+              "reasoning": 57,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "role": "why synthesizer",
+      "helper": "whySynthesizer",
+      "toolSpanId": "a631882386c73ede",
+      "answer": "c8ca79tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "3cddf908c3f72dbf",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "ccf101672efa3f5e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 512,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 395,
+              "text": 117
+            }
+          }
+        },
+        {
+          "spanId": "e05a86ff2864c7fa",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16237,
+            "outputTokens": 70,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16237
+            },
+            "outputDetails": {
+              "reasoning": 57,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 2a84f500-9fc2-4ac7-9423-a358a5251462 used openai.responses/gpt-6.1-sol inside pstack-why-synthesizer-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "5fa2a286-413b-4752-8484-bc7d9c87d1b0",
+      "traceId": "4ce56e5db38fdf1f98e44bfb9e4e3880",
+      "agent": "pstack-reflect-tooling-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "16083c1df503b629",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 74,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 66,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "reflect tooling",
+      "helper": "reflectTooling",
+      "toolSpanId": "b52fb246376195aa",
+      "answer": "547c96tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "c28040ca9146a4cd",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22917,
+            "outputTokens": 514,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 133
+            },
+            "outputDetails": {
+              "reasoning": 446,
+              "text": 68
+            }
+          }
+        },
+        {
+          "spanId": "87083f3071b039d7",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "16083c1df503b629",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 74,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 66,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5fa2a286-413b-4752-8484-bc7d9c87d1b0 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-tooling-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "305a3629-5bc6-42e9-9cf4-b28b5485dbbd",
+      "traceId": "9d0f3ac93185e5134f9998b2e6446a5d",
+      "agent": "pstack-reflect-judgment-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "b72f6f01fc0b2968",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 76,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16232
+            },
+            "outputDetails": {
+              "reasoning": 64,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "reflect judgment, divergent, synthesizer",
+      "helper": "reflectJudgment",
+      "toolSpanId": "e5adba19d005f24e",
+      "answer": "c86eectlaboc",
+      "leadInferences": [
+        {
+          "spanId": "b72f6f01fc0b2968",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 76,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16232
+            },
+            "outputDetails": {
+              "reasoning": 64,
+              "text": 12
+            }
+          }
+        },
+        {
+          "spanId": "1cbc8dc35334bd2c",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23795,
+            "outputTokens": 29,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 1011
+            },
+            "outputDetails": {
+              "reasoning": 8,
+              "text": 21
+            }
+          }
+        },
+        {
+          "spanId": "19fba1ba33b33f89",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22923,
+            "outputTokens": 836,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 139
+            },
+            "outputDetails": {
+              "reasoning": 730,
+              "text": 106
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 305a3629-5bc6-42e9-9cf4-b28b5485dbbd used openai.responses/gpt-6.1-sol inside pstack-reflect-judgment-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "af8774a5-3c07-4dd9-9180-cf765b016752",
+      "traceId": "cd0383c0c3180aeb90d8dd01c1201a5d",
+      "agent": "pstack-arena-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "21bdd10fa244c802",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17822,
+            "outputTokens": 54,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 670
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 54
+            }
+          }
+        },
+        {
+          "spanId": "a635b41de5521e6b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 593,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17210
+            },
+            "outputDetails": {
+              "reasoning": 537,
+              "text": 56
+            }
+          }
+        }
+      ],
+      "role": "arena runners",
+      "helper": "arenaRunners1",
+      "toolSpanId": "d01fc94ac70a3d4e",
+      "answer": "No subagent tool is available in this harness, so I did the job myself.\n\n`2b5ceatlaboc`\n\nEvidence: `echo \"cobaltaec5b2\" | rev` printed `2b5ceatlaboc`.",
+      "leadInferences": [
+        {
+          "spanId": "38a1d9665f955a01",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "21bdd10fa244c802",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17822,
+            "outputTokens": 54,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 670
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 54
+            }
+          }
+        },
+        {
+          "spanId": "84a5020e5448f83e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22941,
+            "outputTokens": 380,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 157
+            },
+            "outputDetails": {
+              "reasoning": 292,
+              "text": 88
+            }
+          }
+        },
+        {
+          "spanId": "a635b41de5521e6b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 593,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17210
+            },
+            "outputDetails": {
+              "reasoning": 537,
+              "text": 56
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace af8774a5-3c07-4dd9-9180-cf765b016752 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-runners-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "7ace979d-9493-45f2-8a53-6c21756a4f55",
+      "traceId": "611a669c0a40a60e96010bda8cd17797",
+      "agent": "pstack-arena-runners-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "127fd635f3c73419",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16223,
+            "outputTokens": 62,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16223
+            },
+            "outputDetails": {
+              "reasoning": 49,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "role": "arena runners",
+      "helper": "arenaRunners2",
+      "toolSpanId": "adb84b2ac6a56767",
+      "answer": "a2125btlaboc",
+      "leadInferences": [
+        {
+          "spanId": "127fd635f3c73419",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16223,
+            "outputTokens": 62,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16223
+            },
+            "outputDetails": {
+              "reasoning": 49,
+              "text": 13
+            }
+          }
+        },
+        {
+          "spanId": "cfe70ab29c0d8a5a",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "7c26d5476909da25",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22935,
+            "outputTokens": 258,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 151
+            },
+            "outputDetails": {
+              "reasoning": 172,
+              "text": 86
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 7ace979d-9493-45f2-8a53-6c21756a4f55 used openai.responses/gpt-6.1-sol inside pstack-arena-runners-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "113e05cd-41b2-4bcc-b345-11b8106a0d3e",
+      "traceId": "1afa366d1fb7cc7c247750fff1843f96",
+      "agent": "pstack-arena-cross-judge-pool-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "69646e8b59e6a34a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17223,
+            "outputTokens": 714,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17223
+            },
+            "outputDetails": {
+              "reasoning": 654,
+              "text": 60
+            }
+          }
+        },
+        {
+          "spanId": "415f3a3781119dcb",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17954,
+            "outputTokens": 99,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 802
+            },
+            "outputDetails": {
+              "reasoning": 36,
+              "text": 63
+            }
+          }
+        }
+      ],
+      "role": "arena cross-judge pool",
+      "helper": "arenaCrossJudgePool1",
+      "toolSpanId": "61d5eb562a891201",
+      "answer": "1784betlaboc\n\n**Evidence.** Helper took the job itself per the brief, no re-delegation. Verified with `printf '%s' \"cobalteb4871\" | rev` → `1784betlaboc`. The reversed string is `1784betlaboc`.",
+      "leadInferences": [
+        {
+          "spanId": "121ec83adc94a5b0",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22943,
+            "outputTokens": 376,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 159
+            },
+            "outputDetails": {
+              "reasoning": 304,
+              "text": 72
+            }
+          }
+        },
+        {
+          "spanId": "69646e8b59e6a34a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17223,
+            "outputTokens": 714,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17223
+            },
+            "outputDetails": {
+              "reasoning": 654,
+              "text": 60
+            }
+          }
+        },
+        {
+          "spanId": "415f3a3781119dcb",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17954,
+            "outputTokens": 99,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 802
+            },
+            "outputDetails": {
+              "reasoning": 36,
+              "text": 63
+            }
+          }
+        },
+        {
+          "spanId": "cbf83499714bce3f",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 113e05cd-41b2-4bcc-b345-11b8106a0d3e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-cross-judge-pool-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "6b1841e6-9ab6-4ffa-8dd6-be3a399c338a",
+      "traceId": "ea14bdd2d744cca18b0bb18a118afa5e",
+      "agent": "pstack-arena-cross-judge-pool-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "3adb2009bfef4d0b",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 34,
+            "inputDetails": {
+              "cacheRead": 3328,
+              "cacheWrite": 0,
+              "text": 12904
+            },
+            "outputDetails": {
+              "reasoning": 23,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "role": "arena cross-judge pool",
+      "helper": "arenaCrossJudgePool2",
+      "toolSpanId": "6dfefdbb7f85d464",
+      "answer": "470414tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "f613d4cbb6f0d2a2",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "4b1d0f250d291ce6",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22936,
+            "outputTokens": 363,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 152
+            },
+            "outputDetails": {
+              "reasoning": 278,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "3adb2009bfef4d0b",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 34,
+            "inputDetails": {
+              "cacheRead": 3328,
+              "cacheWrite": 0,
+              "text": 12904
+            },
+            "outputDetails": {
+              "reasoning": 23,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 6b1841e6-9ab6-4ffa-8dd6-be3a399c338a used openai.responses/gpt-6.1-sol inside pstack-arena-cross-judge-pool-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "5bd38377-8d87-4e16-8e38-2dd20cd0cc0e",
+      "traceId": "04c3e452077bc9fa2961264743638640",
+      "agent": "pstack-architect-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "4be3dd46f689bc30",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17204,
+            "outputTokens": 588,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17204
+            },
+            "outputDetails": {
+              "reasoning": 524,
+              "text": 64
+            }
+          }
+        },
+        {
+          "spanId": "6845345f48af94ce",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17811,
+            "outputTokens": 171,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 659
+            },
+            "outputDetails": {
+              "reasoning": 42,
+              "text": 129
+            }
+          }
+        }
+      ],
+      "role": "architect runners",
+      "helper": "architectRunners1",
+      "toolSpanId": "1657803badc3d5c9",
+      "answer": "I have no subagent tool in this harness, so I could not hand choice 1 to a `poteto-agent` runner, and I could not set the model to `commandcode/deepseek/deepseek-v4.1-flash`. Per the Harness mapping section, a harness without a subagent tool means doing the delegated step myself. So I ran the reversal directly and verified it with `python3`.\n\nEvidence: `python3 -c \"s='cobalt8669a4'; print(s[::-1])\"` printed `4a9668tlaboc`.\n\n4a9668tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "31fa843658fc0487",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "919d89934918d489",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22939,
+            "outputTokens": 298,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 155
+            },
+            "outputDetails": {
+              "reasoning": 228,
+              "text": 70
+            }
+          }
+        },
+        {
+          "spanId": "4be3dd46f689bc30",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17204,
+            "outputTokens": 588,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17204
+            },
+            "outputDetails": {
+              "reasoning": 524,
+              "text": 64
+            }
+          }
+        },
+        {
+          "spanId": "6845345f48af94ce",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17811,
+            "outputTokens": 171,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 659
+            },
+            "outputDetails": {
+              "reasoning": 42,
+              "text": 129
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5bd38377-8d87-4e16-8e38-2dd20cd0cc0e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-architect-runners-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "baf453ad-9aea-4254-ac48-f8fde6b06186",
+      "traceId": "42533fd67bd6f8cc66d8bc6c6578b086",
+      "agent": "pstack-architect-runners-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "5cd05b7920fc2a48",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 68,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "architect runners",
+      "helper": "architectRunners2",
+      "toolSpanId": "7f854c6578b80df7",
+      "answer": "33b016tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "be5bcdd53482116b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22934,
+            "outputTokens": 435,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 150
+            },
+            "outputDetails": {
+              "reasoning": 350,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "5cd05b7920fc2a48",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 68,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 12
+            }
+          }
+        },
+        {
+          "spanId": "3c7ee7c859bc16ae",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace baf453ad-9aea-4254-ac48-f8fde6b06186 used openai.responses/gpt-6.1-sol inside pstack-architect-runners-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "9263dec1-02b0-48d1-8674-de1884bafeae",
+      "traceId": "96a72911afabcc95445e742d8a034f15",
+      "agent": "pstack-interrogate-reviewers-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "61e241615d8d2eff",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17217,
+            "outputTokens": 413,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17217
+            },
+            "outputDetails": {
+              "reasoning": 354,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "3b67830ccfbee922",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17649,
+            "outputTokens": 10,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 497
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 10
+            }
+          }
+        }
+      ],
+      "role": "interrogate reviewers",
+      "helper": "interrogateReviewers1",
+      "toolSpanId": "4bb48320e7c4ccb2",
+      "answer": "5a2a27tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "53e3e42d5f27f48e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22941,
+            "outputTokens": 483,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 157
+            },
+            "outputDetails": {
+              "reasoning": 396,
+              "text": 87
+            }
+          }
+        },
+        {
+          "spanId": "61e241615d8d2eff",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17217,
+            "outputTokens": 413,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17217
+            },
+            "outputDetails": {
+              "reasoning": 354,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "3b67830ccfbee922",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17649,
+            "outputTokens": 10,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 497
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 10
+            }
+          }
+        },
+        {
+          "spanId": "affd63c623884b48",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23463,
+            "outputTokens": 29,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 679
+            },
+            "outputDetails": {
+              "reasoning": 6,
+              "text": 23
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 9263dec1-02b0-48d1-8674-de1884bafeae used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-interrogate-reviewers-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "5e2dc09d-49e9-4f7a-a14a-de09b4db980f",
+      "traceId": "b31168a9e0d01719f03b242376937f88",
+      "agent": "pstack-interrogate-reviewers-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "65ade12b05b04a74",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16230,
+            "outputTokens": 44,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16230
+            },
+            "outputDetails": {
+              "reasoning": 32,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "interrogate reviewers",
+      "helper": "interrogateReviewers2",
+      "toolSpanId": "776fbb0b1aac4b06",
+      "answer": "af4973tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "15eef9734a0e583b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23244,
+            "outputTokens": 29,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 460
+            },
+            "outputDetails": {
+              "reasoning": 8,
+              "text": 21
+            }
+          }
+        },
+        {
+          "spanId": "380cfcf2fe9cf950",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22935,
+            "outputTokens": 272,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 151
+            },
+            "outputDetails": {
+              "reasoning": 200,
+              "text": 72
+            }
+          }
+        },
+        {
+          "spanId": "65ade12b05b04a74",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16230,
+            "outputTokens": 44,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16230
+            },
+            "outputDetails": {
+              "reasoning": 32,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5e2dc09d-49e9-4f7a-a14a-de09b4db980f used openai.responses/gpt-6.1-sol inside pstack-interrogate-reviewers-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "20749b1f-e70c-46cb-8ac6-41f0fb60eb4f",
+      "traceId": "850dd1f3ce176a4c60854ec56e4c2dc2",
+      "agent": "pstack-swarm-workers-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "2835ae7636799961",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17188,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17188
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "swarm workers",
+      "helper": "swarmWorkers",
+      "toolSpanId": "d7907fa805bdd4a3",
+      "answer": "1f283dtlaboc",
+      "leadInferences": [
+        {
+          "spanId": "e0018ba898153fa7",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 503,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 418,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "2835ae7636799961",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17188,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17188
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "c11669dcfa8d674a",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 20749b1f-e70c-46cb-8ac6-41f0fb60eb4f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-swarm-workers-1, expected anthropic/claude-fable-5."
+      }
+    }
+  ],
+  "criterion5": {
+    "screenSaved": "PASS",
+    "screenMismatch": "FAIL",
+    "listSaved": "PASS",
+    "listMismatch": "FAIL",
+    "leadSaved": "PASS",
+    "leadMismatch": "FAIL",
+    "rolesSaved": "PASS",
+    "rolesMismatch": "FAIL"
+  },
+  "restoredHashes": {
+    "pstack": null,
+    "lead": "da34bc64835941269937c246187bf6bd6f8cc1de3d9e93e523d4124f5c36be71"
+  }
+}

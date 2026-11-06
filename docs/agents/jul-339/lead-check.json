@@ -43,7 +43,7 @@
     "fullInstructions": "PASS",
     "subscriptionModelAndTrace": "PASS"
   },
-  "shippingRerun": "pending separate Shipping step",
+  "shippingRerun": "passed at 3e12c78",
   "modelSetting": {
     "path": "/home/ubuntu/.config/julia/lead-model",
     "value": "openai/gpt-6.1-sol",

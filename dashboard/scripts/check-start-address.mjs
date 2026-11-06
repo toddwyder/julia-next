@@ -8,14 +8,13 @@ import { fileURLToPath } from 'node:url';
 
 const MUST_SHOW = [
   'Start screen',
-  'Main session',
-  'Shipping',
+  'Lead',
   'Effort',
   'Small',
   'Medium',
   'Large',
   'Unlimited',
-  'How hard the models think',
+  'reasoning budget',
 ];
 
 const NOT_THE_DASHBOARD = [

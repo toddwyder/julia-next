@@ -12,6 +12,7 @@
     "check:programs": "node scripts/machine-programs.mjs --check",
     "check:studio": "node scripts/check-studio-start.mjs",
     "check:lead": "node scripts/check-lead.mjs",
+    "check:model-picker": "node scripts/check-model-picker.mjs",
     "check:recipes-model": "node scripts/check-recipes-model.mjs",
     "prove:recipe-events": "node scripts/prove-recipe-events.mjs",
     "prove:household-rules": "node scripts/prove-household-rules.mjs",
