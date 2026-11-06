@@ -61,3 +61,13 @@ node scripts/julia-agents.mjs -- npm run check:model-picker -- docs/agents/jul-3
 The check starts a temporary dashboard and two temporary Studio servers, saves through the real Start screen, reads the Studio traces, and restores the settings files it found. It starts no card and no workflow.
 
 The live run began from a seeded role file with every role on DeepSeek, because the ChatGPT subscription window was exhausted. The check restored that file. The machine's own state before the build was Lead Sol and no role file; both were put back after the run. The Lead was saved as Kimi for the check, as the card's operator directed. The picker still offers the 8 ChatGPT models, which answer again when the account window resets.
+
+## UAT fix, 6 November
+
+Todd's UAT failed: he changed the Lead and `feature, refactoring` on the preview Start screen and saved, restarted the preview Studio, and the Lead ran on `gpt-6.1-sol` with the coder on `deepseek-v4.1-flash`. Both settings files held neither pick.
+
+The Start screen posted its whole in-memory choice, so a page opened before a newer save re-stamped every row it had loaded. Reproduced on the preview: page A saved three Building roles, page B saved the Lead and the coder, and page A's next Save put the Lead back on Sol and the coder back on DeepSeek. A Studio restart then registered Sol and DeepSeek, and a Lead chat's trace showed the same (run `fb23700b-a6e6-4e6b-8b70-dd5711e994e5`).
+
+The page now sends only the rows it moved, measured against the choice it loaded. The server applies them onto a fresh read of both files, and `formatSettings` and `saveSettings` stay the only validator and the only atomic writer. A stale page's Save lands its own picks and leaves every row it never touched alone, and a Save with no changes writes nothing.
+
+`scripts/check-model-picker.mjs` now opens a second Start screen before the picks are saved and saves it again afterwards, then runs criteria 3 and 4 on that result. On the old code it failed with `A stale Start screen save replaced the Lead pick.` (`openai/gpt-6.1-sol` against `commandcode/moonshotai/Kimi-K3.1-Pro`). The proof's `staleSave` block records the passing run; `criterion5` and the restored hashes are unchanged.

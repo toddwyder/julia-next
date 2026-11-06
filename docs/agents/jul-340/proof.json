@@ -1,11 +1,28 @@
 {
   "card": "JUL-340",
-  "checkedAt": "2026-11-06T02:06:49.712Z",
+  "checkedAt": "2026-11-06T07:57:48.607Z",
   "originalHashes": {
-    "pstack": "2c201abcc9e77413f0d9c22dcf1c8b0bd819676f073dba42930e7db09920c2b2",
+    "pstack": null,
     "lead": "da34bc64835941269937c246187bf6bd6f8cc1de3d9e93e523d4124f5c36be71"
   },
   "accountLeadModels": [
+    "anthropic/claude-fable-5",
+    "anthropic/claude-fable-5-1",
+    "anthropic/claude-haiku-4-5",
+    "anthropic/claude-haiku-4-5-20251001",
+    "anthropic/claude-haiku-5-5",
+    "anthropic/claude-opus-4-5",
+    "anthropic/claude-opus-4-5-20251101",
+    "anthropic/claude-opus-4-6",
+    "anthropic/claude-opus-4-7",
+    "anthropic/claude-opus-4-8",
+    "anthropic/claude-opus-5",
+    "anthropic/claude-opus-5-5",
+    "anthropic/claude-sonnet-4-5",
+    "anthropic/claude-sonnet-4-5-20250929",
+    "anthropic/claude-sonnet-4-6",
+    "anthropic/claude-sonnet-5",
+    "anthropic/claude-sonnet-5-5",
     "commandcode/MiniMaxAI/MiniMax-M2.5",
     "commandcode/MiniMaxAI/MiniMax-M2.7",
     "commandcode/MiniMaxAI/MiniMax-M3",
@@ -78,23 +95,6 @@
     "commandcode/zai-org/GLM-5.2",
     "commandcode/zai-org/GLM-5.2-Fast",
     "commandcode/zai-org/GLM-5.3",
-    "anthropic/claude-fable-5",
-    "anthropic/claude-fable-5-1",
-    "anthropic/claude-haiku-4-5",
-    "anthropic/claude-haiku-4-5-20251001",
-    "anthropic/claude-haiku-5-5",
-    "anthropic/claude-opus-4-5",
-    "anthropic/claude-opus-4-5-20251101",
-    "anthropic/claude-opus-4-6",
-    "anthropic/claude-opus-4-7",
-    "anthropic/claude-opus-4-8",
-    "anthropic/claude-opus-5",
-    "anthropic/claude-opus-5-5",
-    "anthropic/claude-sonnet-4-5",
-    "anthropic/claude-sonnet-4-5-20250929",
-    "anthropic/claude-sonnet-4-6",
-    "anthropic/claude-sonnet-5",
-    "anthropic/claude-sonnet-5-5",
     "openai/gpt-6.1-sol",
     "openai/gpt-6-astra",
     "openai/gpt-6.1-terra",
@@ -106,8 +106,8 @@
     "commandcode/moonshotai/Kimi-K3.1-Pro"
   ],
   "criterion1": {
-    "url": "http://127.0.0.1:40331/start",
-    "screenshot": "/home/ubuntu/julia-builder/docs/agents/jul-340/start-saved.png",
+    "url": "http://127.0.0.1:40917/start",
+    "screenshot": "/home/ubuntu/julia-fix-451/docs/agents/jul-340/start-saved.png",
     "savedLead": "commandcode/moonshotai/Kimi-K3.1-Pro",
     "savedCoder": "commandcode/deepseek/deepseek-v4-flash",
     "lead": {
@@ -125,7 +125,7 @@
           "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -137,7 +137,7 @@
           "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -149,7 +149,7 @@
           "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -161,7 +161,7 @@
           "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -170,10 +170,10 @@
       {
         "role": "judgment and prose",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash"
+          "openai/gpt-6.1-sol"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -182,10 +182,10 @@
       {
         "role": "hardest tasks",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash"
+          "openai/gpt-6.1-sol"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -197,7 +197,7 @@
           "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -206,10 +206,10 @@
       {
         "role": "how explainer",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash"
+          "openai/gpt-6.1-sol"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -221,7 +221,7 @@
           "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -230,10 +230,10 @@
       {
         "role": "why synthesizer",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash"
+          "openai/gpt-6.1-sol"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -245,7 +245,7 @@
           "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -254,10 +254,10 @@
       {
         "role": "reflect judgment, divergent, synthesizer",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash"
+          "openai/gpt-6.1-sol"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -266,10 +266,11 @@
       {
         "role": "arena runners",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash"
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -278,10 +279,11 @@
       {
         "role": "arena cross-judge pool",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash"
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -290,10 +292,11 @@
       {
         "role": "architect runners",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash"
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -302,10 +305,11 @@
       {
         "role": "interrogate reviewers",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash"
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
@@ -317,1536 +321,1913 @@
           "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
-        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatchedPick": "anthropic/claude-fable-5",
         "mismatch": {
           "verdict": "FAIL",
           "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
         }
       }
-    ]
+    ],
+    "staleSave": {
+      "resaveLead": "commandcode/moonshotai/Kimi-K3.1-Pro",
+      "resaveCoder": "commandcode/deepseek/deepseek-v4-flash",
+      "ownPick": "commandcode/deepseek/deepseek-v4-flash",
+      "lead": "commandcode/moonshotai/Kimi-K3.1-Pro",
+      "coder": "commandcode/deepseek/deepseek-v4-flash"
+    }
   },
   "savedHashes": {
-    "pstack": "4a709693ab880d4b6add25d180909cdaf18851d8a9273f660d6459e3e12d5df1",
+    "pstack": "08867c451fb6c0f7529f0910110b4b52162778279be00623b072ad4dff981821",
     "lead": "922223ec22e20faaf2f02f3ac206fedd36648a6228c13da5a0ae743470a2e1d3"
   },
   "criterion3": {
-    "runId": "0a1fb9cf-a2db-46c0-9df7-59bab69b4944",
-    "traceId": "3be1ff9c89bb99fd936b4277edd5c2ee",
+    "runId": "cfe165cd-2866-4995-955a-8f306f7d0a78",
+    "traceId": "9b5034999d5935f5c40a77f47ab8394b",
     "agent": "flow-build",
     "model": "commandcode/moonshotai/Kimi-K3.1-Pro",
     "inferenceSpans": [
       {
-        "spanId": "a7ba69d8afa53394",
+        "spanId": "4b70d4e97e28511f",
         "provider": "commandcode",
         "model": "moonshotai/Kimi-K3.1-Pro",
         "usage": {
-          "inputTokens": 12441,
-          "outputTokens": 57,
+          "inputTokens": 12445,
+          "outputTokens": 216,
           "inputDetails": {
-            "cacheRead": 12288,
-            "text": 153
+            "cacheRead": 0,
+            "text": 12445
           },
           "outputDetails": {
-            "reasoning": 37,
+            "reasoning": 196,
             "text": 20
           }
         }
       }
     ],
     "savedVerdict": "PASS",
-    "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+    "mismatchedPick": "anthropic/claude-fable-5",
     "mismatch": {
       "verdict": "FAIL",
-      "reason": "Studio trace 0a1fb9cf-a2db-46c0-9df7-59bab69b4944 used commandcode/moonshotai/Kimi-K3.1-Pro inside flow-build, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      "reason": "Studio trace cfe165cd-2866-4995-955a-8f306f7d0a78 used commandcode/moonshotai/Kimi-K3.1-Pro inside flow-build, expected anthropic/claude-fable-5."
     }
   },
   "criterion4": [
     {
-      "runId": "e3413877-a2df-4808-8746-181f55e6871e",
-      "traceId": "b3865b2c3dac51e08a7b31c3191ed4cd",
+      "runId": "1f0ebd72-ee3a-4e60-9d12-167ee73d4412",
+      "traceId": "5134124012a6677d9fddf9aabfe3505c",
       "agent": "pstack-feature-refactoring-1",
       "model": "commandcode/deepseek/deepseek-v4-flash",
       "inferenceSpans": [
         {
-          "spanId": "5c87e82bbcafd05a",
+          "spanId": "fddc559614f7b45a",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4-flash",
           "usage": {
-            "inputTokens": 17223,
-            "outputTokens": 318,
+            "inputTokens": 17210,
+            "outputTokens": 284,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 71
-            },
-            "outputDetails": {
-              "reasoning": 260,
               "text": 58
-            }
-          }
-        },
-        {
-          "spanId": "24a8ffeca07964d8",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4-flash",
-          "usage": {
-            "inputTokens": 17561,
-            "outputTokens": 9,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 409
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 9
+              "reasoning": 278,
+              "text": 6
             }
           }
         }
       ],
       "role": "feature, refactoring",
       "helper": "featureRefactoring",
-      "toolSpanId": "f8b5f5c5223b4ce6",
-      "answer": "32a4c4tlaboc",
+      "toolSpanId": "8fb953093266a0bb",
+      "answer": "5686detlaboc",
       "leadInferences": [
         {
-          "spanId": "6edd85ec07de9de9",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21654,
-            "outputTokens": 435,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 150
-            },
-            "outputDetails": {
-              "reasoning": 325,
-              "text": 110
-            }
-          }
-        },
-        {
-          "spanId": "223b29e3c2e443cb",
+          "spanId": "5d8a92c970a0ad41",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         },
         {
-          "spanId": "5c87e82bbcafd05a",
+          "spanId": "fddc559614f7b45a",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4-flash",
           "usage": {
-            "inputTokens": 17223,
-            "outputTokens": 318,
+            "inputTokens": 17210,
+            "outputTokens": 284,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 71
+              "text": 58
             },
             "outputDetails": {
-              "reasoning": 260,
-              "text": 58
+              "reasoning": 278,
+              "text": 6
             }
           }
         },
         {
-          "spanId": "24a8ffeca07964d8",
+          "spanId": "8f7825fccc799b66",
           "provider": "commandcode",
-          "model": "deepseek/deepseek-v4-flash",
+          "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 17561,
-            "outputTokens": 9,
+            "inputTokens": 22918,
+            "outputTokens": 415,
             "inputDetails": {
-              "cacheRead": 17152,
-              "text": 409
+              "cacheRead": 0,
+              "text": 22918
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 9
+              "reasoning": 326,
+              "text": 89
             }
           }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace e3413877-a2df-4808-8746-181f55e6871e used commandcode/deepseek/deepseek-v4-flash, commandcode/deepseek/deepseek-v4-flash inside pstack-feature-refactoring-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 1f0ebd72-ee3a-4e60-9d12-167ee73d4412 used commandcode/deepseek/deepseek-v4-flash inside pstack-feature-refactoring-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "67a165a0-6366-4590-a34f-c2c1730ff19b",
-      "traceId": "cdad61d55d6581269311ac52edf8c681",
+      "runId": "14492a25-ed3c-435e-80b3-06a4baec4196",
+      "traceId": "0540efed290cf5c9673e7d4afc1e4945",
       "agent": "pstack-bug-fix-1",
       "model": "commandcode/deepseek/deepseek-v4.1-flash",
       "inferenceSpans": [
         {
-          "spanId": "3a957b0362186912",
+          "spanId": "2dacf66cfa2621a7",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17410,
-            "outputTokens": 9,
+            "inputTokens": 17189,
+            "outputTokens": 259,
             "inputDetails": {
-              "cacheRead": 17152,
-              "text": 258
+              "cacheRead": 0,
+              "text": 17189
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 9
+              "reasoning": 198,
+              "text": 61
             }
           }
         },
         {
-          "spanId": "e5a3b368f5b12753",
+          "spanId": "adced7a356da6e1b",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17195,
-            "outputTokens": 197,
+            "inputTokens": 17466,
+            "outputTokens": 8,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17195
+              "cacheRead": 17152,
+              "text": 314
             },
             "outputDetails": {
-              "reasoning": 140,
-              "text": 57
+              "reasoning": 0,
+              "text": 8
             }
           }
         }
       ],
       "role": "bug-fix",
       "helper": "bugFix",
-      "toolSpanId": "8137c9c04804dad8",
-      "answer": "c354e9tlaboc",
+      "toolSpanId": "9381cbb042292b56",
+      "answer": "d43531tlaboc",
       "leadInferences": [
         {
-          "spanId": "3a957b0362186912",
+          "spanId": "2dacf66cfa2621a7",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17410,
-            "outputTokens": 9,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 258
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 9
-            }
-          }
-        },
-        {
-          "spanId": "fa64d3d825102e3f",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 332,
+            "inputTokens": 17189,
+            "outputTokens": 259,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 21652
+              "text": 17189
             },
             "outputDetails": {
-              "reasoning": 238,
-              "text": 94
+              "reasoning": 198,
+              "text": 61
             }
           }
         },
         {
-          "spanId": "e5a3b368f5b12753",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17195,
-            "outputTokens": 197,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17195
-            },
-            "outputDetails": {
-              "reasoning": 140,
-              "text": 57
-            }
-          }
-        },
-        {
-          "spanId": "6689c462500e44d9",
+          "spanId": "47a1d6d861521499",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
+        },
+        {
+          "spanId": "e9338706c3c22e2b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22917,
+            "outputTokens": 344,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 22917
+            },
+            "outputDetails": {
+              "reasoning": 261,
+              "text": 83
+            }
+          }
+        },
+        {
+          "spanId": "adced7a356da6e1b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17466,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 314
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 67a165a0-6366-4590-a34f-c2c1730ff19b used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-bug-fix-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 14492a25-ed3c-435e-80b3-06a4baec4196 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-bug-fix-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "f607593d-0cfa-4ccd-90c9-b7fa0d57a8ed",
-      "traceId": "53c78312488443a941367941fa195238",
+      "runId": "b7c5ea28-0356-417b-a9cc-6d974976045a",
+      "traceId": "90293e477f2b3e8494f813ef3f38c6e0",
       "agent": "pstack-perf-issue-1",
       "model": "commandcode/deepseek/deepseek-v4.1-flash",
       "inferenceSpans": [
         {
-          "spanId": "8eb8db938252ab91",
+          "spanId": "71682f834bde11ee",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 193,
+            "inputTokens": 17187,
+            "outputTokens": 184,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17177
+              "text": 17187
             },
             "outputDetails": {
-              "reasoning": 184,
-              "text": 9
+              "reasoning": 176,
+              "text": 8
             }
           }
         }
       ],
       "role": "perf-issue",
       "helper": "perfIssue",
-      "toolSpanId": "8c1b8ab45d1462d4",
-      "answer": "e017f6tlaboc",
+      "toolSpanId": "60e88407cfa7a88c",
+      "answer": "fba84etlaboc",
       "leadInferences": [
         {
-          "spanId": "8eb8db938252ab91",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 193,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17177
-            },
-            "outputDetails": {
-              "reasoning": 184,
-              "text": 9
-            }
-          }
-        },
-        {
-          "spanId": "94fedd07b18b23aa",
+          "spanId": "4b6b7d2b45778e46",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 423,
+            "inputTokens": 22918,
+            "outputTokens": 315,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 148
+              "cacheRead": 22784,
+              "text": 134
             },
             "outputDetails": {
-              "reasoning": 339,
+              "reasoning": 231,
               "text": 84
             }
           }
         },
         {
-          "spanId": "4ef9d565ba2fb2df",
+          "spanId": "71682f834bde11ee",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17187,
+            "outputTokens": 184,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17187
+            },
+            "outputDetails": {
+              "reasoning": 176,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "1808fb82ff9cf916",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace f607593d-0cfa-4ccd-90c9-b7fa0d57a8ed used commandcode/deepseek/deepseek-v4.1-flash inside pstack-perf-issue-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace b7c5ea28-0356-417b-a9cc-6d974976045a used commandcode/deepseek/deepseek-v4.1-flash inside pstack-perf-issue-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "b37f901e-5093-4210-870e-79ec7367cf2a",
-      "traceId": "46bfd5a58e4513e92c9882d66210a54e",
+      "runId": "8def0b97-636c-45f9-8a0e-eb874d138838",
+      "traceId": "6015e2ee5d757aca9e0a0e091cacf9fd",
       "agent": "pstack-hillclimb-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "model": "commandcode/deepseek/deepseek-v4-flash",
       "inferenceSpans": [
         {
-          "spanId": "ef16d3108a7b93e1",
+          "spanId": "e52b78623364ca6d",
           "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "model": "deepseek/deepseek-v4-flash",
           "usage": {
-            "inputTokens": 17188,
-            "outputTokens": 211,
+            "inputTokens": 17604,
+            "outputTokens": 8,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17188
+              "cacheRead": 17152,
+              "text": 452
             },
             "outputDetails": {
-              "reasoning": 203,
+              "reasoning": 0,
               "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "85849273e7388a9c",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17206,
+            "outputTokens": 379,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 54
+            },
+            "outputDetails": {
+              "reasoning": 322,
+              "text": 57
             }
           }
         }
       ],
       "role": "hillclimb",
       "helper": "hillclimb",
-      "toolSpanId": "636856bdf94db23c",
-      "answer": "331d19tlaboc",
+      "toolSpanId": "0ee47b720199262f",
+      "answer": "0f6700tlaboc",
       "leadInferences": [
         {
-          "spanId": "d2d205ad1fd24399",
+          "spanId": "1fdc762e38a3e84e",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         },
         {
-          "spanId": "1fc7924043f0469a",
+          "spanId": "e52b78623364ca6d",
           "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
+          "model": "deepseek/deepseek-v4-flash",
           "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 375,
+            "inputTokens": 17604,
+            "outputTokens": 8,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 148
+              "cacheRead": 17152,
+              "text": 452
             },
             "outputDetails": {
-              "reasoning": 307,
-              "text": 68
+              "reasoning": 0,
+              "text": 8
             }
           }
         },
         {
-          "spanId": "ef16d3108a7b93e1",
+          "spanId": "d67f8a019a332106",
           "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 17188,
-            "outputTokens": 211,
+            "inputTokens": 22919,
+            "outputTokens": 380,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17188
+              "cacheRead": 22784,
+              "text": 135
             },
             "outputDetails": {
-              "reasoning": 203,
-              "text": 8
+              "reasoning": 295,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "85849273e7388a9c",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17206,
+            "outputTokens": 379,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 54
+            },
+            "outputDetails": {
+              "reasoning": 322,
+              "text": 57
             }
           }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace b37f901e-5093-4210-870e-79ec7367cf2a used commandcode/deepseek/deepseek-v4.1-flash inside pstack-hillclimb-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 8def0b97-636c-45f9-8a0e-eb874d138838 used commandcode/deepseek/deepseek-v4-flash, commandcode/deepseek/deepseek-v4-flash inside pstack-hillclimb-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "0820edd0-6db4-4199-889f-1fed69fb614f",
-      "traceId": "0d8ce9ea132155ad11f8e04755d95076",
+      "runId": "20ca87a9-fbfb-47cd-a523-1d7618dbc277",
+      "traceId": "d6099e1f9ae55be0a8b39bdb438c2c36",
       "agent": "pstack-judgment-and-prose-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "model": "openai/gpt-6.1-sol",
       "inferenceSpans": [
         {
-          "spanId": "c390fda56f47bb34",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "spanId": "42ec0da5279718ba",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
           "usage": {
-            "inputTokens": 17183,
-            "outputTokens": 75,
+            "inputTokens": 16209,
+            "outputTokens": 67,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17183
+              "cacheWrite": 0,
+              "text": 16209
             },
             "outputDetails": {
-              "reasoning": 65,
-              "text": 10
+              "reasoning": 56,
+              "text": 11
             }
           }
         }
       ],
       "role": "judgment and prose",
       "helper": "judgmentAndProse",
-      "toolSpanId": "596864b8a47c7b34",
-      "answer": "4c1f59tlaboc",
+      "toolSpanId": "f706d9acdde53f38",
+      "answer": "00236atlaboc",
       "leadInferences": [
         {
-          "spanId": "2266ef165a074b6e",
+          "spanId": "b8902dd0cddccf7e",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21654,
-            "outputTokens": 270,
+            "inputTokens": 22919,
+            "outputTokens": 369,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 150
+              "cacheRead": 22784,
+              "text": 135
             },
             "outputDetails": {
-              "reasoning": 182,
-              "text": 88
+              "reasoning": 282,
+              "text": 87
             }
           }
         },
         {
-          "spanId": "c206b077f100de60",
+          "spanId": "e0522d5f1eaa2622",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        },
-        {
-          "spanId": "c390fda56f47bb34",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17183,
-            "outputTokens": 75,
+            "inputTokens": 23325,
+            "outputTokens": 27,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17183
+              "cacheRead": 22784,
+              "text": 541
             },
             "outputDetails": {
-              "reasoning": 65,
-              "text": 10
+              "reasoning": 7,
+              "text": 20
+            }
+          }
+        },
+        {
+          "spanId": "42ec0da5279718ba",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16209,
+            "outputTokens": 67,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16209
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 11
             }
           }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 0820edd0-6db4-4199-889f-1fed69fb614f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-judgment-and-prose-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 20ca87a9-fbfb-47cd-a523-1d7618dbc277 used openai.responses/gpt-6.1-sol inside pstack-judgment-and-prose-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "0ddb05d1-5910-4c57-986f-de490d3d238e",
-      "traceId": "5fd41e555b121097765cc019189b219b",
+      "runId": "14c9fa84-df5a-42f8-bdc7-bfdf538a0731",
+      "traceId": "acc1d5718c54f35cbd45f1958ef7a38e",
       "agent": "pstack-hardest-tasks-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "model": "openai/gpt-6.1-sol",
       "inferenceSpans": [
         {
-          "spanId": "8f3e5d71804b5a63",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "spanId": "03babbb7619819c5",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
           "usage": {
-            "inputTokens": 17183,
-            "outputTokens": 246,
+            "inputTokens": 16211,
+            "outputTokens": 69,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17183
+              "cacheWrite": 0,
+              "text": 16211
             },
             "outputDetails": {
-              "reasoning": 187,
-              "text": 59
-            }
-          }
-        },
-        {
-          "spanId": "6f5739a62ddabfb2",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17447,
-            "outputTokens": 9,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 295
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 9
+              "reasoning": 55,
+              "text": 14
             }
           }
         }
       ],
       "role": "hardest tasks",
       "helper": "hardestTasks",
-      "toolSpanId": "41f7ec3f098f519c",
-      "answer": "fb8d6ctlaboc",
+      "toolSpanId": "34f68852458ad954",
+      "answer": "7a5df6tlaboc",
       "leadInferences": [
         {
-          "spanId": "8f3e5d71804b5a63",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "spanId": "03babbb7619819c5",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
           "usage": {
-            "inputTokens": 17183,
-            "outputTokens": 246,
+            "inputTokens": 16211,
+            "outputTokens": 69,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17183
+              "cacheWrite": 0,
+              "text": 16211
             },
             "outputDetails": {
-              "reasoning": 187,
-              "text": 59
+              "reasoning": 55,
+              "text": 14
             }
           }
         },
         {
-          "spanId": "6faa607542f1d271",
+          "spanId": "dc709066fa6c98b8",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21653,
-            "outputTokens": 314,
+            "inputTokens": 22919,
+            "outputTokens": 313,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 149
+              "cacheRead": 22784,
+              "text": 135
             },
             "outputDetails": {
-              "reasoning": 228,
-              "text": 86
+              "reasoning": 243,
+              "text": 70
             }
           }
         },
         {
-          "spanId": "6f5739a62ddabfb2",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17447,
-            "outputTokens": 9,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 295
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 9
-            }
-          }
-        },
-        {
-          "spanId": "bdf906ce2b16de26",
+          "spanId": "4a70bfa93ced33d9",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 0ddb05d1-5910-4c57-986f-de490d3d238e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-hardest-tasks-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 14c9fa84-df5a-42f8-bdc7-bfdf538a0731 used openai.responses/gpt-6.1-sol inside pstack-hardest-tasks-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "9dd122a1-d547-4be7-a179-2cec9c8f2250",
-      "traceId": "95ea9eb0d03e926ddb89f3da3357b7c3",
+      "runId": "4dd528a4-198e-455c-a9c8-5ad7936f2155",
+      "traceId": "7835a3ccfcee2e70e86c16d8f1efaec9",
       "agent": "pstack-how-explorer-1",
       "model": "commandcode/deepseek/deepseek-v4.1-flash",
       "inferenceSpans": [
         {
-          "spanId": "5ce3fcbc36f2c95a",
+          "spanId": "8a2a5f7ef4532f85",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17180,
-            "outputTokens": 138,
+            "inputTokens": 17184,
+            "outputTokens": 120,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17180
+              "text": 17184
             },
             "outputDetails": {
-              "reasoning": 79,
-              "text": 59
-            }
-          }
-        },
-        {
-          "spanId": "ba28d4633960bfe0",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17338,
-            "outputTokens": 11,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 186
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 11
+              "reasoning": 113,
+              "text": 7
             }
           }
         }
       ],
       "role": "how explorer",
       "helper": "howExplorer",
-      "toolSpanId": "56f421c33c544e7d",
-      "answer": "a4a6d5tlaboc",
+      "toolSpanId": "68610672d1121fba",
+      "answer": "44797atlaboc",
       "leadInferences": [
         {
-          "spanId": "5ce3fcbc36f2c95a",
+          "spanId": "8a2a5f7ef4532f85",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17180,
-            "outputTokens": 138,
+            "inputTokens": 17184,
+            "outputTokens": 120,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17180
+              "text": 17184
             },
             "outputDetails": {
-              "reasoning": 79,
-              "text": 59
+              "reasoning": 113,
+              "text": 7
             }
           }
         },
         {
-          "spanId": "5b7d3aece4a5600e",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21654,
-            "outputTokens": 223,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 150
-            },
-            "outputDetails": {
-              "reasoning": 138,
-              "text": 85
-            }
-          }
-        },
-        {
-          "spanId": "ba28d4633960bfe0",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17338,
-            "outputTokens": 11,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 186
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 11
-            }
-          }
-        },
-        {
-          "spanId": "c9e9c94dd6da83d6",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 9dd122a1-d547-4be7-a179-2cec9c8f2250 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explorer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "41946791-ba79-471b-a4af-bf0d6183224d",
-      "traceId": "3ef141e040abccde73e0f6bbe1eb5543",
-      "agent": "pstack-how-explainer-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "afaa3691bc80bba9",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17175,
-            "outputTokens": 175,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17175
-            },
-            "outputDetails": {
-              "reasoning": 167,
-              "text": 8
-            }
-          }
-        }
-      ],
-      "role": "how explainer",
-      "helper": "howExplainer",
-      "toolSpanId": "bdeb567f1447296c",
-      "answer": "43df30tlaboc",
-      "leadInferences": [
-        {
-          "spanId": "ba1fb119d3cc2fc3",
+          "spanId": "f04a1f1c76cd456f",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         },
         {
-          "spanId": "8bc2dd98b85f3fb4",
+          "spanId": "7506c4fe8f264202",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 419,
+            "inputTokens": 22918,
+            "outputTokens": 464,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 148
+              "cacheRead": 22784,
+              "text": 134
             },
             "outputDetails": {
-              "reasoning": 315,
-              "text": 104
-            }
-          }
-        },
-        {
-          "spanId": "afaa3691bc80bba9",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17175,
-            "outputTokens": 175,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17175
-            },
-            "outputDetails": {
-              "reasoning": 167,
-              "text": 8
-            }
-          }
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 41946791-ba79-471b-a4af-bf0d6183224d used commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explainer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "0ff7cc09-1865-475e-ab6f-8ecfbfc23f8f",
-      "traceId": "c4c80591ffcabf27adb80c87b0b70b38",
-      "agent": "pstack-why-investigators-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "a7acf1febee79d3f",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 245,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17177
-            },
-            "outputDetails": {
-              "reasoning": 237,
-              "text": 8
-            }
-          }
-        }
-      ],
-      "role": "why investigators",
-      "helper": "whyInvestigators",
-      "toolSpanId": "3105c0914e8bbdf4",
-      "answer": "6db284tlaboc",
-      "leadInferences": [
-        {
-          "spanId": "481cea56bc8766d7",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21651,
-            "outputTokens": 267,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 147
-            },
-            "outputDetails": {
-              "reasoning": 183,
-              "text": 84
-            }
-          }
-        },
-        {
-          "spanId": "a7acf1febee79d3f",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 245,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17177
-            },
-            "outputDetails": {
-              "reasoning": 237,
-              "text": 8
-            }
-          }
-        },
-        {
-          "spanId": "039040a2b692eca7",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 0ff7cc09-1865-475e-ab6f-8ecfbfc23f8f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-investigators-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "9a164c19-d8e1-4811-99ad-423e0b3a549b",
-      "traceId": "0d88677b4e3093ea1d9003d9d2def4e7",
-      "agent": "pstack-why-synthesizer-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "0a6c137773baa2d7",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17179,
-            "outputTokens": 140,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17179
-            },
-            "outputDetails": {
-              "reasoning": 131,
-              "text": 9
-            }
-          }
-        }
-      ],
-      "role": "why synthesizer",
-      "helper": "whySynthesizer",
-      "toolSpanId": "4b931bef4f826250",
-      "answer": "3b9599tlaboc",
-      "leadInferences": [
-        {
-          "spanId": "c5791526618b1afe",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21653,
-            "outputTokens": 410,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 149
-            },
-            "outputDetails": {
-              "reasoning": 340,
-              "text": 70
-            }
-          }
-        },
-        {
-          "spanId": "0a6c137773baa2d7",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17179,
-            "outputTokens": 140,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17179
-            },
-            "outputDetails": {
-              "reasoning": 131,
-              "text": 9
-            }
-          }
-        },
-        {
-          "spanId": "f67498c555ab3b4d",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 9a164c19-d8e1-4811-99ad-423e0b3a549b used commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-synthesizer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "39ae2c98-ae67-4e12-ad31-39163e0563c5",
-      "traceId": "2d35a2144a52896d5bd3dd4944690331",
-      "agent": "pstack-reflect-tooling-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "bddb0ac43d8f7612",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17176,
-            "outputTokens": 142,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17176
-            },
-            "outputDetails": {
-              "reasoning": 133,
-              "text": 9
-            }
-          }
-        }
-      ],
-      "role": "reflect tooling",
-      "helper": "reflectTooling",
-      "toolSpanId": "f01af1df6a3e1b62",
-      "answer": "cdfc60tlaboc",
-      "leadInferences": [
-        {
-          "spanId": "21e1b60238a12923",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21651,
-            "outputTokens": 795,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 147
-            },
-            "outputDetails": {
-              "reasoning": 711,
-              "text": 84
-            }
-          }
-        },
-        {
-          "spanId": "31a30a52934b9c0a",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        },
-        {
-          "spanId": "bddb0ac43d8f7612",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17176,
-            "outputTokens": 142,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17176
-            },
-            "outputDetails": {
-              "reasoning": 133,
-              "text": 9
-            }
-          }
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 39ae2c98-ae67-4e12-ad31-39163e0563c5 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-tooling-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "3838f18c-750d-4a5f-a816-e908e070644e",
-      "traceId": "cb7df6e9a4617971683e4a06b933c88c",
-      "agent": "pstack-reflect-judgment-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "1f30efe2f73f259b",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17185,
-            "outputTokens": 78,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17185
-            },
-            "outputDetails": {
-              "reasoning": 69,
-              "text": 9
-            }
-          }
-        }
-      ],
-      "role": "reflect judgment, divergent, synthesizer",
-      "helper": "reflectJudgment",
-      "toolSpanId": "0b2709de0a241ba1",
-      "answer": "07bcf8tlaboc",
-      "leadInferences": [
-        {
-          "spanId": "1f30efe2f73f259b",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17185,
-            "outputTokens": 78,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17185
-            },
-            "outputDetails": {
-              "reasoning": 69,
-              "text": 9
-            }
-          }
-        },
-        {
-          "spanId": "9369fb42171bf50c",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        },
-        {
-          "spanId": "7e96c691313c7632",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21657,
-            "outputTokens": 422,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 153
-            },
-            "outputDetails": {
-              "reasoning": 338,
-              "text": 84
-            }
-          }
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 3838f18c-750d-4a5f-a816-e908e070644e used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-judgment-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "5a497aa9-face-4f93-897b-4f5cda03a51f",
-      "traceId": "8a340932ed23a81d927af36cce5b78f7",
-      "agent": "pstack-arena-runners-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "ab08a75cb8e5f646",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 146,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17177
-            },
-            "outputDetails": {
-              "reasoning": 138,
-              "text": 8
-            }
-          }
-        }
-      ],
-      "role": "arena runners",
-      "helper": "arenaRunners",
-      "toolSpanId": "f9bf1318f925b7df",
-      "answer": "7f203ctlaboc",
-      "leadInferences": [
-        {
-          "spanId": "ab08a75cb8e5f646",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 146,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17177
-            },
-            "outputDetails": {
-              "reasoning": 138,
-              "text": 8
-            }
-          }
-        },
-        {
-          "spanId": "2d0f5bc3523659c0",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        },
-        {
-          "spanId": "d213733a69a63f4f",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 413,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 148
-            },
-            "outputDetails": {
-              "reasoning": 330,
+              "reasoning": 381,
               "text": 83
             }
           }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 5a497aa9-face-4f93-897b-4f5cda03a51f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-runners-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 4dd528a4-198e-455c-a9c8-5ad7936f2155 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explorer-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "b0c2b0ac-1df1-4a6c-bee4-205a94c3f755",
-      "traceId": "8b81ae4056c5a0f5f905037a47551012",
-      "agent": "pstack-arena-cross-judge-pool-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "runId": "fcfc02d1-e2f2-4aa5-a13e-f091356047a5",
+      "traceId": "5ee92cce1854cae10280aadf7ee48734",
+      "agent": "pstack-how-explainer-1",
+      "model": "openai/gpt-6.1-sol",
       "inferenceSpans": [
         {
-          "spanId": "9056f8cb011f8940",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "spanId": "aaffa6aab44b2060",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
           "usage": {
-            "inputTokens": 17204,
-            "outputTokens": 473,
+            "inputTokens": 16217,
+            "outputTokens": 69,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17204
+              "cacheWrite": 0,
+              "text": 16217
             },
             "outputDetails": {
-              "reasoning": 417,
-              "text": 56
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        }
+      ],
+      "role": "how explainer",
+      "helper": "howExplainer",
+      "toolSpanId": "16f1feb1ec09ea01",
+      "answer": "29b5f1tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "ef15b7ac0754ae42",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22920,
+            "outputTokens": 604,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 136
+            },
+            "outputDetails": {
+              "reasoning": 508,
+              "text": 96
             }
           }
         },
         {
-          "spanId": "06aeb6c9733f7a78",
+          "spanId": "3e9c1b20aa79f233",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "aaffa6aab44b2060",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 69,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace fcfc02d1-e2f2-4aa5-a13e-f091356047a5 used openai.responses/gpt-6.1-sol inside pstack-how-explainer-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "dbdad893-c4e2-4518-bf4e-04daaf00d561",
+      "traceId": "fcd4b663bf7a84570fd8e2e8513da154",
+      "agent": "pstack-why-investigators-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "2ee2251d82f7e95e",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17694,
-            "outputTokens": 8,
+            "inputTokens": 17189,
+            "outputTokens": 134,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 75,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "a3d7d10e4eb872fe",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17342,
+            "outputTokens": 10,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 542
+              "text": 190
             },
             "outputDetails": {
               "reasoning": 0,
+              "text": 10
+            }
+          }
+        }
+      ],
+      "role": "why investigators",
+      "helper": "whyInvestigators",
+      "toolSpanId": "a53c0f04c084c71a",
+      "answer": "0d9fd3tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "9c8ba02a196635e4",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 354,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 268,
+              "text": 86
+            }
+          }
+        },
+        {
+          "spanId": "2ee2251d82f7e95e",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17189,
+            "outputTokens": 134,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 75,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "a3d7d10e4eb872fe",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17342,
+            "outputTokens": 10,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 190
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 10
+            }
+          }
+        },
+        {
+          "spanId": "5cdd015e5c98f30b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace dbdad893-c4e2-4518-bf4e-04daaf00d561 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-investigators-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "2a84f500-9fc2-4ac7-9423-a358a5251462",
+      "traceId": "8b9a0fd3306510d7fb152711c01c1e92",
+      "agent": "pstack-why-synthesizer-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "e05a86ff2864c7fa",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16237,
+            "outputTokens": 70,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16237
+            },
+            "outputDetails": {
+              "reasoning": 57,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "role": "why synthesizer",
+      "helper": "whySynthesizer",
+      "toolSpanId": "a631882386c73ede",
+      "answer": "c8ca79tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "3cddf908c3f72dbf",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "ccf101672efa3f5e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 512,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 395,
+              "text": 117
+            }
+          }
+        },
+        {
+          "spanId": "e05a86ff2864c7fa",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16237,
+            "outputTokens": 70,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16237
+            },
+            "outputDetails": {
+              "reasoning": 57,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 2a84f500-9fc2-4ac7-9423-a358a5251462 used openai.responses/gpt-6.1-sol inside pstack-why-synthesizer-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "5fa2a286-413b-4752-8484-bc7d9c87d1b0",
+      "traceId": "4ce56e5db38fdf1f98e44bfb9e4e3880",
+      "agent": "pstack-reflect-tooling-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "16083c1df503b629",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 74,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 66,
               "text": 8
+            }
+          }
+        }
+      ],
+      "role": "reflect tooling",
+      "helper": "reflectTooling",
+      "toolSpanId": "b52fb246376195aa",
+      "answer": "547c96tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "c28040ca9146a4cd",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22917,
+            "outputTokens": 514,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 133
+            },
+            "outputDetails": {
+              "reasoning": 446,
+              "text": 68
+            }
+          }
+        },
+        {
+          "spanId": "87083f3071b039d7",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "16083c1df503b629",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 74,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 66,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5fa2a286-413b-4752-8484-bc7d9c87d1b0 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-tooling-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "305a3629-5bc6-42e9-9cf4-b28b5485dbbd",
+      "traceId": "9d0f3ac93185e5134f9998b2e6446a5d",
+      "agent": "pstack-reflect-judgment-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "b72f6f01fc0b2968",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 76,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16232
+            },
+            "outputDetails": {
+              "reasoning": 64,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "reflect judgment, divergent, synthesizer",
+      "helper": "reflectJudgment",
+      "toolSpanId": "e5adba19d005f24e",
+      "answer": "c86eectlaboc",
+      "leadInferences": [
+        {
+          "spanId": "b72f6f01fc0b2968",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 76,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16232
+            },
+            "outputDetails": {
+              "reasoning": 64,
+              "text": 12
+            }
+          }
+        },
+        {
+          "spanId": "1cbc8dc35334bd2c",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23795,
+            "outputTokens": 29,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 1011
+            },
+            "outputDetails": {
+              "reasoning": 8,
+              "text": 21
+            }
+          }
+        },
+        {
+          "spanId": "19fba1ba33b33f89",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22923,
+            "outputTokens": 836,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 139
+            },
+            "outputDetails": {
+              "reasoning": 730,
+              "text": 106
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 305a3629-5bc6-42e9-9cf4-b28b5485dbbd used openai.responses/gpt-6.1-sol inside pstack-reflect-judgment-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "af8774a5-3c07-4dd9-9180-cf765b016752",
+      "traceId": "cd0383c0c3180aeb90d8dd01c1201a5d",
+      "agent": "pstack-arena-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "21bdd10fa244c802",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17822,
+            "outputTokens": 54,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 670
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 54
+            }
+          }
+        },
+        {
+          "spanId": "a635b41de5521e6b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 593,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17210
+            },
+            "outputDetails": {
+              "reasoning": 537,
+              "text": 56
+            }
+          }
+        }
+      ],
+      "role": "arena runners",
+      "helper": "arenaRunners1",
+      "toolSpanId": "d01fc94ac70a3d4e",
+      "answer": "No subagent tool is available in this harness, so I did the job myself.\n\n`2b5ceatlaboc`\n\nEvidence: `echo \"cobaltaec5b2\" | rev` printed `2b5ceatlaboc`.",
+      "leadInferences": [
+        {
+          "spanId": "38a1d9665f955a01",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "21bdd10fa244c802",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17822,
+            "outputTokens": 54,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 670
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 54
+            }
+          }
+        },
+        {
+          "spanId": "84a5020e5448f83e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22941,
+            "outputTokens": 380,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 157
+            },
+            "outputDetails": {
+              "reasoning": 292,
+              "text": 88
+            }
+          }
+        },
+        {
+          "spanId": "a635b41de5521e6b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 593,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17210
+            },
+            "outputDetails": {
+              "reasoning": 537,
+              "text": 56
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace af8774a5-3c07-4dd9-9180-cf765b016752 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-runners-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "7ace979d-9493-45f2-8a53-6c21756a4f55",
+      "traceId": "611a669c0a40a60e96010bda8cd17797",
+      "agent": "pstack-arena-runners-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "127fd635f3c73419",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16223,
+            "outputTokens": 62,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16223
+            },
+            "outputDetails": {
+              "reasoning": 49,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "role": "arena runners",
+      "helper": "arenaRunners2",
+      "toolSpanId": "adb84b2ac6a56767",
+      "answer": "a2125btlaboc",
+      "leadInferences": [
+        {
+          "spanId": "127fd635f3c73419",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16223,
+            "outputTokens": 62,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16223
+            },
+            "outputDetails": {
+              "reasoning": 49,
+              "text": 13
+            }
+          }
+        },
+        {
+          "spanId": "cfe70ab29c0d8a5a",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "7c26d5476909da25",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22935,
+            "outputTokens": 258,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 151
+            },
+            "outputDetails": {
+              "reasoning": 172,
+              "text": 86
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 7ace979d-9493-45f2-8a53-6c21756a4f55 used openai.responses/gpt-6.1-sol inside pstack-arena-runners-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "113e05cd-41b2-4bcc-b345-11b8106a0d3e",
+      "traceId": "1afa366d1fb7cc7c247750fff1843f96",
+      "agent": "pstack-arena-cross-judge-pool-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "69646e8b59e6a34a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17223,
+            "outputTokens": 714,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17223
+            },
+            "outputDetails": {
+              "reasoning": 654,
+              "text": 60
+            }
+          }
+        },
+        {
+          "spanId": "415f3a3781119dcb",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17954,
+            "outputTokens": 99,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 802
+            },
+            "outputDetails": {
+              "reasoning": 36,
+              "text": 63
             }
           }
         }
       ],
       "role": "arena cross-judge pool",
-      "helper": "arenaCrossJudgePool",
-      "toolSpanId": "29a206fb56fb574b",
-      "answer": "0c405etlaboc",
+      "helper": "arenaCrossJudgePool1",
+      "toolSpanId": "61d5eb562a891201",
+      "answer": "1784betlaboc\n\n**Evidence.** Helper took the job itself per the brief, no re-delegation. Verified with `printf '%s' \"cobalteb4871\" | rev` → `1784betlaboc`. The reversed string is `1784betlaboc`.",
       "leadInferences": [
         {
-          "spanId": "25e632aba503eef9",
+          "spanId": "121ec83adc94a5b0",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21656,
-            "outputTokens": 346,
+            "inputTokens": 22943,
+            "outputTokens": 376,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 21656
+              "cacheRead": 22784,
+              "text": 159
             },
             "outputDetails": {
-              "reasoning": 249,
-              "text": 97
+              "reasoning": 304,
+              "text": 72
             }
           }
         },
         {
-          "spanId": "7aa1ede3109a7a1e",
+          "spanId": "69646e8b59e6a34a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17223,
+            "outputTokens": 714,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17223
+            },
+            "outputDetails": {
+              "reasoning": 654,
+              "text": 60
+            }
+          }
+        },
+        {
+          "spanId": "415f3a3781119dcb",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17954,
+            "outputTokens": 99,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 802
+            },
+            "outputDetails": {
+              "reasoning": 36,
+              "text": 63
+            }
+          }
+        },
+        {
+          "spanId": "cbf83499714bce3f",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 113e05cd-41b2-4bcc-b345-11b8106a0d3e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-cross-judge-pool-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "6b1841e6-9ab6-4ffa-8dd6-be3a399c338a",
+      "traceId": "ea14bdd2d744cca18b0bb18a118afa5e",
+      "agent": "pstack-arena-cross-judge-pool-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "3adb2009bfef4d0b",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 34,
+            "inputDetails": {
+              "cacheRead": 3328,
+              "cacheWrite": 0,
+              "text": 12904
+            },
+            "outputDetails": {
+              "reasoning": 23,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "role": "arena cross-judge pool",
+      "helper": "arenaCrossJudgePool2",
+      "toolSpanId": "6dfefdbb7f85d464",
+      "answer": "470414tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "f613d4cbb6f0d2a2",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         },
         {
-          "spanId": "9056f8cb011f8940",
+          "spanId": "4b1d0f250d291ce6",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22936,
+            "outputTokens": 363,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 152
+            },
+            "outputDetails": {
+              "reasoning": 278,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "3adb2009bfef4d0b",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 34,
+            "inputDetails": {
+              "cacheRead": 3328,
+              "cacheWrite": 0,
+              "text": 12904
+            },
+            "outputDetails": {
+              "reasoning": 23,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 6b1841e6-9ab6-4ffa-8dd6-be3a399c338a used openai.responses/gpt-6.1-sol inside pstack-arena-cross-judge-pool-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "5bd38377-8d87-4e16-8e38-2dd20cd0cc0e",
+      "traceId": "04c3e452077bc9fa2961264743638640",
+      "agent": "pstack-architect-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "4be3dd46f689bc30",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
             "inputTokens": 17204,
-            "outputTokens": 473,
+            "outputTokens": 588,
             "inputDetails": {
               "cacheRead": 0,
               "text": 17204
             },
             "outputDetails": {
-              "reasoning": 417,
-              "text": 56
+              "reasoning": 524,
+              "text": 64
             }
           }
         },
         {
-          "spanId": "06aeb6c9733f7a78",
+          "spanId": "6845345f48af94ce",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17694,
-            "outputTokens": 8,
+            "inputTokens": 17811,
+            "outputTokens": 171,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 542
+              "text": 659
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 8
-            }
-          }
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace b0c2b0ac-1df1-4a6c-bee4-205a94c3f755 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-cross-judge-pool-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "a2f88260-5f71-4b4b-a410-ec4f134135fc",
-      "traceId": "78b446c8710056feebc1a2553e02f261",
-      "agent": "pstack-architect-runners-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "72337b95b62c26fc",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17182,
-            "outputTokens": 447,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17182
-            },
-            "outputDetails": {
-              "reasoning": 391,
-              "text": 56
-            }
-          }
-        },
-        {
-          "spanId": "d0cd587cba1c52f3",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17646,
-            "outputTokens": 8,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 494
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 8
+              "reasoning": 42,
+              "text": 129
             }
           }
         }
       ],
       "role": "architect runners",
-      "helper": "architectRunners",
-      "toolSpanId": "b25bda3577d84d97",
-      "answer": "67ad69tlaboc",
+      "helper": "architectRunners1",
+      "toolSpanId": "1657803badc3d5c9",
+      "answer": "I have no subagent tool in this harness, so I could not hand choice 1 to a `poteto-agent` runner, and I could not set the model to `commandcode/deepseek/deepseek-v4.1-flash`. Per the Harness mapping section, a harness without a subagent tool means doing the delegated step myself. So I ran the reversal directly and verified it with `python3`.\n\nEvidence: `python3 -c \"s='cobalt8669a4'; print(s[::-1])\"` printed `4a9668tlaboc`.\n\n4a9668tlaboc",
       "leadInferences": [
         {
-          "spanId": "4c2cf5482d62a8f5",
+          "spanId": "31fa843658fc0487",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "919d89934918d489",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21651,
-            "outputTokens": 391,
+            "inputTokens": 22939,
+            "outputTokens": 298,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 147
+              "cacheRead": 22784,
+              "text": 155
             },
             "outputDetails": {
-              "reasoning": 298,
-              "text": 93
+              "reasoning": 228,
+              "text": 70
             }
           }
         },
         {
-          "spanId": "72337b95b62c26fc",
+          "spanId": "4be3dd46f689bc30",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17182,
-            "outputTokens": 447,
+            "inputTokens": 17204,
+            "outputTokens": 588,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17182
+              "text": 17204
             },
             "outputDetails": {
-              "reasoning": 391,
-              "text": 56
+              "reasoning": 524,
+              "text": 64
             }
           }
         },
         {
-          "spanId": "d0cd587cba1c52f3",
+          "spanId": "6845345f48af94ce",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17646,
-            "outputTokens": 8,
+            "inputTokens": 17811,
+            "outputTokens": 171,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 494
+              "text": 659
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 8
+              "reasoning": 42,
+              "text": 129
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5bd38377-8d87-4e16-8e38-2dd20cd0cc0e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-architect-runners-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "baf453ad-9aea-4254-ac48-f8fde6b06186",
+      "traceId": "42533fd67bd6f8cc66d8bc6c6578b086",
+      "agent": "pstack-architect-runners-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "5cd05b7920fc2a48",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 68,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "architect runners",
+      "helper": "architectRunners2",
+      "toolSpanId": "7f854c6578b80df7",
+      "answer": "33b016tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "be5bcdd53482116b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22934,
+            "outputTokens": 435,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 150
+            },
+            "outputDetails": {
+              "reasoning": 350,
+              "text": 85
             }
           }
         },
         {
-          "spanId": "fb1b0a352422bd76",
+          "spanId": "5cd05b7920fc2a48",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 68,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 12
+            }
+          }
+        },
+        {
+          "spanId": "3c7ee7c859bc16ae",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace a2f88260-5f71-4b4b-a410-ec4f134135fc used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-architect-runners-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace baf453ad-9aea-4254-ac48-f8fde6b06186 used openai.responses/gpt-6.1-sol inside pstack-architect-runners-2, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "e08534e3-0023-4cc4-b2b8-5b403f856dde",
-      "traceId": "a8887198a104de1d4ddfc6bc7ccc8a86",
+      "runId": "9263dec1-02b0-48d1-8674-de1884bafeae",
+      "traceId": "96a72911afabcc95445e742d8a034f15",
       "agent": "pstack-interrogate-reviewers-1",
       "model": "commandcode/deepseek/deepseek-v4.1-flash",
       "inferenceSpans": [
         {
-          "spanId": "0b0713890344873b",
+          "spanId": "61e241615d8d2eff",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17497,
-            "outputTokens": 8,
+            "inputTokens": 17217,
+            "outputTokens": 413,
             "inputDetails": {
-              "cacheRead": 17152,
-              "text": 345
+              "cacheRead": 0,
+              "text": 17217
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 8
+              "reasoning": 354,
+              "text": 59
             }
           }
         },
         {
-          "spanId": "7e436a6700fcaf9f",
+          "spanId": "3b67830ccfbee922",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17184,
-            "outputTokens": 296,
+            "inputTokens": 17649,
+            "outputTokens": 10,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17184
+              "cacheRead": 17152,
+              "text": 497
             },
             "outputDetails": {
-              "reasoning": 239,
-              "text": 57
+              "reasoning": 0,
+              "text": 10
             }
           }
         }
       ],
       "role": "interrogate reviewers",
-      "helper": "interrogateReviewers",
-      "toolSpanId": "4ac03fd8a8b5013a",
-      "answer": "78fb26tlaboc",
+      "helper": "interrogateReviewers1",
+      "toolSpanId": "4bb48320e7c4ccb2",
+      "answer": "5a2a27tlaboc",
       "leadInferences": [
         {
-          "spanId": "7ea6ebc2cbc73247",
+          "spanId": "53e3e42d5f27f48e",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 354,
+            "inputTokens": 22941,
+            "outputTokens": 483,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 148
+              "cacheRead": 22784,
+              "text": 157
             },
             "outputDetails": {
-              "reasoning": 270,
-              "text": 84
+              "reasoning": 396,
+              "text": 87
             }
           }
         },
         {
-          "spanId": "0b0713890344873b",
+          "spanId": "61e241615d8d2eff",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17497,
-            "outputTokens": 8,
+            "inputTokens": 17217,
+            "outputTokens": 413,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17217
+            },
+            "outputDetails": {
+              "reasoning": 354,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "3b67830ccfbee922",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17649,
+            "outputTokens": 10,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 345
+              "text": 497
             },
             "outputDetails": {
               "reasoning": 0,
-              "text": 8
+              "text": 10
             }
           }
         },
         {
-          "spanId": "50ade8a650f51889",
+          "spanId": "affd63c623884b48",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        },
-        {
-          "spanId": "7e436a6700fcaf9f",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17184,
-            "outputTokens": 296,
+            "inputTokens": 23463,
+            "outputTokens": 29,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17184
+              "cacheRead": 22784,
+              "text": 679
             },
             "outputDetails": {
-              "reasoning": 239,
-              "text": 57
+              "reasoning": 6,
+              "text": 23
             }
           }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace e08534e3-0023-4cc4-b2b8-5b403f856dde used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-interrogate-reviewers-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 9263dec1-02b0-48d1-8674-de1884bafeae used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-interrogate-reviewers-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "44e1e545-9661-499d-b9eb-5d47018e83b9",
-      "traceId": "e1c61bdf2cf5bcfbad670e3e6029ec5e",
+      "runId": "5e2dc09d-49e9-4f7a-a14a-de09b4db980f",
+      "traceId": "b31168a9e0d01719f03b242376937f88",
+      "agent": "pstack-interrogate-reviewers-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "65ade12b05b04a74",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16230,
+            "outputTokens": 44,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16230
+            },
+            "outputDetails": {
+              "reasoning": 32,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "interrogate reviewers",
+      "helper": "interrogateReviewers2",
+      "toolSpanId": "776fbb0b1aac4b06",
+      "answer": "af4973tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "15eef9734a0e583b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23244,
+            "outputTokens": 29,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 460
+            },
+            "outputDetails": {
+              "reasoning": 8,
+              "text": 21
+            }
+          }
+        },
+        {
+          "spanId": "380cfcf2fe9cf950",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22935,
+            "outputTokens": 272,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 151
+            },
+            "outputDetails": {
+              "reasoning": 200,
+              "text": 72
+            }
+          }
+        },
+        {
+          "spanId": "65ade12b05b04a74",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16230,
+            "outputTokens": 44,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16230
+            },
+            "outputDetails": {
+              "reasoning": 32,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5e2dc09d-49e9-4f7a-a14a-de09b4db980f used openai.responses/gpt-6.1-sol inside pstack-interrogate-reviewers-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "20749b1f-e70c-46cb-8ac6-41f0fb60eb4f",
+      "traceId": "850dd1f3ce176a4c60854ec56e4c2dc2",
       "agent": "pstack-swarm-workers-1",
       "model": "commandcode/deepseek/deepseek-v4.1-flash",
       "inferenceSpans": [
         {
-          "spanId": "19eb39267bb4c1dc",
+          "spanId": "2835ae7636799961",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17190,
+            "inputTokens": 17188,
             "outputTokens": 8,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17190
+              "text": 17188
             },
             "outputDetails": {
               "reasoning": 0,
@@ -1857,25 +2238,36 @@
       ],
       "role": "swarm workers",
       "helper": "swarmWorkers",
-      "toolSpanId": "a260bdc8c68b3087",
-      "answer": "d08178atloboc",
+      "toolSpanId": "d7907fa805bdd4a3",
+      "answer": "1f283dtlaboc",
       "leadInferences": [
         {
-          "spanId": "15afe4cfb10c9c15",
+          "spanId": "e0018ba898153fa7",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 503,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 418,
+              "text": 85
+            }
+          }
         },
         {
-          "spanId": "19eb39267bb4c1dc",
+          "spanId": "2835ae7636799961",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17190,
+            "inputTokens": 17188,
             "outputTokens": 8,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17190
+              "text": 17188
             },
             "outputDetails": {
               "reasoning": 0,
@@ -1884,28 +2276,17 @@
           }
         },
         {
-          "spanId": "a6d7fcc369f55fab",
+          "spanId": "c11669dcfa8d674a",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21651,
-            "outputTokens": 501,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 147
-            },
-            "outputDetails": {
-              "reasoning": 405,
-              "text": 96
-            }
-          }
+          "usage": null
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 44e1e545-9661-499d-b9eb-5d47018e83b9 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-swarm-workers-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 20749b1f-e70c-46cb-8ac6-41f0fb60eb4f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-swarm-workers-1, expected anthropic/claude-fable-5."
       }
     }
   ],
@@ -1913,8 +2294,15 @@
     {
       "name": "mastra_model_total_input_tokens",
       "model": "deepseek-deepseek-v4-1-flash",
-      "value": 17190,
-      "estimatedCost": 0.0025785,
+      "value": 17188,
+      "estimatedCost": 0.0025781999999999997,
+      "costUnit": "USD"
+    },
+    {
+      "name": "mastra_model_total_output_tokens",
+      "model": "deepseek-deepseek-v4-1-flash",
+      "value": 8,
+      "estimatedCost": 0.0000048,
       "costUnit": "USD"
     },
     {
@@ -1927,1529 +2315,1899 @@
     {
       "name": "mastra_model_input_text_tokens",
       "model": "deepseek-deepseek-v4-1-flash",
-      "value": 17190,
-      "estimatedCost": 0.0025785,
+      "value": 17188,
+      "estimatedCost": 0.0025781999999999997,
       "costUnit": "USD"
     }
   ],
   "criterion2": [
     {
-      "runId": "0a1fb9cf-a2db-46c0-9df7-59bab69b4944",
-      "traceId": "3be1ff9c89bb99fd936b4277edd5c2ee",
+      "runId": "cfe165cd-2866-4995-955a-8f306f7d0a78",
+      "traceId": "9b5034999d5935f5c40a77f47ab8394b",
       "agent": "flow-build",
       "model": "commandcode/moonshotai/Kimi-K3.1-Pro",
       "inferenceSpans": [
         {
-          "spanId": "a7ba69d8afa53394",
+          "spanId": "4b70d4e97e28511f",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 12441,
-            "outputTokens": 57,
+            "inputTokens": 12445,
+            "outputTokens": 216,
             "inputDetails": {
-              "cacheRead": 12288,
-              "text": 153
+              "cacheRead": 0,
+              "text": 12445
             },
             "outputDetails": {
-              "reasoning": 37,
+              "reasoning": 196,
               "text": 20
             }
           }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 0a1fb9cf-a2db-46c0-9df7-59bab69b4944 used commandcode/moonshotai/Kimi-K3.1-Pro inside flow-build, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace cfe165cd-2866-4995-955a-8f306f7d0a78 used commandcode/moonshotai/Kimi-K3.1-Pro inside flow-build, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "e3413877-a2df-4808-8746-181f55e6871e",
-      "traceId": "b3865b2c3dac51e08a7b31c3191ed4cd",
+      "runId": "1f0ebd72-ee3a-4e60-9d12-167ee73d4412",
+      "traceId": "5134124012a6677d9fddf9aabfe3505c",
       "agent": "pstack-feature-refactoring-1",
       "model": "commandcode/deepseek/deepseek-v4-flash",
       "inferenceSpans": [
         {
-          "spanId": "5c87e82bbcafd05a",
+          "spanId": "fddc559614f7b45a",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4-flash",
           "usage": {
-            "inputTokens": 17223,
-            "outputTokens": 318,
+            "inputTokens": 17210,
+            "outputTokens": 284,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 71
-            },
-            "outputDetails": {
-              "reasoning": 260,
               "text": 58
-            }
-          }
-        },
-        {
-          "spanId": "24a8ffeca07964d8",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4-flash",
-          "usage": {
-            "inputTokens": 17561,
-            "outputTokens": 9,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 409
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 9
+              "reasoning": 278,
+              "text": 6
             }
           }
         }
       ],
       "role": "feature, refactoring",
       "helper": "featureRefactoring",
-      "toolSpanId": "f8b5f5c5223b4ce6",
-      "answer": "32a4c4tlaboc",
+      "toolSpanId": "8fb953093266a0bb",
+      "answer": "5686detlaboc",
       "leadInferences": [
         {
-          "spanId": "6edd85ec07de9de9",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21654,
-            "outputTokens": 435,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 150
-            },
-            "outputDetails": {
-              "reasoning": 325,
-              "text": 110
-            }
-          }
-        },
-        {
-          "spanId": "223b29e3c2e443cb",
+          "spanId": "5d8a92c970a0ad41",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         },
         {
-          "spanId": "5c87e82bbcafd05a",
+          "spanId": "fddc559614f7b45a",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4-flash",
           "usage": {
-            "inputTokens": 17223,
-            "outputTokens": 318,
+            "inputTokens": 17210,
+            "outputTokens": 284,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 71
+              "text": 58
             },
             "outputDetails": {
-              "reasoning": 260,
-              "text": 58
+              "reasoning": 278,
+              "text": 6
             }
           }
         },
         {
-          "spanId": "24a8ffeca07964d8",
+          "spanId": "8f7825fccc799b66",
           "provider": "commandcode",
-          "model": "deepseek/deepseek-v4-flash",
+          "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 17561,
-            "outputTokens": 9,
+            "inputTokens": 22918,
+            "outputTokens": 415,
             "inputDetails": {
-              "cacheRead": 17152,
-              "text": 409
+              "cacheRead": 0,
+              "text": 22918
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 9
+              "reasoning": 326,
+              "text": 89
             }
           }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace e3413877-a2df-4808-8746-181f55e6871e used commandcode/deepseek/deepseek-v4-flash, commandcode/deepseek/deepseek-v4-flash inside pstack-feature-refactoring-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 1f0ebd72-ee3a-4e60-9d12-167ee73d4412 used commandcode/deepseek/deepseek-v4-flash inside pstack-feature-refactoring-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "67a165a0-6366-4590-a34f-c2c1730ff19b",
-      "traceId": "cdad61d55d6581269311ac52edf8c681",
+      "runId": "14492a25-ed3c-435e-80b3-06a4baec4196",
+      "traceId": "0540efed290cf5c9673e7d4afc1e4945",
       "agent": "pstack-bug-fix-1",
       "model": "commandcode/deepseek/deepseek-v4.1-flash",
       "inferenceSpans": [
         {
-          "spanId": "3a957b0362186912",
+          "spanId": "2dacf66cfa2621a7",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17410,
-            "outputTokens": 9,
+            "inputTokens": 17189,
+            "outputTokens": 259,
             "inputDetails": {
-              "cacheRead": 17152,
-              "text": 258
+              "cacheRead": 0,
+              "text": 17189
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 9
+              "reasoning": 198,
+              "text": 61
             }
           }
         },
         {
-          "spanId": "e5a3b368f5b12753",
+          "spanId": "adced7a356da6e1b",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17195,
-            "outputTokens": 197,
+            "inputTokens": 17466,
+            "outputTokens": 8,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17195
+              "cacheRead": 17152,
+              "text": 314
             },
             "outputDetails": {
-              "reasoning": 140,
-              "text": 57
+              "reasoning": 0,
+              "text": 8
             }
           }
         }
       ],
       "role": "bug-fix",
       "helper": "bugFix",
-      "toolSpanId": "8137c9c04804dad8",
-      "answer": "c354e9tlaboc",
+      "toolSpanId": "9381cbb042292b56",
+      "answer": "d43531tlaboc",
       "leadInferences": [
         {
-          "spanId": "3a957b0362186912",
+          "spanId": "2dacf66cfa2621a7",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17410,
-            "outputTokens": 9,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 258
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 9
-            }
-          }
-        },
-        {
-          "spanId": "fa64d3d825102e3f",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 332,
+            "inputTokens": 17189,
+            "outputTokens": 259,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 21652
+              "text": 17189
             },
             "outputDetails": {
-              "reasoning": 238,
-              "text": 94
+              "reasoning": 198,
+              "text": 61
             }
           }
         },
         {
-          "spanId": "e5a3b368f5b12753",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17195,
-            "outputTokens": 197,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17195
-            },
-            "outputDetails": {
-              "reasoning": 140,
-              "text": 57
-            }
-          }
-        },
-        {
-          "spanId": "6689c462500e44d9",
+          "spanId": "47a1d6d861521499",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
+        },
+        {
+          "spanId": "e9338706c3c22e2b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22917,
+            "outputTokens": 344,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 22917
+            },
+            "outputDetails": {
+              "reasoning": 261,
+              "text": 83
+            }
+          }
+        },
+        {
+          "spanId": "adced7a356da6e1b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17466,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 314
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 67a165a0-6366-4590-a34f-c2c1730ff19b used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-bug-fix-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 14492a25-ed3c-435e-80b3-06a4baec4196 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-bug-fix-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "f607593d-0cfa-4ccd-90c9-b7fa0d57a8ed",
-      "traceId": "53c78312488443a941367941fa195238",
+      "runId": "b7c5ea28-0356-417b-a9cc-6d974976045a",
+      "traceId": "90293e477f2b3e8494f813ef3f38c6e0",
       "agent": "pstack-perf-issue-1",
       "model": "commandcode/deepseek/deepseek-v4.1-flash",
       "inferenceSpans": [
         {
-          "spanId": "8eb8db938252ab91",
+          "spanId": "71682f834bde11ee",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 193,
+            "inputTokens": 17187,
+            "outputTokens": 184,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17177
+              "text": 17187
             },
             "outputDetails": {
-              "reasoning": 184,
-              "text": 9
+              "reasoning": 176,
+              "text": 8
             }
           }
         }
       ],
       "role": "perf-issue",
       "helper": "perfIssue",
-      "toolSpanId": "8c1b8ab45d1462d4",
-      "answer": "e017f6tlaboc",
+      "toolSpanId": "60e88407cfa7a88c",
+      "answer": "fba84etlaboc",
       "leadInferences": [
         {
-          "spanId": "8eb8db938252ab91",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 193,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17177
-            },
-            "outputDetails": {
-              "reasoning": 184,
-              "text": 9
-            }
-          }
-        },
-        {
-          "spanId": "94fedd07b18b23aa",
+          "spanId": "4b6b7d2b45778e46",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 423,
+            "inputTokens": 22918,
+            "outputTokens": 315,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 148
+              "cacheRead": 22784,
+              "text": 134
             },
             "outputDetails": {
-              "reasoning": 339,
+              "reasoning": 231,
               "text": 84
             }
           }
         },
         {
-          "spanId": "4ef9d565ba2fb2df",
+          "spanId": "71682f834bde11ee",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17187,
+            "outputTokens": 184,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17187
+            },
+            "outputDetails": {
+              "reasoning": 176,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "1808fb82ff9cf916",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace f607593d-0cfa-4ccd-90c9-b7fa0d57a8ed used commandcode/deepseek/deepseek-v4.1-flash inside pstack-perf-issue-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace b7c5ea28-0356-417b-a9cc-6d974976045a used commandcode/deepseek/deepseek-v4.1-flash inside pstack-perf-issue-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "b37f901e-5093-4210-870e-79ec7367cf2a",
-      "traceId": "46bfd5a58e4513e92c9882d66210a54e",
+      "runId": "8def0b97-636c-45f9-8a0e-eb874d138838",
+      "traceId": "6015e2ee5d757aca9e0a0e091cacf9fd",
       "agent": "pstack-hillclimb-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "model": "commandcode/deepseek/deepseek-v4-flash",
       "inferenceSpans": [
         {
-          "spanId": "ef16d3108a7b93e1",
+          "spanId": "e52b78623364ca6d",
           "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "model": "deepseek/deepseek-v4-flash",
           "usage": {
-            "inputTokens": 17188,
-            "outputTokens": 211,
+            "inputTokens": 17604,
+            "outputTokens": 8,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17188
+              "cacheRead": 17152,
+              "text": 452
             },
             "outputDetails": {
-              "reasoning": 203,
+              "reasoning": 0,
               "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "85849273e7388a9c",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17206,
+            "outputTokens": 379,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 54
+            },
+            "outputDetails": {
+              "reasoning": 322,
+              "text": 57
             }
           }
         }
       ],
       "role": "hillclimb",
       "helper": "hillclimb",
-      "toolSpanId": "636856bdf94db23c",
-      "answer": "331d19tlaboc",
+      "toolSpanId": "0ee47b720199262f",
+      "answer": "0f6700tlaboc",
       "leadInferences": [
         {
-          "spanId": "d2d205ad1fd24399",
+          "spanId": "1fdc762e38a3e84e",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         },
         {
-          "spanId": "1fc7924043f0469a",
+          "spanId": "e52b78623364ca6d",
           "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
+          "model": "deepseek/deepseek-v4-flash",
           "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 375,
+            "inputTokens": 17604,
+            "outputTokens": 8,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 148
+              "cacheRead": 17152,
+              "text": 452
             },
             "outputDetails": {
-              "reasoning": 307,
-              "text": 68
+              "reasoning": 0,
+              "text": 8
             }
           }
         },
         {
-          "spanId": "ef16d3108a7b93e1",
+          "spanId": "d67f8a019a332106",
           "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 17188,
-            "outputTokens": 211,
+            "inputTokens": 22919,
+            "outputTokens": 380,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17188
+              "cacheRead": 22784,
+              "text": 135
             },
             "outputDetails": {
-              "reasoning": 203,
-              "text": 8
+              "reasoning": 295,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "85849273e7388a9c",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17206,
+            "outputTokens": 379,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 54
+            },
+            "outputDetails": {
+              "reasoning": 322,
+              "text": 57
             }
           }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace b37f901e-5093-4210-870e-79ec7367cf2a used commandcode/deepseek/deepseek-v4.1-flash inside pstack-hillclimb-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 8def0b97-636c-45f9-8a0e-eb874d138838 used commandcode/deepseek/deepseek-v4-flash, commandcode/deepseek/deepseek-v4-flash inside pstack-hillclimb-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "0820edd0-6db4-4199-889f-1fed69fb614f",
-      "traceId": "0d8ce9ea132155ad11f8e04755d95076",
+      "runId": "20ca87a9-fbfb-47cd-a523-1d7618dbc277",
+      "traceId": "d6099e1f9ae55be0a8b39bdb438c2c36",
       "agent": "pstack-judgment-and-prose-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "model": "openai/gpt-6.1-sol",
       "inferenceSpans": [
         {
-          "spanId": "c390fda56f47bb34",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "spanId": "42ec0da5279718ba",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
           "usage": {
-            "inputTokens": 17183,
-            "outputTokens": 75,
+            "inputTokens": 16209,
+            "outputTokens": 67,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17183
+              "cacheWrite": 0,
+              "text": 16209
             },
             "outputDetails": {
-              "reasoning": 65,
-              "text": 10
+              "reasoning": 56,
+              "text": 11
             }
           }
         }
       ],
       "role": "judgment and prose",
       "helper": "judgmentAndProse",
-      "toolSpanId": "596864b8a47c7b34",
-      "answer": "4c1f59tlaboc",
+      "toolSpanId": "f706d9acdde53f38",
+      "answer": "00236atlaboc",
       "leadInferences": [
         {
-          "spanId": "2266ef165a074b6e",
+          "spanId": "b8902dd0cddccf7e",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21654,
-            "outputTokens": 270,
+            "inputTokens": 22919,
+            "outputTokens": 369,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 150
+              "cacheRead": 22784,
+              "text": 135
             },
             "outputDetails": {
-              "reasoning": 182,
-              "text": 88
+              "reasoning": 282,
+              "text": 87
             }
           }
         },
         {
-          "spanId": "c206b077f100de60",
+          "spanId": "e0522d5f1eaa2622",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        },
-        {
-          "spanId": "c390fda56f47bb34",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17183,
-            "outputTokens": 75,
+            "inputTokens": 23325,
+            "outputTokens": 27,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17183
+              "cacheRead": 22784,
+              "text": 541
             },
             "outputDetails": {
-              "reasoning": 65,
-              "text": 10
+              "reasoning": 7,
+              "text": 20
+            }
+          }
+        },
+        {
+          "spanId": "42ec0da5279718ba",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16209,
+            "outputTokens": 67,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16209
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 11
             }
           }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 0820edd0-6db4-4199-889f-1fed69fb614f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-judgment-and-prose-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 20ca87a9-fbfb-47cd-a523-1d7618dbc277 used openai.responses/gpt-6.1-sol inside pstack-judgment-and-prose-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "0ddb05d1-5910-4c57-986f-de490d3d238e",
-      "traceId": "5fd41e555b121097765cc019189b219b",
+      "runId": "14c9fa84-df5a-42f8-bdc7-bfdf538a0731",
+      "traceId": "acc1d5718c54f35cbd45f1958ef7a38e",
       "agent": "pstack-hardest-tasks-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "model": "openai/gpt-6.1-sol",
       "inferenceSpans": [
         {
-          "spanId": "8f3e5d71804b5a63",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "spanId": "03babbb7619819c5",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
           "usage": {
-            "inputTokens": 17183,
-            "outputTokens": 246,
+            "inputTokens": 16211,
+            "outputTokens": 69,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17183
+              "cacheWrite": 0,
+              "text": 16211
             },
             "outputDetails": {
-              "reasoning": 187,
-              "text": 59
-            }
-          }
-        },
-        {
-          "spanId": "6f5739a62ddabfb2",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17447,
-            "outputTokens": 9,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 295
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 9
+              "reasoning": 55,
+              "text": 14
             }
           }
         }
       ],
       "role": "hardest tasks",
       "helper": "hardestTasks",
-      "toolSpanId": "41f7ec3f098f519c",
-      "answer": "fb8d6ctlaboc",
+      "toolSpanId": "34f68852458ad954",
+      "answer": "7a5df6tlaboc",
       "leadInferences": [
         {
-          "spanId": "8f3e5d71804b5a63",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "spanId": "03babbb7619819c5",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
           "usage": {
-            "inputTokens": 17183,
-            "outputTokens": 246,
+            "inputTokens": 16211,
+            "outputTokens": 69,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17183
+              "cacheWrite": 0,
+              "text": 16211
             },
             "outputDetails": {
-              "reasoning": 187,
-              "text": 59
+              "reasoning": 55,
+              "text": 14
             }
           }
         },
         {
-          "spanId": "6faa607542f1d271",
+          "spanId": "dc709066fa6c98b8",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21653,
-            "outputTokens": 314,
+            "inputTokens": 22919,
+            "outputTokens": 313,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 149
+              "cacheRead": 22784,
+              "text": 135
             },
             "outputDetails": {
-              "reasoning": 228,
-              "text": 86
+              "reasoning": 243,
+              "text": 70
             }
           }
         },
         {
-          "spanId": "6f5739a62ddabfb2",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17447,
-            "outputTokens": 9,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 295
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 9
-            }
-          }
-        },
-        {
-          "spanId": "bdf906ce2b16de26",
+          "spanId": "4a70bfa93ced33d9",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 0ddb05d1-5910-4c57-986f-de490d3d238e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-hardest-tasks-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 14c9fa84-df5a-42f8-bdc7-bfdf538a0731 used openai.responses/gpt-6.1-sol inside pstack-hardest-tasks-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "9dd122a1-d547-4be7-a179-2cec9c8f2250",
-      "traceId": "95ea9eb0d03e926ddb89f3da3357b7c3",
+      "runId": "4dd528a4-198e-455c-a9c8-5ad7936f2155",
+      "traceId": "7835a3ccfcee2e70e86c16d8f1efaec9",
       "agent": "pstack-how-explorer-1",
       "model": "commandcode/deepseek/deepseek-v4.1-flash",
       "inferenceSpans": [
         {
-          "spanId": "5ce3fcbc36f2c95a",
+          "spanId": "8a2a5f7ef4532f85",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17180,
-            "outputTokens": 138,
+            "inputTokens": 17184,
+            "outputTokens": 120,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17180
+              "text": 17184
             },
             "outputDetails": {
-              "reasoning": 79,
-              "text": 59
-            }
-          }
-        },
-        {
-          "spanId": "ba28d4633960bfe0",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17338,
-            "outputTokens": 11,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 186
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 11
+              "reasoning": 113,
+              "text": 7
             }
           }
         }
       ],
       "role": "how explorer",
       "helper": "howExplorer",
-      "toolSpanId": "56f421c33c544e7d",
-      "answer": "a4a6d5tlaboc",
+      "toolSpanId": "68610672d1121fba",
+      "answer": "44797atlaboc",
       "leadInferences": [
         {
-          "spanId": "5ce3fcbc36f2c95a",
+          "spanId": "8a2a5f7ef4532f85",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17180,
-            "outputTokens": 138,
+            "inputTokens": 17184,
+            "outputTokens": 120,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17180
+              "text": 17184
             },
             "outputDetails": {
-              "reasoning": 79,
-              "text": 59
+              "reasoning": 113,
+              "text": 7
             }
           }
         },
         {
-          "spanId": "5b7d3aece4a5600e",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21654,
-            "outputTokens": 223,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 150
-            },
-            "outputDetails": {
-              "reasoning": 138,
-              "text": 85
-            }
-          }
-        },
-        {
-          "spanId": "ba28d4633960bfe0",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17338,
-            "outputTokens": 11,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 186
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 11
-            }
-          }
-        },
-        {
-          "spanId": "c9e9c94dd6da83d6",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 9dd122a1-d547-4be7-a179-2cec9c8f2250 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explorer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "41946791-ba79-471b-a4af-bf0d6183224d",
-      "traceId": "3ef141e040abccde73e0f6bbe1eb5543",
-      "agent": "pstack-how-explainer-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "afaa3691bc80bba9",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17175,
-            "outputTokens": 175,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17175
-            },
-            "outputDetails": {
-              "reasoning": 167,
-              "text": 8
-            }
-          }
-        }
-      ],
-      "role": "how explainer",
-      "helper": "howExplainer",
-      "toolSpanId": "bdeb567f1447296c",
-      "answer": "43df30tlaboc",
-      "leadInferences": [
-        {
-          "spanId": "ba1fb119d3cc2fc3",
+          "spanId": "f04a1f1c76cd456f",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         },
         {
-          "spanId": "8bc2dd98b85f3fb4",
+          "spanId": "7506c4fe8f264202",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 419,
+            "inputTokens": 22918,
+            "outputTokens": 464,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 148
+              "cacheRead": 22784,
+              "text": 134
             },
             "outputDetails": {
-              "reasoning": 315,
-              "text": 104
-            }
-          }
-        },
-        {
-          "spanId": "afaa3691bc80bba9",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17175,
-            "outputTokens": 175,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17175
-            },
-            "outputDetails": {
-              "reasoning": 167,
-              "text": 8
-            }
-          }
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 41946791-ba79-471b-a4af-bf0d6183224d used commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explainer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "0ff7cc09-1865-475e-ab6f-8ecfbfc23f8f",
-      "traceId": "c4c80591ffcabf27adb80c87b0b70b38",
-      "agent": "pstack-why-investigators-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "a7acf1febee79d3f",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 245,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17177
-            },
-            "outputDetails": {
-              "reasoning": 237,
-              "text": 8
-            }
-          }
-        }
-      ],
-      "role": "why investigators",
-      "helper": "whyInvestigators",
-      "toolSpanId": "3105c0914e8bbdf4",
-      "answer": "6db284tlaboc",
-      "leadInferences": [
-        {
-          "spanId": "481cea56bc8766d7",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21651,
-            "outputTokens": 267,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 147
-            },
-            "outputDetails": {
-              "reasoning": 183,
-              "text": 84
-            }
-          }
-        },
-        {
-          "spanId": "a7acf1febee79d3f",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 245,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17177
-            },
-            "outputDetails": {
-              "reasoning": 237,
-              "text": 8
-            }
-          }
-        },
-        {
-          "spanId": "039040a2b692eca7",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 0ff7cc09-1865-475e-ab6f-8ecfbfc23f8f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-investigators-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "9a164c19-d8e1-4811-99ad-423e0b3a549b",
-      "traceId": "0d88677b4e3093ea1d9003d9d2def4e7",
-      "agent": "pstack-why-synthesizer-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "0a6c137773baa2d7",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17179,
-            "outputTokens": 140,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17179
-            },
-            "outputDetails": {
-              "reasoning": 131,
-              "text": 9
-            }
-          }
-        }
-      ],
-      "role": "why synthesizer",
-      "helper": "whySynthesizer",
-      "toolSpanId": "4b931bef4f826250",
-      "answer": "3b9599tlaboc",
-      "leadInferences": [
-        {
-          "spanId": "c5791526618b1afe",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21653,
-            "outputTokens": 410,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 149
-            },
-            "outputDetails": {
-              "reasoning": 340,
-              "text": 70
-            }
-          }
-        },
-        {
-          "spanId": "0a6c137773baa2d7",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17179,
-            "outputTokens": 140,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17179
-            },
-            "outputDetails": {
-              "reasoning": 131,
-              "text": 9
-            }
-          }
-        },
-        {
-          "spanId": "f67498c555ab3b4d",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 9a164c19-d8e1-4811-99ad-423e0b3a549b used commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-synthesizer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "39ae2c98-ae67-4e12-ad31-39163e0563c5",
-      "traceId": "2d35a2144a52896d5bd3dd4944690331",
-      "agent": "pstack-reflect-tooling-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "bddb0ac43d8f7612",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17176,
-            "outputTokens": 142,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17176
-            },
-            "outputDetails": {
-              "reasoning": 133,
-              "text": 9
-            }
-          }
-        }
-      ],
-      "role": "reflect tooling",
-      "helper": "reflectTooling",
-      "toolSpanId": "f01af1df6a3e1b62",
-      "answer": "cdfc60tlaboc",
-      "leadInferences": [
-        {
-          "spanId": "21e1b60238a12923",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21651,
-            "outputTokens": 795,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 147
-            },
-            "outputDetails": {
-              "reasoning": 711,
-              "text": 84
-            }
-          }
-        },
-        {
-          "spanId": "31a30a52934b9c0a",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        },
-        {
-          "spanId": "bddb0ac43d8f7612",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17176,
-            "outputTokens": 142,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17176
-            },
-            "outputDetails": {
-              "reasoning": 133,
-              "text": 9
-            }
-          }
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 39ae2c98-ae67-4e12-ad31-39163e0563c5 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-tooling-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "3838f18c-750d-4a5f-a816-e908e070644e",
-      "traceId": "cb7df6e9a4617971683e4a06b933c88c",
-      "agent": "pstack-reflect-judgment-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "1f30efe2f73f259b",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17185,
-            "outputTokens": 78,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17185
-            },
-            "outputDetails": {
-              "reasoning": 69,
-              "text": 9
-            }
-          }
-        }
-      ],
-      "role": "reflect judgment, divergent, synthesizer",
-      "helper": "reflectJudgment",
-      "toolSpanId": "0b2709de0a241ba1",
-      "answer": "07bcf8tlaboc",
-      "leadInferences": [
-        {
-          "spanId": "1f30efe2f73f259b",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17185,
-            "outputTokens": 78,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17185
-            },
-            "outputDetails": {
-              "reasoning": 69,
-              "text": 9
-            }
-          }
-        },
-        {
-          "spanId": "9369fb42171bf50c",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        },
-        {
-          "spanId": "7e96c691313c7632",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21657,
-            "outputTokens": 422,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 153
-            },
-            "outputDetails": {
-              "reasoning": 338,
-              "text": 84
-            }
-          }
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace 3838f18c-750d-4a5f-a816-e908e070644e used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-judgment-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "5a497aa9-face-4f93-897b-4f5cda03a51f",
-      "traceId": "8a340932ed23a81d927af36cce5b78f7",
-      "agent": "pstack-arena-runners-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "ab08a75cb8e5f646",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 146,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17177
-            },
-            "outputDetails": {
-              "reasoning": 138,
-              "text": 8
-            }
-          }
-        }
-      ],
-      "role": "arena runners",
-      "helper": "arenaRunners",
-      "toolSpanId": "f9bf1318f925b7df",
-      "answer": "7f203ctlaboc",
-      "leadInferences": [
-        {
-          "spanId": "ab08a75cb8e5f646",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17177,
-            "outputTokens": 146,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17177
-            },
-            "outputDetails": {
-              "reasoning": 138,
-              "text": 8
-            }
-          }
-        },
-        {
-          "spanId": "2d0f5bc3523659c0",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        },
-        {
-          "spanId": "d213733a69a63f4f",
-          "provider": "commandcode",
-          "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 413,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 148
-            },
-            "outputDetails": {
-              "reasoning": 330,
+              "reasoning": 381,
               "text": 83
             }
           }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 5a497aa9-face-4f93-897b-4f5cda03a51f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-runners-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 4dd528a4-198e-455c-a9c8-5ad7936f2155 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explorer-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "b0c2b0ac-1df1-4a6c-bee4-205a94c3f755",
-      "traceId": "8b81ae4056c5a0f5f905037a47551012",
-      "agent": "pstack-arena-cross-judge-pool-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "runId": "fcfc02d1-e2f2-4aa5-a13e-f091356047a5",
+      "traceId": "5ee92cce1854cae10280aadf7ee48734",
+      "agent": "pstack-how-explainer-1",
+      "model": "openai/gpt-6.1-sol",
       "inferenceSpans": [
         {
-          "spanId": "9056f8cb011f8940",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
+          "spanId": "aaffa6aab44b2060",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
           "usage": {
-            "inputTokens": 17204,
-            "outputTokens": 473,
+            "inputTokens": 16217,
+            "outputTokens": 69,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17204
+              "cacheWrite": 0,
+              "text": 16217
             },
             "outputDetails": {
-              "reasoning": 417,
-              "text": 56
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        }
+      ],
+      "role": "how explainer",
+      "helper": "howExplainer",
+      "toolSpanId": "16f1feb1ec09ea01",
+      "answer": "29b5f1tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "ef15b7ac0754ae42",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22920,
+            "outputTokens": 604,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 136
+            },
+            "outputDetails": {
+              "reasoning": 508,
+              "text": 96
             }
           }
         },
         {
-          "spanId": "06aeb6c9733f7a78",
+          "spanId": "3e9c1b20aa79f233",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "aaffa6aab44b2060",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 69,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 55,
+              "text": 14
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace fcfc02d1-e2f2-4aa5-a13e-f091356047a5 used openai.responses/gpt-6.1-sol inside pstack-how-explainer-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "dbdad893-c4e2-4518-bf4e-04daaf00d561",
+      "traceId": "fcd4b663bf7a84570fd8e2e8513da154",
+      "agent": "pstack-why-investigators-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "2ee2251d82f7e95e",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17694,
-            "outputTokens": 8,
+            "inputTokens": 17189,
+            "outputTokens": 134,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 75,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "a3d7d10e4eb872fe",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17342,
+            "outputTokens": 10,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 542
+              "text": 190
             },
             "outputDetails": {
               "reasoning": 0,
+              "text": 10
+            }
+          }
+        }
+      ],
+      "role": "why investigators",
+      "helper": "whyInvestigators",
+      "toolSpanId": "a53c0f04c084c71a",
+      "answer": "0d9fd3tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "9c8ba02a196635e4",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 354,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 268,
+              "text": 86
+            }
+          }
+        },
+        {
+          "spanId": "2ee2251d82f7e95e",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17189,
+            "outputTokens": 134,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17189
+            },
+            "outputDetails": {
+              "reasoning": 75,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "a3d7d10e4eb872fe",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17342,
+            "outputTokens": 10,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 190
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 10
+            }
+          }
+        },
+        {
+          "spanId": "5cdd015e5c98f30b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace dbdad893-c4e2-4518-bf4e-04daaf00d561 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-investigators-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "2a84f500-9fc2-4ac7-9423-a358a5251462",
+      "traceId": "8b9a0fd3306510d7fb152711c01c1e92",
+      "agent": "pstack-why-synthesizer-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "e05a86ff2864c7fa",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16237,
+            "outputTokens": 70,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16237
+            },
+            "outputDetails": {
+              "reasoning": 57,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "role": "why synthesizer",
+      "helper": "whySynthesizer",
+      "toolSpanId": "a631882386c73ede",
+      "answer": "c8ca79tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "3cddf908c3f72dbf",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "ccf101672efa3f5e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 512,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 395,
+              "text": 117
+            }
+          }
+        },
+        {
+          "spanId": "e05a86ff2864c7fa",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16237,
+            "outputTokens": 70,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16237
+            },
+            "outputDetails": {
+              "reasoning": 57,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 2a84f500-9fc2-4ac7-9423-a358a5251462 used openai.responses/gpt-6.1-sol inside pstack-why-synthesizer-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "5fa2a286-413b-4752-8484-bc7d9c87d1b0",
+      "traceId": "4ce56e5db38fdf1f98e44bfb9e4e3880",
+      "agent": "pstack-reflect-tooling-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "16083c1df503b629",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 74,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 66,
               "text": 8
+            }
+          }
+        }
+      ],
+      "role": "reflect tooling",
+      "helper": "reflectTooling",
+      "toolSpanId": "b52fb246376195aa",
+      "answer": "547c96tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "c28040ca9146a4cd",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22917,
+            "outputTokens": 514,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 133
+            },
+            "outputDetails": {
+              "reasoning": 446,
+              "text": 68
+            }
+          }
+        },
+        {
+          "spanId": "87083f3071b039d7",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "16083c1df503b629",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 74,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 66,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5fa2a286-413b-4752-8484-bc7d9c87d1b0 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-tooling-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "305a3629-5bc6-42e9-9cf4-b28b5485dbbd",
+      "traceId": "9d0f3ac93185e5134f9998b2e6446a5d",
+      "agent": "pstack-reflect-judgment-1",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "b72f6f01fc0b2968",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 76,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16232
+            },
+            "outputDetails": {
+              "reasoning": 64,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "reflect judgment, divergent, synthesizer",
+      "helper": "reflectJudgment",
+      "toolSpanId": "e5adba19d005f24e",
+      "answer": "c86eectlaboc",
+      "leadInferences": [
+        {
+          "spanId": "b72f6f01fc0b2968",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 76,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16232
+            },
+            "outputDetails": {
+              "reasoning": 64,
+              "text": 12
+            }
+          }
+        },
+        {
+          "spanId": "1cbc8dc35334bd2c",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23795,
+            "outputTokens": 29,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 1011
+            },
+            "outputDetails": {
+              "reasoning": 8,
+              "text": 21
+            }
+          }
+        },
+        {
+          "spanId": "19fba1ba33b33f89",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22923,
+            "outputTokens": 836,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 139
+            },
+            "outputDetails": {
+              "reasoning": 730,
+              "text": 106
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 305a3629-5bc6-42e9-9cf4-b28b5485dbbd used openai.responses/gpt-6.1-sol inside pstack-reflect-judgment-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "af8774a5-3c07-4dd9-9180-cf765b016752",
+      "traceId": "cd0383c0c3180aeb90d8dd01c1201a5d",
+      "agent": "pstack-arena-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "21bdd10fa244c802",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17822,
+            "outputTokens": 54,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 670
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 54
+            }
+          }
+        },
+        {
+          "spanId": "a635b41de5521e6b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 593,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17210
+            },
+            "outputDetails": {
+              "reasoning": 537,
+              "text": 56
+            }
+          }
+        }
+      ],
+      "role": "arena runners",
+      "helper": "arenaRunners1",
+      "toolSpanId": "d01fc94ac70a3d4e",
+      "answer": "No subagent tool is available in this harness, so I did the job myself.\n\n`2b5ceatlaboc`\n\nEvidence: `echo \"cobaltaec5b2\" | rev` printed `2b5ceatlaboc`.",
+      "leadInferences": [
+        {
+          "spanId": "38a1d9665f955a01",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "21bdd10fa244c802",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17822,
+            "outputTokens": 54,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 670
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 54
+            }
+          }
+        },
+        {
+          "spanId": "84a5020e5448f83e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22941,
+            "outputTokens": 380,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 157
+            },
+            "outputDetails": {
+              "reasoning": 292,
+              "text": 88
+            }
+          }
+        },
+        {
+          "spanId": "a635b41de5521e6b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17210,
+            "outputTokens": 593,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17210
+            },
+            "outputDetails": {
+              "reasoning": 537,
+              "text": 56
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace af8774a5-3c07-4dd9-9180-cf765b016752 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-runners-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "7ace979d-9493-45f2-8a53-6c21756a4f55",
+      "traceId": "611a669c0a40a60e96010bda8cd17797",
+      "agent": "pstack-arena-runners-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "127fd635f3c73419",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16223,
+            "outputTokens": 62,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16223
+            },
+            "outputDetails": {
+              "reasoning": 49,
+              "text": 13
+            }
+          }
+        }
+      ],
+      "role": "arena runners",
+      "helper": "arenaRunners2",
+      "toolSpanId": "adb84b2ac6a56767",
+      "answer": "a2125btlaboc",
+      "leadInferences": [
+        {
+          "spanId": "127fd635f3c73419",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16223,
+            "outputTokens": 62,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16223
+            },
+            "outputDetails": {
+              "reasoning": 49,
+              "text": 13
+            }
+          }
+        },
+        {
+          "spanId": "cfe70ab29c0d8a5a",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "7c26d5476909da25",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22935,
+            "outputTokens": 258,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 151
+            },
+            "outputDetails": {
+              "reasoning": 172,
+              "text": 86
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 7ace979d-9493-45f2-8a53-6c21756a4f55 used openai.responses/gpt-6.1-sol inside pstack-arena-runners-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "113e05cd-41b2-4bcc-b345-11b8106a0d3e",
+      "traceId": "1afa366d1fb7cc7c247750fff1843f96",
+      "agent": "pstack-arena-cross-judge-pool-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "69646e8b59e6a34a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17223,
+            "outputTokens": 714,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17223
+            },
+            "outputDetails": {
+              "reasoning": 654,
+              "text": 60
+            }
+          }
+        },
+        {
+          "spanId": "415f3a3781119dcb",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17954,
+            "outputTokens": 99,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 802
+            },
+            "outputDetails": {
+              "reasoning": 36,
+              "text": 63
             }
           }
         }
       ],
       "role": "arena cross-judge pool",
-      "helper": "arenaCrossJudgePool",
-      "toolSpanId": "29a206fb56fb574b",
-      "answer": "0c405etlaboc",
+      "helper": "arenaCrossJudgePool1",
+      "toolSpanId": "61d5eb562a891201",
+      "answer": "1784betlaboc\n\n**Evidence.** Helper took the job itself per the brief, no re-delegation. Verified with `printf '%s' \"cobalteb4871\" | rev` → `1784betlaboc`. The reversed string is `1784betlaboc`.",
       "leadInferences": [
         {
-          "spanId": "25e632aba503eef9",
+          "spanId": "121ec83adc94a5b0",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21656,
-            "outputTokens": 346,
+            "inputTokens": 22943,
+            "outputTokens": 376,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 21656
+              "cacheRead": 22784,
+              "text": 159
             },
             "outputDetails": {
-              "reasoning": 249,
-              "text": 97
+              "reasoning": 304,
+              "text": 72
             }
           }
         },
         {
-          "spanId": "7aa1ede3109a7a1e",
+          "spanId": "69646e8b59e6a34a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17223,
+            "outputTokens": 714,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17223
+            },
+            "outputDetails": {
+              "reasoning": 654,
+              "text": 60
+            }
+          }
+        },
+        {
+          "spanId": "415f3a3781119dcb",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17954,
+            "outputTokens": 99,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 802
+            },
+            "outputDetails": {
+              "reasoning": 36,
+              "text": 63
+            }
+          }
+        },
+        {
+          "spanId": "cbf83499714bce3f",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 113e05cd-41b2-4bcc-b345-11b8106a0d3e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-cross-judge-pool-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "6b1841e6-9ab6-4ffa-8dd6-be3a399c338a",
+      "traceId": "ea14bdd2d744cca18b0bb18a118afa5e",
+      "agent": "pstack-arena-cross-judge-pool-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "3adb2009bfef4d0b",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 34,
+            "inputDetails": {
+              "cacheRead": 3328,
+              "cacheWrite": 0,
+              "text": 12904
+            },
+            "outputDetails": {
+              "reasoning": 23,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "role": "arena cross-judge pool",
+      "helper": "arenaCrossJudgePool2",
+      "toolSpanId": "6dfefdbb7f85d464",
+      "answer": "470414tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "f613d4cbb6f0d2a2",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         },
         {
-          "spanId": "9056f8cb011f8940",
+          "spanId": "4b1d0f250d291ce6",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22936,
+            "outputTokens": 363,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 152
+            },
+            "outputDetails": {
+              "reasoning": 278,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "3adb2009bfef4d0b",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16232,
+            "outputTokens": 34,
+            "inputDetails": {
+              "cacheRead": 3328,
+              "cacheWrite": 0,
+              "text": 12904
+            },
+            "outputDetails": {
+              "reasoning": 23,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 6b1841e6-9ab6-4ffa-8dd6-be3a399c338a used openai.responses/gpt-6.1-sol inside pstack-arena-cross-judge-pool-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "5bd38377-8d87-4e16-8e38-2dd20cd0cc0e",
+      "traceId": "04c3e452077bc9fa2961264743638640",
+      "agent": "pstack-architect-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "4be3dd46f689bc30",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
             "inputTokens": 17204,
-            "outputTokens": 473,
+            "outputTokens": 588,
             "inputDetails": {
               "cacheRead": 0,
               "text": 17204
             },
             "outputDetails": {
-              "reasoning": 417,
-              "text": 56
+              "reasoning": 524,
+              "text": 64
             }
           }
         },
         {
-          "spanId": "06aeb6c9733f7a78",
+          "spanId": "6845345f48af94ce",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17694,
-            "outputTokens": 8,
+            "inputTokens": 17811,
+            "outputTokens": 171,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 542
+              "text": 659
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 8
-            }
-          }
-        }
-      ],
-      "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
-      "mismatch": {
-        "verdict": "FAIL",
-        "reason": "Studio trace b0c2b0ac-1df1-4a6c-bee4-205a94c3f755 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-cross-judge-pool-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
-      }
-    },
-    {
-      "runId": "a2f88260-5f71-4b4b-a410-ec4f134135fc",
-      "traceId": "78b446c8710056feebc1a2553e02f261",
-      "agent": "pstack-architect-runners-1",
-      "model": "commandcode/deepseek/deepseek-v4.1-flash",
-      "inferenceSpans": [
-        {
-          "spanId": "72337b95b62c26fc",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17182,
-            "outputTokens": 447,
-            "inputDetails": {
-              "cacheRead": 0,
-              "text": 17182
-            },
-            "outputDetails": {
-              "reasoning": 391,
-              "text": 56
-            }
-          }
-        },
-        {
-          "spanId": "d0cd587cba1c52f3",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
-          "usage": {
-            "inputTokens": 17646,
-            "outputTokens": 8,
-            "inputDetails": {
-              "cacheRead": 17152,
-              "text": 494
-            },
-            "outputDetails": {
-              "reasoning": 0,
-              "text": 8
+              "reasoning": 42,
+              "text": 129
             }
           }
         }
       ],
       "role": "architect runners",
-      "helper": "architectRunners",
-      "toolSpanId": "b25bda3577d84d97",
-      "answer": "67ad69tlaboc",
+      "helper": "architectRunners1",
+      "toolSpanId": "1657803badc3d5c9",
+      "answer": "I have no subagent tool in this harness, so I could not hand choice 1 to a `poteto-agent` runner, and I could not set the model to `commandcode/deepseek/deepseek-v4.1-flash`. Per the Harness mapping section, a harness without a subagent tool means doing the delegated step myself. So I ran the reversal directly and verified it with `python3`.\n\nEvidence: `python3 -c \"s='cobalt8669a4'; print(s[::-1])\"` printed `4a9668tlaboc`.\n\n4a9668tlaboc",
       "leadInferences": [
         {
-          "spanId": "4c2cf5482d62a8f5",
+          "spanId": "31fa843658fc0487",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "919d89934918d489",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21651,
-            "outputTokens": 391,
+            "inputTokens": 22939,
+            "outputTokens": 298,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 147
+              "cacheRead": 22784,
+              "text": 155
             },
             "outputDetails": {
-              "reasoning": 298,
-              "text": 93
+              "reasoning": 228,
+              "text": 70
             }
           }
         },
         {
-          "spanId": "72337b95b62c26fc",
+          "spanId": "4be3dd46f689bc30",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17182,
-            "outputTokens": 447,
+            "inputTokens": 17204,
+            "outputTokens": 588,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17182
+              "text": 17204
             },
             "outputDetails": {
-              "reasoning": 391,
-              "text": 56
+              "reasoning": 524,
+              "text": 64
             }
           }
         },
         {
-          "spanId": "d0cd587cba1c52f3",
+          "spanId": "6845345f48af94ce",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17646,
-            "outputTokens": 8,
+            "inputTokens": 17811,
+            "outputTokens": 171,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 494
+              "text": 659
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 8
+              "reasoning": 42,
+              "text": 129
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5bd38377-8d87-4e16-8e38-2dd20cd0cc0e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-architect-runners-1, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "baf453ad-9aea-4254-ac48-f8fde6b06186",
+      "traceId": "42533fd67bd6f8cc66d8bc6c6578b086",
+      "agent": "pstack-architect-runners-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "5cd05b7920fc2a48",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 68,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "architect runners",
+      "helper": "architectRunners2",
+      "toolSpanId": "7f854c6578b80df7",
+      "answer": "33b016tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "be5bcdd53482116b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22934,
+            "outputTokens": 435,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 150
+            },
+            "outputDetails": {
+              "reasoning": 350,
+              "text": 85
             }
           }
         },
         {
-          "spanId": "fb1b0a352422bd76",
+          "spanId": "5cd05b7920fc2a48",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16217,
+            "outputTokens": 68,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16217
+            },
+            "outputDetails": {
+              "reasoning": 56,
+              "text": 12
+            }
+          }
+        },
+        {
+          "spanId": "3c7ee7c859bc16ae",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": null
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace a2f88260-5f71-4b4b-a410-ec4f134135fc used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-architect-runners-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace baf453ad-9aea-4254-ac48-f8fde6b06186 used openai.responses/gpt-6.1-sol inside pstack-architect-runners-2, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "e08534e3-0023-4cc4-b2b8-5b403f856dde",
-      "traceId": "a8887198a104de1d4ddfc6bc7ccc8a86",
+      "runId": "9263dec1-02b0-48d1-8674-de1884bafeae",
+      "traceId": "96a72911afabcc95445e742d8a034f15",
       "agent": "pstack-interrogate-reviewers-1",
       "model": "commandcode/deepseek/deepseek-v4.1-flash",
       "inferenceSpans": [
         {
-          "spanId": "0b0713890344873b",
+          "spanId": "61e241615d8d2eff",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17497,
-            "outputTokens": 8,
+            "inputTokens": 17217,
+            "outputTokens": 413,
             "inputDetails": {
-              "cacheRead": 17152,
-              "text": 345
+              "cacheRead": 0,
+              "text": 17217
             },
             "outputDetails": {
-              "reasoning": 0,
-              "text": 8
+              "reasoning": 354,
+              "text": 59
             }
           }
         },
         {
-          "spanId": "7e436a6700fcaf9f",
+          "spanId": "3b67830ccfbee922",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17184,
-            "outputTokens": 296,
+            "inputTokens": 17649,
+            "outputTokens": 10,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17184
+              "cacheRead": 17152,
+              "text": 497
             },
             "outputDetails": {
-              "reasoning": 239,
-              "text": 57
+              "reasoning": 0,
+              "text": 10
             }
           }
         }
       ],
       "role": "interrogate reviewers",
-      "helper": "interrogateReviewers",
-      "toolSpanId": "4ac03fd8a8b5013a",
-      "answer": "78fb26tlaboc",
+      "helper": "interrogateReviewers1",
+      "toolSpanId": "4bb48320e7c4ccb2",
+      "answer": "5a2a27tlaboc",
       "leadInferences": [
         {
-          "spanId": "7ea6ebc2cbc73247",
+          "spanId": "53e3e42d5f27f48e",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
           "usage": {
-            "inputTokens": 21652,
-            "outputTokens": 354,
+            "inputTokens": 22941,
+            "outputTokens": 483,
             "inputDetails": {
-              "cacheRead": 21504,
-              "text": 148
+              "cacheRead": 22784,
+              "text": 157
             },
             "outputDetails": {
-              "reasoning": 270,
-              "text": 84
+              "reasoning": 396,
+              "text": 87
             }
           }
         },
         {
-          "spanId": "0b0713890344873b",
+          "spanId": "61e241615d8d2eff",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17497,
-            "outputTokens": 8,
+            "inputTokens": 17217,
+            "outputTokens": 413,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17217
+            },
+            "outputDetails": {
+              "reasoning": 354,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "3b67830ccfbee922",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17649,
+            "outputTokens": 10,
             "inputDetails": {
               "cacheRead": 17152,
-              "text": 345
+              "text": 497
             },
             "outputDetails": {
               "reasoning": 0,
-              "text": 8
+              "text": 10
             }
           }
         },
         {
-          "spanId": "50ade8a650f51889",
+          "spanId": "affd63c623884b48",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
-        },
-        {
-          "spanId": "7e436a6700fcaf9f",
-          "provider": "commandcode",
-          "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17184,
-            "outputTokens": 296,
+            "inputTokens": 23463,
+            "outputTokens": 29,
             "inputDetails": {
-              "cacheRead": 0,
-              "text": 17184
+              "cacheRead": 22784,
+              "text": 679
             },
             "outputDetails": {
-              "reasoning": 239,
-              "text": 57
+              "reasoning": 6,
+              "text": 23
             }
           }
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace e08534e3-0023-4cc4-b2b8-5b403f856dde used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-interrogate-reviewers-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 9263dec1-02b0-48d1-8674-de1884bafeae used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-interrogate-reviewers-1, expected anthropic/claude-fable-5."
       }
     },
     {
-      "runId": "44e1e545-9661-499d-b9eb-5d47018e83b9",
-      "traceId": "e1c61bdf2cf5bcfbad670e3e6029ec5e",
+      "runId": "5e2dc09d-49e9-4f7a-a14a-de09b4db980f",
+      "traceId": "b31168a9e0d01719f03b242376937f88",
+      "agent": "pstack-interrogate-reviewers-2",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "65ade12b05b04a74",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16230,
+            "outputTokens": 44,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16230
+            },
+            "outputDetails": {
+              "reasoning": 32,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "role": "interrogate reviewers",
+      "helper": "interrogateReviewers2",
+      "toolSpanId": "776fbb0b1aac4b06",
+      "answer": "af4973tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "15eef9734a0e583b",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 23244,
+            "outputTokens": 29,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 460
+            },
+            "outputDetails": {
+              "reasoning": 8,
+              "text": 21
+            }
+          }
+        },
+        {
+          "spanId": "380cfcf2fe9cf950",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 22935,
+            "outputTokens": 272,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 151
+            },
+            "outputDetails": {
+              "reasoning": 200,
+              "text": 72
+            }
+          }
+        },
+        {
+          "spanId": "65ade12b05b04a74",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 16230,
+            "outputTokens": 44,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16230
+            },
+            "outputDetails": {
+              "reasoning": 32,
+              "text": 12
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "anthropic/claude-fable-5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5e2dc09d-49e9-4f7a-a14a-de09b4db980f used openai.responses/gpt-6.1-sol inside pstack-interrogate-reviewers-2, expected anthropic/claude-fable-5."
+      }
+    },
+    {
+      "runId": "20749b1f-e70c-46cb-8ac6-41f0fb60eb4f",
+      "traceId": "850dd1f3ce176a4c60854ec56e4c2dc2",
       "agent": "pstack-swarm-workers-1",
       "model": "commandcode/deepseek/deepseek-v4.1-flash",
       "inferenceSpans": [
         {
-          "spanId": "19eb39267bb4c1dc",
+          "spanId": "2835ae7636799961",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17190,
+            "inputTokens": 17188,
             "outputTokens": 8,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17190
+              "text": 17188
             },
             "outputDetails": {
               "reasoning": 0,
@@ -3460,25 +4218,36 @@
       ],
       "role": "swarm workers",
       "helper": "swarmWorkers",
-      "toolSpanId": "a260bdc8c68b3087",
-      "answer": "d08178atloboc",
+      "toolSpanId": "d7907fa805bdd4a3",
+      "answer": "1f283dtlaboc",
       "leadInferences": [
         {
-          "spanId": "15afe4cfb10c9c15",
+          "spanId": "e0018ba898153fa7",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": null
+          "usage": {
+            "inputTokens": 22919,
+            "outputTokens": 503,
+            "inputDetails": {
+              "cacheRead": 22784,
+              "text": 135
+            },
+            "outputDetails": {
+              "reasoning": 418,
+              "text": 85
+            }
+          }
         },
         {
-          "spanId": "19eb39267bb4c1dc",
+          "spanId": "2835ae7636799961",
           "provider": "commandcode",
           "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 17190,
+            "inputTokens": 17188,
             "outputTokens": 8,
             "inputDetails": {
               "cacheRead": 0,
-              "text": 17190
+              "text": 17188
             },
             "outputDetails": {
               "reasoning": 0,
@@ -3487,28 +4256,17 @@
           }
         },
         {
-          "spanId": "a6d7fcc369f55fab",
+          "spanId": "c11669dcfa8d674a",
           "provider": "commandcode",
           "model": "moonshotai/Kimi-K3.1-Pro",
-          "usage": {
-            "inputTokens": 21651,
-            "outputTokens": 501,
-            "inputDetails": {
-              "cacheRead": 21504,
-              "text": 147
-            },
-            "outputDetails": {
-              "reasoning": 405,
-              "text": 96
-            }
-          }
+          "usage": null
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatchedPick": "anthropic/claude-fable-5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 44e1e545-9661-499d-b9eb-5d47018e83b9 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-swarm-workers-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+        "reason": "Studio trace 20749b1f-e70c-46cb-8ac6-41f0fb60eb4f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-swarm-workers-1, expected anthropic/claude-fable-5."
       }
     }
   ],
@@ -3523,7 +4281,7 @@
     "rolesMismatch": "FAIL"
   },
   "restoredHashes": {
-    "pstack": "2c201abcc9e77413f0d9c22dcf1c8b0bd819676f073dba42930e7db09920c2b2",
+    "pstack": null,
     "lead": "da34bc64835941269937c246187bf6bd6f8cc1de3d9e93e523d4124f5c36be71"
   }
 }
