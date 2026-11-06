@@ -1,0 +1,349 @@
+{
+  "card": "JUL-340",
+  "checkedAt": "2026-11-06T00:56:35.839Z",
+  "originalHashes": {
+    "pstack": null,
+    "lead": "da34bc64835941269937c246187bf6bd6f8cc1de3d9e93e523d4124f5c36be71"
+  },
+  "accountLeadModels": [
+    "openai/gpt-6.1-sol",
+    "openai/gpt-6-astra",
+    "openai/gpt-6.1-terra",
+    "openai/gpt-6-sol",
+    "openai/gpt-6-luna",
+    "openai/gpt-5.6-sol",
+    "openai/gpt-5.6-terra",
+    "openai/gpt-5.6-luna"
+  ],
+  "criterion1": {
+    "url": "http://127.0.0.1:38143/start",
+    "screenshot": "/home/ubuntu/julia-builder/docs/agents/jul-340/start-saved.png",
+    "savedLead": "openai/gpt-6-luna",
+    "savedCoder": "commandcode/deepseek/deepseek-v4-flash",
+    "lead": {
+      "model": "openai/gpt-6.1-sol",
+      "savedVerdict": "PASS",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "The expression evaluated to a falsy value:\n\n  assert(leadText.includes(wrongLead))\n"
+      }
+    },
+    "visibleRoles": [
+      {
+        "role": "feature, refactoring",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "bug-fix",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "perf-issue",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "hillclimb",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "judgment and prose",
+        "models": [
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "hardest tasks",
+        "models": [
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "how explorer",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "how explainer",
+        "models": [
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "why investigators",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "why synthesizer",
+        "models": [
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "reflect tooling",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "reflect judgment, divergent, synthesizer",
+        "models": [
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "arena runners",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "arena cross-judge pool",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "architect runners",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "interrogate reviewers",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash",
+          "openai/gpt-6.1-sol"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      },
+      {
+        "role": "swarm workers",
+        "models": [
+          "commandcode/deepseek/deepseek-v4.1-flash"
+        ],
+        "savedVerdict": "PASS",
+        "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+        "mismatch": {
+          "verdict": "FAIL",
+          "reason": "The expression evaluated to a falsy value:\n\n  assert(actualIds.includes(wrong))\n"
+        }
+      }
+    ]
+  },
+  "savedHashes": {
+    "pstack": "07849e3cca9aa20fd3f72fdd8740ba56b7574cba388e2327295568ba7d6b1da9",
+    "lead": "69b79f9722922ef2f669fb867d0fd8763e0644d46a1dd8bb48720d1b20992b4d"
+  },
+  "criterion3": {
+    "runId": "775b755b-b1b5-4e8b-84dc-d253c6101381",
+    "traceId": "5fc97638ad333ee7eb0d9e8266019290",
+    "agent": "flow-build",
+    "model": "openai/gpt-6-luna",
+    "inferenceSpans": [
+      {
+        "spanId": "07c2af364c3d9966",
+        "provider": "openai.responses",
+        "model": "gpt-6-luna",
+        "usage": {
+          "inputTokens": 12666,
+          "outputTokens": 9,
+          "inputDetails": {
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "text": 12666
+          },
+          "outputDetails": {
+            "reasoning": 0,
+            "text": 9
+          }
+        }
+      }
+    ],
+    "savedVerdict": "PASS",
+    "mismatchedPick": "openai/gpt-6.1-sol",
+    "mismatch": {
+      "verdict": "FAIL",
+      "reason": "Studio trace 775b755b-b1b5-4e8b-84dc-d253c6101381 used openai.responses/gpt-6-luna inside flow-build, expected openai/gpt-6.1-sol."
+    }
+  },
+  "criterion2": [
+    {
+      "runId": "775b755b-b1b5-4e8b-84dc-d253c6101381",
+      "traceId": "5fc97638ad333ee7eb0d9e8266019290",
+      "agent": "flow-build",
+      "model": "openai/gpt-6-luna",
+      "inferenceSpans": [
+        {
+          "spanId": "07c2af364c3d9966",
+          "provider": "openai.responses",
+          "model": "gpt-6-luna",
+          "usage": {
+            "inputTokens": 12666,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 12666
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "openai/gpt-6.1-sol",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 775b755b-b1b5-4e8b-84dc-d253c6101381 used openai.responses/gpt-6-luna inside flow-build, expected openai/gpt-6.1-sol."
+      }
+    },
+    {
+      "runId": "d0c4fa98-2113-4e14-a842-19b088335942",
+      "traceId": "b8633ca6ae70d8940007506c6e5eeb2b",
+      "agent": "flow-build",
+      "model": "openai/gpt-6.1-sol",
+      "inferenceSpans": [
+        {
+          "spanId": "6bf7d5a159cf035e",
+          "provider": "openai.responses",
+          "model": "gpt-6.1-sol",
+          "usage": {
+            "inputTokens": 12666,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 5632,
+              "cacheWrite": 0,
+              "text": 7034
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "openai/gpt-6-astra",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace d0c4fa98-2113-4e14-a842-19b088335942 used openai.responses/gpt-6.1-sol inside flow-build, expected openai/gpt-6-astra."
+      }
+    }
+  ],
+  "failure": "Studio stream returned a provider error for 05c8f597-b118-443c-9d35-e663464f7443.",
+  "restoredHashes": {
+    "pstack": null,
+    "lead": "da34bc64835941269937c246187bf6bd6f8cc1de3d9e93e523d4124f5c36be71"
+  }
+}
