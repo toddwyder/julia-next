@@ -81,11 +81,13 @@ test('missing, unknown and injected role models are rejected without changing ei
   }
 });
 
-test('Lead accepts only a model on its ChatGPT route and panels cannot be empty', () => {
-  assert.deepEqual(leadModels(models).map(model => model.id), [models[0].id, models[1].id]);
+test('Lead accepts any account model and panels cannot be empty', () => {
+  assert.deepEqual(leadModels(models).map(model => model.id), models.map(model => model.id));
   const choice = fresh();
   choice.lead = models[2].id;
-  assert.throws(() => formatSettings(choice, models), /ChatGPT/);
+  assert.equal(formatSettings(choice, models).lead, `${models[2].id}\n`);
+  choice.lead = 'unknown/model';
+  assert.throws(() => formatSettings(choice, models), /account model/);
   choice.lead = models[0].id;
   choice.groups.panels.roles['arena-runners'] = [];
   assert.throws(() => formatSettings(choice, models), /at least one/);

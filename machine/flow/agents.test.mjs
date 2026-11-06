@@ -6,7 +6,7 @@ import test from 'node:test';
 
 import { createAgents, repoRoot } from './agents.mjs';
 import { helperKey, readRoleModels } from './role-models.mjs';
-import { leadModelId } from './models.mjs';
+import { buildModel, leadModelId } from './models.mjs';
 import { installLeadModel } from '../../scripts/install-lead-model.mjs';
 import { ROLE_GROUPS, formatSettings } from '../../dashboard/lib/model-settings.js';
 import { initialChoice } from '../../dashboard/lib/roles.js';
@@ -135,10 +135,17 @@ test('the role file the Start screen writes reads back with every saved model', 
 
 test('invalid Lead settings fail instead of falling back to an API model', t => {
   const file = join(temporary(t), 'lead-model');
-  for (const value of ['', 'auto', 'inherit-parent', 'commandcode/deepseek/deepseek-v4.1-flash', 'openai/gpt-6.1-sol\nopenai/gpt-5.4']) {
+  for (const value of ['', 'auto', 'inherit-parent', 'gpt-6.1-sol', 'openai/gpt-6.1-sol\nopenai/gpt-5.4']) {
     writeFileSync(file, value);
-    assert.throws(() => leadModelId(file), /ChatGPT subscription/);
+    assert.throws(() => leadModelId(file), /account model id/);
   }
+});
+
+test('the Lead setting accepts a CommandCode model through the helper route', t => {
+  const file = join(temporary(t), 'lead-model');
+  writeFileSync(file, 'commandcode/moonshotai/Kimi-K3.1-Pro\n');
+  assert.equal(leadModelId(file), 'commandcode/moonshotai/Kimi-K3.1-Pro');
+  assert.equal(buildModel(file), 'commandcode/moonshotai/Kimi-K3.1-Pro');
 });
 
 test('installing the Lead setting twice keeps an existing model and the coder role', t => {

@@ -1,8 +1,14 @@
+// The Lead's own model is one account model, read from its independent setting.
+// CommandCode models use the same raw id route as the helpers; Claude and ChatGPT
+// use their subscription providers.
+
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { openaiCodexProvider } from '@mastra/code-sdk/providers/openai-codex';
+import { agentModel } from './role-models.mjs';
+
+const ACCOUNT_MODEL = /^[a-z][a-z0-9-]*\/[a-zA-Z0-9][a-zA-Z0-9/._:-]*$/;
 
 export function leadModelPath() {
   return process.env.JULIA_LEAD_MODEL_FILE ?? join(homedir(), '.config', 'julia', 'lead-model');
@@ -18,12 +24,12 @@ export function leadModelId(file = leadModelPath()) {
     }
     throw error;
   }
-  if (!/^openai\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value)) {
-    throw new Error(`Lead model setting ${file} must contain one openai/<model> value for the ChatGPT subscription.`);
+  if (!ACCOUNT_MODEL.test(value)) {
+    throw new Error(`Lead model setting ${file} must contain one account model id, such as openai/gpt-6.1-sol or commandcode/moonshotai/Kimi-K3.1-Pro.`);
   }
   return value;
 }
 
 export function buildModel(file) {
-  return openaiCodexProvider(leadModelId(file).slice('openai/'.length));
+  return agentModel(leadModelId(file));
 }

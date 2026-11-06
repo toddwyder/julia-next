@@ -55,7 +55,7 @@ export function readSettings({ paths = settingsPaths(), modelIds = [] } = {}) {
 }
 
 export function leadModels(models) {
-  return models.filter(model => model.provider === 'openai' && /^openai\/[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(model.id));
+  return models.filter(model => ['openai', 'anthropic', 'commandcode'].includes(model.provider));
 }
 
 export function formatSettings(choice, models) {
@@ -68,7 +68,7 @@ export function formatSettings(choice, models) {
   };
   if (!Object.hasOwn(EFFORT, choice?.effort)) throw new Error('Choose a valid effort.');
   if (!leadModels(models).some(model => model.id === choice.lead)) {
-    throw new Error('Choose an available ChatGPT model for Lead.');
+    throw new Error('Choose an available account model for Lead.');
   }
   const lines = [`# budget: ${choice.effort} (${EFFORT[choice.effort]})`];
   for (const group of ROLE_GROUPS) {

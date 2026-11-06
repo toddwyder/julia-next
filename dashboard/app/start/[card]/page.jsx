@@ -39,7 +39,8 @@ export default async function StartPage({ params }) {
   }
   const account = { anthropic: 'Claude subscription', openai: 'ChatGPT subscription', commandcode: 'CommandCode' };
   const picks = (models ?? []).map(model => {
-    const priced = prices?.models.find(row => row.id === model.id);
+    const priced = prices?.models.find(row => row.id === model.id || row.id === `mastracode/${model.id}`)
+      ?? (Number.isFinite(model.inputPerMillion) ? model : null);
     return {
       id: model.id,
       provider: model.provider,
