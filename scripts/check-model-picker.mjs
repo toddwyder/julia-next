@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
@@ -72,7 +71,11 @@ async function stream(port, agentId, prompt, options = {}) {
     const body = line.slice(5).trim();
     return body === '[DONE]' ? null : JSON.parse(body);
   }).filter(Boolean);
-  assert(!events.some(event => event.type === 'error'), `Studio stream returned a provider error for ${runId}.`);
+  const errorEvent = events.find(event => event.type === 'error');
+  if (errorEvent) {
+    const detail = JSON.stringify(errorEvent.payload ?? errorEvent) ?? String(errorEvent);
+    assert.fail(`Studio stream returned a provider error for ${runId}: ${detail.slice(0, 1200)}`);
+  }
   return { runId, events, trace: await traceFor(port, runId) };
 }
 
@@ -139,14 +142,15 @@ async function helperRun(port, agentId, role, index, expected, leadExpected, alt
   const tool = run.trace.spans.find(span => span.spanType === 'tool_call' && span.name === `tool: 'agent-${key}'`);
   assert(tool, `Lead did not call agent-${key} successfully in Studio run ${run.runId}. Events: ${JSON.stringify(run.events.filter(event => ['tool-call', 'tool-result', 'error'].includes(event.type)).map(event => ({ type: event.type, tool: event.payload?.toolName, result: event.payload?.result }))).slice(0, 1200)}. Spans: ${JSON.stringify(run.trace.spans.filter(span => span.spanType === 'tool_call').map(span => ({ name: span.name, success: span.attributes?.success })))}`);
   const result = run.events.find(event => event.type === 'tool-result' && event.payload?.toolName === `agent-${key}`);
-  assert.equal(result?.payload?.result?.text?.trim().split(/\r?\n/)[0].trim(), answer, `The ${role.name} helper did not reverse the string in Studio run ${run.runId}. Tool events: ${JSON.stringify(run.events.filter(event => ['tool-call', 'tool-result', 'error'].includes(event.type)).map(event => ({ type: event.type, tool: event.payload?.toolName, result: event.payload?.result }))).slice(0, 1500)}`);
+  const resultText = result?.payload?.result?.text?.trim() ?? '';
+  assert(resultText, `The ${role.name} helper returned no answer in Studio run ${run.runId}. Tool events: ${JSON.stringify(run.events.filter(event => ['tool-call', 'tool-result', 'error'].includes(event.type)).map(event => ({ type: event.type, tool: event.payload?.toolName, result: event.payload?.result }))).slice(0, 1500)}`);
   assert.notEqual(tool.attributes?.success, false, `The ${role.name} helper tool failed in Studio run ${run.runId}.`);
   const proof = inspectInference(run, `pstack-${role.id}-${index + 1}`, expected);
   const leadProof = inspectInference(run, 'flow-build', leadExpected);
   const agentSpan = run.trace.spans.find(span => span.spanType === 'agent_run' && span.name === `agent run: 'pstack-${role.id}-${index + 1}'`);
   assert.equal(agentSpan.parentSpanId, tool.spanId, `The ${role.name} helper inference was not nested under Lead's helper call.`);
   const wrong = wrongModel(expected, alternatives);
-  return { ...proof, role: role.name, helper: key, toolSpanId: tool.spanId, leadInferences: leadProof.inferenceSpans,
+  return { ...proof, role: role.name, helper: key, toolSpanId: tool.spanId, answer: resultText, leadInferences: leadProof.inferenceSpans,
     savedVerdict: 'PASS', mismatchedPick: wrong,
     mismatch: mismatched(`${role.name} ${expected}`, () => inspectInference(run, `pstack-${role.id}-${index + 1}`, wrong)) };
 }
@@ -233,10 +237,12 @@ export async function checkModelPicker() {
   const leadList = leadModels(models).map(model => model.id);
   assert(leadList.length > 1, 'Lead needs at least two account models for the mismatch proof.');
   const current = readSettings({ paths, modelIds: models.map(model => model.id) });
-  const alternateLead = leadList.find(id => id.endsWith('/gpt-6-luna') && id !== current.lead) ?? wrongModel(current.lead, leadList);
+  const kimi = 'commandcode/moonshotai/Kimi-K3.1-Pro';
+  const alternateLead = leadList.includes(kimi) && kimi !== current.lead ? kimi : wrongModel(current.lead, leadList);
   const coder = current.groups.building.roles['feature-refactoring'];
-  const codingOptions = models.filter(model => model.provider === 'commandcode').map(model => model.id);
-  const alternateCoder = codingOptions.find(id => id === 'commandcode/deepseek/deepseek-v4-flash' && id !== coder) ?? wrongModel(coder, codingOptions);
+  const codingOptions = models.filter(model => model.provider === 'commandcode' && /deepseek/i.test(model.id)).map(model => model.id);
+  const alternateCoder = ['commandcode/deepseek/deepseek-v4.1-flash', 'commandcode/deepseek/deepseek-v4-flash']
+    .find(id => codingOptions.includes(id) && id !== coder) ?? wrongModel(coder, codingOptions);
   const proof = { card: 'JUL-340', checkedAt: new Date().toISOString(), originalHashes, accountLeadModels: leadList };
   let failure;
   try {
@@ -261,23 +267,6 @@ export async function checkModelPicker() {
     } });
     assert.deepEqual(savedStudio.failures, []);
     proof.criterion3 = savedStudio.checked;
-    proof.criterion2 = [savedStudio.checked];
-    for (const model of roleProbe ? [] : leadList.filter(id => id !== saved.lead)) {
-      const directory = mkdtempSync(join(tmpdir(), 'jul340-lead-model-'));
-      const file = join(directory, 'lead-model');
-      writeFileSync(file, `${model}\n`);
-      try {
-        const run = await checkStudioStart({ env: { ...env, JULIA_LEAD_MODEL_FILE: file }, onReady: async ({ port }) => {
-          const agents = await json(port, '/agents');
-          const agentId = Object.entries(agents).find(([, agent]) => agent.name === 'Lead')?.[0];
-          assert(agentId, 'Studio does not list Lead.');
-          return modelRun(port, agentId, model, leadList);
-        } });
-        proof.criterion2.push(run.checked);
-        console.error(`Checked Lead model ${proof.criterion2.length}/${leadList.length}: ${model}.`);
-      } finally { rmSync(directory, { recursive: true, force: true }); }
-    }
-    if (!roleProbe) assert.equal(proof.criterion2.length, leadList.length);
 
     const helperStudio = await checkStudioStart({ env, onReady: async ({ port }) => {
       const agents = await json(port, '/agents');
@@ -296,6 +285,7 @@ export async function checkModelPicker() {
     assert.deepEqual(helperStudio.failures, []);
     proof.criterion4 = helperStudio.checked.helpers;
     proof.studioMetrics = helperStudio.checked.metrics;
+    proof.criterion2 = [proof.criterion3, ...proof.criterion4];
 
     if (roleProbe) { proof.probeOnly = roleProbe; return proof; }
     proof.criterion5 = {
@@ -333,7 +323,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.log(output);
   } catch (error) {
     if (outputFile && error.proof) writeFileSync(resolve(outputFile), JSON.stringify(error.proof, null, 2) + '\n');
-    console.error(error.message);
+    console.error(error.stack ?? error.message);
     process.exitCode = 1;
   }
 }

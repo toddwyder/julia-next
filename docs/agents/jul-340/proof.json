@@ -1,11 +1,100 @@
 {
   "card": "JUL-340",
-  "checkedAt": "2026-11-06T00:56:35.839Z",
+  "checkedAt": "2026-11-06T02:06:49.712Z",
   "originalHashes": {
-    "pstack": null,
+    "pstack": "2c201abcc9e77413f0d9c22dcf1c8b0bd819676f073dba42930e7db09920c2b2",
     "lead": "da34bc64835941269937c246187bf6bd6f8cc1de3d9e93e523d4124f5c36be71"
   },
   "accountLeadModels": [
+    "commandcode/MiniMaxAI/MiniMax-M2.5",
+    "commandcode/MiniMaxAI/MiniMax-M2.7",
+    "commandcode/MiniMaxAI/MiniMax-M3",
+    "commandcode/Qwen/Qwen3.8-27B",
+    "commandcode/Qwen/Qwen3.8-Flash",
+    "commandcode/Qwen/Qwen3.8-Max",
+    "commandcode/Qwen/Qwen3.8-Max-0902",
+    "commandcode/Qwen/Qwen3.8-Omni-Flash",
+    "commandcode/claude-fable-5",
+    "commandcode/claude-fable-5-1",
+    "commandcode/claude-haiku-4-5-20251001",
+    "commandcode/claude-haiku-5-5",
+    "commandcode/claude-opus-4-7",
+    "commandcode/claude-opus-4-8",
+    "commandcode/claude-opus-5",
+    "commandcode/claude-opus-5-5",
+    "commandcode/claude-sonnet-4-6",
+    "commandcode/claude-sonnet-5",
+    "commandcode/claude-sonnet-5-5",
+    "commandcode/deepseek/deepseek-v4-flash",
+    "commandcode/deepseek/deepseek-v4-flash-fast",
+    "commandcode/deepseek/deepseek-v4-flash-vision-exp",
+    "commandcode/deepseek/deepseek-v4-pro",
+    "commandcode/deepseek/deepseek-v4.1-flash",
+    "commandcode/deepseek/deepseek-v4.1-flash-fast",
+    "commandcode/google/gemini-3.1-flash-lite",
+    "commandcode/google/gemini-3.5-flash",
+    "commandcode/google/gemini-3.5-flash-lite",
+    "commandcode/google/gemini-3.6-flash",
+    "commandcode/google/gemini-3.7-flash",
+    "commandcode/google/gemini-3.8-flash",
+    "commandcode/google/gemini-4-argon",
+    "commandcode/gpt-5.3-codex",
+    "commandcode/gpt-5.4",
+    "commandcode/gpt-5.4-mini",
+    "commandcode/gpt-5.5",
+    "commandcode/gpt-5.6-luna",
+    "commandcode/gpt-5.6-sol",
+    "commandcode/gpt-5.6-terra",
+    "commandcode/gpt-6-astra",
+    "commandcode/gpt-6-luna",
+    "commandcode/gpt-6-sol",
+    "commandcode/gpt-6.1-sol",
+    "commandcode/gpt-6.1-terra",
+    "commandcode/inclusionai/ling-3.1-flash:free",
+    "commandcode/meta/muse-spark-1.1",
+    "commandcode/meta/muse-spark-1.2",
+    "commandcode/meta/muse-spark-1.2-contributor",
+    "commandcode/meta/muse-spark-1.3",
+    "commandcode/meta/muse-spark-1.3-contributor",
+    "commandcode/meta/muse-wonder-1.0",
+    "commandcode/mistral/mistral-large-4",
+    "commandcode/moonshotai/Kimi-K2.7-Code",
+    "commandcode/moonshotai/Kimi-K2.7-Code-Highspeed",
+    "commandcode/moonshotai/Kimi-K3",
+    "commandcode/nvidia/nemotron-3-ultra-550b-a55b",
+    "commandcode/sakana/fugu-ultra",
+    "commandcode/stepfun/Step-3.5-Flash",
+    "commandcode/stepfun/Step-3.7-Flash",
+    "commandcode/stepfun/Step-5-Preview",
+    "commandcode/tencent/hy3-paid",
+    "commandcode/tencent/hy4-preview",
+    "commandcode/thinkingmachines/inkling",
+    "commandcode/thinkingmachines/inkling-small",
+    "commandcode/xai/grok-4.5",
+    "commandcode/xai/grok-4.6",
+    "commandcode/xai/grok-4.7",
+    "commandcode/z-ai/glm-5.3-flash",
+    "commandcode/z-ai/glm-5.3-flashx",
+    "commandcode/zai-org/GLM-5.2",
+    "commandcode/zai-org/GLM-5.2-Fast",
+    "commandcode/zai-org/GLM-5.3",
+    "anthropic/claude-fable-5",
+    "anthropic/claude-fable-5-1",
+    "anthropic/claude-haiku-4-5",
+    "anthropic/claude-haiku-4-5-20251001",
+    "anthropic/claude-haiku-5-5",
+    "anthropic/claude-opus-4-5",
+    "anthropic/claude-opus-4-5-20251101",
+    "anthropic/claude-opus-4-6",
+    "anthropic/claude-opus-4-7",
+    "anthropic/claude-opus-4-8",
+    "anthropic/claude-opus-5",
+    "anthropic/claude-opus-5-5",
+    "anthropic/claude-sonnet-4-5",
+    "anthropic/claude-sonnet-4-5-20250929",
+    "anthropic/claude-sonnet-4-6",
+    "anthropic/claude-sonnet-5",
+    "anthropic/claude-sonnet-5-5",
     "openai/gpt-6.1-sol",
     "openai/gpt-6-astra",
     "openai/gpt-6.1-terra",
@@ -13,12 +102,13 @@
     "openai/gpt-6-luna",
     "openai/gpt-5.6-sol",
     "openai/gpt-5.6-terra",
-    "openai/gpt-5.6-luna"
+    "openai/gpt-5.6-luna",
+    "commandcode/moonshotai/Kimi-K3.1-Pro"
   ],
   "criterion1": {
-    "url": "http://127.0.0.1:38143/start",
+    "url": "http://127.0.0.1:40331/start",
     "screenshot": "/home/ubuntu/julia-builder/docs/agents/jul-340/start-saved.png",
-    "savedLead": "openai/gpt-6-luna",
+    "savedLead": "commandcode/moonshotai/Kimi-K3.1-Pro",
     "savedCoder": "commandcode/deepseek/deepseek-v4-flash",
     "lead": {
       "model": "openai/gpt-6.1-sol",
@@ -80,7 +170,7 @@
       {
         "role": "judgment and prose",
         "models": [
-          "openai/gpt-6.1-sol"
+          "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
         "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
@@ -92,7 +182,7 @@
       {
         "role": "hardest tasks",
         "models": [
-          "openai/gpt-6.1-sol"
+          "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
         "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
@@ -116,7 +206,7 @@
       {
         "role": "how explainer",
         "models": [
-          "openai/gpt-6.1-sol"
+          "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
         "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
@@ -140,7 +230,7 @@
       {
         "role": "why synthesizer",
         "models": [
-          "openai/gpt-6.1-sol"
+          "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
         "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
@@ -164,7 +254,7 @@
       {
         "role": "reflect judgment, divergent, synthesizer",
         "models": [
-          "openai/gpt-6.1-sol"
+          "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
         "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
@@ -176,8 +266,7 @@
       {
         "role": "arena runners",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash",
-          "openai/gpt-6.1-sol"
+          "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
         "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
@@ -189,8 +278,7 @@
       {
         "role": "arena cross-judge pool",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash",
-          "openai/gpt-6.1-sol"
+          "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
         "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
@@ -202,8 +290,7 @@
       {
         "role": "architect runners",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash",
-          "openai/gpt-6.1-sol"
+          "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
         "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
@@ -215,8 +302,7 @@
       {
         "role": "interrogate reviewers",
         "models": [
-          "commandcode/deepseek/deepseek-v4.1-flash",
-          "openai/gpt-6.1-sol"
+          "commandcode/deepseek/deepseek-v4.1-flash"
         ],
         "savedVerdict": "PASS",
         "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
@@ -240,59 +326,137 @@
     ]
   },
   "savedHashes": {
-    "pstack": "07849e3cca9aa20fd3f72fdd8740ba56b7574cba388e2327295568ba7d6b1da9",
-    "lead": "69b79f9722922ef2f669fb867d0fd8763e0644d46a1dd8bb48720d1b20992b4d"
+    "pstack": "4a709693ab880d4b6add25d180909cdaf18851d8a9273f660d6459e3e12d5df1",
+    "lead": "922223ec22e20faaf2f02f3ac206fedd36648a6228c13da5a0ae743470a2e1d3"
   },
   "criterion3": {
-    "runId": "775b755b-b1b5-4e8b-84dc-d253c6101381",
-    "traceId": "5fc97638ad333ee7eb0d9e8266019290",
+    "runId": "0a1fb9cf-a2db-46c0-9df7-59bab69b4944",
+    "traceId": "3be1ff9c89bb99fd936b4277edd5c2ee",
     "agent": "flow-build",
-    "model": "openai/gpt-6-luna",
+    "model": "commandcode/moonshotai/Kimi-K3.1-Pro",
     "inferenceSpans": [
       {
-        "spanId": "07c2af364c3d9966",
-        "provider": "openai.responses",
-        "model": "gpt-6-luna",
+        "spanId": "a7ba69d8afa53394",
+        "provider": "commandcode",
+        "model": "moonshotai/Kimi-K3.1-Pro",
         "usage": {
-          "inputTokens": 12666,
-          "outputTokens": 9,
+          "inputTokens": 12441,
+          "outputTokens": 57,
           "inputDetails": {
-            "cacheRead": 0,
-            "cacheWrite": 0,
-            "text": 12666
+            "cacheRead": 12288,
+            "text": 153
           },
           "outputDetails": {
-            "reasoning": 0,
-            "text": 9
+            "reasoning": 37,
+            "text": 20
           }
         }
       }
     ],
     "savedVerdict": "PASS",
-    "mismatchedPick": "openai/gpt-6.1-sol",
+    "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
     "mismatch": {
       "verdict": "FAIL",
-      "reason": "Studio trace 775b755b-b1b5-4e8b-84dc-d253c6101381 used openai.responses/gpt-6-luna inside flow-build, expected openai/gpt-6.1-sol."
+      "reason": "Studio trace 0a1fb9cf-a2db-46c0-9df7-59bab69b4944 used commandcode/moonshotai/Kimi-K3.1-Pro inside flow-build, expected commandcode/MiniMaxAI/MiniMax-M2.5."
     }
   },
-  "criterion2": [
+  "criterion4": [
     {
-      "runId": "775b755b-b1b5-4e8b-84dc-d253c6101381",
-      "traceId": "5fc97638ad333ee7eb0d9e8266019290",
-      "agent": "flow-build",
-      "model": "openai/gpt-6-luna",
+      "runId": "e3413877-a2df-4808-8746-181f55e6871e",
+      "traceId": "b3865b2c3dac51e08a7b31c3191ed4cd",
+      "agent": "pstack-feature-refactoring-1",
+      "model": "commandcode/deepseek/deepseek-v4-flash",
       "inferenceSpans": [
         {
-          "spanId": "07c2af364c3d9966",
-          "provider": "openai.responses",
-          "model": "gpt-6-luna",
+          "spanId": "5c87e82bbcafd05a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
           "usage": {
-            "inputTokens": 12666,
+            "inputTokens": 17223,
+            "outputTokens": 318,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 71
+            },
+            "outputDetails": {
+              "reasoning": 260,
+              "text": 58
+            }
+          }
+        },
+        {
+          "spanId": "24a8ffeca07964d8",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17561,
             "outputTokens": 9,
             "inputDetails": {
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "text": 12666
+              "cacheRead": 17152,
+              "text": 409
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "feature, refactoring",
+      "helper": "featureRefactoring",
+      "toolSpanId": "f8b5f5c5223b4ce6",
+      "answer": "32a4c4tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "6edd85ec07de9de9",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21654,
+            "outputTokens": 435,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 150
+            },
+            "outputDetails": {
+              "reasoning": 325,
+              "text": 110
+            }
+          }
+        },
+        {
+          "spanId": "223b29e3c2e443cb",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "5c87e82bbcafd05a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17223,
+            "outputTokens": 318,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 71
+            },
+            "outputDetails": {
+              "reasoning": 260,
+              "text": 58
+            }
+          }
+        },
+        {
+          "spanId": "24a8ffeca07964d8",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17561,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 409
             },
             "outputDetails": {
               "reasoning": 0,
@@ -302,29 +466,1600 @@
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "openai/gpt-6.1-sol",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace 775b755b-b1b5-4e8b-84dc-d253c6101381 used openai.responses/gpt-6-luna inside flow-build, expected openai/gpt-6.1-sol."
+        "reason": "Studio trace e3413877-a2df-4808-8746-181f55e6871e used commandcode/deepseek/deepseek-v4-flash, commandcode/deepseek/deepseek-v4-flash inside pstack-feature-refactoring-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
       }
     },
     {
-      "runId": "d0c4fa98-2113-4e14-a842-19b088335942",
-      "traceId": "b8633ca6ae70d8940007506c6e5eeb2b",
-      "agent": "flow-build",
-      "model": "openai/gpt-6.1-sol",
+      "runId": "67a165a0-6366-4590-a34f-c2c1730ff19b",
+      "traceId": "cdad61d55d6581269311ac52edf8c681",
+      "agent": "pstack-bug-fix-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
       "inferenceSpans": [
         {
-          "spanId": "6bf7d5a159cf035e",
-          "provider": "openai.responses",
-          "model": "gpt-6.1-sol",
+          "spanId": "3a957b0362186912",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
           "usage": {
-            "inputTokens": 12666,
+            "inputTokens": 17410,
             "outputTokens": 9,
             "inputDetails": {
-              "cacheRead": 5632,
-              "cacheWrite": 0,
-              "text": 7034
+              "cacheRead": 17152,
+              "text": 258
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "e5a3b368f5b12753",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17195,
+            "outputTokens": 197,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17195
+            },
+            "outputDetails": {
+              "reasoning": 140,
+              "text": 57
+            }
+          }
+        }
+      ],
+      "role": "bug-fix",
+      "helper": "bugFix",
+      "toolSpanId": "8137c9c04804dad8",
+      "answer": "c354e9tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "3a957b0362186912",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17410,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 258
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "fa64d3d825102e3f",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 332,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 21652
+            },
+            "outputDetails": {
+              "reasoning": 238,
+              "text": 94
+            }
+          }
+        },
+        {
+          "spanId": "e5a3b368f5b12753",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17195,
+            "outputTokens": 197,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17195
+            },
+            "outputDetails": {
+              "reasoning": 140,
+              "text": 57
+            }
+          }
+        },
+        {
+          "spanId": "6689c462500e44d9",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 67a165a0-6366-4590-a34f-c2c1730ff19b used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-bug-fix-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "f607593d-0cfa-4ccd-90c9-b7fa0d57a8ed",
+      "traceId": "53c78312488443a941367941fa195238",
+      "agent": "pstack-perf-issue-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "8eb8db938252ab91",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 193,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 184,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "perf-issue",
+      "helper": "perfIssue",
+      "toolSpanId": "8c1b8ab45d1462d4",
+      "answer": "e017f6tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "8eb8db938252ab91",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 193,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 184,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "94fedd07b18b23aa",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 423,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 148
+            },
+            "outputDetails": {
+              "reasoning": 339,
+              "text": 84
+            }
+          }
+        },
+        {
+          "spanId": "4ef9d565ba2fb2df",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace f607593d-0cfa-4ccd-90c9-b7fa0d57a8ed used commandcode/deepseek/deepseek-v4.1-flash inside pstack-perf-issue-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "b37f901e-5093-4210-870e-79ec7367cf2a",
+      "traceId": "46bfd5a58e4513e92c9882d66210a54e",
+      "agent": "pstack-hillclimb-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "ef16d3108a7b93e1",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17188,
+            "outputTokens": 211,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17188
+            },
+            "outputDetails": {
+              "reasoning": 203,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "hillclimb",
+      "helper": "hillclimb",
+      "toolSpanId": "636856bdf94db23c",
+      "answer": "331d19tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "d2d205ad1fd24399",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "1fc7924043f0469a",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 375,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 148
+            },
+            "outputDetails": {
+              "reasoning": 307,
+              "text": 68
+            }
+          }
+        },
+        {
+          "spanId": "ef16d3108a7b93e1",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17188,
+            "outputTokens": 211,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17188
+            },
+            "outputDetails": {
+              "reasoning": 203,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace b37f901e-5093-4210-870e-79ec7367cf2a used commandcode/deepseek/deepseek-v4.1-flash inside pstack-hillclimb-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "0820edd0-6db4-4199-889f-1fed69fb614f",
+      "traceId": "0d8ce9ea132155ad11f8e04755d95076",
+      "agent": "pstack-judgment-and-prose-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "c390fda56f47bb34",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17183,
+            "outputTokens": 75,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17183
+            },
+            "outputDetails": {
+              "reasoning": 65,
+              "text": 10
+            }
+          }
+        }
+      ],
+      "role": "judgment and prose",
+      "helper": "judgmentAndProse",
+      "toolSpanId": "596864b8a47c7b34",
+      "answer": "4c1f59tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "2266ef165a074b6e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21654,
+            "outputTokens": 270,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 150
+            },
+            "outputDetails": {
+              "reasoning": 182,
+              "text": 88
+            }
+          }
+        },
+        {
+          "spanId": "c206b077f100de60",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "c390fda56f47bb34",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17183,
+            "outputTokens": 75,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17183
+            },
+            "outputDetails": {
+              "reasoning": 65,
+              "text": 10
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 0820edd0-6db4-4199-889f-1fed69fb614f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-judgment-and-prose-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "0ddb05d1-5910-4c57-986f-de490d3d238e",
+      "traceId": "5fd41e555b121097765cc019189b219b",
+      "agent": "pstack-hardest-tasks-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "8f3e5d71804b5a63",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17183,
+            "outputTokens": 246,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17183
+            },
+            "outputDetails": {
+              "reasoning": 187,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "6f5739a62ddabfb2",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17447,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 295
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "hardest tasks",
+      "helper": "hardestTasks",
+      "toolSpanId": "41f7ec3f098f519c",
+      "answer": "fb8d6ctlaboc",
+      "leadInferences": [
+        {
+          "spanId": "8f3e5d71804b5a63",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17183,
+            "outputTokens": 246,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17183
+            },
+            "outputDetails": {
+              "reasoning": 187,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "6faa607542f1d271",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21653,
+            "outputTokens": 314,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 149
+            },
+            "outputDetails": {
+              "reasoning": 228,
+              "text": 86
+            }
+          }
+        },
+        {
+          "spanId": "6f5739a62ddabfb2",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17447,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 295
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "bdf906ce2b16de26",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 0ddb05d1-5910-4c57-986f-de490d3d238e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-hardest-tasks-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "9dd122a1-d547-4be7-a179-2cec9c8f2250",
+      "traceId": "95ea9eb0d03e926ddb89f3da3357b7c3",
+      "agent": "pstack-how-explorer-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "5ce3fcbc36f2c95a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17180,
+            "outputTokens": 138,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17180
+            },
+            "outputDetails": {
+              "reasoning": 79,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "ba28d4633960bfe0",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17338,
+            "outputTokens": 11,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 186
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "role": "how explorer",
+      "helper": "howExplorer",
+      "toolSpanId": "56f421c33c544e7d",
+      "answer": "a4a6d5tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "5ce3fcbc36f2c95a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17180,
+            "outputTokens": 138,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17180
+            },
+            "outputDetails": {
+              "reasoning": 79,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "5b7d3aece4a5600e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21654,
+            "outputTokens": 223,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 150
+            },
+            "outputDetails": {
+              "reasoning": 138,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "ba28d4633960bfe0",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17338,
+            "outputTokens": 11,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 186
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 11
+            }
+          }
+        },
+        {
+          "spanId": "c9e9c94dd6da83d6",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 9dd122a1-d547-4be7-a179-2cec9c8f2250 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explorer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "41946791-ba79-471b-a4af-bf0d6183224d",
+      "traceId": "3ef141e040abccde73e0f6bbe1eb5543",
+      "agent": "pstack-how-explainer-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "afaa3691bc80bba9",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17175,
+            "outputTokens": 175,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17175
+            },
+            "outputDetails": {
+              "reasoning": 167,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "how explainer",
+      "helper": "howExplainer",
+      "toolSpanId": "bdeb567f1447296c",
+      "answer": "43df30tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "ba1fb119d3cc2fc3",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "8bc2dd98b85f3fb4",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 419,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 148
+            },
+            "outputDetails": {
+              "reasoning": 315,
+              "text": 104
+            }
+          }
+        },
+        {
+          "spanId": "afaa3691bc80bba9",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17175,
+            "outputTokens": 175,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17175
+            },
+            "outputDetails": {
+              "reasoning": 167,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 41946791-ba79-471b-a4af-bf0d6183224d used commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explainer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "0ff7cc09-1865-475e-ab6f-8ecfbfc23f8f",
+      "traceId": "c4c80591ffcabf27adb80c87b0b70b38",
+      "agent": "pstack-why-investigators-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "a7acf1febee79d3f",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 245,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 237,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "why investigators",
+      "helper": "whyInvestigators",
+      "toolSpanId": "3105c0914e8bbdf4",
+      "answer": "6db284tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "481cea56bc8766d7",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21651,
+            "outputTokens": 267,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 147
+            },
+            "outputDetails": {
+              "reasoning": 183,
+              "text": 84
+            }
+          }
+        },
+        {
+          "spanId": "a7acf1febee79d3f",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 245,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 237,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "039040a2b692eca7",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 0ff7cc09-1865-475e-ab6f-8ecfbfc23f8f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-investigators-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "9a164c19-d8e1-4811-99ad-423e0b3a549b",
+      "traceId": "0d88677b4e3093ea1d9003d9d2def4e7",
+      "agent": "pstack-why-synthesizer-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "0a6c137773baa2d7",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17179,
+            "outputTokens": 140,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17179
+            },
+            "outputDetails": {
+              "reasoning": 131,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "why synthesizer",
+      "helper": "whySynthesizer",
+      "toolSpanId": "4b931bef4f826250",
+      "answer": "3b9599tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "c5791526618b1afe",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21653,
+            "outputTokens": 410,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 149
+            },
+            "outputDetails": {
+              "reasoning": 340,
+              "text": 70
+            }
+          }
+        },
+        {
+          "spanId": "0a6c137773baa2d7",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17179,
+            "outputTokens": 140,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17179
+            },
+            "outputDetails": {
+              "reasoning": 131,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "f67498c555ab3b4d",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 9a164c19-d8e1-4811-99ad-423e0b3a549b used commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-synthesizer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "39ae2c98-ae67-4e12-ad31-39163e0563c5",
+      "traceId": "2d35a2144a52896d5bd3dd4944690331",
+      "agent": "pstack-reflect-tooling-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "bddb0ac43d8f7612",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17176,
+            "outputTokens": 142,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17176
+            },
+            "outputDetails": {
+              "reasoning": 133,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "reflect tooling",
+      "helper": "reflectTooling",
+      "toolSpanId": "f01af1df6a3e1b62",
+      "answer": "cdfc60tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "21e1b60238a12923",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21651,
+            "outputTokens": 795,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 147
+            },
+            "outputDetails": {
+              "reasoning": 711,
+              "text": 84
+            }
+          }
+        },
+        {
+          "spanId": "31a30a52934b9c0a",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "bddb0ac43d8f7612",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17176,
+            "outputTokens": 142,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17176
+            },
+            "outputDetails": {
+              "reasoning": 133,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 39ae2c98-ae67-4e12-ad31-39163e0563c5 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-tooling-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "3838f18c-750d-4a5f-a816-e908e070644e",
+      "traceId": "cb7df6e9a4617971683e4a06b933c88c",
+      "agent": "pstack-reflect-judgment-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "1f30efe2f73f259b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17185,
+            "outputTokens": 78,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17185
+            },
+            "outputDetails": {
+              "reasoning": 69,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "reflect judgment, divergent, synthesizer",
+      "helper": "reflectJudgment",
+      "toolSpanId": "0b2709de0a241ba1",
+      "answer": "07bcf8tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "1f30efe2f73f259b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17185,
+            "outputTokens": 78,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17185
+            },
+            "outputDetails": {
+              "reasoning": 69,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "9369fb42171bf50c",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "7e96c691313c7632",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21657,
+            "outputTokens": 422,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 153
+            },
+            "outputDetails": {
+              "reasoning": 338,
+              "text": 84
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 3838f18c-750d-4a5f-a816-e908e070644e used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-judgment-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "5a497aa9-face-4f93-897b-4f5cda03a51f",
+      "traceId": "8a340932ed23a81d927af36cce5b78f7",
+      "agent": "pstack-arena-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "ab08a75cb8e5f646",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 146,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 138,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "arena runners",
+      "helper": "arenaRunners",
+      "toolSpanId": "f9bf1318f925b7df",
+      "answer": "7f203ctlaboc",
+      "leadInferences": [
+        {
+          "spanId": "ab08a75cb8e5f646",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 146,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 138,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "2d0f5bc3523659c0",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "d213733a69a63f4f",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 413,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 148
+            },
+            "outputDetails": {
+              "reasoning": 330,
+              "text": 83
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5a497aa9-face-4f93-897b-4f5cda03a51f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-runners-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "b0c2b0ac-1df1-4a6c-bee4-205a94c3f755",
+      "traceId": "8b81ae4056c5a0f5f905037a47551012",
+      "agent": "pstack-arena-cross-judge-pool-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "9056f8cb011f8940",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17204,
+            "outputTokens": 473,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17204
+            },
+            "outputDetails": {
+              "reasoning": 417,
+              "text": 56
+            }
+          }
+        },
+        {
+          "spanId": "06aeb6c9733f7a78",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17694,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 542
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "arena cross-judge pool",
+      "helper": "arenaCrossJudgePool",
+      "toolSpanId": "29a206fb56fb574b",
+      "answer": "0c405etlaboc",
+      "leadInferences": [
+        {
+          "spanId": "25e632aba503eef9",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21656,
+            "outputTokens": 346,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 21656
+            },
+            "outputDetails": {
+              "reasoning": 249,
+              "text": 97
+            }
+          }
+        },
+        {
+          "spanId": "7aa1ede3109a7a1e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "9056f8cb011f8940",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17204,
+            "outputTokens": 473,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17204
+            },
+            "outputDetails": {
+              "reasoning": 417,
+              "text": 56
+            }
+          }
+        },
+        {
+          "spanId": "06aeb6c9733f7a78",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17694,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 542
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace b0c2b0ac-1df1-4a6c-bee4-205a94c3f755 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-cross-judge-pool-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "a2f88260-5f71-4b4b-a410-ec4f134135fc",
+      "traceId": "78b446c8710056feebc1a2553e02f261",
+      "agent": "pstack-architect-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "72337b95b62c26fc",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17182,
+            "outputTokens": 447,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17182
+            },
+            "outputDetails": {
+              "reasoning": 391,
+              "text": 56
+            }
+          }
+        },
+        {
+          "spanId": "d0cd587cba1c52f3",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17646,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 494
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "architect runners",
+      "helper": "architectRunners",
+      "toolSpanId": "b25bda3577d84d97",
+      "answer": "67ad69tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "4c2cf5482d62a8f5",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21651,
+            "outputTokens": 391,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 147
+            },
+            "outputDetails": {
+              "reasoning": 298,
+              "text": 93
+            }
+          }
+        },
+        {
+          "spanId": "72337b95b62c26fc",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17182,
+            "outputTokens": 447,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17182
+            },
+            "outputDetails": {
+              "reasoning": 391,
+              "text": 56
+            }
+          }
+        },
+        {
+          "spanId": "d0cd587cba1c52f3",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17646,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 494
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "fb1b0a352422bd76",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace a2f88260-5f71-4b4b-a410-ec4f134135fc used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-architect-runners-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "e08534e3-0023-4cc4-b2b8-5b403f856dde",
+      "traceId": "a8887198a104de1d4ddfc6bc7ccc8a86",
+      "agent": "pstack-interrogate-reviewers-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "0b0713890344873b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17497,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 345
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "7e436a6700fcaf9f",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 296,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 239,
+              "text": 57
+            }
+          }
+        }
+      ],
+      "role": "interrogate reviewers",
+      "helper": "interrogateReviewers",
+      "toolSpanId": "4ac03fd8a8b5013a",
+      "answer": "78fb26tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "7ea6ebc2cbc73247",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 354,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 148
+            },
+            "outputDetails": {
+              "reasoning": 270,
+              "text": 84
+            }
+          }
+        },
+        {
+          "spanId": "0b0713890344873b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17497,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 345
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "50ade8a650f51889",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "7e436a6700fcaf9f",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 296,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 239,
+              "text": 57
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace e08534e3-0023-4cc4-b2b8-5b403f856dde used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-interrogate-reviewers-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "44e1e545-9661-499d-b9eb-5d47018e83b9",
+      "traceId": "e1c61bdf2cf5bcfbad670e3e6029ec5e",
+      "agent": "pstack-swarm-workers-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "19eb39267bb4c1dc",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17190,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17190
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "swarm workers",
+      "helper": "swarmWorkers",
+      "toolSpanId": "a260bdc8c68b3087",
+      "answer": "d08178atloboc",
+      "leadInferences": [
+        {
+          "spanId": "15afe4cfb10c9c15",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "19eb39267bb4c1dc",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17190,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17190
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "a6d7fcc369f55fab",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21651,
+            "outputTokens": 501,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 147
+            },
+            "outputDetails": {
+              "reasoning": 405,
+              "text": 96
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 44e1e545-9661-499d-b9eb-5d47018e83b9 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-swarm-workers-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    }
+  ],
+  "studioMetrics": [
+    {
+      "name": "mastra_model_total_input_tokens",
+      "model": "deepseek-deepseek-v4-1-flash",
+      "value": 17190,
+      "estimatedCost": 0.0025785,
+      "costUnit": "USD"
+    },
+    {
+      "name": "mastra_model_output_text_tokens",
+      "model": "deepseek-deepseek-v4-1-flash",
+      "value": 8,
+      "estimatedCost": 0.0000048,
+      "costUnit": "USD"
+    },
+    {
+      "name": "mastra_model_input_text_tokens",
+      "model": "deepseek-deepseek-v4-1-flash",
+      "value": 17190,
+      "estimatedCost": 0.0025785,
+      "costUnit": "USD"
+    }
+  ],
+  "criterion2": [
+    {
+      "runId": "0a1fb9cf-a2db-46c0-9df7-59bab69b4944",
+      "traceId": "3be1ff9c89bb99fd936b4277edd5c2ee",
+      "agent": "flow-build",
+      "model": "commandcode/moonshotai/Kimi-K3.1-Pro",
+      "inferenceSpans": [
+        {
+          "spanId": "a7ba69d8afa53394",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 12441,
+            "outputTokens": 57,
+            "inputDetails": {
+              "cacheRead": 12288,
+              "text": 153
+            },
+            "outputDetails": {
+              "reasoning": 37,
+              "text": 20
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 0a1fb9cf-a2db-46c0-9df7-59bab69b4944 used commandcode/moonshotai/Kimi-K3.1-Pro inside flow-build, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "e3413877-a2df-4808-8746-181f55e6871e",
+      "traceId": "b3865b2c3dac51e08a7b31c3191ed4cd",
+      "agent": "pstack-feature-refactoring-1",
+      "model": "commandcode/deepseek/deepseek-v4-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "5c87e82bbcafd05a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17223,
+            "outputTokens": 318,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 71
+            },
+            "outputDetails": {
+              "reasoning": 260,
+              "text": 58
+            }
+          }
+        },
+        {
+          "spanId": "24a8ffeca07964d8",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17561,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 409
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "feature, refactoring",
+      "helper": "featureRefactoring",
+      "toolSpanId": "f8b5f5c5223b4ce6",
+      "answer": "32a4c4tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "6edd85ec07de9de9",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21654,
+            "outputTokens": 435,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 150
+            },
+            "outputDetails": {
+              "reasoning": 325,
+              "text": 110
+            }
+          }
+        },
+        {
+          "spanId": "223b29e3c2e443cb",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "5c87e82bbcafd05a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17223,
+            "outputTokens": 318,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 71
+            },
+            "outputDetails": {
+              "reasoning": 260,
+              "text": 58
+            }
+          }
+        },
+        {
+          "spanId": "24a8ffeca07964d8",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4-flash",
+          "usage": {
+            "inputTokens": 17561,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 409
             },
             "outputDetails": {
               "reasoning": 0,
@@ -334,16 +2069,1461 @@
         }
       ],
       "savedVerdict": "PASS",
-      "mismatchedPick": "openai/gpt-6-astra",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
       "mismatch": {
         "verdict": "FAIL",
-        "reason": "Studio trace d0c4fa98-2113-4e14-a842-19b088335942 used openai.responses/gpt-6.1-sol inside flow-build, expected openai/gpt-6-astra."
+        "reason": "Studio trace e3413877-a2df-4808-8746-181f55e6871e used commandcode/deepseek/deepseek-v4-flash, commandcode/deepseek/deepseek-v4-flash inside pstack-feature-refactoring-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "67a165a0-6366-4590-a34f-c2c1730ff19b",
+      "traceId": "cdad61d55d6581269311ac52edf8c681",
+      "agent": "pstack-bug-fix-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "3a957b0362186912",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17410,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 258
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "e5a3b368f5b12753",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17195,
+            "outputTokens": 197,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17195
+            },
+            "outputDetails": {
+              "reasoning": 140,
+              "text": 57
+            }
+          }
+        }
+      ],
+      "role": "bug-fix",
+      "helper": "bugFix",
+      "toolSpanId": "8137c9c04804dad8",
+      "answer": "c354e9tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "3a957b0362186912",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17410,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 258
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "fa64d3d825102e3f",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 332,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 21652
+            },
+            "outputDetails": {
+              "reasoning": 238,
+              "text": 94
+            }
+          }
+        },
+        {
+          "spanId": "e5a3b368f5b12753",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17195,
+            "outputTokens": 197,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17195
+            },
+            "outputDetails": {
+              "reasoning": 140,
+              "text": 57
+            }
+          }
+        },
+        {
+          "spanId": "6689c462500e44d9",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 67a165a0-6366-4590-a34f-c2c1730ff19b used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-bug-fix-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "f607593d-0cfa-4ccd-90c9-b7fa0d57a8ed",
+      "traceId": "53c78312488443a941367941fa195238",
+      "agent": "pstack-perf-issue-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "8eb8db938252ab91",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 193,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 184,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "perf-issue",
+      "helper": "perfIssue",
+      "toolSpanId": "8c1b8ab45d1462d4",
+      "answer": "e017f6tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "8eb8db938252ab91",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 193,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 184,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "94fedd07b18b23aa",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 423,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 148
+            },
+            "outputDetails": {
+              "reasoning": 339,
+              "text": 84
+            }
+          }
+        },
+        {
+          "spanId": "4ef9d565ba2fb2df",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace f607593d-0cfa-4ccd-90c9-b7fa0d57a8ed used commandcode/deepseek/deepseek-v4.1-flash inside pstack-perf-issue-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "b37f901e-5093-4210-870e-79ec7367cf2a",
+      "traceId": "46bfd5a58e4513e92c9882d66210a54e",
+      "agent": "pstack-hillclimb-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "ef16d3108a7b93e1",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17188,
+            "outputTokens": 211,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17188
+            },
+            "outputDetails": {
+              "reasoning": 203,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "hillclimb",
+      "helper": "hillclimb",
+      "toolSpanId": "636856bdf94db23c",
+      "answer": "331d19tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "d2d205ad1fd24399",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "1fc7924043f0469a",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 375,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 148
+            },
+            "outputDetails": {
+              "reasoning": 307,
+              "text": 68
+            }
+          }
+        },
+        {
+          "spanId": "ef16d3108a7b93e1",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17188,
+            "outputTokens": 211,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17188
+            },
+            "outputDetails": {
+              "reasoning": 203,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace b37f901e-5093-4210-870e-79ec7367cf2a used commandcode/deepseek/deepseek-v4.1-flash inside pstack-hillclimb-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "0820edd0-6db4-4199-889f-1fed69fb614f",
+      "traceId": "0d8ce9ea132155ad11f8e04755d95076",
+      "agent": "pstack-judgment-and-prose-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "c390fda56f47bb34",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17183,
+            "outputTokens": 75,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17183
+            },
+            "outputDetails": {
+              "reasoning": 65,
+              "text": 10
+            }
+          }
+        }
+      ],
+      "role": "judgment and prose",
+      "helper": "judgmentAndProse",
+      "toolSpanId": "596864b8a47c7b34",
+      "answer": "4c1f59tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "2266ef165a074b6e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21654,
+            "outputTokens": 270,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 150
+            },
+            "outputDetails": {
+              "reasoning": 182,
+              "text": 88
+            }
+          }
+        },
+        {
+          "spanId": "c206b077f100de60",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "c390fda56f47bb34",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17183,
+            "outputTokens": 75,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17183
+            },
+            "outputDetails": {
+              "reasoning": 65,
+              "text": 10
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 0820edd0-6db4-4199-889f-1fed69fb614f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-judgment-and-prose-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "0ddb05d1-5910-4c57-986f-de490d3d238e",
+      "traceId": "5fd41e555b121097765cc019189b219b",
+      "agent": "pstack-hardest-tasks-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "8f3e5d71804b5a63",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17183,
+            "outputTokens": 246,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17183
+            },
+            "outputDetails": {
+              "reasoning": 187,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "6f5739a62ddabfb2",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17447,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 295
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "hardest tasks",
+      "helper": "hardestTasks",
+      "toolSpanId": "41f7ec3f098f519c",
+      "answer": "fb8d6ctlaboc",
+      "leadInferences": [
+        {
+          "spanId": "8f3e5d71804b5a63",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17183,
+            "outputTokens": 246,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17183
+            },
+            "outputDetails": {
+              "reasoning": 187,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "6faa607542f1d271",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21653,
+            "outputTokens": 314,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 149
+            },
+            "outputDetails": {
+              "reasoning": 228,
+              "text": 86
+            }
+          }
+        },
+        {
+          "spanId": "6f5739a62ddabfb2",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17447,
+            "outputTokens": 9,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 295
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "bdf906ce2b16de26",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 0ddb05d1-5910-4c57-986f-de490d3d238e used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-hardest-tasks-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "9dd122a1-d547-4be7-a179-2cec9c8f2250",
+      "traceId": "95ea9eb0d03e926ddb89f3da3357b7c3",
+      "agent": "pstack-how-explorer-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "5ce3fcbc36f2c95a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17180,
+            "outputTokens": 138,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17180
+            },
+            "outputDetails": {
+              "reasoning": 79,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "ba28d4633960bfe0",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17338,
+            "outputTokens": 11,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 186
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 11
+            }
+          }
+        }
+      ],
+      "role": "how explorer",
+      "helper": "howExplorer",
+      "toolSpanId": "56f421c33c544e7d",
+      "answer": "a4a6d5tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "5ce3fcbc36f2c95a",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17180,
+            "outputTokens": 138,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17180
+            },
+            "outputDetails": {
+              "reasoning": 79,
+              "text": 59
+            }
+          }
+        },
+        {
+          "spanId": "5b7d3aece4a5600e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21654,
+            "outputTokens": 223,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 150
+            },
+            "outputDetails": {
+              "reasoning": 138,
+              "text": 85
+            }
+          }
+        },
+        {
+          "spanId": "ba28d4633960bfe0",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17338,
+            "outputTokens": 11,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 186
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 11
+            }
+          }
+        },
+        {
+          "spanId": "c9e9c94dd6da83d6",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 9dd122a1-d547-4be7-a179-2cec9c8f2250 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explorer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "41946791-ba79-471b-a4af-bf0d6183224d",
+      "traceId": "3ef141e040abccde73e0f6bbe1eb5543",
+      "agent": "pstack-how-explainer-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "afaa3691bc80bba9",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17175,
+            "outputTokens": 175,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17175
+            },
+            "outputDetails": {
+              "reasoning": 167,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "how explainer",
+      "helper": "howExplainer",
+      "toolSpanId": "bdeb567f1447296c",
+      "answer": "43df30tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "ba1fb119d3cc2fc3",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "8bc2dd98b85f3fb4",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 419,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 148
+            },
+            "outputDetails": {
+              "reasoning": 315,
+              "text": 104
+            }
+          }
+        },
+        {
+          "spanId": "afaa3691bc80bba9",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17175,
+            "outputTokens": 175,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17175
+            },
+            "outputDetails": {
+              "reasoning": 167,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 41946791-ba79-471b-a4af-bf0d6183224d used commandcode/deepseek/deepseek-v4.1-flash inside pstack-how-explainer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "0ff7cc09-1865-475e-ab6f-8ecfbfc23f8f",
+      "traceId": "c4c80591ffcabf27adb80c87b0b70b38",
+      "agent": "pstack-why-investigators-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "a7acf1febee79d3f",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 245,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 237,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "why investigators",
+      "helper": "whyInvestigators",
+      "toolSpanId": "3105c0914e8bbdf4",
+      "answer": "6db284tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "481cea56bc8766d7",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21651,
+            "outputTokens": 267,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 147
+            },
+            "outputDetails": {
+              "reasoning": 183,
+              "text": 84
+            }
+          }
+        },
+        {
+          "spanId": "a7acf1febee79d3f",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 245,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 237,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "039040a2b692eca7",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 0ff7cc09-1865-475e-ab6f-8ecfbfc23f8f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-investigators-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "9a164c19-d8e1-4811-99ad-423e0b3a549b",
+      "traceId": "0d88677b4e3093ea1d9003d9d2def4e7",
+      "agent": "pstack-why-synthesizer-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "0a6c137773baa2d7",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17179,
+            "outputTokens": 140,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17179
+            },
+            "outputDetails": {
+              "reasoning": 131,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "why synthesizer",
+      "helper": "whySynthesizer",
+      "toolSpanId": "4b931bef4f826250",
+      "answer": "3b9599tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "c5791526618b1afe",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21653,
+            "outputTokens": 410,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 149
+            },
+            "outputDetails": {
+              "reasoning": 340,
+              "text": 70
+            }
+          }
+        },
+        {
+          "spanId": "0a6c137773baa2d7",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17179,
+            "outputTokens": 140,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17179
+            },
+            "outputDetails": {
+              "reasoning": 131,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "f67498c555ab3b4d",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 9a164c19-d8e1-4811-99ad-423e0b3a549b used commandcode/deepseek/deepseek-v4.1-flash inside pstack-why-synthesizer-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "39ae2c98-ae67-4e12-ad31-39163e0563c5",
+      "traceId": "2d35a2144a52896d5bd3dd4944690331",
+      "agent": "pstack-reflect-tooling-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "bddb0ac43d8f7612",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17176,
+            "outputTokens": 142,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17176
+            },
+            "outputDetails": {
+              "reasoning": 133,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "reflect tooling",
+      "helper": "reflectTooling",
+      "toolSpanId": "f01af1df6a3e1b62",
+      "answer": "cdfc60tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "21e1b60238a12923",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21651,
+            "outputTokens": 795,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 147
+            },
+            "outputDetails": {
+              "reasoning": 711,
+              "text": 84
+            }
+          }
+        },
+        {
+          "spanId": "31a30a52934b9c0a",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "bddb0ac43d8f7612",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17176,
+            "outputTokens": 142,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17176
+            },
+            "outputDetails": {
+              "reasoning": 133,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 39ae2c98-ae67-4e12-ad31-39163e0563c5 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-tooling-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "3838f18c-750d-4a5f-a816-e908e070644e",
+      "traceId": "cb7df6e9a4617971683e4a06b933c88c",
+      "agent": "pstack-reflect-judgment-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "1f30efe2f73f259b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17185,
+            "outputTokens": 78,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17185
+            },
+            "outputDetails": {
+              "reasoning": 69,
+              "text": 9
+            }
+          }
+        }
+      ],
+      "role": "reflect judgment, divergent, synthesizer",
+      "helper": "reflectJudgment",
+      "toolSpanId": "0b2709de0a241ba1",
+      "answer": "07bcf8tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "1f30efe2f73f259b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17185,
+            "outputTokens": 78,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17185
+            },
+            "outputDetails": {
+              "reasoning": 69,
+              "text": 9
+            }
+          }
+        },
+        {
+          "spanId": "9369fb42171bf50c",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "7e96c691313c7632",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21657,
+            "outputTokens": 422,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 153
+            },
+            "outputDetails": {
+              "reasoning": 338,
+              "text": 84
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 3838f18c-750d-4a5f-a816-e908e070644e used commandcode/deepseek/deepseek-v4.1-flash inside pstack-reflect-judgment-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "5a497aa9-face-4f93-897b-4f5cda03a51f",
+      "traceId": "8a340932ed23a81d927af36cce5b78f7",
+      "agent": "pstack-arena-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "ab08a75cb8e5f646",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 146,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 138,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "arena runners",
+      "helper": "arenaRunners",
+      "toolSpanId": "f9bf1318f925b7df",
+      "answer": "7f203ctlaboc",
+      "leadInferences": [
+        {
+          "spanId": "ab08a75cb8e5f646",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17177,
+            "outputTokens": 146,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17177
+            },
+            "outputDetails": {
+              "reasoning": 138,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "2d0f5bc3523659c0",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "d213733a69a63f4f",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 413,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 148
+            },
+            "outputDetails": {
+              "reasoning": 330,
+              "text": 83
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 5a497aa9-face-4f93-897b-4f5cda03a51f used commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-runners-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "b0c2b0ac-1df1-4a6c-bee4-205a94c3f755",
+      "traceId": "8b81ae4056c5a0f5f905037a47551012",
+      "agent": "pstack-arena-cross-judge-pool-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "9056f8cb011f8940",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17204,
+            "outputTokens": 473,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17204
+            },
+            "outputDetails": {
+              "reasoning": 417,
+              "text": 56
+            }
+          }
+        },
+        {
+          "spanId": "06aeb6c9733f7a78",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17694,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 542
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "arena cross-judge pool",
+      "helper": "arenaCrossJudgePool",
+      "toolSpanId": "29a206fb56fb574b",
+      "answer": "0c405etlaboc",
+      "leadInferences": [
+        {
+          "spanId": "25e632aba503eef9",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21656,
+            "outputTokens": 346,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 21656
+            },
+            "outputDetails": {
+              "reasoning": 249,
+              "text": 97
+            }
+          }
+        },
+        {
+          "spanId": "7aa1ede3109a7a1e",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "9056f8cb011f8940",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17204,
+            "outputTokens": 473,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17204
+            },
+            "outputDetails": {
+              "reasoning": 417,
+              "text": 56
+            }
+          }
+        },
+        {
+          "spanId": "06aeb6c9733f7a78",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17694,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 542
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace b0c2b0ac-1df1-4a6c-bee4-205a94c3f755 used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-arena-cross-judge-pool-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "a2f88260-5f71-4b4b-a410-ec4f134135fc",
+      "traceId": "78b446c8710056feebc1a2553e02f261",
+      "agent": "pstack-architect-runners-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "72337b95b62c26fc",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17182,
+            "outputTokens": 447,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17182
+            },
+            "outputDetails": {
+              "reasoning": 391,
+              "text": 56
+            }
+          }
+        },
+        {
+          "spanId": "d0cd587cba1c52f3",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17646,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 494
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "architect runners",
+      "helper": "architectRunners",
+      "toolSpanId": "b25bda3577d84d97",
+      "answer": "67ad69tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "4c2cf5482d62a8f5",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21651,
+            "outputTokens": 391,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 147
+            },
+            "outputDetails": {
+              "reasoning": 298,
+              "text": 93
+            }
+          }
+        },
+        {
+          "spanId": "72337b95b62c26fc",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17182,
+            "outputTokens": 447,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17182
+            },
+            "outputDetails": {
+              "reasoning": 391,
+              "text": 56
+            }
+          }
+        },
+        {
+          "spanId": "d0cd587cba1c52f3",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17646,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 494
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "fb1b0a352422bd76",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace a2f88260-5f71-4b4b-a410-ec4f134135fc used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-architect-runners-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "e08534e3-0023-4cc4-b2b8-5b403f856dde",
+      "traceId": "a8887198a104de1d4ddfc6bc7ccc8a86",
+      "agent": "pstack-interrogate-reviewers-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "0b0713890344873b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17497,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 345
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "7e436a6700fcaf9f",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 296,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 239,
+              "text": 57
+            }
+          }
+        }
+      ],
+      "role": "interrogate reviewers",
+      "helper": "interrogateReviewers",
+      "toolSpanId": "4ac03fd8a8b5013a",
+      "answer": "78fb26tlaboc",
+      "leadInferences": [
+        {
+          "spanId": "7ea6ebc2cbc73247",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21652,
+            "outputTokens": 354,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 148
+            },
+            "outputDetails": {
+              "reasoning": 270,
+              "text": 84
+            }
+          }
+        },
+        {
+          "spanId": "0b0713890344873b",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17497,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 17152,
+              "text": 345
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "50ade8a650f51889",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "7e436a6700fcaf9f",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17184,
+            "outputTokens": 296,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17184
+            },
+            "outputDetails": {
+              "reasoning": 239,
+              "text": 57
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace e08534e3-0023-4cc4-b2b8-5b403f856dde used commandcode/deepseek/deepseek-v4.1-flash, commandcode/deepseek/deepseek-v4.1-flash inside pstack-interrogate-reviewers-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
+      }
+    },
+    {
+      "runId": "44e1e545-9661-499d-b9eb-5d47018e83b9",
+      "traceId": "e1c61bdf2cf5bcfbad670e3e6029ec5e",
+      "agent": "pstack-swarm-workers-1",
+      "model": "commandcode/deepseek/deepseek-v4.1-flash",
+      "inferenceSpans": [
+        {
+          "spanId": "19eb39267bb4c1dc",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17190,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17190
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        }
+      ],
+      "role": "swarm workers",
+      "helper": "swarmWorkers",
+      "toolSpanId": "a260bdc8c68b3087",
+      "answer": "d08178atloboc",
+      "leadInferences": [
+        {
+          "spanId": "15afe4cfb10c9c15",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": null
+        },
+        {
+          "spanId": "19eb39267bb4c1dc",
+          "provider": "commandcode",
+          "model": "deepseek/deepseek-v4.1-flash",
+          "usage": {
+            "inputTokens": 17190,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 0,
+              "text": 17190
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          }
+        },
+        {
+          "spanId": "a6d7fcc369f55fab",
+          "provider": "commandcode",
+          "model": "moonshotai/Kimi-K3.1-Pro",
+          "usage": {
+            "inputTokens": 21651,
+            "outputTokens": 501,
+            "inputDetails": {
+              "cacheRead": 21504,
+              "text": 147
+            },
+            "outputDetails": {
+              "reasoning": 405,
+              "text": 96
+            }
+          }
+        }
+      ],
+      "savedVerdict": "PASS",
+      "mismatchedPick": "commandcode/MiniMaxAI/MiniMax-M2.5",
+      "mismatch": {
+        "verdict": "FAIL",
+        "reason": "Studio trace 44e1e545-9661-499d-b9eb-5d47018e83b9 used commandcode/deepseek/deepseek-v4.1-flash inside pstack-swarm-workers-1, expected commandcode/MiniMaxAI/MiniMax-M2.5."
       }
     }
   ],
-  "failure": "Studio stream returned a provider error for 05c8f597-b118-443c-9d35-e663464f7443.",
+  "criterion5": {
+    "screenSaved": "PASS",
+    "screenMismatch": "FAIL",
+    "listSaved": "PASS",
+    "listMismatch": "FAIL",
+    "leadSaved": "PASS",
+    "leadMismatch": "FAIL",
+    "rolesSaved": "PASS",
+    "rolesMismatch": "FAIL"
+  },
   "restoredHashes": {
-    "pstack": null,
+    "pstack": "2c201abcc9e77413f0d9c22dcf1c8b0bd819676f073dba42930e7db09920c2b2",
     "lead": "da34bc64835941269937c246187bf6bd6f8cc1de3d9e93e523d4124f5c36be71"
   }
 }
