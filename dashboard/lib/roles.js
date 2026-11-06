@@ -197,6 +197,61 @@ export function removePanelModel(choice, groupId, modelId, roleId = '') {
   return next;
 }
 
+export const STALE_PAGE = 'This page is out of date. Reload it and save again.';
+
+const sameRow = (before, after) => (Array.isArray(before) || Array.isArray(after)
+  ? Array.isArray(before) && Array.isArray(after)
+    && before.length === after.length && before.every((value, at) => value === after[at])
+  : before === after);
+
+// The page sends only the rows it moved, measured against the choice it loaded, so a page
+// older than the files cannot overwrite a row it never touched.
+export function changedRows(baseline, choice) {
+  const patch = {};
+  if (baseline.effort !== choice.effort) patch.effort = choice.effort;
+  if (baseline.lead !== choice.lead) patch.lead = choice.lead;
+  const roles = {};
+  for (const [groupId, group] of Object.entries(baseline.groups ?? {})) {
+    const next = choice.groups?.[groupId];
+    if (!next) continue;
+    for (const [roleId, value] of Object.entries(group.roles ?? {})) {
+      const after = next.roles?.[roleId];
+      if (sameRow(value, after)) continue;
+      (roles[groupId] ??= {})[roleId] = Array.isArray(after) ? [...after] : after;
+    }
+  }
+  if (Object.keys(roles).length) patch.roles = roles;
+  return patch;
+}
+
+// The patch names rows, never a whole screen, so it is applied onto a fresh read. Model ids,
+// effort values and panel sizes stay formatSettings' job.
+export function applyRows(current, patch) {
+  if (!isObject(patch)) throw new Error('A save needs an object of rows.');
+  if (Object.hasOwn(patch, 'groups')) throw new Error(STALE_PAGE);
+  const next = copy(current);
+  if (Object.hasOwn(patch, 'effort')) next.effort = patch.effort;
+  if (Object.hasOwn(patch, 'lead')) next.lead = patch.lead;
+  const roles = patch.roles ?? {};
+  if (!isObject(roles)) throw new Error('A save names roles group by group.');
+  for (const [groupId, rows] of Object.entries(roles)) {
+    const group = next.groups?.[groupId];
+    if (!group) throw new Error(`Unknown group ${groupId}.`);
+    if (!isObject(rows)) throw new Error(`Unknown role in group ${groupId}.`);
+    for (const [roleId, value] of Object.entries(rows)) {
+      if (!Object.hasOwn(group.roles, roleId)) throw new Error(`Unknown role ${roleId}.`);
+      if (group.models) {
+        if (!Array.isArray(value) || !value.every(id => typeof id === 'string')) throw new Error(PANEL_MODEL_ONLY);
+        group.roles[roleId] = [...value];
+        continue;
+      }
+      if (typeof value !== 'string') throw new Error('A role holds one model.');
+      group.roles[roleId] = value;
+    }
+  }
+  return next;
+}
+
 // A saved draft is untrusted: the file may have been hand-edited, a model may have retired,
 // or a group may have changed. Anything unknown falls back to the fresh choice, and every
 // group and role in the config is always present.

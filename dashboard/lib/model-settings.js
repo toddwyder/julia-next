@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { initialChoice, sharedModel } from './roles.js';
+import { applyRows, initialChoice, sharedModel } from './roles.js';
 import ROLES from '../config/roles.json' with { type: 'json' };
 
 export const ROLE_GROUPS = ROLES.groups;
@@ -115,4 +115,18 @@ export function saveSettings(choice, { models, paths = settingsPaths() }) {
     for (const item of files) rmSync(item.temporary, { force: true });
   }
   return { updatedAt: new Date().toISOString() };
+}
+
+// The patch was measured against a page that may already be older than the files, so it lands
+// on a fresh read. An empty patch writes nothing, which keeps a stale page from restamping.
+export function saveSettingsPatch(patch, { models, paths = settingsPaths() }) {
+  const modelIds = models.map(model => model.id);
+  const current = readSettings({ paths, modelIds });
+  const merged = applyRows(current, patch);
+  const namesRows = Object.hasOwn(patch, 'effort') || Object.hasOwn(patch, 'lead')
+    || Object.values(patch.roles ?? {}).some(rows => Object.keys(rows ?? {}).length);
+  if (!namesRows) return { choice: current, updatedAt: null, wrote: false };
+  formatSettings(merged, models);
+  const { updatedAt } = saveSettings(merged, { models, paths });
+  return { choice: readSettings({ paths, modelIds }), updatedAt, wrote: true };
 }

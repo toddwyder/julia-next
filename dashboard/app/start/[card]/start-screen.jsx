@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  EFFORTS, addPanelModel, effortById, isRoleOverride,
+  EFFORTS, addPanelModel, changedRows, effortById, isRoleOverride,
   removePanelModel, setEffort, setGroupModel, setRoleModel,
 } from '../../../lib/roles.js';
 import styles from './start.module.css';
@@ -52,6 +52,8 @@ function describeChange(prev, next, groups, byId) {
 
 export default function StartScreen({ card, groups, models, initial, leadModels, saveDraft }) {
   const [choice, setChoice] = useState(initial);
+  // The rows this page loaded, so Save sends only what this page moved.
+  const baseline = useRef(initial);
   const [expanded, setExpanded] = useState(() => groups.map(group => group.id));
   const [picker, setPicker] = useState(null);
   const [info, setInfo] = useState('');
@@ -89,8 +91,11 @@ export default function StartScreen({ card, groups, models, initial, leadModels,
     setSaveProblem('');
     setSaved(false);
     try {
-      const result = await saveDraft({ ...choice, card });
+      const patch = changedRows(baseline.current, choice);
+      const result = await saveDraft(patch);
       if (!result.ok) throw new Error(result.problem);
+      baseline.current = result.choice;
+      setChoice(result.choice);
       setSaved(true);
     } catch (error) {
       setSaveProblem(error.message || 'The models could not be saved. Your picks are still on screen.');

@@ -2,14 +2,14 @@ import { connection } from 'next/server';
 import { getReadyCard } from '../../../lib/linear.js';
 import { displayName, priceLabel, readModels } from '../../../lib/models.js';
 import { accountModels } from '../../../lib/account-models.js';
-import { ROLE_GROUPS, leadModels, readSettings, saveSettings } from '../../../lib/model-settings.js';
+import { ROLE_GROUPS, leadModels, readSettings, saveSettingsPatch } from '../../../lib/model-settings.js';
 import StartScreen from './start-screen.jsx';
 import styles from './start.module.css';
 
-async function saveModels(next) {
+async function saveModels(patch) {
   'use server';
   try {
-    return { ok: true, ...saveSettings(next, { models: await accountModels() }) };
+    return { ok: true, ...saveSettingsPatch(patch, { models: await accountModels() }) };
   } catch (error) {
     console.error('julia-dashboard: model settings save failed:', error);
     return { ok: false, problem: 'The models could not be saved. Check that every role has an available model and that both settings files are writable. Your unsaved picks are still on screen.' };
