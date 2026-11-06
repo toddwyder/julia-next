@@ -1,0 +1,13 @@
+{
+  "prompt": "Preserve this circular scalloped seal engraving with the correct word Julia around the upper rim and large J in the centre. Remove the lower date ribbon and its inscription entirely. Continue the engraved concentric rim in that area. The only letters anywhere are Julia and central J. No digits or other words. Exclusively umber #2e2119 copperplate hatch lines, no fill colour, no painted tones. Every unprinted gap transparent, including interior. Center whole circular mark with generous clear margins on transparent 1536\u00d71024 canvas.",
+  "tool": "image_gen",
+  "transparent_background": true,
+  "size": [
+    1536,
+    1024
+  ],
+  "expected_lettering": "Julia; J",
+  "visual_lettering_check": "Passed by direct inspection of final artwork.",
+  "initial_generation_prompt": "Use case: logo-brand. Create one finished Julia lettered logo, an authentic 18th-century printer's device, trade card or engraved shop label. Landscape 1536\u00d71024 PNG, 3:2 aspect ratio. Transparent background.\nDesign: A wax-seal-style circular mark translated entirely into copperplate line engraving. The exact word \"Julia\" follows the upper rim in readable engraved letters, with a single large \"J\" in the centre. An engraved concentric rim and scalloped outer edge. Do not render an actual coloured wax material.\nExact lettering: Julia; J. Spell Julia J-u-l-i-a, or J-U-L-I-A for roman capitals. No extra words, pseudoletters, signatures or watermark. For dates use exactly Est. 1961 with the period and those four digits.\nMedium: eighteenth-century copperplate LINE engraving. Fine crisp cross-hatching, parallel burin strokes, delicate tapering ornamental linework, intentionally engraved hand-lettering integrated into the plate composition. Letters are the identity, not ordinary typeset text added to an illustration. Clear legibility comes before flourishes.\nInk: exclusively umber #2e2119. No other colour, no watercolour wash, no tinted areas, no opaque white or cream interiors, no fill colour, no painted shading. All unprinted spaces including within the device are transparent. Shade through fine separate hatch lines only. Flat lighting, no cast shadows, no paper texture or background. No realistic product render, no ingredient-icon illustration, no soft painterly colour, no modern generic font.\nComposition: centered complete design with breathing room, all flourishes and edges inside the canvas. Strong typographic hierarchy and a recognisable silhouette. One design only.",
+  "postprocessing": "None. Original generated PNG copied."
+}

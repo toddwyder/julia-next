@@ -1,0 +1,13 @@
+{
+  "prompt": "Edit this apothecary label. Preserve the hand-engraved roman-capital word JULIA exactly, and the ornamental corner frame. Remove the entire lower ribbon bearing Est. 1961 and replace it with modest symmetrical engraved corner scrollwork. The only text anywhere must be JULIA. Use exclusively umber #2e2119 copperplate line engraving and transparent unprinted areas, no fill colour, no wash, no white background. Keep the design centered, complete and fully within a 1536\u00d71024 landscape canvas with clear margins. Transparent background. Preserve fine cross-hatching and hand lettering.",
+  "tool": "image_gen",
+  "transparent_background": true,
+  "size": [
+    1536,
+    1024
+  ],
+  "expected_lettering": "JULIA",
+  "visual_lettering_check": "Passed by direct inspection of final artwork.",
+  "initial_generation_prompt": "Use case: logo-brand. Create one finished Julia lettered logo, an authentic 18th-century printer's device, trade card or engraved shop label. Landscape 1536\u00d71024 PNG, 3:2 aspect ratio. Transparent background.\nDesign: An engraved apothecary jar label with ornamental corners. The name \"JULIA\" in engraved roman capitals, each letter visibly carved with hairline detailing. The label itself is the design, not an illustration of a jar.\nExact lettering: JULIA. Spell Julia J-u-l-i-a, or J-U-L-I-A for roman capitals. No extra words, pseudoletters, signatures or watermark. For dates use exactly Est. 1961 with the period and those four digits.\nMedium: eighteenth-century copperplate LINE engraving. Fine crisp cross-hatching, parallel burin strokes, delicate tapering ornamental linework, intentionally engraved hand-lettering integrated into the plate composition. Letters are the identity, not ordinary typeset text added to an illustration. Clear legibility comes before flourishes.\nInk: exclusively umber #2e2119. No other colour, no watercolour wash, no tinted areas, no opaque white or cream interiors, no fill colour, no painted shading. All unprinted spaces including within the device are transparent. Shade through fine separate hatch lines only. Flat lighting, no cast shadows, no paper texture or background. No realistic product render, no ingredient-icon illustration, no soft painterly colour, no modern generic font.\nComposition: centered complete design with breathing room, all flourishes and edges inside the canvas. Strong typographic hierarchy and a recognisable silhouette. One design only.",
+  "postprocessing": "None. Original generated PNG copied."
+}
