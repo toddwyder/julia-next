@@ -1,0 +1,45 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Library — Folded page</title>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box} html,body{margin:0;width:1440px;height:900px;overflow:hidden}
+body{background:#f6f1e6;color:#2e2119;font:19px/1.45 "Libre Caslon Text",Georgia,serif}
+.bar{background:#6f7c5a;border-bottom:4px solid #a24f3f;height:72px;display:flex;align-items:center;padding:0 40px;gap:36px;color:#f6f1e6}
+.logo{font-family:"IM Fell English";font-style:italic;font-size:34px;margin-right:18px}
+.nav a{font-family:"IM Fell English SC";font-size:21px;color:#f6f1e6;text-decoration:none;margin-right:28px;padding-bottom:6px}
+.nav a.on{border-bottom:3px solid #f6f1e6}
+.acts{margin-left:auto;display:flex;gap:12px}
+.btn{font-family:"IM Fell English SC";font-size:19px;padding:8px 18px;border-radius:4px;border:1.5px solid #f6f1e6;color:#f6f1e6}
+.btn.solid{background:#a24f3f;border-color:#a24f3f}
+.search{display:flex;align-items:center;gap:12px;background:#fffdf8;border:2px solid #5a3e2e;border-radius:6px;padding:12px 18px;font-size:21px;color:#8a7a68}
+.search b{font-family:"IM Fell English";font-weight:400;font-size:26px;color:#5a3e2e}
+.sw{font-family:"IM Fell English SC";font-size:19px;color:#5a3e2e;display:flex;align-items:center;gap:10px;white-space:nowrap}
+.sw i{width:46px;height:26px;border-radius:13px;border:2px solid #5a3e2e;position:relative;display:inline-block}
+.sw i:after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#5a3e2e}
+.sec{font-family:"IM Fell English SC";color:#6f7c5a;font-size:21px;letter-spacing:.06em}
+.t{font-size:21px;color:#2e2119}
+.m{font-size:16px;color:#6b5a4a;font-variant-numeric:tabular-nums}
+.sc{color:#5a3e2e} .gl{margin-left:6px;font-family:"IM Fell English SC";font-size:16px;padding:0 6px;border-radius:3px;border:1px solid}
+.gl.low{color:#6f7c5a} .gl.medium{color:#8a6a1e} .gl.high{color:#a24f3f}
+.ing{font-style:italic;font-size:17px;color:#5a3e2e}
+.letter{font-family:"IM Fell English";font-style:italic;color:#a24f3f}
+.lab{position:relative;border:3px solid #6f7c5a;border-radius:16px;background:#fffdf8;padding:10px 16px;box-shadow:0 0 0 4px #f6f1e6,0 0 0 6px #6f7c5a;margin:0 10px}
+.lab:before,.lab:after{content:"";position:absolute;top:50%;width:12px;height:12px;border:2px solid #6f7c5a;background:#f6f1e6;transform:translateY(-50%) rotate(45deg)}
+.lab:before{left:-12px}.lab:after{right:-12px}
+.lab .t{font-size:19px;line-height:1.25;margin-bottom:4px}
+.az{display:flex;gap:4px}.az span{font-family:"IM Fell English";font-size:22px;color:#5a3e2e;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:1.5px solid #c9b89f;border-radius:4px;background:#fffdf8}.az span.off{color:#d4c6b0;border-color:#e6dccb;background:transparent}
+.col .lab{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:8px 18px;margin:0 12px 14px}
+.col .lab .t{margin:0}.col .lab .ing{display:none}.col .lab.big{display:block}.col .lab.big .ing{display:block}
+.top{display:flex;gap:24px;align-items:center}.top .search{flex:1}
+.vaz{position:absolute;right:28px;top:96px;bottom:20px;display:flex;flex-direction:column;justify-content:space-between}
+.vaz span{font-family:"IM Fell English";font-size:19px;color:#5a3e2e;line-height:1;text-align:center}.vaz span.off{color:#d4c6b0}
+.handle{display:inline-block;width:60px;height:12px;border:2px solid #8a6a1e;border-radius:0 0 30px 30px;border-top:0;background:linear-gradient(#c9a24a,#9c7a2c);vertical-align:middle}
+.wrap{position:relative;height:828px;padding:22px 0 0}.inner{width:860px;margin:0 auto}
+.fold{margin:16px 0 18px}
+.fold .bar{display:flex;justify-content:space-between;padding:8px 16px;background:#efe2cf;border:2px solid #5a3e2e;font-family:"IM Fell English SC";font-size:19px;color:#5a3e2e}
+.fold .flap{border:2px solid #5a3e2e;border-top:0;background:linear-gradient(#e4d3b8 0,#f3e8d6 14px,#fffdf8 30px);padding:10px 22px;font-size:18px;clip-path:polygon(0 0,100% 0,100% 100%,40px 100%,0 calc(100% - 40px))}
+.fold .flap span{display:block;padding:2px 0}
+.lh{display:flex;align-items:center;gap:12px;margin:6px 12px 10px}.lh:after{content:"";flex:1;border-top:1.5px solid #6f7c5a}.lh .letter{font-size:34px;line-height:1}
+</style></head><body>
+<div class="bar"><span class="logo">Julia</span><nav class="nav"><a class="on">Library</a><a>Lab</a><a>Menus</a><a>Prep List</a><a>Shopping List</a></nav>
+<div class="acts"><span class="btn">Import</span><span class="btn solid">Add recipe</span></div></div>
+<div class="wrap"><div class="inner"><div class="top"><div class="search"><b>⚲</b> What shall we cook? Search titles, ingredients or source…</div><span class="sw"><i></i>Under 30 minutes</span></div><div class="fold"><div class="bar"><span>Recently opened</span><span>fold up ▴</span></div><div class="flap"><span>Homemade Artisan Crackers</span><span>Swordfish and Caponata di Melanzane</span><span>Savory Chickpea Pancakes with Leek and Mushrooms</span><span>Rajma (Kidney Bean Curry) Tacos</span><span>Roasted Winter Squash with Vanilla Butter</span></div></div><div class="col"><div class="lh"><span class="letter">B</span></div><div class="lab"><div class="t">Brussels Sprouts Baba Ghanoush</div><div class="m">serves 8</div></div><div class="lh"><span class="letter">C</span></div><div class="lab"><div class="t">Cranberry, Apple, and Walnut Conserve</div><div class="m">serves 12</div></div><div class="lab"><div class="t">Cucumber Crunch Salad with Curried Cashews</div><div class="m">serves 2</div></div><div class="lh"><span class="letter">D</span></div><div class="lab"><div class="t">DIY Shawarma Spice Blend</div><div class="m">5 min · serves 4</div></div><div class="lh"><span class="letter">F</span></div><div class="lab"><div class="t">Fig Cranberry Sauce</div><div class="m">serves 10</div></div></div></div><div class="vaz"><span class="off">A</span><span class="">B</span><span class="">C</span><span class="">D</span><span class="off">E</span><span class="">F</span><span class="off">G</span><span class="">H</span><span class="off">I</span><span class="off">J</span><span class="off">K</span><span class="off">L</span><span class="off">M</span><span class="off">N</span><span class="off">O</span><span class="off">P</span><span class="off">Q</span><span class="">R</span><span class="">S</span><span class="off">T</span><span class="">U</span><span class="off">V</span><span class="off">W</span><span class="off">X</span><span class="off">Y</span><span class="off">Z</span></div></div></body></html>
