@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LOCKED · Julia recipe page — direction A in the drawings' colours</title>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Alegreya:ital,wght@0,400;0,700;1,400&family=Alegreya+SC:wght@500;700&family=Libre+Franklin:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --page:#f6f5f1; --ink:#22252a; --muted:#5d6168; --line:#d9d7d0; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--page); color:var(--ink); font:17px/1.5 "Libre Franklin", system-ui, sans-serif; }
+  .wrap { max-width:1180px; margin:0 auto; padding:32px 20px 80px; }
+  h1.top { font-size:28px; margin:0 0 6px; }
+  .lede { color:var(--muted); max-width:780px; margin:0 0 8px; }
+  .note { font-size:14px; color:var(--muted); max-width:780px; margin:0 0 28px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:28px; margin:0 0 28px; display:grid; grid-template-columns:minmax(0,1fr) 392px; gap:32px; align-items:start; }
+  .kicker { font-size:13px; letter-spacing:.12em; text-transform:uppercase; font-weight:700; color:#8a5a00; margin:0 0 4px; }
+  .card h2 { font-size:30px; margin:0 0 4px; line-height:1.15; }
+  .letter { display:inline-block; min-width:38px; height:38px; line-height:38px; text-align:center; border-radius:50%; background:var(--ink); color:#fff; font-size:20px; margin-right:10px; vertical-align:middle; }
+  dt { font-size:13px; letter-spacing:.08em; text-transform:uppercase; font-weight:700; color:var(--muted); margin-top:14px; }
+  dd { margin:2px 0 0; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+  .chip { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--muted); }
+  .chip i { width:26px; height:26px; border-radius:5px; border:1px solid rgba(0,0,0,.15); display:inline-block; }
+  .risk { background:#fbf3e4; border-left:4px solid #c98a1b; padding:10px 14px; margin-top:16px; border-radius:4px; }
+  .raises { margin:4px 0 0; padding-left:18px; } .raises li { margin-bottom:6px; }
+  .phonewrap { text-align:center; }
+  .phone { width:390px; height:780px; border:10px solid #2c2f33; border-radius:38px; overflow:hidden; background:#fff; margin:0 auto; }
+  .screen { width:100%; height:100%; overflow-y:auto; text-align:left; }
+  .cap { font-size:13px; color:var(--muted); margin-top:8px; }
+  .declined { background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px 24px; margin:0 0 28px; font-size:15px; color:var(--muted); }
+  .declined h3 { margin:0 0 8px; font-size:15px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink); }
+  .declined li { margin-bottom:6px; } .declined b { color:var(--ink); }
+  .choose { background:#fff; border:2px solid var(--ink); border-radius:10px; padding:22px 26px; }
+  .choose h2 { margin:0 0 8px; font-size:22px; }
+  @media (max-width:900px){ .card{grid-template-columns:1fr;} .phone{width:100%;max-width:390px;} }
+  ul.n { list-style:none; margin:0; padding:0; }
+  .ic { width:48px; height:48px; object-fit:cover; transform:scale(1.25); mix-blend-mode:multiply; }
+
+  /* ---------- A: Apothecary jar labels (Delft) ---------- */
+  .A { background:var(--ground); color:var(--ink); font-family:"Libre Caslon Text", Georgia, serif; font-size:19px; line-height:1.5; }
+  .A .mast { display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-bottom:2px solid var(--frame); font-family:"IM Fell English SC", serif; font-size:19px; color:var(--frame); letter-spacing:.06em; }
+  .A .mast b { font-family:"IM Fell English", serif; font-style:italic; font-weight:400; font-size:26px; letter-spacing:0; }
+  .A .head { padding:18px 18px 6px; text-align:center; }
+  .A .crumb { font-family:"IM Fell English SC"; font-size:19px; color:var(--frame); }
+  .A h3 { font-family:"IM Fell English", serif; font-weight:400; font-size:34px; line-height:1.1; margin:6px 0 12px; }
+  .A .ctl { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; font-family:"IM Fell English SC"; font-size:19px; }
+  .A .pill { border:1.5px solid var(--frame); border-radius:4px; padding:2px 12px; color:var(--frame); background:#fff; }
+  .A .pill.on { background:var(--frame); color:#fff; }
+  .A .go { display:block; margin:14px 18px 4px; background:var(--frame); color:#fff; text-align:center; padding:12px; border-radius:4px; font-family:"IM Fell English SC"; font-size:21px; letter-spacing:.06em; box-shadow:inset 0 0 0 3px var(--frame), inset 0 0 0 4px var(--ground); }
+  .A .shop { display:block; text-align:center; font-style:italic; color:var(--frame); margin-top:6px; }
+  .A .sec { margin:22px 18px 8px; text-align:center; font-family:"IM Fell English SC"; font-size:21px; color:var(--frame); letter-spacing:.08em; }
+  .A .sec:before, .A .sec:after { content:"❧"; color:var(--acc); margin:0 10px; font-family:serif; }
+  .A .sec:before { display:inline-block; transform:scaleX(-1); }
+  .A .shelf { margin:0 14px; display:grid; grid-template-columns:1fr; gap:0; }
+  .A .shelf li { display:grid; grid-template-columns:48px 4.4em 1fr; gap:8px; align-items:center; padding:6px 4px; border-bottom:1px solid var(--rule); font-variant-numeric:tabular-nums; }
+  .A .shelf .amt { text-align:right; font-weight:700; }
+  .A .used { font-family:"IM Fell English SC"; font-size:15px; color:var(--frame); border:1px solid var(--frame); border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; }
+  .A .noic { width:44px; height:44px; }
+  .A .step { margin:6px 14px 22px; }
+  .A .label { position:relative; margin:0 6px 12px; border:2px solid var(--frame); border-radius:18px; padding:10px 14px 10px 64px; background:#fff;
+              box-shadow:0 0 0 4px var(--ground), 0 0 0 5px var(--frame); }
+  .A .label:before, .A .label:after { content:""; position:absolute; top:50%; width:14px; height:14px; border:2px solid var(--frame); background:var(--ground); transform:translateY(-50%) rotate(45deg); }
+  .A .label:before { left:-14px; } .A .label:after { right:-14px; }
+  .A .num { position:absolute; left:10px; top:50%; transform:translateY(-50%); font-family:"IM Fell English", serif; font-style:italic; font-size:42px; line-height:1; color:var(--frame); }
+  .A .label li { display:grid; grid-template-columns:4.4em 1fr; gap:8px; font-variant-numeric:tabular-nums; }
+  .A .label .amt { text-align:right; font-weight:700; }
+  .A .step p { margin:0 8px; }
+  .A .here .label { box-shadow:0 0 0 4px var(--ground), 0 0 0 5px var(--frame), 0 0 0 9px var(--acc); }
+  .A .mark { display:block; text-align:center; font-family:"IM Fell English SC"; color:var(--acc2); font-size:17px; margin:0 0 4px; }
+
+  .v1 { --frame:#5a3e2e; --acc:#a24f3f; --ink:#2e2119; --ground:#f6f1e6; --rule:#e3d6c2; --acc2:#a24f3f; }
+.v1 .go { background:#a24f3f; box-shadow:inset 0 0 0 3px #a24f3f, inset 0 0 0 4px var(--ground); } .v1 .pill.on { background:#a24f3f; border-color:#a24f3f; }
+.v1 .num { color:#a24f3f; }
+.v2 { --frame:#1c1a18; --acc:#b8902f; --ink:#1c1a18; --ground:#f8f5ee; --rule:#e2dccf; --acc2:#a3302a; }
+.v2 .go { background:#a3302a; box-shadow:inset 0 0 0 3px #a3302a, inset 0 0 0 4px var(--ground); } .v2 .pill.on { background:#a3302a; border-color:#a3302a; }
+.v2 .sec, .v2 .crumb, .v2 .shop { color:#a3302a; }
+.v2 .num { color:#a3302a; }
+.v3 { --frame:#5a3e2e; --acc:#7f8c69; --ink:#2e2119; --ground:#f6f1e6; --rule:#e3d6c2; --acc2:#7f8c69; }
+.v3 .go { background:#a24f3f; box-shadow:inset 0 0 0 3px #a24f3f, inset 0 0 0 4px var(--ground); } .v3 .pill.on { background:#a24f3f; border-color:#a24f3f; }
+.v3 .num { color:#a24f3f; }
+.v3 .sec { color:#6f7c5a; }
+
+/* page-scale colour */
+.A .mast { background:var(--band); color:var(--bandtext); border-bottom:4px solid var(--bandrule); }
+.A .mast b, .A .mast span { color:var(--bandtext); }
+.A .shelf { background:var(--panel); padding:6px 10px; border-radius:6px; border:1.5px solid var(--frame); }
+.A .shelf li { border-bottom-color:var(--panelrule); }
+.A .label { background:var(--wash); border-width:2.5px; }
+.A .num { font-size:46px; }
+.A .used { background:var(--usedbg); color:var(--usedtx); border-color:var(--usedbg); }
+.A .here .label { box-shadow:0 0 0 4px var(--ground), 0 0 0 5px var(--frame), 0 0 0 10px var(--herering); }
+.A .mark { color:var(--herering); font-size:19px; }
+.v1 { --band:#5a3e2e; --bandtext:#f6f1e6; --bandrule:#a24f3f; --panel:#efe2cf; --panelrule:#dcc8ad; --wash:#eed8bf; --usedbg:#a24f3f; --usedtx:#fff; --herering:#a24f3f; }
+.v2 { --band:#a3302a; --bandtext:#fbf3e3; --bandrule:#b8902f; --panel:#f6eed8; --panelrule:#e4d6b3; --wash:#f8f0da; --usedbg:#1c1a18; --usedtx:#fff; --herering:#b8902f; }
+.v3 { --band:#6f7c5a; --bandtext:#f6f1e6; --bandrule:#a24f3f; --panel:#efe2cf; --panelrule:#dcc8ad; --wash:#fbf8f1; --usedbg:#a24f3f; --usedtx:#fff; --herering:#a24f3f; }
+.v3 .label { border-color:#6f7c5a; border-width:3px; box-shadow:0 0 0 4px var(--ground), 0 0 0 6px #6f7c5a; }
+.v3 .label:before, .v3 .label:after { border-color:#6f7c5a; }
+.v3 .here .label { box-shadow:0 0 0 4px var(--ground), 0 0 0 6px #6f7c5a, 0 0 0 11px #a24f3f; }
+</style></head><body><div class="wrap"><h1 class="top">Recipe page — locked direction (6 Nov 2026)</h1><p class="lede">Apothecary, 1750 · palette 3 (umber, madder, sage). Phone first screen and first steps. Top bar is a stand-in: navigation is designed with the library page; logo has its own round.</p><div class="phonewrap"><div class="phone"><div class="screen A v3">
+      <div class="mast"><b>Julia</b><span>Library</span></div>
+      <div class="head">
+        <div class="crumb">← Library</div>
+        <h3>Homemade Artisan Crackers</h3>
+        <div class="ctl"><span class="pill">− Serves 4 +</span><span class="pill on">US</span><span class="pill">Metric</span></div>
+      </div>
+      <span class="go">Start cooking</span>
+      <span class="shop">Add to shopping list</span>
+      <div class="sec">Ingredients</div>
+      <ul class="n shelf">
+        <li><img class="ic" src="data:image/webp;base64,UklGRpwEAABXRUJQVlA4IJAEAADQFgCdASpwAHAAPm02lUgkIyIhJfxpyIANiWcA1thTqnt5BqoYG38u6CBbdMRcd4i4v8K1HjzXhBpEZpXkGfekZauOo/OYmyd0lsg1klU/uscdKAjJ7IbvID9tg9vkh5svZbhdUeQM9Wu8d9lK6WhmhRtm86c/IOO/beB7NOQDolf3lq8Lt77QPHJ0Urfaq8qCQ+/ID/4Mhv7KIgGhHR3yTy5qhC5wIHe6Mqlt5lb5HtlMW6elt/VGc+ZoGeBRwAD+/KgAAg0pYi4/Qal6LSP6YFExwIo6z3j8IeoWmCfYMvdxrb6YnancaaJvSdI7eOqf3yYMC/cfq8LhVMGCYAWxbiRCVOd3ec/mKA2IYcZayuzCyDPZ4PCUmr/sxQIlAx+7AvKt5SrmB6iyo5ZgCF19vRj+Op4Wl2aMlcG+fBKyYvkbwZ7p7zGvpsvbClGQnACrwnJL5rML7lQl6A61pKEGeNSlQpuaRHlf22EmxU5qgJAKED6qgAwvlNhw0kJBSgK05VJY8JUEeZHb0LXmwvcvwbGPzovZTcSCzXTGrYGh4aYBPXyFHsaAHCcgQkOJ4TBem8HGdB1UMgVfsLjnOTNoNvawnJTqSkFYFUL2tBpQJuezm7gL+rW/Io9Lm0Lcy4FsJbMyPgsKfPFNF8nemGqSKQlS0bvawP5nXhdLXh3QhFFqXVblGVpzdeOJwxvgkJ9ICYqPObF0Eprs1XS6Xee56MobBIWuy3leqyOeotOZP+w2+5KLz13v/+pBczdl47MJpVKM5tne3GKkg27A/Gqml3KHXlp2cnqXPKX+fuZ989nryX7EXRvPAvc7SlcFweJHm2EnEnvWx0AFqGnHS0dEgbPZsYfwC+oCmWSOiXxDAceRjmS+paLbMgSQYxxGiHHyIwcfBM+P0X881j0FQI+4PZ4L1n/JGT+ym5L36Bi587Cml4QlpIgPkYHGWGSV+v1Ec+dGHkCj/slcS2bTEBZQkoLIazqbUG5s+SzxiXT6q/mmzszNfK+yG2wA+I6aj4bkgb2S7bdaaCF6pL/oWyd5auwJBf3T9+mR6S/yDBxgVL6nXtbzVNznnDd4srcGfpq9E3t4zOPMFFTgVQQWwGmMqoiKe2++j0asEUqT0kSSJYxzItc7s5AV85pygc39p4bTSaZRSE6fxtCPpEBJ0AoaMsGKMMdpTub+BQgGwxrfvlb/6plZbz9QpI64gmlUCK/QDf/5PPayZBH6WRVOXNki5Fdt3NkdejwajWpzz5F/F4R4jHj71isDulov+lTCeaRnKU9sKKjp12X0msiV3whfnPvpxGOjrCplmfKy9lJSkdyG2YjsC1T5Z2hKsfX/D+ue0rEMMkCMT9FxtklfDbLmKB7D+DvtRgTO7wkn8P5b6flbJ7YoQF002YxqyhWUcDQkmpxXg+zLz6H4/skx9afBwEv2q5qWfbWTNl2YR+vmXwV/b8f3/kkb1njfA2FqpZxVKP7Sq1Ff6zhwC3cbq0TyGpu/XlrS35YNPElq1qplG9Beu4+8OnrnlPPWfi1EC6RSjZk1IU0SEkIvCQwAAAAA" alt=""><span class="amt">2 cups</span><span>all-purpose flour (250 g), plus more for kneading and rolling</span></li>
+        <li><img class="ic" src="data:image/webp;base64,UklGRtgBAABXRUJQVlA4IMwBAAAwDQCdASpwAHAAPm02lkekIyIhJ9qocIANiWcA1nG/EgmNq+i+B6YmN8zyPPmPCgDHdaS7tqeNi+aUPydd2oyTACcA4TWG1aAABdNUpkb9rbOesOcKo04mTXguI5C0yoI5Hrja3z1ubZeCBc5M4eOHwIAA/vxKAAAB5bKUL4L763OSx2DAxJKWRD9p8E3LUX+HmiF0Ly1qGm2hIFBhf0mBmRmo7RQln7YB2GctLRTtZi7O+Bppjej6VH9hX/+53Wsk/G6ZM/sVopsBZlzRK55V3zgQn0YONCBi+b9/S/J8UzCNQuyOyu/PUDRm/8NUGfZbkA/KOaxWiSN8mpvlihJhja+6a3WQ9RPdEAWG4hHGehgw3LFf98dqZq6LCm3SlqGm0TPO102YjjUWjZBISEUuPzYOHPsh/IFVd//+Sj8iB73Prf2OJqtnSUH1YOQMuQhSTL97nZxV1QKpFB9h6psXe4bW+wKScj6xsIqpxQ2Q58M1X4iLDTjGPbH90Be2pbmWbnkQjVo4/9PF29ckGwaqP8MOypcPR9oKsVRt71sfYfU84yZwbPDvWXeYYe4FmiIlfrXISFkOwpeg4FSJKa9NpQ2qgWdYAAAAAAAA" alt=""><span class="amt">1 tsp</span><span>granulated sugar</span></li>
+        <li><img class="ic" src="data:image/webp;base64,UklGRtwDAABXRUJQVlA4INADAADwEwCdASpwAHAAPm0ylEgkIqIhJzXZsIANiWcA1pxByQlo8KzZpvj+AntF+sEa7Z3maqru5ZawyvEuTExGPE7NFT2unRV0yk/hJOTD3CrgGWqtJwqJHFxwYicLOZK3A94X3CQlV9XlGr+97ZZ2a4Ed3k0knzgU051xd6vkXgBecuNoVoG+acKqKpB/kyHiQ+XFjKofqE355e5SIrTyIfEhuLnSGT+4hIAA/vyoAAAC7fOg96BcS6QkJrgO3Z+aWAK/MRBSeGt9zdY8kQe/6wFwFniC4V8FifDMFM+Y51XGGy9Ai6V4QQeDVHEo/o6yKbEIXa/QxFIe20eKLNlusClXBeOSad2Ja802vFdbinzWraRgqKIFQfYd4xemdpJShUHfDilsddz8aDekhe7s1NE6XKHPm36sq2pwkpnkEYGvCkE16TClOAR5a4NWHIyvT4Vp61BOQ/MEpAfczjLIkENGTw3WbxFllohJVkd1WIXjvY5rF130u0cCSfhipr3X4MWzWeJ1SqnIJZpW8hUx0pysPfPGyQEkHEBSIQ9H5Z4NvxNLitkzDQu0BHJIzgF4vFoRo+tDsd2V01+GaqLZ25Avx2bMKz8QarrDcStsEbycRn5zkM2187hJwxXiNi21r3V2jwrZAmoF4Rvk9KRtfSr7n2YCoh+e+0avCtgUBGRMuFZSD8YuyFzdnmBOZ4eLdaKhCEtcF+3cc9ficwLyOmIivwDdyAKIlI3OczzXBLFHk34flpsnWKGGIYe8OwNuzxfkKpsJJK2pFLm1Dnn2/t5dLexpBabwuZI6LzhlC5vSvAEL2b1PmWlBxCHsSZzj9Ftvl0pDS2c67Lc5IO1MEGrsXItg6y5W05sRpckyoshLhSJpQ0kns+4RsOA/Kw7frlLYVx1WBblhbDs/oHDovwL3Rs9Pr7s+EGyCX3Ot8Ge54Pej26x4aLHG7CX8EowmZE6R7djrcCpyS5lQmQXVkxnsBGO8Y6pEPKwUKVs9uw2fKv1icna3wEyA4Iuhl1pJ3pfWkYrbgzBv1w23BKteEpawCF9szpc3y7pRv7hvb93OnJwFmO53YZuS2UNc+OG501/qfjWIOpUZQxW+KOJiElth8xOgT6EeOhDLXGIKrNAR4Jrle8N1shfHU3k1sQpblVres0+K5bpUSfJbG6a/XNCvBpfrgawOgCLMWDJ5PXR75jhUAy0jclmSH9MDxxOSb4cCmWyt+D7hPfFn00GhewqDRH+QsQtcLlCpwysKRAbsrd/+3/UGW/e/TS+NXEGfqwxStUE+DAIteAAELaYAAAAA" alt=""><span class="amt">1 tsp</span><span>salt</span></li>
+        <li><span class="noic"></span><span class="amt">½ tsp</span><span>onion powder</span></li>
+        <li><span class="noic"></span><span class="amt">¼ tsp</span><span>garlic powder</span></li>
+        <li><img class="ic" src="data:image/webp;base64,UklGRsgEAABXRUJQVlA4ILwEAABQFQCdASpwAHAAPm0ylEgkIqIhJfxpmIANiWcA1WEiPLRTtAp+ib6DgFxF+uPC/vBvuLyhwiqCUAP0R6rf9t4zfqL2DOlIQzBmCVxJalIYodH/wPadkkHOwBNbP2dJaZzq0QyAK+dc7wACezx38ixhY4ahERgnN2wEO6aTIZdu+zg20IwcHR8L7+/ozxAjb1YUamNVinWuayQXNe4Sy3Df7EEPhDrYX4wE1jA6ImK/APsWAAD+/KgBKDqMGw/oJevwv3cNgaz8mJnEfY2jhE3aWsaVnR/AH/WWBdnnmPWCCW0KLHwNPYZeS/laAvlm0E7q0rfdo7JdAO02rNs1EA8/+d2Pe/VOBXb/ejTSMgzguAWKxpfuHDlFPwBqLZ3XZXKXTMt61bGO8ExcVXXRYxhoOjkuwFrdRxVIQfH+kwsaenSUW9vX5JL8ZrMsxEGSKfH9fC8s6hXfQemfZlrDx/lsGoBPRcrmgbXptsS/cdIijurKRw+/oo2e3RgCKDb1wIKte//j0nMIgzQoF1WOggBMFqCLBWL1I/8AGO9FPcdR9vP8guAFFs6sq/UH7mN5g+AaCD1gFm+EsMH7gMR9J6/lDECz/HmAD34oEDigyb77TtFxyiGO6v7uQmD/NchN2P4Quj0QBhHDWy+XeHQj5buwCdupyzVSyKdKfvAwkgH9RU4DLz7rJr2HrlAYEJdyLtfSbO3E+F3K281PuCi5ccQSBvzBuPnGmeb71rhtmvuCKM7uOp6qzuIaT2NsZICMUS7UxNLedEi2ruaRch3rPd2YOm75/3RfcBMXFIU2THb3Ahl1jz6QonQPdiLJSN3LBFc3HihlvYpL0qRzkf5/Say8WeOuNSRhgwtmFevNTD70jOnA7/NrrwSrTkXLz0yYsr120+lYUQtkO+CD+GmndsP62OF00MIhaW2klBFEkp/CyU0K1cQGyEAr5wqOQvipLr+RJuEe/0IB580i6YbYqw8eawxmzo/enkHsX2gxJF/bBchJrecPAN28AjMnPsubQ/mLNAcixgv91gS6i8E1lIgfuKuTShUKDj56ibuVAK7nd1vf5I0lvZHtR0YGIrG5hakMgr1YQpimLdZ+SA6fYRBbyu2okXVwGqZzHGKqVGUCdv9szohBdC3OzfWy/fSnmqKIYx9uWUvlHpPkcx49Ns0auPpdVOmiJCB3VshR3Xxq5ELM0/icskfX0oacwURE0oVVd1djymgrf1KyE/J/zb4RHrdBE3ZQuimk7LjOFrUu6eNEQUTAeKC7SYxuVDUXKSr7vyuHYjTXrtnbO2hDxhr3e9996McLTxQbTBicI7QYiyxUIXnAAxW0eb3+VXhD2Y0LC+BokPNZGz6qKjXCTyt9EJrzFlwl8958xYiAcwvjNHWnG3PYrvCX2ucg+ZfcCWrYsADmPWCdlkn8v/uLex4Wm/mUh/4i/WSzBqPFPkZ99islv7HsOibFreLpXaHChIwoj0Z5nE9q3mP1r2PjrLpiQD2814F1ZLH3ocOUR9c6Z9cD1RBa2BfXgDmyCFbUNny1E+IN7wDlZPtQIHwYm7AnksWkkJWY/xwDHRG/9wyhS1ig8BDovOJi2kBFosnf5jr1BOFqFz3fIAAAAAA=" alt=""><span class="amt">1 tbsp</span><span>fresh rosemary, or other add-in (see Notes), finely chopped</span></li>
+        <li><span class="noic"></span><span class="amt">⅔ cup</span><span>water (160 g/ml)</span></li>
+        <li><img class="ic" src="data:image/webp;base64,UklGRlwDAABXRUJQVlA4IFADAADQEgCdASpwAHAAPm00lkikIqIhI1M6WIANiWcA1oz+vZvBDirspmNT3FJRpO3z5U9j7vjtRRUi8Z2Xj5wfvIHMKxe5eD1Gjzmd3x83/jebw4r7k0tdIpZdNY6w3n5x2ic0p/0Md670pV+S0eGxOHADmBMcAdwBGPzDb9aMTK22uo3wRQXXndnSe0lMnK5wXrZWMyeA5QNcIWw27fb00AAA/vxKE5psKlOy72ucn3uVxzBbzb0EnLQ2Ak7jJOp29HYK+OP0QMW0cOOSjPPaWKvZTTszrwYlg2U4WtvpM/PrsXrctMmbe8jTAyAGQsW854Uf0g+jx9B3qmn7oeebNkR21B45/TEA6gy1/4ZU5hVn2ACCwSQhRdk7ViNtUz+qbjIFpwUP7qdhvZfREK2xP7/cz2R/HjF/KtbaEyC8WsL6A/TEPypKKd4tToYDef8npmOh/5j+BiqHqPdwKROAPOWR3cFx7O2LLRmWLBjcpRKM1iZDjLvvekKcyppUG3MX2tNhem+q+Pp7g7wvzv+G6SbIUv5FiaZFZwLyo3+gkREo+aXwDmJBui454Aq7N5sTnGhvul4D0KB0qEkTeKZX0ckfGDSyrg34TIlrhCzmSdNM8im+KXekotSXJBXUYMc7GxhRzOO/yrqtdPdMa+QQOWxwOM5WSEMUenTYTb46QmPzdZVodPGOHVykX4hxsKC7CNzM1r4EIXw35i/HJFu0I6FVgjOzh2/SWOOw27FOY5WH33RhOBXhBFojAgo/IJYsfWnLwXBmTadxkU8ytUvtwUfUK1gxpVwa2P2UhTCaYOPauSa8l5tHyeQejbnjkccdfCvK9CFSo4GW/VknCIv3JI6yVDnnFan/9wkAdii3jjyYQPR1GH/ChB5h20v/zbt63DMkfJR6Cc+xqYk0ew+vJ0s1F+xPVj+iqws50ODnvyNO9bck5u28U48PZEVxCoqlZ2H5dJHiJaFdtco76hTPiCHhh+z2IMMFc+WOCex1Mj61X+QKPwUE4kp36g60IikGrni6nP2tO2wl4v5Z3+O9jD4SxjG1R7wJsv79qvlQDNKYXKx9Ukkk4ZgscEzZLK3Cb2y4A7ONtkpd82l4ksBNZBI14NXWGHXbYL+xTuDgYpAAAA==" alt=""><span class="amt">3 tbsp</span><span>extra-virgin olive oil (41 g/45 ml), plus more for brushing on top</span></li>
+        <li><img class="ic" src="data:image/webp;base64,UklGRhQDAABXRUJQVlA4IAgDAAAwEQCdASpwAHAAPm02lUgkIyIhJzXYoIANiWcA1wUrmF7QGUk1WZMjnzTgWByuufVUD6Wo9iY3y6h0yjNUyISdn1cfqxmArACqMNd+Y70z8tuFh8axM+mqWkQJ5qWDbHRbM+XiRlPD0lCNBNPdwTpbtvpQQQo6gWdnZYB5681x+bv9KLZcd43fiKDA8ZeXUOmDAAD+/KgAAAOq6txmdX92ax2zGIhZsHFAkK6YPqpd+sLxeQXSsXR0ODspeDR9ko5uTFqmgLyyqIRttqsMEWFGvwsIoRwNXns+MwMcKOvwxA0lr6HpUfUvukqJ4xq6/LeNOOUzfE8kGQw8Fp8EfcA4aPzAwsmYWa3NDi8yGgw6nFuSzFeFkC74a3UlmF1rDE7VZ82NuyetQuUgDWdxQ14WHbPV288QgEgE/eup4ohQH0oXYAfqdK1rIvOf02u8bTG7fadbq9tXlTRLzKyy+ik2W2+a1qTw13WEsJRiZQqyLZM8QN9c3G0JJz1Sef6C6nnTKJglIEaYCHIn8HFpT0wJpSBBH3hemGiqDVsSCcxWW77pHNBNtZZf6ciBR2mYRSn2d0bwy8IWzRVvARaI/zJwqkDVedBEqvaXG2diLa4O6jPSIrG3biMV7O6voKj8nvB2Z5htLMsW0/UaSdRTfOCp0X0N6DjUnzs8GcFOQna2gfoH5OrjQQvRdO41uCIf/0aJP1NT97MOTr/CJfDFApjUWRfHxpJ9JPYim615kP7a4FfKb9lgKXVkg0auPjROJS3LuFyRiQqL2w5SNaskDpd2WjxZzKjAlcPYakHxcbXlrdbNOIdJssHi+i8uKn4n9ijhROfw9HW93+X7RA6fuf1GFRoSeVG/Jp6qG/mfRrsXAk5EaDC5IgMlw7qFDVKoLfm+Cf+/G8WKelLTlToWfzrUmi5MpDU/vP0125BRQ+52h190FBn7DjaGBL5qU0qdsPcE8LZdmkufW1Pqn3gCSIUoTP7qOXTYJ35AmNcyQoK0VXnq160hDBZFzxD2sXjIhUdSNgAAAAAAAA==" alt=""><span class="amt"></span><span>flaky sea salt, for topping</span></li>
+      </ul>
+      <div class="sec">Preparation</div>
+      <div class="step"><div class="label"><span class="num">1</span><ul class="n">
+        <li><span class="amt">2 cups</span><span>flour</span></li><li><span class="amt">1 tsp</span><span>sugar</span></li><li><span class="amt">1 tsp</span><span>salt</span></li><li><span class="amt">½ tsp</span><span>onion powder</span></li><li><span class="amt">¼ tsp</span><span>garlic powder</span></li><li><span class="amt">1 tbsp</span><span>rosemary</span></li><li><span class="amt">⅔ cup</span><span>water</span></li><li><span class="amt">3 tbsp</span><span>olive oil</span></li>
+      </ul></div>
+      <p>In a large bowl, whisk together the flour, sugar, salt, onion powder, garlic powder, and rosemary (or other add-ins). Pour in the water and olive oil and stir with a wooden spoon or silicone spatula until the dough comes together in a clump.</p></div>
+      <div class="step here"><span class="mark">~ you stopped here ~</span><div class="label"><span class="num">2</span><ul class="n"><li><span class="amt">a little</span><span>flour, for kneading</span></li></ul></div>
+      <p>Turn the dough out onto a lightly floured work surface. Lightly flour your hands and the dough and knead it, sprinkling on a little more flour as you go, until it's no longer sticking to your hands and you can shape it into a rough ball, about 1 to 2 minutes. Return the dough to the bowl and cover the bowl with plastic wrap. Let the dough rest for at least 10 minutes, and up to 1 hour at room temperature.</p></div>
+      <div class="step"><div class="label"><span class="num">3</span><ul class="n"><li><span class="amt">—</span><span>no ingredients</span></li></ul></div>
+      <p>Preheat the oven to 425°F (218°C) and line large silver baking sheets with parchment paper.</p></div>
+    </div></div></div></body></html>
