@@ -1,7 +1,9 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { homedir, tmpdir } from 'node:os';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+
+import { listAccountModels } from '../lib/account-model-catalog.js';
 
 import { accountProviders, mergeSweep, parsePrices, stateDir } from '../lib/models.js';
 
@@ -29,29 +31,7 @@ export function findSdkPath(env = process.env) {
 export async function availableModels(env = process.env) {
   const sdkPath = findSdkPath(env);
   const { createMastraCodeAgentController } = await import(sdkPath);
-  const storageDir = join(tmpdir(), `julia-dashboard-sweep-${process.pid}`);
-  mkdirSync(storageDir, { recursive: true });
-  const { controller, storage } = await createMastraCodeAgentController({
-    cwd: dashboardRoot,
-    disableMcp: true,
-    disableHooks: true,
-    disablePlugins: true,
-    disableGithubSignals: true,
-    createInitialThread: false,
-    storage: { type: 'libsql', url: `file:${join(storageDir, 'sweep.db')}` },
-  });
-  try {
-    const list = await controller.listAvailableModels();
-    return list
-      .filter(model => model.hasApiKey === true)
-      .map(model => ({
-        id: model.id,
-        provider: model.provider,
-        modelName: model.modelName ?? model.id.split('/').at(-1),
-      }));
-  } finally {
-    await storage?.close?.();
-  }
+  return listAccountModels(createMastraCodeAgentController, dashboardRoot);
 }
 
 export async function fetchPrices(source, { fetchImpl = fetch, now = new Date() } = {}) {

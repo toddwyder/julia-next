@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import { checkStartHtml } from './check-start-address.mjs';
 
 const startScreen = `<h1>Practice: JUL-276 document the Ready card journey</h1>
-<p>Start screen</p><h2>Settings</h2><dt>Main session</dt><dt>Shipping</dt>
+<p>Start screen</p><h2>Settings</h2><dt>Lead</dt>
 <dt>Effort</dt><h2>Effort</h2>
-How hard the models think. More brains is slower and costs more.
+Sets pstack&#x27;s reasoning budget. Each provider uses the reasoning levels its model supports.
 Small Medium Large Unlimited`;
 
 test('the real Start screen passes the check', () => {
