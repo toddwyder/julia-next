@@ -1,0 +1,46 @@
+{
+  "anchors": [
+    {
+      "rule": "Each role runs on its explicit model.",
+      "file": ".agents/skills/poteto-mode/SKILL.md",
+      "anchor": "explicit model per role",
+      "enforcedBy": "The Lead and helper command gate (P6), with each role's model resolved per call (P3)."
+    },
+    {
+      "rule": "Feature, bug-fix and refactor code is delegated.",
+      "file": ".agents/skills/poteto-mode/playbooks/feature.md",
+      "anchor": "Mandatory: no skip-with-reason escape",
+      "enforcedBy": "A helper is the Lead's only route to code-writing (P5, P6)."
+    },
+    {
+      "rule": "Code-writing goes to the role's helper, on its configured model.",
+      "file": ".agents/skills/poteto-mode/playbooks/feature.md",
+      "anchor": "Delegate code-writing to a subagent using your configured feature model",
+      "enforcedBy": "The role-to-model map in `machine/flow/role-models.mjs`, with the Lead choosing the role (P3)."
+    },
+    {
+      "rule": "Each role has a default model.",
+      "file": ".agents/skills/poteto-mode/SKILL.md",
+      "anchor": "Defaults for every",
+      "enforcedBy": "The picker's `~/.config/julia/lead-role-models.md` plus the defaults in `dashboard/config/roles.json` (P3)."
+    },
+    {
+      "rule": "Helpers delegate no further.",
+      "file": ".agents/skills/poteto-mode/playbooks/feature.md",
+      "anchor": "waits on a nested agent",
+      "enforcedBy": "Helpers are created with no `agents`, so they cannot delegate (P5)."
+    },
+    {
+      "rule": "Subagents are fresh per delegation.",
+      "file": ".agents/skills/poteto-mode/SKILL.md",
+      "anchor": "Fresh subagents by default.",
+      "enforcedBy": "One thread per delegation, from stock Mastra (P5)."
+    },
+    {
+      "rule": "A stopped run resumes from its saved point.",
+      "file": ".agents/skills/poteto-mode/playbooks/pause-safely.md",
+      "anchor": "Write the resume note off-context.",
+      "enforcedBy": "The adopt-or-start build step over stock Mastra recovery (P7)."
+    }
+  ]
+}

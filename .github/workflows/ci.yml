@@ -30,10 +30,48 @@ jobs:
         run: node scripts/check-agent-links.mjs
       - name: Check the machine program list is up to date
         run: node scripts/machine-programs.mjs --check
+      - name: Check the enforced pstack anchors are intact
+        run: node scripts/check-pstack-anchors.mjs
       - name: Check every branch has an open pull request
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/check-branch-pr.mjs
+
+  pstack-text:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - name: List the pstack text this pull request adds
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-pstack-anchors.mjs --new-text --base "$BASE" > "$RUNNER_TEMP/pstack-text.md"
+      - name: Post the list as a pull request comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          [[ -s "$RUNNER_TEMP/pstack-text.md" ]] || exit 0
+          found=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.body | startswith("<!-- pstack-anchors -->")) | .id')
+          if [[ -n "$found" ]]; then
+            url="repos/$GITHUB_REPOSITORY/issues/comments/${found%%$'\n'*}"
+            method=PATCH
+          else
+            url="repos/$GITHUB_REPOSITORY/issues/$PR/comments"
+            method=POST
+          fi
+          gh api --method "$method" "$url" --input <(jq -n --rawfile body "$RUNNER_TEMP/pstack-text.md" '{body: $body}')
 
   package-tests:
     runs-on: ubuntu-22.04
@@ -80,13 +118,14 @@ jobs:
         run: npm run build
 
   checks:
-    needs: [repository-hygiene, package-tests, web]
+    needs: [repository-hygiene, package-tests, web, pstack-text]
     if: always()
     runs-on: ubuntu-22.04
     env:
       REPOSITORY_HYGIENE: ${{ needs.repository-hygiene.result }}
       PACKAGE_TESTS: ${{ needs.package-tests.result }}
       WEB: ${{ needs.web.result }}
+      PSTACK_TEXT: ${{ needs.pstack-text.result }}
     steps:
       - name: Require every job to pass
         run: |
@@ -94,3 +133,4 @@ jobs:
           [[ "$REPOSITORY_HYGIENE" == success ]]
           [[ "$PACKAGE_TESTS" == success ]]
           [[ "$WEB" == success ]]
+          [[ "$PSTACK_TEXT" == success || "$PSTACK_TEXT" == skipped ]]
