@@ -6,6 +6,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { scratchDir } from '../../scripts/scratch-dir.mjs';
 import { fileURLToPath } from 'node:url';
 
 import { getIssue, postComment, setIssueState } from '../../scripts/linear-cli.mjs';
@@ -70,7 +71,7 @@ function traceFileFor(pr, label = 'merge') {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const runDir = path.join(root, '.artifacts/merge', `pr-${args.pr}`);
+  const runDir = path.join(scratchDir, 'artifacts', 'merge', `pr-${args.pr}`);
   const saved = args.force ? null : readRecord(runDir);
   if (saved?.status === 'finished' && saved.merge?.commit) {
     console.log(`The merge machine already finished ${args.card} on pull request #${args.pr}: ${saved.merge.commit}. Pass --force to run it again.`);
@@ -127,7 +128,7 @@ async function main() {
       })
       .filter(Boolean);
 
-    const artifacts = path.join(root, '.artifacts');
+    const artifacts = path.join(scratchDir, 'artifacts');
     const runDirs = fs.existsSync(artifacts)
       ? fs
           .readdirSync(artifacts)
@@ -145,6 +146,7 @@ async function main() {
 
     return sweepPlan({
       root,
+      artifacts,
       card,
       pr,
       branches,

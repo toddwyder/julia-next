@@ -11,7 +11,7 @@ node scripts/julia-agents.mjs -- node machine/merge/run.mjs --pr 420 --card JUL-
 ```
 
 `--no-post` does everything except write to Linear: the merge still happens, and
-the completion comment is kept at `.artifacts/merge/pr-<n>/card-note.md` instead
+the completion comment is kept at `~/.local/state/julia-scratch/artifacts/merge/pr-<n>/card-note.md` instead
 of being posted. `--card-file <path>` reads the card from a JSON file instead of
 Linear. `--model` overrides the retro's model (default is the free Beam model).
 `--force` ignores a saved record; without it a run that already finished stops
@@ -103,7 +103,7 @@ so the record and the retro it describes are never out of step.
 ## The sweep
 
 `sweep.mjs` removes only what this card left behind: the branch the merge
-deleted locally or on the remote, the `.artifacts/*/pr-<n>` run folders and
+deleted locally or on the remote, the `~/.local/state/julia-scratch/artifacts/*/pr-<n>` run folders and
 worktrees belonging to this pull request, and changed test files whose imports
 point at modules that are not on main. It never touches `main`, never touches a
 branch whose commits main does not hold, refuses anything under

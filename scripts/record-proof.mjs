@@ -3,13 +3,15 @@
 // both by the app and by storage itself. The household project is never used.
 //
 // Needs .firebase-proof.json (written by scripts/provision-firebase.mjs) and
-// Playwright's chromium. Videos land in .proof/, one per session.
+// Playwright's chromium. Videos land in the scratch area, one per session.
 
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scratchDir } from './scratch-dir.mjs';
 
 import { chromium, expect } from '@playwright/test';
 import { serviceAccountToken } from './provision-firebase.mjs';
@@ -18,7 +20,7 @@ import { getAuth } from 'firebase-admin/auth';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const PROOF_CONFIG = fileURLToPath(new URL('../.firebase-proof.json', import.meta.url));
-const OUT = fileURLToPath(new URL('../.proof/', import.meta.url));
+const OUT = `${join(scratchDir, 'proof')}/`;
 const IDENTITY = 'https://identitytoolkit.googleapis.com/v1/accounts:';
 const PROOF_KEYS = fileURLToPath(new URL('../.firebase-proof-keys/', import.meta.url));
 const LIBRARY_KEY = 'julia.recipes.v1';

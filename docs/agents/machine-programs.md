@@ -9,7 +9,7 @@ of any size, not only a change to the sentence beside it.
 
 | Program | What it does | sha256 |
 | --- | --- | --- |
-| `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `b239f12a16969757e4aaa8a8a7fbd8743c836ca3566fbee54c8da62dcd46bfac` |
+| `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `4a018e0072e670e0ac91791376f4072832334a3927465c37acadc47a41739099` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `7501664a0b3774a5ac48b0628c40f9b1157703d1b2c2b94eb589fdde1f0b5e49` |
 | `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `e4a38ba53e9a0180be91361923745ffc7dec12c4c471a5f450eb2eaf3fa3354d` |
 | `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `36be31f65368be87543f3f94cbd1199a85503eeb201c4090e61a2cfaabd77e6d` |

@@ -11,8 +11,6 @@
 # path at this file, so an edit here takes effect at the next launch.
 set -u
 
-self=$(readlink -f "$0")
-repo=$(dirname "$(dirname "$self")")
 real="${MASTRACODE_REAL_BIN:-$HOME/.local/lib/mastracode-program/node_modules/.bin/mastracode}"
 if [ ! -x "$real" ]; then
   echo "mastracode launcher: no Mastra Code program at $real" >&2
@@ -26,14 +24,6 @@ export JULIA_TRACES_DIR
 if [ -z "${MASTRA_OBSERVABILITY_DB_PATH:-}" ]; then
   MASTRA_OBSERVABILITY_DB_PATH="$traces/$(date -u +%Y%m%dT%H%M%SZ)-$$.duckdb"
   export MASTRA_OBSERVABILITY_DB_PATH
-fi
-
-# Bounded so a slow disk cannot hold up the session, and never fatal: a fold that fails is
-# retried at the next launch, and a file a session still holds is left alone by the fold.
-if [ -f "$repo/scripts/trace-store.mjs" ]; then
-  timeout 60 node "$repo/scripts/trace-store.mjs" fold --quiet || true
-else
-  echo "mastracode launcher: no trace-store.mjs beside this file, so finished trace files are not folded" >&2
 fi
 
 exec "$real" "$@"

@@ -33,7 +33,7 @@ node scripts/julia-agents.mjs -- npx mastra dev
 
 Run it from the repository root: the CLI looks for `src/mastra/index.ts` there. The server answers on
 `:4111` by default. `FLOW_DIR` is where the run's state (`state.db`) and trace (`trace.duckdb`) are
-written, and it defaults to `.artifacts/flow/studio` under the repository; set it to an absolute path
+written, and it defaults to `~/.local/state/julia-scratch/flow/studio`; set it to an absolute path
 to keep runs apart. The repository the build agent works in is `FLOW_REPO`, default the working
 directory.
 
@@ -46,9 +46,9 @@ A card that waits for Todd is answered from the command line, which reads the ca
 saved snapshot:
 
 ```sh
-node machine/flow/run.mjs status --dir .artifacts/flow/studio --run-id <run id>
-node machine/flow/run.mjs resume --dir .artifacts/flow/studio --run-id <run id> --answer yes
-node machine/flow/run.mjs cost --dir .artifacts/flow/studio
+node machine/flow/run.mjs status --dir ~/.local/state/julia-scratch/flow/studio --run-id <run id>
+node machine/flow/run.mjs resume --dir ~/.local/state/julia-scratch/flow/studio --run-id <run id> --answer yes
+node machine/flow/run.mjs cost --dir ~/.local/state/julia-scratch/flow/studio
 ```
 
 `docs/agents/machine-programs.md` names every program that starts a card or carries a stage, and
@@ -98,6 +98,18 @@ names the merge commit and `/api/health` reports `ok`. The update service writes
 it is free to update, and `code: active-run` with the run it waited for when a build is in flight,
 in which case the next timer run does the work.
 
+## Scratch and daily maintenance
+
+Run outputs use `~/.local/state/julia-scratch` by default. `JULIA_SCRATCH_DIR` overrides
+the location. The user tmpfiles configuration `~/.config/user-tmpfiles.d/julia-scratch.conf`
+cleans entries untouched for three days. The stock `systemd-tmpfiles-clean.timer` runs daily.
+User lingering is enabled, so user timers continue without a login. Inspect them with
+`systemctl --user list-timers --all` and inspect cleanup with
+`journalctl --user -u systemd-tmpfiles-clean.service`. `julia-trace-fold.timer` and
+`julia-disk-check.timer` also run daily. Their unit files live in `~/.config/systemd/user`.
+The disk check alerts Todd on JUL-185 below 10 GB free through the Julia controller account.
+Inspect its result with `journalctl --user -u julia-disk-check.service`.
+
 ## Mastra Code's trace store
 
 Mastra Code opens its trace store once, at startup, and DuckDB lets one process write a file. A
@@ -109,8 +121,8 @@ first slice of 30 October and nothing said so.
 The launcher at `~/.local/bin/mastracode` (`scripts/mastracode`, installed by
 `node scripts/install-launcher.mjs`) is the one place every session starts from. It gives the launch
 its own file under `~/.local/share/mastracode/traces/<utc stamp>-<pid>.duckdb` through
-`MASTRA_OBSERVABILITY_DB_PATH`, so parallel sessions never share a lock, and before starting it folds
-whatever earlier sessions left behind. `JULIA_TRACES_DIR` moves the directory; `MASTRA_APP_DATA_DIR`
+`MASTRA_OBSERVABILITY_DB_PATH`, so parallel sessions never share a lock. The daily
+`julia-trace-fold.timer` folds finished traces. `JULIA_TRACES_DIR` moves the directory; `MASTRA_APP_DATA_DIR`
 moves it with the rest of the data. `mastracode` on PATH is now the launcher rather than the
 program, so a script that needs the program's own packages reads `MASTRACODE_PROGRAM_DIR` or
 `~/.local/lib/mastracode-program`, never the command's neighbours.
@@ -149,15 +161,13 @@ Deleting a file is what returns the disk. A delete inside a file gives nothing b
 `CHECKPOINT`: on 30 October 52,443 rows were deleted and checkpointed and the file was 5,955,137,536
 B before and after, with 99.9% of it freed blocks the next writes would reuse.
 
-Nothing has to be remembered: no session id, no card, no timer, no list. The scorecard prices a
+The daily timer folds finished traces without a session id or card. The scorecard prices a
 card from every file in that directory, the archive included, and the archive is only as big as
 the cost rows.
 
 `fold` prints one JSON answer and exits 0. When the traces directory is over 15 GB after a fold it
 prints a loud warning and exits 1, and it also exits 1 when it left a trace behind: at either size a
-round was too big or half done, and Todd needs to know. The launcher runs it with `--quiet`, which
-prints only those notes and goes to stderr, so a failed cleanup is said out loud in the session's own
-output instead of vanishing.
+round was too big or half done, and Todd needs to know. Inspect `journalctl --user -u julia-trace-fold.service` for the daily fold result.
 
 DuckDB's default memory limit is 85% of the machine, which on this 7 GB server is 6 GB, and on
 30 October the kernel killed a run at 6.15 GB before it deleted a row. `fold` opens each file with a

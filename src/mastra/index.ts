@@ -1,9 +1,7 @@
 // The Studio entry. Registering the card-path workflow here is what puts it on
 // Studio's run form, and that form is the one place a card is started.
 //
-// `npx mastra dev` is run from the repository root, so the run folder defaults
-// to `.artifacts/flow/studio` there. FLOW_DIR points it somewhere else, and it
-// has to be absolute because the dev server runs from its own output folder.
+// FLOW_DIR overrides the default Studio run folder in the scratch area.
 
 process.env.CMD_API_KEY ??= process.env.COMMANDCODE_API_KEY;
 
@@ -14,8 +12,9 @@ import { openMastra } from '../../machine/flow/mastra.mjs';
 import { CARD_PATH } from '../../machine/flow/schema.mjs';
 import { openScratch } from '../../machine/flow/scratch.mjs';
 import { buildCardPath } from '../../machine/flow/workflow.mjs';
+import { scratchDir } from '../../scripts/scratch-dir.mjs';
 
-const dir = resolve(process.env.FLOW_DIR ?? '.artifacts/flow/studio');
+const dir = resolve(process.env.FLOW_DIR ?? resolve(scratchDir, 'flow', 'studio'));
 
 openScratch(dir);
 const agents = createAgents();

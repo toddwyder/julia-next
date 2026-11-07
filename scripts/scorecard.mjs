@@ -8,10 +8,11 @@ import { DatabaseSync } from 'node:sqlite';
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, statfsSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { homedir, tmpdir } from 'node:os';
+import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { launcherPath } from './install-launcher.mjs';
+import { scratchDir } from './scratch-dir.mjs';
 
 import { isLockedMessage, leftBehindTraces, legacyStoreFile, traceFiles, tracesDir } from './trace-store.mjs';
 
@@ -367,13 +368,14 @@ export async function readTracing(dir, files, threadIds, leftBehind = []) {
     }
     // A running Mastra Code holds its file's lock, so read a copy.
     const fileSize = statSync(file.path).size + (existsSync(`${file.path}.wal`) ? statSync(`${file.path}.wal`).size : 0);
-    const free = statfsSync(tmpdir());
+    mkdirSync(scratchDir, { recursive: true, mode: 0o700 });
+    const free = statfsSync(scratchDir);
     const room = Number(free.bavail) * Number(free.bsize);
     if (!traceCopyFits(fileSize, room)) {
       missed.push(`${file.name} is ${gigabytes(fileSize)} and only ${gigabytes(room)} is free to copy it`);
       continue;
     }
-    const copy = mkdtempSync(join(tmpdir(), 'scorecard-'));
+    const copy = mkdtempSync(join(scratchDir, 'scorecard-'));
     try {
       copyFileSync(file.path, join(copy, 'o.duckdb'));
       if (existsSync(`${file.path}.wal`)) copyFileSync(`${file.path}.wal`, join(copy, 'o.duckdb.wal'));

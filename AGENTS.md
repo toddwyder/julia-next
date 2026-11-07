@@ -32,7 +32,7 @@ A build is done when a run produced a record, not when the builder says it passe
 ## Finish
 A card is finished when its PR is merged to main (after Todd's UAT yes when the card changes something he uses), main CI is green on the merge commit, and the card is Complete in Linear with that commit in a comment.
 
-After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Nothing in the retro touches the trace store: every session writes its own trace file, and the launcher folds finished files into the archive beside them at the next launch, so a slice's prompt payloads leave the disk without anyone remembering and its cost rows stay for the scorecard. `node scripts/trace-store.mjs status` answers the size question. The next slice does not wait for that PR.
+After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Nothing in the retro touches the trace store: every session writes its own trace file, and the daily trace-fold timer folds finished files into the archive beside them, so a slice's prompt payloads leave the disk without anyone remembering and its cost rows stay for the scorecard. `node scripts/trace-store.mjs status` answers the size question. The next slice does not wait for that PR.
 
 ## Enforced rules
 
