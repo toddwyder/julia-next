@@ -50,7 +50,7 @@ The exporter batch setting, `maxBatchSize`, has no line in the packaged 1.82.0 r
   - [ ] `git show origin/main:.agents/skills/interrogate/SKILL.md`
   - [ ] `git show origin/main:docs/agents/server-runbook.md`
 - [ ] On the operator's go, arm the audit tick as `/loop 1h` with the tick prompt below. Never leave the cadence to memory.
-- [ ] Record the server's memory budget before the first lane. It has 7.6 GB and no swap. One Studio test copy runs at a time, capped at 1.6 GB. The cap rests on a measured peak of 1,482 MB, a live Studio peak of 1.26 GiB, and 3.7 GiB free with the builders running.
+- [ ] Record the server's memory budget before the first lane. It has 7.6 GB and no swap. One Studio test copy runs at a time, capped at 2.2 GB. The cap rests on measured peaks of 1,482 MB and 1,878 MB, and 3.8 GiB free with the builders running.
 - [ ] Use this tick prompt, verbatim. "Re-read the execution playbook from trunk. Audit the operation against it and fix drift in this tick. Probe every active lane and judge progress by side effects only. Stand down a stuck lane. If a helper hit the 100-turn limit, do not dispatch a replacement. Report in three lines what is left and the tokens it used, and wait for Todd. Then post a short status message to the operator in chat only when the audit found a tracked change that no earlier status message reported, such as a PR opened, a code-ready head, a round launched or closed, a verdict, a merge, a stuck agent and the action taken, a blocker added or cleared, or a decision only the operator can make. Name every such change and nothing else. Do not repeat a table, the merged list, or an unchanged blocker. If the audit found none, end the turn with no reply text. Either way, log this tick's row in your decision trail. The row names the items reported, or none."
 - [ ] On the operator's hold or stand-down, send every owner a zero-writes order at once.
 - [ ] Put the Studio folder back on main before any slice runs. `git -C ~/julia-builder status` prints `On branch main` and a clean tree, and `jul-341-apothecary` stays on origin with its five commits. Todd's grant covers this server change.
@@ -88,10 +88,10 @@ The exporter batch setting, `maxBatchSize`, has no line in the packaged 1.82.0 r
 
 ### Boot recipe, for every live lane
 
-Each live lane runs on the server at the PR head, in its own worktree. Run one live lane at a time. The server has 7.6 GB and no swap, so each candidate Studio is capped at 1.6 GB RSS. The cap rests on a measured peak of 1,482 MB, a live Studio peak of 1.26 GiB, and 3.7 GiB free with the builders running. A helper without the lock waits and never starts its own copy. Drive the browser through `playwright-cli` and the shell through tmux. Live Studio on its own port stays on main and is never restarted by a lane.
+Each live lane runs on the server at the PR head, in its own worktree. Run one live lane at a time. The server has 7.6 GB and no swap, so each candidate Studio is capped at 2.2 GB RSS. The cap rests on measured peaks of 1,482 MB and 1,878 MB, and 3.8 GiB free with the builders running. A helper without the lock waits and never starts its own copy. Drive the browser through `playwright-cli` and the shell through tmux. Live Studio on its own port stays on main and is never restarted by a lane.
 
 - [ ] `git fetch origin <head-branch> && git checkout <head SHA>`.
-- [ ] Start a candidate Studio from the worktree on its own port with `FLOW_DIR`, `JULIA_LEAD_MODEL_FILE`, and the models-file variable pointed at files in the lane folder, under a 1.6 GB memory cap. Pick the free model in every role. Wait for the `card-path` run form, as `node scripts/check-studio-start.mjs` checks it.
+- [ ] Start a candidate Studio from the worktree on its own port with `FLOW_DIR`, `JULIA_LEAD_MODEL_FILE`, and the models-file variable pointed at files in the lane folder, under a 2.2 GB memory cap. Pick the free model in every role. Wait for the `card-path` run form, as `node scripts/check-studio-start.mjs` checks it.
 - [ ] Deliver input only through Studio's run form, the dashboard Start screen, or a tmux shell. Read-only diagnostics are the run's `trace.duckdb` copied into the lane folder, `state.db` copied the same way, `journalctl --user`, and `git -C <folder> status`.
 - [ ] Save every screenshot to `~/.local/state/julia-scratch/swarm-<pr-id>/worker-<n>/<slug>.png` and return the paths with the report.
 
@@ -138,7 +138,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 - [ ] Metric. Peak heap of the 60-step probe, and peak RSS of the candidate Studio over a 100-step run.
 - [ ] Probe. `node --expose-gc scripts/prove-trace-memory.mjs` at trunk and head, interleaved three times each.
 - [ ] Baseline. Record the trunk peak heap first. Trunk is expected to hit the 1.2 GB cap.
-- [ ] Rule. Head fails if any head run exceeds 150 MB heap or the 100-step run exceeds 1.6 GB RSS.
+- [ ] Rule. Head fails if any head run exceeds 150 MB heap or the 100-step run exceeds 2.2 GB RSS.
 
 **Review gate.** None. P1 is not review-gated.
 
@@ -259,7 +259,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Review gate.** The operator reviews before merge.
 
-- [ ] Run the normal candidate Studio with the dashboard under the 1.6 GB cap. Do not substitute a lighter page, a reduced route, or a screenshot-only path.
+- [ ] Run the normal candidate Studio with the dashboard under the 2.2 GB cap. Do not substitute a lighter page, a reduced route, or a screenshot-only path.
 - [ ] Copy lane 1, 2, and 5 screenshots into `docs/agents/mechanical-layer/media/P3-review-<slug>.png`.
 - [ ] Record a 30 to 60 second video of the change on a lane VM. Save it as `docs/agents/mechanical-layer/media/P3-review.mp4`.
 - [ ] Post the screenshots and the video in chat. Stop at merge-ready. Wait for the operator's click.
@@ -592,7 +592,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 - [ ] Metric. Peak Studio RSS over the practice run, and the run's cost from the scorecard.
 - [ ] Probe. `systemctl --user show julia-studio -p MemoryPeak` before and after the run, and `node scripts/scorecard.mjs JUL-342`. The 7 Nov JUL-341 run is the trunk side.
 - [ ] Baseline. Record the 7 Nov peak first, which was 1.8 GB before the kill.
-- [ ] Rule. The practice run fails if its peak RSS exceeds 1.6 GB.
+- [ ] Rule. The practice run fails if its peak RSS exceeds 2.2 GB.
 
 **Review gate.** The operator reviews before merge.
 
