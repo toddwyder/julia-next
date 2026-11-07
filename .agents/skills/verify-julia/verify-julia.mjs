@@ -4,9 +4,10 @@ import { createHash, randomBytes } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
+import { scratchDir } from '../../../scripts/scratch-dir.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');
-const artifacts = join(root, '.artifacts/verify-julia');
+const artifacts = join(scratchDir, 'verify-julia', createHash('sha256').update(root).digest('hex').slice(0, 16));
 const runFile = join(artifacts, 'run.json');
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
 const playwright = join(root, 'node_modules/playwright/cli.js');
@@ -191,9 +192,9 @@ async function cleanup() {
 }
 
 const [command, ...rest] = process.argv.slice(2);
-const commands = { launch: () => launch(rest), doctor, test: () => test(rest), cleanup };
+const commands = { launch: () => launch(rest), doctor, test: () => test(rest), cleanup, 'run-file': () => console.log(runFile) };
 if (!commands[command]) {
-  console.error('usage: verify-julia.mjs launch [--url <address>] | doctor | test <spec...> | cleanup');
+  console.error('usage: verify-julia.mjs launch [--url <address>] | doctor | test <spec...> | cleanup | run-file');
   process.exit(2);
 }
 try { await commands[command](); } catch (error) { console.error(error.message); process.exitCode = 1; }

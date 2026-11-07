@@ -33,7 +33,7 @@ node scripts/julia-agents.mjs -- npx mastra dev
 
 Run it from the repository root: the CLI looks for `src/mastra/index.ts` there. The server answers on
 `:4111` by default. `FLOW_DIR` is where the run's state (`state.db`) and trace (`trace.duckdb`) are
-written, and it defaults to `~/.local/state/julia-scratch/flow/studio`; set it to an absolute path
+written, and it defaults to `.artifacts/flow/studio` under the repository; set it to an absolute path
 to keep runs apart. The repository the build agent works in is `FLOW_REPO`, default the working
 directory.
 
@@ -46,9 +46,9 @@ A card that waits for Todd is answered from the command line, which reads the ca
 saved snapshot:
 
 ```sh
-node machine/flow/run.mjs status --dir ~/.local/state/julia-scratch/flow/studio --run-id <run id>
-node machine/flow/run.mjs resume --dir ~/.local/state/julia-scratch/flow/studio --run-id <run id> --answer yes
-node machine/flow/run.mjs cost --dir ~/.local/state/julia-scratch/flow/studio
+node machine/flow/run.mjs status --dir .artifacts/flow/studio --run-id <run id>
+node machine/flow/run.mjs resume --dir .artifacts/flow/studio --run-id <run id> --answer yes
+node machine/flow/run.mjs cost --dir .artifacts/flow/studio
 ```
 
 `docs/agents/machine-programs.md` names every program that starts a card or carries a stage, and
@@ -100,9 +100,10 @@ in which case the next timer run does the work.
 
 ## Scratch and daily maintenance
 
-Run outputs use `~/.local/state/julia-scratch` by default. `JULIA_SCRATCH_DIR` overrides
-the location. The user tmpfiles configuration `~/.config/user-tmpfiles.d/julia-scratch.conf`
-cleans entries untouched for three days. The stock `systemd-tmpfiles-clean.timer` runs daily.
+Throwaway copies use `~/.local/state/julia-scratch` by default. Studio run state stays
+in `.artifacts/flow` so a run waiting for Todd can resume after any number of days. The user tmpfiles configuration `~/.config/user-tmpfiles.d/julia-scratch.conf`
+cleans entries untouched for three days. The cleaner does not cover `/tmp`; Ubuntu clears that directory at reboot. The stock
+`systemd-tmpfiles-clean.timer` runs daily.
 User lingering is enabled, so user timers continue without a login. Inspect them with
 `systemctl --user list-timers --all` and inspect cleanup with
 `journalctl --user -u systemd-tmpfiles-clean.service`. `julia-trace-fold.timer` and

@@ -8,7 +8,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scratchDir } from '../../scripts/scratch-dir.mjs';
 
 import { bootHarness, loadMastra, stopHarness } from '../shipping/harness.mjs';
 import { FREE_MODEL, reviewLimitNote, runWithinTimeLimit } from '../shipping/workflow.mjs';
@@ -115,7 +114,7 @@ export async function runRetro({
 }) {
   const { LibSQLStore } = await loadMastra();
   const file = path.join(checkout, retroPath);
-  const storage = new LibSQLStore({ id: storageName, url: `file:${path.join(scratchDir, 'artifacts', 'merge', `pr-${pr}`, `${storageName}.db`)}` });
+  const storage = new LibSQLStore({ id: storageName, url: `file:${path.join(root, '.artifacts', 'merge', `pr-${pr}`, `${storageName}.db`)}` });
   const { booted, session, mastra, requestContext, subagent } = await bootHarness({ cwd: checkout, storage });
   try {
     const task = retroTask({ card, pr, title, mergeCommit, checkout, retroPath, determinations, changed, failed, metrics });

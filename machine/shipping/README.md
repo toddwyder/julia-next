@@ -9,7 +9,7 @@ the run.
 node scripts/julia-agents.mjs -- node machine/shipping/run.mjs --pr 401 --card JUL-305
 ```
 
-`--no-post` writes the determination to `~/.local/state/julia-scratch/artifacts/shipping/pr-<n>/determination.md`
+`--no-post` writes the determination to `.artifacts/shipping/pr-<n>/determination.md`
 instead of commenting. `--model` overrides the model (default is the free Beam
 model below). `--force` reviews and posts again when the saved record already
 covers that commit; without it a rerun reads `record.json` first and stops, so a
@@ -18,7 +18,7 @@ run that died after commenting cannot comment twice.
 ## What happens, in order
 
 1. `run.mjs` fetches `pull/<n>/head` and adds a detached worktree at
-   `~/.local/state/julia-scratch/artifacts/shipping/pr-<n>/worktree`, so the agent reviews the pull
+   `~/.local/state/julia-scratch/shipping/pr-<n>/worktree`, so the agent reviews the pull
    request's code rather than the machine's working copy.
 2. It points `MASTRA_OBSERVABILITY_DB_PATH` at a new trace file under the
    traces directory and `MASTRA_DB_PATH` at a state database inside the run

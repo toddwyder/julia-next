@@ -1,9 +1,10 @@
 // op 2.40.0: https://www.1password.dev/cli/secrets-environment-variables
 // Thin server bootstrap; op owns authentication, reference resolution and masking.
-import { readFileSync,statSync } from 'node:fs'
+import { mkdirSync,readFileSync,statSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { resolve,dirname } from 'node:path'
+import { scratchDir } from './scratch-dir.mjs'
 export const agentsTokenPath='/home/ubuntu/.config/julia-agents/service-account-token'
 const referencesPath=fileURLToPath(new URL('./julia-agents.env',import.meta.url))
 const tokenScript=fileURLToPath(new URL('./linear-token.mjs',import.meta.url))
@@ -16,7 +17,8 @@ export function runAgentsCommand(argv,{tokenPath=agentsTokenPath,environment=pro
   const token=readFileSync(tokenPath,'utf8').trim()
   if(!token)throw Error()
   const env=Object.fromEntries(Object.entries(environment).filter(([key,value])=>!key.startsWith('OP_')&&!fields.has(key)&&!value.startsWith('op://')))
-  Object.assign(env,{OP_SERVICE_ACCOUNT_TOKEN:token,OP_BIOMETRIC_UNLOCK_ENABLED:'false',OP_CACHE:'false'})
+  mkdirSync(scratchDir,{recursive:true})
+  Object.assign(env,{TMPDIR:scratchDir,OP_SERVICE_ACCOUNT_TOKEN:token,OP_BIOMETRIC_UNLOCK_ENABLED:'false',OP_CACHE:'false'})
   const auth=spawnSync('op',['user','get','--me','--format=json'],{env,encoding:'utf8',timeout:30000})
   if(auth.status!==0||auth.error||JSON.parse(auth.stdout).type!=='SERVICE_ACCOUNT')throw Error()
   const child=spawnSync('op',['run','--env-file',referencesPath,'--',process.execPath,tokenScript,'--',...argv],{env,stdio:'inherit',timeout:undefined})

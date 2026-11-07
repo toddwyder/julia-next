@@ -22,6 +22,7 @@ Todd decides what Julia does for the household and gives UAT. Everything else is
 
 ## Server
 - Agents run as ubuntu with admin rights; Todd accepts the risks.
+- Put disposable checkouts, copies, and run artifacts under `~/.local/state/julia-scratch`, including when a skill suggests a different temporary path. Keep Studio run state in `.artifacts/flow`.
 - Commands needing Julia keys: `node scripts/julia-agents.mjs -- <command>`.
 - Before changing the server, read `docs/agents/server-runbook.md`. When a card uses a Julia word you don't know, read [GLOSSARY.md](GLOSSARY.md).
 - Linear holds cards and requirements. GitHub holds code.

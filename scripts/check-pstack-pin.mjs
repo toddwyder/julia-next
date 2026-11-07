@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scratchDir } from './scratch-dir.mjs';
 
 export const MIRROR = 'https://github.com/backnotprop/pstack';
 export const JULIA_SKILLS = new Set([
@@ -104,7 +104,8 @@ export function checkPstackPin(root = process.cwd(), { fetchMirror = cloneMirror
   const pin = readPin(root);
   const problems = [];
 
-  const checkout = mkdtempSync(join(tmpdir(), 'pstack-pin-'));
+  mkdirSync(scratchDir, { recursive: true });
+  const checkout = mkdtempSync(join(scratchDir, 'pstack-pin-'));
   try {
     fetchMirror(pin, checkout);
     problems.push(...compareSkillTrees(

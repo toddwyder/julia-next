@@ -247,6 +247,7 @@ export function prepareMainCheckout({ root, runDir, sha, git }) {
   } catch {
     // Nothing there yet.
   }
+  git(['worktree', 'prune']);
   fs.mkdirSync(runDir, { recursive: true });
   git(['worktree', 'add', '--detach', '--quiet', dir, sha]);
   return dir;

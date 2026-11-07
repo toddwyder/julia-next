@@ -10,7 +10,7 @@ node scripts/julia-agents.mjs -- node machine/remediation/run.mjs --pr 412 --car
 ```
 
 `--no-post` writes every determination, the card note and the stop into
-`~/.local/state/julia-scratch/artifacts/remediation/pr-<n>` instead of commenting, which is how the practice
+`.artifacts/remediation/pr-<n>` instead of commenting, which is how the practice
 runs are made. `--model` sets the Shipping model (default is the free Beam model
 below), `--builder-model` the model a fresh builder or the investigation gets.
 `--force` starts the loop again when the saved record says it already stopped.
@@ -20,7 +20,7 @@ run before it is ended (default 20).
 
 ## What happens, in order
 
-1. `run.mjs` fetches `pull/<n>/head` into `~/.local/state/julia-scratch/artifacts/remediation/pr-<n>/worktree`
+1. `run.mjs` fetches `pull/<n>/head` into `~/.local/state/julia-scratch/remediation/pr-<n>/worktree`
    and reads `record.json` from the last attempt. Rounds that already posted are
    carried forward, so a crash between two reviews cannot post the first
    determination twice.

@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scratchDir } from './scratch-dir.mjs';
 
 export const WORKFLOW = 'card-path';
 export const FORM_FIELDS = ['card', 'kind'];
@@ -66,7 +66,8 @@ async function waitForWorkflows(port, child, log, timeoutMs) {
 }
 
 export async function checkStudioStart({ root = process.cwd(), timeoutMs = 180000, env = process.env, onReady } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'studio-check-'));
+  mkdirSync(scratchDir, { recursive: true });
+  const dir = mkdtempSync(join(scratchDir, 'studio-check-'));
   const port = await freePort();
   const log = { text: '' };
   const child = spawn('npm', ['exec', '--yes', 'mastra@1.38.0', 'dev'], {

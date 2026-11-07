@@ -71,7 +71,8 @@ function traceFileFor(pr, label = 'merge') {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const runDir = path.join(scratchDir, 'artifacts', 'merge', `pr-${args.pr}`);
+  const runDir = path.join(root, '.artifacts', 'merge', `pr-${args.pr}`);
+  const checkoutDir = path.join(scratchDir, 'merge', `pr-${args.pr}`);
   const saved = args.force ? null : readRecord(runDir);
   if (saved?.status === 'finished' && saved.merge?.commit) {
     console.log(`The merge machine already finished ${args.card} on pull request #${args.pr}: ${saved.merge.commit}. Pass --force to run it again.`);
@@ -128,7 +129,7 @@ async function main() {
       })
       .filter(Boolean);
 
-    const artifacts = path.join(scratchDir, 'artifacts');
+    const artifacts = path.join(root, '.artifacts');
     const runDirs = fs.existsSync(artifacts)
       ? fs
           .readdirSync(artifacts)
@@ -150,7 +151,7 @@ async function main() {
       card,
       pr,
       branches,
-      worktrees: worktrees.filter(tree => !tree.path.startsWith(runDir)),
+      worktrees: worktrees.filter(tree => !tree.path.startsWith(checkoutDir)),
       runDirs,
       deadTests,
       currentBranch: git(['rev-parse', '--abbrev-ref', 'HEAD']),
@@ -170,7 +171,7 @@ async function main() {
     merge: ({ pr, head }) => mergePullRequest({ pr, head }),
     deleteBranch: ({ ref }) => deleteRemoteBranch(ref),
     waitMerged: async ({ pr }) => waitForMerged({ pr, read: readPullRequest, log: console.log }),
-    prepareMain: ({ sha }) => prepareMainCheckout({ root, runDir, sha, git }),
+    prepareMain: ({ sha }) => prepareMainCheckout({ root, runDir: checkoutDir, sha, git }),
     waitChecks: ({ pr }) => waitForPullChecks({ pr, log: console.log }),
     waitCi: ({ sha }) => waitForMainCi({ sha, list: mainRunsFor, log: console.log }),
     git,

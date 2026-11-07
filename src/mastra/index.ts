@@ -1,7 +1,7 @@
 // The Studio entry. Registering the card-path workflow here is what puts it on
 // Studio's run form, and that form is the one place a card is started.
 //
-// FLOW_DIR overrides the default Studio run folder in the scratch area.
+// FLOW_DIR overrides the durable Studio run folder under .artifacts/flow.
 
 process.env.CMD_API_KEY ??= process.env.COMMANDCODE_API_KEY;
 
@@ -12,9 +12,8 @@ import { openMastra } from '../../machine/flow/mastra.mjs';
 import { CARD_PATH } from '../../machine/flow/schema.mjs';
 import { openScratch } from '../../machine/flow/scratch.mjs';
 import { buildCardPath } from '../../machine/flow/workflow.mjs';
-import { scratchDir } from '../../scripts/scratch-dir.mjs';
 
-const dir = resolve(process.env.FLOW_DIR ?? resolve(scratchDir, 'flow', 'studio'));
+const dir = resolve(process.env.FLOW_DIR ?? '.artifacts/flow/studio');
 
 openScratch(dir);
 const agents = createAgents();

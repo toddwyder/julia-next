@@ -66,8 +66,8 @@ async function main() {
   }
 
   const root = repoRoot;
-  const runDir = path.join(scratchDir, 'artifacts', 'remediation', `pr-${options.pr}`);
-  const checkout = path.join(runDir, 'worktree');
+  const runDir = path.join(root, '.artifacts', 'remediation', `pr-${options.pr}`);
+  const checkout = path.join(scratchDir, 'remediation', `pr-${options.pr}`, 'worktree');
   const modelId = options.model ?? FREE_MODEL;
   const builderModel = options.builderModel ?? BUILDER_MODEL;
 

@@ -17,6 +17,10 @@ if [ ! -x "$real" ]; then
   exit 1
 fi
 
+TMPDIR="$HOME/.local/state/julia-scratch"
+mkdir -p "$TMPDIR" || exit 1
+export TMPDIR
+
 traces="${JULIA_TRACES_DIR:-${MASTRA_APP_DATA_DIR:-$HOME/.local/share/mastracode}/traces}"
 mkdir -p "$traces" || exit 1
 JULIA_TRACES_DIR="$traces"
