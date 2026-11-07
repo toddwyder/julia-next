@@ -25,4 +25,12 @@ Locked sketch: .impeccable/mocks/decision/library-locked.html (desktop first scr
 - A–Z strip down the right edge to jump by letter; letters with no recipes greyed.
 - Rejected along the way: grids and multi-column layouts (scan across then back is slow), Score/GL on entries.
 
-Open: how many key ingredients per entry; phone layout beyond the locked top bar.
+Settled (Todd, 6 Nov 2026): each entry shows 4 key ingredients, chosen as what makes the dish distinctive, never staples such as salt, eggs or sugar; fewer when a recipe has fewer. On phone the main menu (Library, Lab, Menus, Prep List, Shopping List) is a bar at the bottom of the screen, the top bar shows only the logo, and Import and Add recipe are buttons under the search box (they are commands, not navigation).
+
+## Direction contract
+THESIS: Find a known recipe in seconds by typing, or browse by title then ingredients. Refuses grids and cards.
+OWN-WORLD: The recipe page's world and palette. Each recipe a jar label in one centred column under madder italic letter heads.
+STORY: The visitor types and the list narrows as they type, or jumps by letter and picks by title and ingredients.
+FIRST VIEWPORT (desktop): sage bar with logo, main menu (current underlined), Import (outline) and Add recipe (madder) at right; search on top with the Under 30 minutes switch; Recently opened flap; the column with title left, time and servings right, 4 distinctive key ingredients in italic beneath; A–Z strip on the right edge. Phone: main menu in a bottom bar; Import and Add recipe under the search box.
+FORM: the locked sketch, seed:b5c9d9efefdbbeb1.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance

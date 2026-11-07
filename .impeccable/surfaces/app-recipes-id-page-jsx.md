@@ -9,8 +9,8 @@ Job: Todd cooks at the stove on phone or tablet, sometimes reads or preps first;
 Success: one glance at the current step shows what to do and how much of each ingredient; no scrolling between ingredients and steps.
 Look: locked 6 Nov 2026 (see Selected direction). Used, well-loved vintage cookbook, homage to Julia Child ("established 1961" = Mastering the Art of French Cooking); light paper, not monotone; no photos; no dark backgrounds; no pink; no forest green with terracotta; large high-contrast text readable from arm's length. Not the cream-paper-plus-serif default.
 Scope: this page, phone and tablet first; Cook mode stays. Keep servings stepper, imperial/metric, Start Cooking Mode, Import to Shopping List, nutrition panel (score and glycemic load always shown as estimates), Share, Edit, Riff. Cooking content leads; nutrition, Share, Edit, Riff sit out of the way. The top bar uses the locked Julia logo.
-Ranges: 5–30 ingredients, 3–20 steps; some recipes link steps to their ingredients, some don't, both must work; servings 1 to 75+, amounts rescale; long titles and steps; notes and source. Text arrives with HTML entities ("it&#8217;s") that must display as characters.
-Layout: every recipe shows its complete ingredient list at the top, so browsing sees everything without scrolling into the steps. Each step also shows its own ingredients and amounts above its instruction (never in a narrow left column); the repetition is intended. Unlinked recipes keep the full list one tap away from any step on phone and beside the steps on tablet.
+Ranges: 5–30 ingredients, 3–20 steps; every recipe is linked; servings 1 to 75+, amounts rescale; long titles and steps; notes and source. Text arrives with HTML entities ("it&#8217;s") that must display as characters.
+Layout: every recipe shows its complete ingredient list at the top, so browsing sees everything without scrolling into the steps. Each step also shows its own ingredients and amounts above its instruction (never in a narrow left column); the repetition is intended.
 Taste evidence: liked boxed steps, a warm paper background, paper over dark; disliked black backgrounds, all-same looks, forest green/terracotta, pink, monotone, modern feel.
 
 ## Selected direction (locked by Todd, 6 Nov 2026; seed:c5295090e4f5cfb5)
@@ -28,4 +28,12 @@ Locked sketch: .impeccable/mocks/decision/recipe-page-locked.html (phone first s
 - Reading text sits on clean paper; decoration lives only in the frame (top bar, section heads, labels).
 - Removed at Todd's request: the step-number marker on each ingredient in the full list.
 
-Open: where nutrition lives; exact phone behaviour for unlinked recipes; navigation (designed with the library page).
+Settled (Todd, 6 Nov 2026): nutrition sits open at the bottom of the page, after the steps. Every recipe is linked (steps carry their ingredients), so the page has no unlinked case. On phone the main menu is a bottom bar (see the library brief).
+
+## Direction contract
+THESIS: A cooking page where every step carries its own ingredients and amounts, so the cook never scrolls between list and step. Refuses the default of one list on top and bare steps below.
+OWN-WORLD: Apothecary, 1750, a used household receipt book. Parchment ground, umber ink, madder for step numbers and Start cooking, sage for top bar, heads and label borders. Each step's ingredients in a jar label: sage double border, pointed ends, plain paper inside. IM Fell English titles; Libre Caslon Text reading text at arm's-length size. Engraved ingredient pictures in the full list. No photos, no dark backgrounds.
+STORY: At a glance the cook sees what this step needs and how much, scaled to the chosen servings, and where they stopped.
+FIRST VIEWPORT (phone): sage bar with logo; back to Library; title; servings stepper; US/Metric; Start cooking (primary); Add to shopping list; full ingredient list on a parchment panel with pictures and right-aligned amounts; then steps, each label above its instruction, "you stopped here" marked. Nutrition open at the bottom. Main menu in a bottom bar.
+FORM: the locked sketch, seed:c5295090e4f5cfb5.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
