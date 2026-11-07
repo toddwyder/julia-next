@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { scratchDir } from '../../../scripts/scratch-dir.mjs';
@@ -83,6 +83,9 @@ async function launch(args) {
   } else {
     const port = await freePort();
     const distDir = join('.next', 'verify-julia', runId);
+    mkdirSync(join(root, '.next', 'verify-julia'), { recursive: true });
+    mkdirSync(join(evidenceDir, 'next'), { recursive: true });
+    symlinkSync(join(evidenceDir, 'next'), join(root, distDir), 'dir');
     let emulators = { state: 'reused', pid: null };
     if (!(await emulatorsReady())) {
       const emulatorLog = openSync(join(evidenceDir, 'emulators.log'), 'a');
