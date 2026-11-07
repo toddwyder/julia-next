@@ -6,10 +6,10 @@ Build the locked Apothecary library and recipe pages on the preview so Todd and 
 
 ## Feature checklist
 
-- [ ] 1. `how` over the affected subsystem.
-- [ ] 2. `architect` for parallel design exploration.
-- [ ] 3. Write the throughput checkpoint as four todo items.
-- [ ] 4. Delegate code-writing to a subagent using your configured feature model with a specific scope.
+- [x] 1. `how` over the affected subsystem.
+- [x] 2. `architect` for parallel design exploration.
+- [x] 3. Write the throughput checkpoint as four todo items.
+- [x] 4. Delegate code-writing to a subagent using your configured feature model with a specific scope.
 - [ ] 5. Verify on the matching surface.
 - [ ] 6. Rebase into small, ordered commits. Stack follow-ups.
 - [ ] 7. If the design is contested, `interrogate` before shipping.
