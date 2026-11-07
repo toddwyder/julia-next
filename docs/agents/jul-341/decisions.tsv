@@ -1,0 +1,4 @@
+ts	phase	decision	why	evidence	result
+2026-11-07T15:31:57Z	start	Build the locked pages and stop before Shipping	The requested handoff is an up-to-date pull request, not a merge	docs/agents/jul-341/build.md	open
+2026-11-07T15:31:57Z	scope	Use the card basket override and preserve both locked directions	Todd settled the design on 6 and 7 November; the card replaces per-ingredient pictures	.impeccable/surfaces/app-recipes-id-page-jsx.md	open
+2026-11-07T15:31:57Z	tooling	Run local Codex design workers after routed helpers returned no result	The exposed helper calls returned no report or artifact; available CLI models can perform the work	.artifacts/jul-341/design-a.log	open
