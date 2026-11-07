@@ -15,6 +15,7 @@ Julia uses pstack (adopted 22 October 2026). pstack builds and proves. This file
 
 ## Todd
 Todd decides what Julia does for the household and gives UAT. Everything else is yours: decide it and record it in the decision log. When a step truly needs his own account, show that nothing else can do it, reduce it to one approval he clicks, and keep working while it is pending.
+Todd gives every builder session pstack's full-autonomy grant. It pre-approves deleting server files and folders from finished or closed work, changing server configuration and schedulers, and merging to main once required checks pass. Bring Todd only decisions about what Julia does for the household, UAT, steps requiring his own account, and deletion of household data.
 
 - A turn ends finished or blocked on a named decision he can answer from the message; never on a progress line.
 - An approval with conditions is one open item per condition, quoted as he wrote it, closed only with evidence.
