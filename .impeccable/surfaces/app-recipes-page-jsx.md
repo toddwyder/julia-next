@@ -14,11 +14,15 @@ Layout: search box is the primary control, results update as you type; one colum
 
 ## Selected layout (locked by Todd, 6 Nov 2026; seed:b5c9d9efefdbbeb1)
 Locked sketch: .impeccable/mocks/decision/library-locked.html (desktop first screen, 1440x900; the composition the build matches).
-- "Folded page": sage top bar with the main menu (Library, Lab, Menus, Prep List, Shopping List; current one underlined), Import (outline) and Add recipe (madder) at the right. "Julia" is a stand-in for the logo.
+- "Folded page": sage top bar with the main menu (Library, Lab, Menus, Prep List, Shopping List; current one underlined), Import (outline) and Add recipe (madder) at the right. The locked Julia logo sits at the left.
+- Logo lock, 7 Nov 2026. The sage top bar is about 112px tall on desktop and 76px on phone. The locked logo sits at the left, with its aspect ratio preserved.
+- Top-bar logo: `.impeccable/mocks/logo/final/julia-logo-cream-on-sage.png`.
+- Browser-tab icon: `.impeccable/mocks/logo/final/julia-tab-icon.png`.
+- Spare for parchment backgrounds: `.impeccable/mocks/logo/final/julia-logo-umber-on-parchment.png`.
 - Search on top ("What shall we cook? Search titles, ingredients or source…") with the Under 30 minutes switch beside it.
 - Recently opened is a page flap under the search that folds up and down, listing the last 5 recipes opened.
 - One centred column of jar labels (sage double border, pointed ends, plain paper inside) under madder italic letter heads; title left, time and servings right; key ingredients on a second line in italic.
 - A–Z strip down the right edge to jump by letter; letters with no recipes greyed.
 - Rejected along the way: grids and multi-column layouts (scan across then back is slow), Score/GL on entries.
 
-Open: how many key ingredients per entry; phone layout; logo (its own round).
+Open: how many key ingredients per entry; phone layout beyond the locked top bar.

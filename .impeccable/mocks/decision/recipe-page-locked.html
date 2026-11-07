@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/png" href="../logo/final/julia-tab-icon.png">
 <title>LOCKED · Julia recipe page — direction A in the drawings' colours</title>
 <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Alegreya:ital,wght@0,400;0,700;1,400&family=Alegreya+SC:wght@500;700&family=Libre+Franklin:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -39,8 +40,10 @@
 
   /* ---------- A: Apothecary jar labels (Delft) ---------- */
   .A { background:var(--ground); color:var(--ink); font-family:"Libre Caslon Text", Georgia, serif; font-size:19px; line-height:1.5; }
-  .A .mast { display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-bottom:2px solid var(--frame); font-family:"IM Fell English SC", serif; font-size:19px; color:var(--frame); letter-spacing:.06em; }
-  .A .mast b { font-family:"IM Fell English", serif; font-style:italic; font-weight:400; font-size:26px; letter-spacing:0; }
+  .A .mast { display:flex; justify-content:space-between; align-items:center; height:112px; padding:0 18px; border-bottom:2px solid var(--frame); font-family:"IM Fell English SC", serif; font-size:19px; color:var(--frame); letter-spacing:.06em; }
+  .A .mast .logo { display:block; width:auto; height:80px; }
+  .phone .A .mast { height:76px; }
+  .phone .A .mast .logo { height:52px; }
   .A .head { padding:18px 18px 6px; text-align:center; }
   .A .crumb { font-family:"IM Fell English SC"; font-size:19px; color:var(--frame); }
   .A h3 { font-family:"IM Fell English", serif; font-weight:400; font-size:34px; line-height:1.1; margin:6px 0 12px; }
@@ -83,7 +86,7 @@
 
 /* page-scale colour */
 .A .mast { background:var(--band); color:var(--bandtext); border-bottom:4px solid var(--bandrule); }
-.A .mast b, .A .mast span { color:var(--bandtext); }
+.A .mast span { color:var(--bandtext); }
 .A .shelf { background:var(--panel); padding:6px 10px; border-radius:6px; border:1.5px solid var(--frame); }
 .A .shelf li { border-bottom-color:var(--panelrule); }
 .A .label { background:var(--wash); border-width:2.5px; }
@@ -97,8 +100,8 @@
 .v3 .label { border-color:#6f7c5a; border-width:3px; box-shadow:0 0 0 4px var(--ground), 0 0 0 6px #6f7c5a; }
 .v3 .label:before, .v3 .label:after { border-color:#6f7c5a; }
 .v3 .here .label { box-shadow:0 0 0 4px var(--ground), 0 0 0 6px #6f7c5a, 0 0 0 11px #a24f3f; }
-</style></head><body><div class="wrap"><h1 class="top">Recipe page — locked direction (6 Nov 2026)</h1><p class="lede">Apothecary, 1750 · palette 3 (umber, madder, sage). Phone first screen and first steps. Top bar is a stand-in: navigation is designed with the library page; logo has its own round.</p><div class="phonewrap"><div class="phone"><div class="screen A v3">
-      <div class="mast"><b>Julia</b><span>Library</span></div>
+</style></head><body><div class="wrap"><h1 class="top">Recipe page — locked direction (6 Nov 2026)</h1><p class="lede">Apothecary, 1750 · palette 3 (umber, madder, sage). Phone first screen and first steps. Locked logo in the 76px sage phone bar. The desktop bar is 112px. Navigation is designed with the library page.</p><div class="phonewrap"><div class="phone"><div class="screen A v3">
+      <div class="mast"><img class="logo" src="../logo/final/julia-logo-cream-on-sage.png" width="770" height="244" alt="Julia"><span>Library</span></div>
       <div class="head">
         <div class="crumb">← Library</div>
         <h3>Homemade Artisan Crackers</h3>
