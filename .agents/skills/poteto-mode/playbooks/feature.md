@@ -1,5 +1,7 @@
 ### Feature
 
+A helper reports its token spend.
+
 **You own the design. Plan, review, verify.** Delegate implementation. Stay in the lead.
 
 1. `how` over the affected subsystem.
