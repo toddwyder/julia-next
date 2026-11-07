@@ -17,7 +17,7 @@ Julia's user features. Each file says what the feature is, how a user reaches it
 2. Load the run into the shell and define the browser shortcut:
 
    ```bash
-   eval "$(node -e 'const r=require("./.artifacts/verify-julia/run.json");console.log(`RUN_URL=${r.url} RUN_SESSION=${r.session} EVIDENCE=${r.evidenceDir}`)')"
+   eval "$(node -e 'const r=require(process.argv[1]);console.log(`RUN_URL=${r.url} RUN_SESSION=${r.session} EVIDENCE=${r.evidenceDir}`)' "$(node .agents/skills/verify-julia/verify-julia.mjs run-file)")"
    pw() { npx --no-install playwright cli "-s=$RUN_SESSION" "$@"; }
    ```
 

@@ -14,10 +14,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scratchDir } from '../../scripts/scratch-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..', '..');
-const runDir = path.join(repoRoot, '.artifacts', 'stock-workflow-proof');
+const runDir = path.join(scratchDir, 'stock-workflow-proof');
 
 const TIME_LIMIT_MS = 10 * 60_000;
 const COST_LIMIT_USD = 0.5;

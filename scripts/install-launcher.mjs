@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Points `mastracode` on PATH at scripts/mastracode, which gives every session its own trace
-// file and folds the sessions that have finished. That path is first on PATH, so it catches
+// file. The daily trace-fold timer folds finished sessions. That path is first on PATH, so it catches
 // every launcher: a shell, the dashboard, and a lane started by scripts/lanes.mjs.
 //
 //   node scripts/install-launcher.mjs

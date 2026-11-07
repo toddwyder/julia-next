@@ -1,8 +1,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scratchDir } from './scratch-dir.mjs';
 import { JULIA_SKILLS } from './check-pstack-pin.mjs';
 
 function vendored(path) {
@@ -83,7 +83,8 @@ export function runOwnedTests(environment, { root = process.cwd(), plan = testOw
     const files = owner.tests[environment];
     if (!files.length) continue;
     console.log(JSON.stringify({ owner: owner.directory, lockfile: owner.lockfile, runtime: owner.runtime, environment, tests: files }));
-    const directory = mkdtempSync(join(tmpdir(), 'test-owners-report-'));
+    mkdirSync(scratchDir, { recursive: true });
+    const directory = mkdtempSync(join(scratchDir, 'test-owners-report-'));
     const report = join(directory, 'results.xml');
     try {
       if (environment === 'browser') {

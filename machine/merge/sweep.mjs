@@ -55,6 +55,7 @@ export function deadTestFiles({ files = [], read, exists }) {
 
 export function sweepPlan({
   root,
+  artifacts = path.join(root, '.artifacts'),
   card,
   pr,
   branches = [],
@@ -64,7 +65,6 @@ export function sweepPlan({
   currentBranch = 'main',
   mergedHead = null,
 }) {
-  const artifacts = path.join(root, '.artifacts');
   const removeBranches = [];
   const keep = [];
   const noticed = [];
@@ -98,7 +98,7 @@ export function sweepPlan({
       continue;
     }
     if (branchBelongsToCard(tree.branch ?? '', card)) {
-      noticed.push({ what: `worktree ${tree.path}`, why: `on branch ${tree.branch}, which carries the card id but lives outside .artifacts` });
+      noticed.push({ what: `worktree ${tree.path}`, why: `on branch ${tree.branch}, which carries the card id but lives outside the artifacts directory` });
     }
   }
 
@@ -106,7 +106,7 @@ export function sweepPlan({
   for (const dir of runDirs) {
     const inside = dir === artifacts || dir.startsWith(`${artifacts}${path.sep}`);
     if (!inside) {
-      noticed.push({ what: dir, why: 'outside .artifacts, so the machine will not remove it' });
+      noticed.push({ what: dir, why: 'outside the artifacts directory, so the machine will not remove it' });
       continue;
     }
     if (path.basename(dir) !== `pr-${pr}`) {

@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { postComment, prepareCheckout, repoRoot, savedPosting, traceFileFor } from './run-parts.mjs';
+import { scratchDir } from '../../scripts/scratch-dir.mjs';
 
 const USAGE = `usage: node machine/shipping/run.mjs --pr <number> --card <JUL-number> [--model <id>] [--no-post] [--force]`;
 
@@ -38,7 +39,7 @@ function parseArgs(argv) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const runDir = path.join(repoRoot, '.artifacts', 'shipping', `pr-${options.pr}`);
-  const checkout = path.join(runDir, 'worktree');
+  const checkout = path.join(scratchDir, 'shipping', `pr-${options.pr}`, 'worktree');
 
   console.log(`Fetching pull request #${options.pr} and checking it out at ${checkout}.`);
   const sha = prepareCheckout(options.pr, runDir, checkout);

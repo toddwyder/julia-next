@@ -20,7 +20,7 @@ run before it is ended (default 20).
 
 ## What happens, in order
 
-1. `run.mjs` fetches `pull/<n>/head` into `.artifacts/remediation/pr-<n>/worktree`
+1. `run.mjs` fetches `pull/<n>/head` into `~/.local/state/julia-scratch/remediation/pr-<n>/worktree`
    and reads `record.json` from the last attempt. Rounds that already posted are
    carried forward, so a crash between two reviews cannot post the first
    determination twice.

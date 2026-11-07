@@ -14,10 +14,11 @@
 // One boot per process. Two copies of @mastra/core must never share a process,
 // so the check takes one program directory and stops there.
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scratchDir } from './scratch-dir.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -66,7 +67,8 @@ async function main(argv) {
   // module load, so the environment is set before the import, the way
   // machine/shipping/run.mjs does it. The paths point into a fresh temp
   // directory so a check never writes the store a live run is reading.
-  const tempDir = mkdtempSync(join(os.tmpdir(), 'check-machine-builder-'));
+  mkdirSync(scratchDir, { recursive: true });
+  const tempDir = mkdtempSync(join(scratchDir, 'check-machine-builder-'));
   process.env.MASTRACODE_PROGRAM_DIR = dir;
   process.env.MASTRA_DB_PATH = join(tempDir, 'state.db');
   process.env.MASTRA_OBSERVABILITY_DB_PATH = join(tempDir, 'trace.db');

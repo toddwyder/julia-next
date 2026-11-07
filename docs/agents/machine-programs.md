@@ -9,7 +9,7 @@ of any size, not only a change to the sentence beside it.
 
 | Program | What it does | sha256 |
 | --- | --- | --- |
-| `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `b239f12a16969757e4aaa8a8a7fbd8743c836ca3566fbee54c8da62dcd46bfac` |
+| `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `6dccaeea1b2ecfe0b390741e92db5554bbaac61495272e0e75178c9b740eaae0` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `7501664a0b3774a5ac48b0628c40f9b1157703d1b2c2b94eb589fdde1f0b5e49` |
 | `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `e4a38ba53e9a0180be91361923745ffc7dec12c4c471a5f450eb2eaf3fa3354d` |
 | `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `36be31f65368be87543f3f94cbd1199a85503eeb201c4090e61a2cfaabd77e6d` |
@@ -21,4 +21,4 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `298f6ebccd36e74f737eec0f651fb6bbafe4f0c5fe7aa5bfd3d874b3e2d298f2` |
 | `machine/flow/run.mjs` | Answers a waiting card, reads a run, writes its cost. No way to start one. | `6a76edaa92fdbadfbb55dd581e77c2556b33f9ccb4744c89e5fded579ab36e44` |
 | `machine/flow/trace.mjs` | Turns the trace file into the run cost record. | `38e5e5c9c3497e0f1ea05f0a6eb89910262ca487b5dfdce03adfc23f9679ba1b` |
-| `scripts/julia-agents.mjs` | Runs a machine command with the Julia keys it needs. | `bd636b6ff3b9135b418a8056b1bd70fc9a5d227c8a17e3d3ca4919cc67040570` |
+| `scripts/julia-agents.mjs` | Runs a machine command with the Julia keys it needs. | `20eab0f08a59b8ba2651d9feac811bcf0d57fd86b9a079ceebf471c417abc3e5` |

@@ -9,7 +9,7 @@ Julia is a Next.js web app. Its user surface is the home page (`/`), the install
 
 The dashboard is a second Next.js app in `dashboard/`. Its surfaces are the Ready list (`/`), the Start screen (`/start/<card>`) and the health address (`/api/health`), which is a machine check. It has its own dependencies and its own service, so `launch` below, which builds and serves the cookbook at the repository root, does not drive it. Start it from `dashboard/` the way its service does (`npm ci && npm run build`, then `node server.js` with `DASHBOARD_HOST`, `DASHBOARD_PORT` and `DASHBOARD_STATE_DIR` set), and drive it and keep the proof the same way. Its lane runner is `dashboard/scripts/lanes.mjs`.
 
-All commands run in bash from the repository root. Each command below reads the active run from `.artifacts/verify-julia/run.json`, so a new shell picks the run back up.
+All commands run in bash from the repository root. Each command below reads the active run from the scratch run file, so a new shell picks the run back up.
 
 ## Launch
 
@@ -18,10 +18,10 @@ Start one run. On a fresh checkout with no `node_modules`, launch runs `npm ci` 
 ```bash
 node .agents/skills/verify-julia/verify-julia.mjs launch                 # local candidate
 node .agents/skills/verify-julia/verify-julia.mjs launch --url https://<preview-address>/   # a deployed build
-eval "$(node -e 'const r=require("./.artifacts/verify-julia/run.json");console.log(`RUN_URL=${r.url} RUN_SESSION=${r.session} EVIDENCE=${r.evidenceDir}`)')"
+eval "$(node -e 'const r=require(process.argv[1]);console.log(`RUN_URL=${r.url} RUN_SESSION=${r.session} EVIDENCE=${r.evidenceDir}`)' "$(node .agents/skills/verify-julia/verify-julia.mjs run-file)")"
 ```
 
-Local launch picks a free port on 127.0.0.1, starts `next dev` in its own process group with its own `.next/verify-julia/<run>` output folder, and logs to `$EVIDENCE/server.log`. So it runs beside any other Julia server, including one on port 3000. Local launch also starts the Auth and Firestore emulators through `scripts/firebase-emulators.mjs`, logging to `$EVIDENCE/emulators.log`, unless both emulator ports already answer, in which case it reuses them and leaves them running at Cleanup. The emulator ports are fixed at 127.0.0.1:8080 and 127.0.0.1:9099, so one local run at a time. Remote launch starts nothing.
+Local launch picks a free port on 127.0.0.1, starts `next dev` in its own process group with output in `$EVIDENCE/next`, and logs to `$EVIDENCE/server.log`. So it runs beside any other Julia server, including one on port 3000. Local launch also starts the Auth and Firestore emulators through `scripts/firebase-emulators.mjs`, logging to `$EVIDENCE/emulators.log`, unless both emulator ports already answer, in which case it reuses them and leaves them running at Cleanup. The emulator ports are fixed at 127.0.0.1:8080 and 127.0.0.1:9099, so one local run at a time. Remote launch starts nothing.
 
 Launch returns only when Julia is usable: both emulators answer, `/api/health` answers `{"status":"ok"}` and `/` returns 200 with a `<main>` element. The first local compile takes about 10 to 30 seconds and the emulators about 20, so a first launch can take 40; the limit is 120 seconds. If Julia is not usable by then, including a `--url` that cannot be reached, launch exits 1 with `Julia did not become usable at <url>` and the last probe result. Launch writes `$EVIDENCE/launch.json` before it waits, and again with the readiness result, with the run ID, URL, browser session name, commit, branch, dirty flag, worktree SHA-256, and Node, Next.js and Playwright versions. It refuses to start while another run is active; run Cleanup first. If launch is interrupted or fails, run Cleanup: it stops the server and emulators launch started and keeps the evidence.
 
@@ -63,7 +63,7 @@ Each call appends its command, output and exit code to `$EVIDENCE/playwright-tes
 
 ## Evidence
 
-Everything goes in `$EVIDENCE` (`.artifacts/verify-julia/<run-id>/`, git-ignored). A proof includes:
+Everything goes in `$EVIDENCE` under `~/.local/state/julia-scratch/verify-julia/` by default. A proof includes:
 
 - `launch.json` and `doctor.json`, which say which build was checked.
 - For each step, the action and what changed: the snapshot or text saved before and after, and a screenshot of the result.

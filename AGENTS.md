@@ -22,6 +22,7 @@ Todd decides what Julia does for the household and gives UAT. Everything else is
 
 ## Server
 - Agents run as ubuntu with admin rights; Todd accepts the risks.
+- Put disposable checkouts, copies, and run artifacts under `~/.local/state/julia-scratch`, including when a skill suggests a different temporary path. Keep Studio run state in `.artifacts/flow`.
 - Commands needing Julia keys: `node scripts/julia-agents.mjs -- <command>`.
 - Before changing the server, read `docs/agents/server-runbook.md`. When a card uses a Julia word you don't know, read [GLOSSARY.md](GLOSSARY.md).
 - Linear holds cards and requirements. GitHub holds code.
@@ -32,7 +33,7 @@ A build is done when a run produced a record, not when the builder says it passe
 ## Finish
 A card is finished when its PR is merged to main (after Todd's UAT yes when the card changes something he uses), main CI is green on the merge commit, and the card is Complete in Linear with that commit in a comment.
 
-After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Nothing in the retro touches the trace store: every session writes its own trace file, and the launcher folds finished files into the archive beside them at the next launch, so a slice's prompt payloads leave the disk without anyone remembering and its cost rows stay for the scorecard. `node scripts/trace-store.mjs status` answers the size question. The next slice does not wait for that PR.
+After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Nothing in the retro touches the trace store: every session writes its own trace file, and the daily trace-fold timer folds finished files into the archive beside them, so a slice's prompt payloads leave the disk without anyone remembering and its cost rows stay for the scorecard. `node scripts/trace-store.mjs status` answers the size question. The next slice does not wait for that PR.
 
 ## Enforced rules
 

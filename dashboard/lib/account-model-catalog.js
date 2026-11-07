@@ -1,9 +1,11 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 export async function listAccountModels(createController, cwd) {
-  const directory = mkdtempSync(join(tmpdir(), 'julia-model-catalog-'));
+  const scratch = join(homedir(), '.local', 'state', 'julia-scratch');
+  mkdirSync(scratch, { recursive: true });
+  const directory = mkdtempSync(join(scratch, 'julia-model-catalog-'));
   let storage;
   try {
     const created = await createController({

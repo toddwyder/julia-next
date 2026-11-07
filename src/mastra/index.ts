@@ -1,9 +1,7 @@
 // The Studio entry. Registering the card-path workflow here is what puts it on
 // Studio's run form, and that form is the one place a card is started.
 //
-// `npx mastra dev` is run from the repository root, so the run folder defaults
-// to `.artifacts/flow/studio` there. FLOW_DIR points it somewhere else, and it
-// has to be absolute because the dev server runs from its own output folder.
+// FLOW_DIR overrides the durable Studio run folder under .artifacts/flow.
 
 process.env.CMD_API_KEY ??= process.env.COMMANDCODE_API_KEY;
 

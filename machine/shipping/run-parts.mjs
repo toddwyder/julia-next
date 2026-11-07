@@ -32,6 +32,7 @@ export function prepareCheckout(pr, runDir, checkout) {
     // Prune is tidiness; a stale registration fails the add with a clear message.
   }
   fs.mkdirSync(runDir, { recursive: true });
+  fs.mkdirSync(path.dirname(checkout), { recursive: true });
   git(['worktree', 'add', '--detach', '--quiet', checkout, sha]);
   return sha;
 }

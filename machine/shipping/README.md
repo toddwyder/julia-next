@@ -18,7 +18,7 @@ run that died after commenting cannot comment twice.
 ## What happens, in order
 
 1. `run.mjs` fetches `pull/<n>/head` and adds a detached worktree at
-   `.artifacts/shipping/pr-<n>/worktree`, so the agent reviews the pull
+   `~/.local/state/julia-scratch/shipping/pr-<n>/worktree`, so the agent reviews the pull
    request's code rather than the machine's working copy.
 2. It points `MASTRA_OBSERVABILITY_DB_PATH` at a new trace file under the
    traces directory and `MASTRA_DB_PATH` at a state database inside the run

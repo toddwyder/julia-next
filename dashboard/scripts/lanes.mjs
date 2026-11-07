@@ -9,15 +9,16 @@
 import { spawn } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { homedir } from 'node:os';
 import { setTimeout as sleep } from 'node:timers/promises';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const LANES = '/tmp/jul-284-lanes';
+const LANES = join(homedir(), '.local', 'state', 'julia-scratch', 'jul-284-lanes');
 // A --url run proves someone else's build, so its screenshots must not overwrite the ones this
 // branch ships for its own build.
-const SHOTS = process.argv.includes('--url') ? '/tmp/jul-284-lanes/live' : join(ROOT, 'docs/scorecards/jul-276/pr-4');
+const SHOTS = process.argv.includes('--url') ? join(LANES, 'live') : join(ROOT, 'docs/scorecards/jul-276/pr-4');
 const MODELS = '/var/lib/julia-dashboard/state/models.json';
 const PORT_BASE = 3114;
 const CARD = 'JUL-280';
