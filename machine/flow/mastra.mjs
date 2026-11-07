@@ -3,10 +3,21 @@
 // so a model call can be found by the card it served.
 
 import { Mastra } from '@mastra/core';
+import { SpanType } from '@mastra/core/observability';
 import { MastraCompositeStore } from '@mastra/core/storage';
 import { DuckDBStore } from '@mastra/duckdb';
 import { LibSQLStore } from '@mastra/libsql';
 import { MastraStorageExporter, Observability } from '@mastra/observability';
+
+// A long build stores one span per model step, and each span's input carries the
+// prompt so far, so unbounded strings cost the square of the step count. Two
+// thousand characters keeps a tool result readable in the trace without keeping
+// the whole of it.
+export const MAX_STRING_LENGTH = 2000;
+
+// The stock error processors log the whole prompt at every step, and their spans
+// are what grew fastest on 7 Nov. Nothing reads them back.
+const EXCLUDED_SPAN_TYPES = [SpanType.PROCESSOR_RUN];
 
 export const cardStamper = card => ({
   name: 'card-stamper',
@@ -34,6 +45,8 @@ export async function openMastra({ card, agents, workflow, stateDb, traceDb }) {
           serviceName: 'jul-336-card-path',
           exporters: [new MastraStorageExporter()],
           spanOutputProcessors: [cardStamper(card)],
+          serializationOptions: { maxStringLength: MAX_STRING_LENGTH },
+          excludeSpanTypes: EXCLUDED_SPAN_TYPES,
           logging: { enabled: false },
         },
       },

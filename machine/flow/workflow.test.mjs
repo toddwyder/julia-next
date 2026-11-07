@@ -15,7 +15,8 @@ process.env.CMD_API_KEY ??= 'unused-in-tests';
 const { Agent } = await import('@mastra/core/agent');
 const { createMockModel } = await import('@mastra/core/test-utils/llm-mock');
 const { buildCardPath } = await import('./workflow.mjs');
-const { openMastra } = await import('./mastra.mjs');
+const { MAX_STRING_LENGTH, openMastra } = await import('./mastra.mjs');
+const { DuckDBInstance } = await import('@duckdb/node-api');
 const { BUILD_RETRIES } = await import('./steps.mjs');
 const { openScratch } = await import('./scratch.mjs');
 const { createWorkflowStateReader } = await import('@mastra/core/workflows');
@@ -75,7 +76,7 @@ async function openCase({
   }
 
   const report = join(caseDir, 'reports', `${CARD}.md`);
-  return { result, trail, dir, caseDir, report, workflow };
+  return { result, trail, dir, caseDir, report, workflow, mastra };
 }
 
 test('a passing card waits for Todd two levels deep, then lands, retros and cleans up', async () => {
@@ -231,4 +232,56 @@ test('an answer for another request is refused and the same run still takes the 
   assert.equal(right.result.landed, true);
 
   rmSync(dirCase, { recursive: true, force: true });
+});
+
+// Every string in a stored span, whatever it is nested in, so the cap is checked
+// against the trace a reader would open rather than against a span object.
+const stringsIn = (value, found = []) => {
+  if (typeof value === 'string') return [...found, value];
+  if (Array.isArray(value)) return value.reduce((all, entry) => stringsIn(entry, all), found);
+  if (value && typeof value === 'object') {
+    return Object.values(value).reduce((all, entry) => stringsIn(entry, all), found);
+  }
+  return found;
+};
+
+const asJson = value => {
+  if (value === null || value === undefined || typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
+
+async function storedSpanText(traceFile) {
+  const instance = await DuckDBInstance.create(traceFile, { access_mode: 'READ_ONLY' });
+  const connection = await instance.connect();
+  const rows = (await connection.runAndReadAll('select input, output from span_events')).getRowObjectsJS();
+  connection.closeSync?.();
+  instance.closeSync?.();
+  return rows.flatMap(row => stringsIn([asJson(row.input), asJson(row.output)]));
+}
+
+// Mastra cuts a long string to the cap and marks the cut, so a stored string is
+// the cap plus this suffix.
+const CUT = '…[truncated]';
+
+test('a stored span keeps every string inside the trace cap', async () => {
+  const longLine = 'y'.repeat(5000);
+  const build = buildOn(createMockModel({ mockText: longLine }));
+  const { dir, mastra } = await openCase({ build, untilFirstWait: true });
+  await mastra.shutdown();
+
+  const stored = await storedSpanText(join(dir, 'trace.duckdb'));
+  const content = stored.map(text => (text.endsWith(CUT) ? text.slice(0, -CUT.length) : text));
+  const longest = Math.max(...content.map(text => text.length));
+
+  assert.ok(stored.length > 0, 'the run wrote spans with text in them');
+  assert.equal(longest, MAX_STRING_LENGTH, 'the long line is stored cut to the cap');
+  assert.ok(
+    stored.every(text => text.length <= MAX_STRING_LENGTH + CUT.length),
+    'no stored string is longer than the cap and its cut mark',
+  );
+  rmSync(dir, { recursive: true, force: true });
 });
