@@ -33,6 +33,7 @@ export const PROGRAMS = [
   ['machine/flow/schema.mjs', 'What the run form asks for and what the run remembers.'],
   ['machine/flow/scratch.mjs', 'The run folder: artifacts, verdicts and the report a stop leaves.'],
   ['machine/flow/mastra.mjs', 'Storage and tracing, so a run is written down and priced.'],
+  ['machine/flow/notice.mjs', 'How trouble reaches Todd: the one notice function and the processors that send one.'],
   ['machine/flow/start.mjs', 'Assembles a run to read it back and to resume a card.'],
   ['machine/flow/run.mjs', 'Answers a waiting card, reads a run, writes its cost. No way to start one.'],
   ['machine/flow/trace.mjs', 'Turns the trace file into the run cost record.'],

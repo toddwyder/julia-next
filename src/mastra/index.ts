@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 
 import { createAgents } from '../../machine/flow/agents.mjs';
 import { openMastra } from '../../machine/flow/mastra.mjs';
+import { announceRestarts } from '../../machine/flow/notice.mjs';
 import { CARD_PATH } from '../../machine/flow/schema.mjs';
 import { openScratch } from '../../machine/flow/scratch.mjs';
 import { buildCardPath } from '../../machine/flow/workflow.mjs';
@@ -28,3 +29,7 @@ export const mastra = await openMastra({
   stateDb: resolve(dir, 'state.db'),
   traceDb: resolve(dir, 'trace.duckdb'),
 });
+
+// A run the last process left running gets one notice here. Nothing else about a
+// restart announces itself, and the run carries on underneath by itself.
+await announceRestarts({ storage: mastra.getStorage() });

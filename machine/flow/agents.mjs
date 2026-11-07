@@ -4,7 +4,8 @@ import { dirname, join, resolve } from 'node:path';
 import { Agent } from '@mastra/core/agent';
 import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace';
 
-import { buildModel } from './models.mjs';
+import { buildModel, leadModelId } from './models.mjs';
+import { notice, noticeProcessors } from './notice.mjs';
 import { agentModel, helperKey, readRoleModels } from './role-models.mjs';
 import { FREE_MODEL } from './schema.mjs';
 
@@ -21,7 +22,7 @@ export function repoRoot() {
   return process.env.FLOW_REPO ?? repositoryContaining(resolve(process.env.MASTRA_PROJECT_ROOT ?? process.cwd()));
 }
 
-export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelFile, roleModelsFile } = {}) {
+export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelFile, roleModelsFile, notify = notice } = {}) {
   const workspace = new Workspace({
     id: 'machine-repo',
     filesystem: new LocalFilesystem({ basePath: repo }),
@@ -43,6 +44,7 @@ export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelF
       model: agentModel(modelId),
       workspace: helperWorkspace,
       defaultOptions: { maxSteps: 100 },
+      ...noticeProcessors({ model: modelId, notify }),
     })];
   })));
   const build = new Agent({
@@ -53,6 +55,7 @@ export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelF
     workspace,
     agents: helpers,
     defaultOptions: { maxSteps: 400 },
+    ...noticeProcessors({ model: leadModelId(leadModelFile), notify }),
   });
 
   const shipping = new Agent({
