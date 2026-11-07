@@ -449,7 +449,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 **Build.**
 
 - [ ] Start red. `workflow.test.mjs` kills a child process mid-build and restarts it. On trunk the build step replays from model step 0, as the 7 Nov run `ffc3d864` did at 16:01:59 in a second trace.
-- [ ] Wrap the Lead with `createDurableAgent` and a `shouldPersistSnapshot` that includes `running` (`docs-harness-durable-agents.md:283`, `:293-306`).
+- [ ] Wrap the Lead with `createDurableAgent` and a `shouldPersistSnapshot` that includes `running` (`docs-harness-durable-agents.md:283`, `:293-306`). Keep P5's delegation hooks in `defaultOptions.delegation`, which Mastra merges back after recovery (`:289`). Hook closures passed per call are not restored.
 - [ ] Replace `createStep(agents.build)` with a build step that uses the run id `<workflow run id>-build`. If `listActiveRuns()` shows that id, the step calls `recover()`. Otherwise it starts the run. Keep `recovery.durableAgents` off, so the stock workflow sweep (`docs-workflows-overview.md:487-503`) is the one thing that restarts a card.
 - [ ] Set `maxBatchSize: 1` on `MastraStorageExporter`, so the steps before a kill reach the trace. DuckDB supports only the event-sourced strategy, so batch size is the one setting that does this.
 
@@ -457,6 +457,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 - [ ] A Studio restart mid-build resumes the build at its last saved step.
 - [ ] The run's trace shows each earlier step once.
+- [ ] The first helper call after a resume runs its full step budget and ends with text.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -466,7 +467,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 - [ ] Lane 1. Regression lane against trunk. Kill the candidate Studio after 20 Lead steps at trunk and head. Save `resume.png`. Pass when trunk restarts at step 0 and head resumes at step 20 or 21.
 - [ ] Lane 2. Count step spans per step number after lane 1. Save `once.png`. Pass when every step before the kill shows once.
-- [ ] Lane 3. Kill during a helper delegation. Save `helper-kill.png`. Pass when only that delegation replays and no earlier Lead step repeats.
+- [ ] Lane 3. Kill during a helper delegation and restart the candidate Studio. Save `helper-kill.png`. Pass when only that delegation replays, no earlier Lead step repeats, and the first helper call after the resume has its full step budget and ends with text.
 - [ ] Lane 4. Kill twice in one build. Save `double-kill.png`. Pass when the build resumes both times and finishes.
 - [ ] Lane 5. Kill while the card waits for Todd's answer. Save `waiting-kill.png`. Pass when the wait comes back unanswered and the build does not rerun.
 - [ ] Lane 6. Read the restart notice from P4 after lane 1. Save `notice.png`. Pass when it names the resume step.
