@@ -3,11 +3,17 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createAgents } from '../machine/flow/agents.mjs';
+import { RequestContext } from '@mastra/core/request-context';
+
+import { BUILD_WORKTREE, createAgents } from '../machine/flow/agents.mjs';
 
 export async function checkLeadPublication({ repo = process.cwd() } = {}) {
   const workspace = await createAgents({ repo }).build.getWorkspace();
-  const sandbox = workspace.sandbox;
+  // The Lead resolves its shell onto the run's build worktree, and this check
+  // has no run, so it reads the GitHub identity from a shell in the checkout.
+  const requestContext = new RequestContext();
+  requestContext.set(BUILD_WORKTREE, repo);
+  const sandbox = await workspace.resolveSandbox({ requestContext });
   try {
     await sandbox.start();
     const identity = await sandbox.executeCommand('gh', ['api', 'user', '--jq', '.login']);
