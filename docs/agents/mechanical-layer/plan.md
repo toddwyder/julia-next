@@ -11,7 +11,7 @@ One box is one unit of work. Every box names the evidence that checks it. A nest
 
 The program runs `.agents/skills/poteto-mode/playbooks/autopilot-full.md`. The builder works by hand in CommandCode, outside Studio, on `commandcode/deepseek/deepseek-v4.1-flash`, as Todd asked on 7 Nov. P5 and P7 move to a stronger model only if DeepSeek gets stuck on them, and the switch is recorded in the owner's trail. Todd's full-autonomy grant lets each owner merge its PR once required checks pass and the root's verdict is clean. P3 changes the model picker, which Todd uses, so P3 stops at merge-ready for his review. P9 ends with Todd's UAT, and the card completes only after his yes.
 
-Live lanes run on `commandcode/deepseek/deepseek-v4.1-flash`, one or two at a time. Audit lanes and Shipping run on `gpt-6-luna`, moving to `gpt-6.1-terra` if Luna misses a real failure. Their model company stays different from the builder's.
+Live lanes run on `commandcode/deepseek/deepseek-v4.1-flash`, one at a time. Audit lanes and Shipping run on `gpt-6-luna`, moving to `gpt-6.1-terra` if Luna misses a real failure. Their model company stays different from the builder's.
 
 Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -50,8 +50,8 @@ The exporter batch setting, `maxBatchSize`, has no line in the packaged 1.82.0 r
   - [ ] `git show origin/main:.agents/skills/interrogate/SKILL.md`
   - [ ] `git show origin/main:docs/agents/server-runbook.md`
 - [ ] On the operator's go, arm the audit tick as `/loop 1h` with the tick prompt below. Never leave the cadence to memory.
-- [ ] Record the server's memory budget before the first lane. It has 7.6 GB and no swap, so at most two candidate Studios run at once, each capped at 1 GB.
-- [ ] Use this tick prompt, verbatim. "Re-read the execution playbook from trunk. Audit the operation against it and fix drift in this tick. Probe every active lane and judge progress by side effects only. Stand down a stuck lane and dispatch its replacement now. Then post a short status message to the operator in chat only when the audit found a tracked change that no earlier status message reported, such as a PR opened, a code-ready head, a round launched or closed, a verdict, a merge, a stuck agent and the action taken, a blocker added or cleared, or a decision only the operator can make. Name every such change and nothing else. Do not repeat a table, the merged list, or an unchanged blocker. If the audit found none, end the turn with no reply text. Either way, log this tick's row in your decision trail. The row names the items reported, or none."
+- [ ] Record the server's memory budget before the first lane. It has 7.6 GB and no swap. One Studio test copy runs at a time, capped at 1.6 GB. The cap rests on a measured peak of 1,482 MB, a live Studio peak of 1.26 GiB, and 3.7 GiB free with the builders running.
+- [ ] Use this tick prompt, verbatim. "Re-read the execution playbook from trunk. Audit the operation against it and fix drift in this tick. Probe every active lane and judge progress by side effects only. Stand down a stuck lane. If a helper hit the 100-turn limit, do not dispatch a replacement. Report in three lines what is left and the tokens it used, and wait for Todd. Then post a short status message to the operator in chat only when the audit found a tracked change that no earlier status message reported, such as a PR opened, a code-ready head, a round launched or closed, a verdict, a merge, a stuck agent and the action taken, a blocker added or cleared, or a decision only the operator can make. Name every such change and nothing else. Do not repeat a table, the merged list, or an unchanged blocker. If the audit found none, end the turn with no reply text. Either way, log this tick's row in your decision trail. The row names the items reported, or none."
 - [ ] On the operator's hold or stand-down, send every owner a zero-writes order at once.
 - [ ] Put the Studio folder back on main before any slice runs. `git -C ~/julia-builder status` prints `On branch main` and a clean tree, and `jul-341-apothecary` stays on origin with its five commits. Todd's grant covers this server change.
 - [ ] Create the nine sub-issues of JUL-342 in Linear, P1 to P9 in order, each with its **You see.** boxes as done-means. Evidence is the nine sub-issue ids posted on JUL-342.
@@ -59,6 +59,7 @@ The exporter batch setting, `maxBatchSize`, has no line in the packaged 1.82.0 r
 ### Spawn owners
 
 - [ ] Spawn one owner per PR on `commandcode/deepseek/deepseek-v4.1-flash` with the full lifecycle the execution playbook names. P5 and P7 move to a stronger model only if DeepSeek gets stuck on them, and the owner records the switch and its reason in the trail. Each owner works in its own worktree under `~/.local/state/julia-scratch/jul-342-<pr>/`, never in `~/julia-builder`.
+- [ ] If a helper hits the 100-turn limit, do not spawn a replacement. Report in three lines what is left and how many tokens it used, and wait for Todd.
 - [ ] Follow this dependency graph. Start dependent work only after its parent merges.
   - [ ] P1, P2, P3, P4, and P8 are independent and first. All branch from `main`.
   - [ ] P5 after P3 and P4.
@@ -81,16 +82,16 @@ The exporter batch setting, `maxBatchSize`, has no line in the packaged 1.82.0 r
 
 ### Verdict and merge, for every PR
 
-- [ ] A full swarm runs once, at the code-ready head. Another full swarm runs only for new behavior, a redesign, or a large new diff. A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head, and a wording-only change gets none. Run each full swarm per `.agents/skills/swarm/SKILL.md`. One gates lane. The ten live lanes from the PR's **Verify, live** block, on `commandcode/deepseek/deepseek-v4.1-flash`, one or two at a time. The perf lane from its **Verify, perf** block. Two or more audit lanes, each with its own focus, that read the diff and the receipts and distrust the PR body, on `gpt-6-luna`, moving to `gpt-6.1-terra` if Luna misses a real failure. Their model company stays different from the builder's. The root audits the receipts in the merge-ready report before the verdict.
+- [ ] A full swarm runs once, at the code-ready head. Another full swarm runs only for new behavior, a redesign, or a large new diff. A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head, and a wording-only change gets none. Run each full swarm per `.agents/skills/swarm/SKILL.md`. One gates lane. The ten live lanes from the PR's **Verify, live** block, on `commandcode/deepseek/deepseek-v4.1-flash`, one at a time. The perf lane from its **Verify, perf** block. Two or more audit lanes, each with its own focus, that read the diff and the receipts and distrust the PR body, on `gpt-6-luna`, moving to `gpt-6.1-terra` if Luna misses a real failure. Their model company stays different from the builder's. The root audits the receipts in the merge-ready report before the verdict.
 - [ ] Judge every finding by the execution playbook's blocking rule. The verdict is clean when none blocks. A failure on trunk behavior in a lane marked `Regression lane against trunk.` is recorded against trunk and does not block the PR. A new head gets a fresh verdict, except for results that stay valid under the patch-id rule in `playbooks/shipping.md`.
 - [ ] The owner squash-merges its own PR after the root's clean verdict at the exact head SHA and green required checks. If the head changes after the verdict, the patch-id rule in `playbooks/shipping.md` decides whether the verdict still covers it. P3 waits for the operator's click.
 
 ### Boot recipe, for every live lane
 
-Each live lane runs on the server at the PR head, in its own worktree. Run one or two live lanes at a time. The server has 7.6 GB and no swap, so each candidate Studio is capped at 1 GB RSS. Drive the browser through `playwright-cli` and the shell through tmux. Live Studio on its own port stays on main and is never restarted by a lane.
+Each live lane runs on the server at the PR head, in its own worktree. Run one live lane at a time. The server has 7.6 GB and no swap, so each candidate Studio is capped at 1.6 GB RSS. The cap rests on a measured peak of 1,482 MB, a live Studio peak of 1.26 GiB, and 3.7 GiB free with the builders running. A helper without the lock waits and never starts its own copy. Drive the browser through `playwright-cli` and the shell through tmux. Live Studio on its own port stays on main and is never restarted by a lane.
 
 - [ ] `git fetch origin <head-branch> && git checkout <head SHA>`.
-- [ ] Start a candidate Studio from the worktree on its own port with `FLOW_DIR`, `JULIA_LEAD_MODEL_FILE`, and the models-file variable pointed at files in the lane folder, under a 1 GB memory cap. Pick the free model in every role. Wait for the `card-path` run form, as `node scripts/check-studio-start.mjs` checks it.
+- [ ] Start a candidate Studio from the worktree on its own port with `FLOW_DIR`, `JULIA_LEAD_MODEL_FILE`, and the models-file variable pointed at files in the lane folder, under a 1.6 GB memory cap. Pick the free model in every role. Wait for the `card-path` run form, as `node scripts/check-studio-start.mjs` checks it.
 - [ ] Deliver input only through Studio's run form, the dashboard Start screen, or a tmux shell. Read-only diagnostics are the run's `trace.duckdb` copied into the lane folder, `state.db` copied the same way, `journalctl --user`, and `git -C <folder> status`.
 - [ ] Save every screenshot to `~/.local/state/julia-scratch/swarm-<pr-id>/worker-<n>/<slug>.png` and return the paths with the report.
 
@@ -119,7 +120,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 - [ ] `machine/flow/workflow.test.mjs` gains a case that a stored span input is at most 2000 characters per string. Run `node --test machine/flow/workflow.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run the 60-step memory probe at trunk and head. Save `memory-trunk-head.png`. Pass when trunk hits the heap limit and head ends under 150 MB.
 - [ ] Lane 2. Start the practice card on the candidate Studio and let it reach 100 Lead steps. Save `long-run.png`. Pass when the run ends and the candidate process has the same PID throughout.
@@ -137,7 +138,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 - [ ] Metric. Peak heap of the 60-step probe, and peak RSS of the candidate Studio over a 100-step run.
 - [ ] Probe. `node --expose-gc scripts/prove-trace-memory.mjs` at trunk and head, interleaved three times each.
 - [ ] Baseline. Record the trunk peak heap first. Trunk is expected to hit the 1.2 GB cap.
-- [ ] Rule. Head fails if any head run exceeds 150 MB heap or the 100-step run exceeds 1 GB RSS.
+- [ ] Rule. Head fails if any head run exceeds 150 MB heap or the 100-step run exceeds 1.6 GB RSS.
 
 **Review gate.** None. P1 is not review-gated.
 
@@ -172,7 +173,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 - [ ] `machine/flow/agents.test.mjs` gains cases for the worktree path and for a second start that reuses the same worktree. Run `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run a practice build at trunk and head and record the Studio folder's branch after each. Save `folder-branch.png`. Pass when trunk leaves the folder off main and head leaves it on main and clean.
 - [ ] Lane 2. Poll `git -C <studio folder> status --porcelain` every 10 seconds during a head build. Save `folder-poll.png`. Pass when every poll is empty.
@@ -236,7 +237,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 - [ ] `dashboard/lib/model-settings.test.mjs` gains cases for an unchanged Save that writes and reads back, for a failed read-back that returns no "Saved", and for a Save that writes only `~/.config/julia/lead-role-models.md` and `~/.config/julia/lead-model` and leaves `~/.agents/pstack-models.md` unchanged. `machine/flow/agents.test.mjs` gains a case that a changed file changes the next call's model without a new `createAgents`, and a case that `readRoleModels` ignores `~/.agents/pstack-models.md`. Run `npm --prefix dashboard test` and `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Change the Lead's pick, save, and start a run without a restart, at trunk and head. Save `next-run.png`. Pass when trunk's trace shows the old model and head's trace shows the new one.
 - [ ] Lane 2. Press Save with nothing changed. Save `unchanged-save.png`. Pass when "Saved" appears and the file's modified time moves.
@@ -258,6 +259,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 **Review gate.** The operator reviews before merge.
 
+- [ ] Run the normal candidate Studio with the dashboard under the 1.6 GB cap. Do not substitute a lighter page, a reduced route, or a screenshot-only path.
 - [ ] Copy lane 1, 2, and 5 screenshots into `docs/agents/mechanical-layer/media/P3-review-<slug>.png`.
 - [ ] Record a 30 to 60 second video of the change on a lane VM. Save it as `docs/agents/mechanical-layer/media/P3-review.mp4`.
 - [ ] Post the screenshots and the video in chat. Stop at merge-ready. Wait for the operator's click.
@@ -298,7 +300,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 - [ ] `machine/flow/notice.test.mjs` covers usage limit, 429, unknown model, authorization block, content filter, and boot restart, each sending one notice. Run `node --test machine/flow/notice.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Force a usage-limit error at trunk and head on a throwaway card. Save `usage-limit.png`. Pass when trunk sends nothing and head's notice reaches Todd's inbox within 60 seconds.
 - [ ] Lane 2. Pick an unknown model for the Lead and start a run. Save `refused-model.png`. Pass when the notice arrives within 60 seconds.
@@ -352,7 +354,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 - [ ] `machine/flow/agents.test.mjs` gains cases for the budget override, the last-step text, and the machine fault. Run `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run the practice card at trunk and head and count helper spans that end with empty text. Save `empty-helpers.png`. Pass when head has none.
 - [ ] Lane 2. Read every helper span's step count. Save `budget.png`. Pass when each helper's budget equals its own setting, whatever `maxSteps` the Lead passed.
@@ -406,7 +408,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 - [ ] `machine/flow/agents.test.mjs` gains cases for the plain name, `bash -c`, a split quote, a script file, base64 through `eval`, an absolute path, and `npx @openai/codex`, each refused. Git, npm, and node still run. Run `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Plant `codex exec` in the practice card's prompt at trunk and head. Save `planted-codex.png`. Pass when trunk runs it and head's trace shows the refusal.
 - [ ] Lane 2. Plant `mastracode --model` the way the 7 Nov Lead did. Save `mastracode.png`. Pass when it is refused.
@@ -463,7 +465,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 - [ ] `machine/flow/workflow.test.mjs` gains a SIGKILL-and-restart case that counts model steps and finds each earlier one once. Run `node --test machine/flow/workflow.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Kill the candidate Studio after 20 Lead steps at trunk and head. Save `resume.png`. Pass when trunk restarts at step 0 and head resumes at step 20 or 21.
 - [ ] Lane 2. Count step spans per step number after lane 1. Save `once.png`. Pass when every step before the kill shows once.
@@ -512,16 +514,16 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 **You see.**
 
-- [ ] A test PR that edits one anchored pstack line fails CI, and the failure names the rule.
+- [ ] A test PR that edits one anchored pstack line shows the anchor check red naming the rule, and the pin check red because the pin is unchanged.
 - [ ] A test PR that adds pstack text shows that text in a PR comment.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] `scripts/check-pstack-anchors.test.mjs` covers a missing anchor, a doubled anchor, an untouched tree, and added text under a heading. Run `node --test scripts/check-pstack-anchors.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
 
-- [ ] Lane 1. Regression lane against trunk. Open a throwaway PR that edits "explicit model per role", based on trunk and on head. Save `anchor-edit.png`. Pass when trunk's CI passes and head's CI fails naming the rule.
+- [ ] Lane 1. Regression lane against trunk. Open the same throwaway PR that edits "explicit model per role" on trunk and on head. Save `anchor-edit.png`. Pass when the head's anchor check fails naming the rule. The pin check is expected to go red because the test edits pstack without updating the pin, and that red is accepted. On trunk, record that no anchor step exists. Record both results.
 - [ ] Lane 2. Remove "Fresh subagents by default." Save `anchor-removed.png`. Pass when CI fails naming that rule.
 - [ ] Lane 3. Duplicate "Write the resume note off-context." Save `anchor-doubled.png`. Pass when CI fails.
 - [ ] Lane 4. Add a sentence under a `##` heading in `SKILL.md` and bump `PSTACK-SOURCE.md`. Save `new-text.png`. Pass when the PR comment lists that sentence under its heading.
@@ -572,7 +574,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 
 - [ ] Every test file named in P1 to P8 passes on main. Run `node scripts/test-owners.mjs --run local`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run the 7 Nov red queries from Appendix A on the JUL-341 trace and on the practice trace. Save `seven-nov.png`. Pass when JUL-341 shows each failure and the practice trace shows none.
 - [ ] Lane 2. List every model in the practice trace. Save `models.png`. Pass when each equals Todd's pick for its role.
@@ -583,14 +585,14 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one o
 - [ ] Lane 7. Plant `codex exec` in the practice card. Save `codex.png`. Pass when the trace shows the refusal and `~/.codex/sessions` gains nothing.
 - [ ] Lane 8. Follow UAT steps 1 and 2 on the picker. Save `uat-save.png`. Pass when "Saved" shows both times and the file holds the picks.
 - [ ] Lane 9. Follow UAT steps 3 and 4. Save `uat-run.png`. Pass when the Lead runs on the new pick with Studio left running.
-- [ ] Lane 10. Run P8's anchor-edit PR again on main. Save `anchors.png`. Pass when CI fails naming the rule.
+- [ ] Lane 10. Run P8's anchor-edit PR again on main. Save `anchors.png`. Pass when the anchor check fails naming the rule. The pin red is accepted.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 - [ ] Metric. Peak Studio RSS over the practice run, and the run's cost from the scorecard.
 - [ ] Probe. `systemctl --user show julia-studio -p MemoryPeak` before and after the run, and `node scripts/scorecard.mjs JUL-342`. The 7 Nov JUL-341 run is the trunk side.
 - [ ] Baseline. Record the 7 Nov peak first, which was 1.8 GB before the kill.
-- [ ] Rule. The practice run fails if its peak RSS exceeds 1 GB.
+- [ ] Rule. The practice run fails if its peak RSS exceeds 1.6 GB.
 
 **Review gate.** The operator reviews before merge.
 
