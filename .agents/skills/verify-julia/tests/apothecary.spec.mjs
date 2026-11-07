@@ -102,6 +102,7 @@ for (const width of [390, 768, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/recipes');
     await expect(entries(page)).toHaveCount(10);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(await page.locator('header').evaluate(el => el.getBoundingClientRect().height)).toBe(width <= 900 ? 76 : 112);
     const logo = page.locator('header img');
     const ratio = await logo.evaluate(img => img.getBoundingClientRect().width / img.getBoundingClientRect().height);

@@ -1,7 +1,9 @@
+import { connection } from 'next/server';
 import { loadPreviewRecipes } from '../../lib/recipe-demo.server';
 import { DemoRecipeProvider } from './recipe-provider';
 
 export default async function RecipesLayout({ children }) {
+  await connection();
   const dataset = await loadPreviewRecipes();
   if (dataset) return <DemoRecipeProvider dataset={dataset}>{children}</DemoRecipeProvider>;
   const [{ default: HouseholdGate }, { default: HouseholdRecipeProvider }] = await Promise.all([

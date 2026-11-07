@@ -51,6 +51,7 @@ test.beforeEach(async () => {
 test('the design fonts are loaded, not only named', async ({ page }) => {
   await signIn(page, TODD);
   await page.goto('/recipes/new');
+  await expect(page.getByRole('heading', { level: 1, name: 'Enter a Recipe' })).toBeVisible();
   const loaded = await page.evaluate(async () => {
     await document.fonts.ready;
     return [...document.fonts].filter(face => face.status === 'loaded').map(face => face.family.replaceAll(/["']/g, ''));
