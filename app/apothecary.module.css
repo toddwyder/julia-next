@@ -1,0 +1,80 @@
+.shell {
+  --ap-paper: #f6f1e6;
+  --ap-clean: #fffdf8;
+  --ap-ink: #2e2119;
+  --ap-umber: #5a3e2e;
+  --ap-sage: #6f7c5a;
+  --ap-madder: #a24f3f;
+  --ap-display: var(--font-apothecary-display), Georgia, serif;
+  --ap-reading: var(--font-apothecary-reading), Georgia, serif;
+  min-height: 100dvh;
+  background: var(--ap-paper);
+  color: var(--ap-ink);
+  font-family: var(--ap-reading);
+  font-size: 19px;
+  line-height: 1.5;
+  padding-bottom: 48px;
+  accent-color: var(--ap-madder);
+  caret-color: var(--ap-madder);
+  scrollbar-color: var(--ap-sage) var(--ap-paper);
+}
+.shell * { box-sizing: border-box; }
+.shell ::selection { background: #e6d7b9; color: var(--ap-ink); }
+.shell :focus-visible { outline: 2px solid var(--ap-madder); outline-offset: 5px; }
+.shell a { text-underline-offset: 4px; }
+.masthead {
+  height: 112px;
+  padding: 0 40px;
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  background: var(--ap-sage);
+  border-bottom: 4px solid var(--ap-madder);
+  color: var(--ap-paper);
+}
+.logo { flex-shrink: 0; display: block; line-height: 0; }
+.logo img { height: 80px; width: auto; max-width: 100%; }
+.nav { display: flex; gap: 28px; align-items: center; font-family: var(--ap-display); font-variant: small-caps; }
+.nav a, .nav button { font: inherit; font-size: 21px; color: var(--ap-paper); text-decoration: none; white-space: nowrap; padding: 8px 0; border: 0; background: transparent; cursor: pointer; }
+.nav button[aria-disabled] { color: #efe8d8; opacity: .8; cursor: help; text-decoration: underline dotted; text-underline-offset: 8px; }
+.nav button:hover { text-decoration: underline dotted; text-underline-offset: 8px; }
+.nav .active { border-bottom: 3px solid var(--ap-paper); }
+.commands { display: flex; gap: 12px; position: relative; font-family: var(--font-apothecary-display), Georgia, serif; }
+.desktopCommands { margin-left: auto; flex-shrink: 0; }
+.importButton, .addButton {
+  font: inherit;
+  font-size: 19px;
+  font-variant: small-caps;
+  padding: 8px 18px;
+  min-height: 46px;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+}
+.addButton { color: #fffdf8; background: #a24f3f; border-color: #a24f3f; }
+.addButton:hover { background: #893e31; }
+.importButton:hover { background: #ffffff15; }
+.commandNotice { z-index: 5; position: absolute; right: 0; top: 100%; width: 300px; padding: 16px; background: #fffdf8; border: 1px solid #5a3e2e; color: #2e2119; font-size: 16px; line-height: 1.5; box-shadow: 0 8px 20px #2e21191a; }
+.navNotice { position: fixed; z-index: 10; bottom: 20px; left: 50%; transform: translateX(-50%); width: min(90%, 500px); padding: 12px 20px; background: var(--ap-clean); border: 1px solid var(--ap-umber); display: flex; gap: 20px; justify-content: space-between; box-shadow: 0 6px 22px #2e211922; font-size: 16px; }
+.navNotice button { font: inherit; color: var(--ap-madder); border: 0; background: transparent; text-decoration: underline; cursor: pointer; }
+@media (min-width: 901px) and (max-width: 1270px) {
+  .masthead { padding: 0 24px; gap: 22px; }
+  .logo img { height: 62px; }
+  .nav { gap: 18px; }
+  .nav a, .nav button { font-size: 18px; }
+  .importButton, .addButton { padding: 8px 12px; font-size: 17px; }
+}
+@media (max-width: 900px) {
+  .shell { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .masthead { height: 76px; padding: 0 18px; }
+  .logo img { height: 52px; }
+  .desktopCommands { display: none; }
+  .nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; gap: 0; justify-content: space-around; padding: 7px 6px calc(7px + env(safe-area-inset-bottom)); background: var(--ap-sage); border-top: 2px solid var(--ap-umber); }
+  .nav a, .nav button { font-size: 16px; min-height: 46px; padding: 8px 3px; }
+  .navNotice { bottom: calc(85px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) { .shell * { scroll-behavior: auto; } }
