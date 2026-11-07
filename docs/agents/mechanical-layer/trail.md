@@ -9,4 +9,5 @@ ts	phase	decision	why	evidence	result
 2026-11-07T21:46:00Z	Linear	Created nine sub-issues, JUL-343 to JUL-351	The plan's Program checklist names one sub-issue per slice	JUL-342 comment b4f27bcd; sub-issues.json	posted
 2026-11-07T21:46:00Z	audit	Armed the hourly audit tick with the plan's verbatim prompt	The plan says never leave the cadence to memory	cron job 69f8f98a	persisted
 2026-11-07T21:47:00Z	owners	Spawned P1, P2, P3, P4, and P8 on deepseek/deepseek-v4.1-flash	The plan makes those five independent and first	agent ids bg-1-48d7b8e1, bg-2-7a28cdc3, bg-3-b513b968, bg-4-7fe5b86f, bg-5-1338198b	running
+2026-11-07T22:03:00Z	tick	Audited tick 1. P1 opened PR #466, P3 opened PR #467, P8 opened PR #463. P2, P3, and P4 hit the 100-turn limit with work left in their worktrees, so I replaced them.	Judged each owner by side effects per autopilot-full step 6	PRs 466, 467, 463; p2 worktree diff; p3 PR #467 at 2d056dd plus one uncommitted file; p4 worktree diff; replacements bg-6-38f3c84a, bg-7-186678dd, bg-8-ef921238	3 PRs open, 3 replacements running
 ```
