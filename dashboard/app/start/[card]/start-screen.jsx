@@ -93,10 +93,9 @@ export default function StartScreen({ card, groups, models, initial, leadModels,
     setSaveProblem('');
     setSaved(false);
     try {
-      const sent = choice;
-      const result = await saveDraft(sent);
+      const result = await saveDraft(choice);
       if (!result.ok) throw new Error(result.problem);
-      if (!picksEqual(result.choice, sent)) throw new Error('The models did not read back as written. Your picks are still on screen.');
+      if (!picksEqual(result.choice, choice)) throw new Error('The models did not read back as written. Your picks are still on screen.');
       setChoice(result.choice);
       setDirty(false);
       setSaved(true);
