@@ -229,6 +229,14 @@ async function browserSave(url, current, models, alternateLead, alternateCoder) 
           mismatch: mismatched(`${role.name} Start row`, () => assert(actualIds.includes(wrong))) });
       }
     }
+    await choose(page, 'Change the Lead model', alternateLead);
+    await choose(page, 'Change the feature, refactoring model', alternateCoder);
+    await page.getByText('Picks are not applied until you press Save.').waitFor();
+    await save(page);
+    await page.getByText('Saved on this machine. The next run uses these picks.').waitFor({ timeout: 20000 });
+    const leadFile = statSync(settingsPaths().lead).mtimeMs;
+    await save(page);
+    assert.ok(statSync(settingsPaths().lead).mtimeMs > leadFile, 'A second Save with nothing changed did not move the settings file.');
     await page.reload();
     assert.equal(await page.getByRole('button', { name: 'Change the Lead model' }).getAttribute('data-current-model-id'), alternateLead);
     assert.equal(await page.getByRole('button', { name: 'Change the feature, refactoring model' }).getAttribute('data-current-model-id'), alternateCoder);
