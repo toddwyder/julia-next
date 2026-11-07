@@ -3,7 +3,7 @@
 Mirror: https://github.com/backnotprop/pstack
 Commit: 6c75f4e67546c2ddbf9634734c1e3ebbea34861a
 Version: 0.15.36 (`.cursor-plugin/plugin.json` and `plugin.json` at that commit)
-Installed: 3 November 2026
+Installed: 4 November 2026
 
 This is the backnotprop mirror, not Cursor's `cursor/plugins` copy. The mirror's harness-neutral rewrites are what let pstack run outside Cursor.
 
