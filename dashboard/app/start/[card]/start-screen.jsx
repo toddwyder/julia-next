@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  EFFORTS, addPanelModel, changedRows, effortById, isRoleOverride,
+  EFFORTS, addPanelModel, effortById, isRoleOverride, picksEqual,
   removePanelModel, setEffort, setGroupModel, setRoleModel,
 } from '../../../lib/roles.js';
 import styles from './start.module.css';
 
-const SAVED_LINE = 'Saved on this machine. Restart Studio in its terminal before the next run.';
+const SAVED_LINE = 'Saved on this machine. The next run uses these picks.';
+const DIRTY_LINE = 'Picks are not applied until you press Save.';
 
 function ModelName({ model }) {
   if (!model) return <span className={styles.model}>Unknown model</span>;
@@ -52,8 +53,6 @@ function describeChange(prev, next, groups, byId) {
 
 export default function StartScreen({ card, groups, models, initial, leadModels, saveDraft }) {
   const [choice, setChoice] = useState(initial);
-  // The rows this page loaded, so Save sends only what this page moved.
-  const baseline = useRef(initial);
   const [expanded, setExpanded] = useState(() => groups.map(group => group.id));
   const [picker, setPicker] = useState(null);
   const [info, setInfo] = useState('');
@@ -62,7 +61,9 @@ export default function StartScreen({ card, groups, models, initial, leadModels,
   const [ready, setReady] = useState(false);
   const [saveProblem, setSaveProblem] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(true);
+  // Nothing has been saved from this page until Save is pressed and the files read back.
+  const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   // The page is drawn before this script runs, so for a moment the controls look usable but
   // drop every tap. Keep them off and say so until the handlers are attached.
@@ -83,6 +84,7 @@ export default function StartScreen({ card, groups, models, initial, leadModels,
     setDone(describeChange(choice, next, groups, byId));
     setSaveProblem('');
     setSaved(false);
+    setDirty(true);
     setChoice(next);
   }
 
@@ -91,11 +93,12 @@ export default function StartScreen({ card, groups, models, initial, leadModels,
     setSaveProblem('');
     setSaved(false);
     try {
-      const patch = changedRows(baseline.current, choice);
-      const result = await saveDraft(patch);
+      const sent = choice;
+      const result = await saveDraft(sent);
       if (!result.ok) throw new Error(result.problem);
-      baseline.current = result.choice;
+      if (!picksEqual(result.choice, sent)) throw new Error('The models did not read back as written. Your picks are still on screen.');
       setChoice(result.choice);
+      setDirty(false);
       setSaved(true);
     } catch (error) {
       setSaveProblem(error.message || 'The models could not be saved. Your picks are still on screen.');
@@ -221,7 +224,8 @@ export default function StartScreen({ card, groups, models, initial, leadModels,
       </ul>
       <button type="button" className={styles.modelButton} disabled={!ready || saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</button>
       {saveProblem ? <p className={styles.notice} role="alert">{saveProblem}</p> : null}
-      <p className={styles.saved} role="status">{saved ? SAVED_LINE : 'Picks are not applied until you press Save. Restart Studio after saving.'}</p>
+      {saved ? <p className={styles.saved} role="status">{SAVED_LINE}</p>
+        : dirty ? <p className={styles.saved} role="status">{DIRTY_LINE}</p> : null}
     </section>
 
     {picker ? <ModelPicker label={pickerLabel(picker, groups)} models={picker.groupId === 'lead' ? leadModels : models}

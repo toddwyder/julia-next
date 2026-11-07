@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
-import { LEAD_DEFAULT_MODEL, ROLE_GROUPS, formatSettings, leadModels, readSettings, saveSettings, saveSettingsPatch, settingsPaths } from './model-settings.js';
-import { STALE_PAGE, applyRows, initialChoice } from './roles.js';
+import { LEAD_DEFAULT_MODEL, ROLE_GROUPS, formatSettings, leadModels, readSettings, saveSettings, saveSettingsChoice, settingsPaths } from './model-settings.js';
+import { initialChoice } from './roles.js';
 
 const models = [
   { id: 'openai/gpt-6.1-sol', provider: 'openai' },
@@ -120,57 +120,52 @@ test('a write failure leaves the previous runtime settings in place', t => {
   } finally { chmodSync(directory, 0o700); }
 });
 
-test('a patch lands on a newer file without reverting the rows it does not name', t => {
+test('an unchanged Save writes both files again and reads the choice back', async t => {
   const paths = profile(t);
-  saveSettings(fresh(), { paths, models });
-  const newer = fresh();
-  newer.lead = models[1].id;
-  newer.groups.building.roles['bug-fix'] = models[1].id;
-  saveSettings(newer, { paths, models });
-  const result = saveSettingsPatch({ roles: { building: { hillclimb: models[2].id } } }, { models, paths });
-  assert.equal(result.wrote, true);
-  assert.equal(typeof result.updatedAt, 'string');
-  const after = readSettings({ paths, modelIds });
-  assert.equal(after.lead, models[1].id);
-  assert.equal(after.groups.building.roles['bug-fix'], models[1].id);
-  assert.equal(after.groups.building.roles.hillclimb, models[2].id);
-  assert.deepEqual(result.choice, after);
-});
-
-test('a patch naming no row writes nothing and does not restamp the files', t => {
-  const paths = profile(t);
-  saveSettings(fresh(), { paths, models });
+  const choice = fresh();
+  const first = saveSettingsChoice(choice, { models, paths });
+  assert.equal(first.wrote, true);
+  assert.deepEqual(first.choice, choice);
   const before = snapshot(paths);
-  for (const patch of [{}, { roles: {} }, { roles: { building: {} } }]) {
-    const result = saveSettingsPatch(patch, { models, paths });
-    assert.deepEqual(result, { choice: readSettings({ paths, modelIds }), updatedAt: null, wrote: false });
+  await new Promise(done => setTimeout(done, 10));
+  const again = saveSettingsChoice(choice, { models, paths });
+  assert.equal(again.wrote, true, 'An unchanged Save must write, not skip.');
+  assert.equal(typeof again.updatedAt, 'string');
+  assert.deepEqual(again.choice, choice);
+  const after = snapshot(paths);
+  for (const [index, file] of Object.values(paths).entries()) {
+    assert.equal(after[index][0], before[index][0], `${file} changed its contents on an unchanged Save.`);
+    assert.ok(after[index][1] > before[index][1], `${file} did not move its modified time on an unchanged Save.`);
   }
-  assert.deepEqual(snapshot(paths), before);
 });
 
-test('a patch naming an unknown row is refused and leaves both files untouched', t => {
+test('a Save whose read-back differs is refused instead of reported as saved', t => {
   const paths = profile(t);
-  saveSettings(fresh(), { paths, models });
+  const choice = fresh();
+  const read = () => ({ ...choice, lead: models[1].id });
+  assert.throws(() => saveSettingsChoice(choice, { models, paths, read }), /did not read back as written/);
+});
+
+test('a Save writes only the picker files and leaves the pstack models file alone', t => {
+  const paths = profile(t);
+  const pstackFile = join(dirname(paths.pstack), '..', '..', '.agents', 'pstack-models.md');
+  mkdirSync(dirname(pstackFile), { recursive: true });
+  writeFileSync(pstackFile, 'feature, refactoring: openai/gpt-6-astra\n');
+  const before = readFileSync(pstackFile);
+  saveSettingsChoice(fresh(), { models, paths });
+  assert.deepEqual(readFileSync(pstackFile), before);
+  assert.ok(readFileSync(paths.pstack, 'utf8').includes('feature, refactoring:'));
+  assert.ok(readFileSync(paths.lead, 'utf8').trim());
+});
+
+test('a Save of an unknown or injected row is refused and leaves both files untouched', t => {
+  const paths = profile(t);
+  saveSettingsChoice(fresh(), { models, paths });
   const before = snapshot(paths);
-  const patches = [
-    { roles: { nowhere: { 'bug-fix': models[0].id } } },
-    { roles: { building: { 'no-such-role': models[0].id } } },
-  ];
-  for (const patch of patches) {
-    assert.throws(() => saveSettingsPatch(patch, { models, paths }), /Unknown/);
+  for (const [roleId, value] of [['no-such-role', models[0].id], ['bug-fix', 'openai/retired-model'], ['bug-fix', 'openai/gpt-6.1-sol\nrole: injected']]) {
+    const choice = fresh();
+    choice.groups.building.roles[roleId] = value;
+    assert.throws(() => saveSettingsChoice(choice, { models, paths }));
+    assert.deepEqual(snapshot(paths), before);
   }
-  assert.throws(() => saveSettingsPatch({ groups: {} }, { models, paths }), { message: STALE_PAGE });
-  assert.deepEqual(snapshot(paths), before);
-});
-
-test('a patch still cannot save a model the account does not offer', t => {
-  const paths = profile(t);
-  saveSettings(fresh(), { paths, models });
-  const before = snapshot(paths);
-  const patch = { roles: { building: { 'bug-fix': 'openai/retired-model' } } };
-  assert.throws(() => saveSettingsPatch(patch, { models, paths }),
-    /Choose an available account model for bug-fix\./);
-  assert.throws(() => formatSettings(applyRows(readSettings({ paths, modelIds }), patch), models),
-    /Choose an available account model for bug-fix\./);
-  assert.deepEqual(snapshot(paths), before);
 });

@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  EFFORTS, PANEL_MINIMUM, PANEL_MODEL_ONLY, STALE_PAGE, addPanelModel, applyRows, changedRows,
-  effortById, initialChoice, isRoleOverride, mergeDraft, removePanelModel, resolveModelId, setEffort,
-  setGroupModel, setRoleModel, sharedModel,
+  EFFORTS, PANEL_MINIMUM, PANEL_MODEL_ONLY, addPanelModel, effortById, initialChoice, isRoleOverride,
+  mergeDraft, picksEqual, removePanelModel, resolveModelId, roleModelIds, setEffort, setGroupModel,
+  setRoleModel, sharedModel,
 } from './roles.js';
 
 const config = JSON.parse(readFileSync(new URL('../config/roles.json', import.meta.url), 'utf8'));
@@ -150,96 +150,28 @@ test('the review panels describe the review pstack now runs', () => {
     'the cross-judge pool can still supply a judge outside the parent chat\'s openai family');
 });
 
-test('a page that moved no row sends an empty patch', () => {
+test('a saved role line resolves to the id the picker shows and the machine runs', () => {
+  const role = config.groups.find(group => group.id === 'building').roles.find(item => item.id === 'bug-fix');
+  assert.deepEqual(roleModelIds(role, 'commandcode/deepseek/deepseek-v4.1-flash', modelIds),
+    ['mastracode/commandcode/deepseek/deepseek-v4.1-flash']);
+  assert.deepEqual(roleModelIds(role, 'anthropic/claude-opus-5-5', modelIds), ['anthropic/claude-opus-5-5']);
+  assert.deepEqual(roleModelIds(role, 'openai/gpt-9-retired', modelIds), ['openai/gpt-9-retired']);
+});
+
+test('a role with no saved line resolves to its default', () => {
+  const role = config.groups.find(group => group.id === 'judgment').roles.find(item => item.id === 'hardest-tasks');
+  assert.deepEqual(roleModelIds(role, undefined, []), [role.default]);
+  const panel = config.groups.find(group => group.id === 'panels').roles.find(item => item.id === 'arena-runners');
+  assert.deepEqual(roleModelIds(panel, 'openai/gpt-6.1-sol, anthropic/claude-opus-5-5', []),
+    ['openai/gpt-6.1-sol', 'anthropic/claude-opus-5-5']);
+});
+
+test('two choices are equal only when the effort, the Lead and every role match', () => {
   const loaded = fresh();
-  assert.deepEqual(changedRows(loaded, loaded), {});
-  const same = JSON.parse(JSON.stringify(loaded));
-  same.lead = 'openai/gpt-6.1-sol';
-  assert.deepEqual(changedRows({ ...loaded, lead: same.lead }, same), {});
-});
-
-test('the effort and the lead are sent only when they moved', () => {
-  const loaded = { ...fresh(), lead: 'openai/gpt-6.1-sol' };
-  assert.deepEqual(changedRows(loaded, { ...loaded, effort: 'small' }), { effort: 'small' });
-  assert.deepEqual(changedRows(loaded, { ...loaded, lead: 'anthropic/claude-opus-5-5' }), { lead: 'anthropic/claude-opus-5-5' });
-  assert.deepEqual(changedRows(loaded, { ...loaded, effort: 'small', lead: 'anthropic/claude-opus-5-5' }),
-    { effort: 'small', lead: 'anthropic/claude-opus-5-5' });
-});
-
-test('one role change sends that role and nothing else', () => {
-  const loaded = fresh();
-  const moved = setRoleModel(loaded, 'building', 'bug-fix', 'anthropic/claude-opus-5-5');
-  assert.deepEqual(changedRows(loaded, moved), { roles: { building: { 'bug-fix': 'anthropic/claude-opus-5-5' } } });
-});
-
-test('a panel that lost one model sends the whole list', () => {
-  const loaded = fresh();
-  const moved = removePanelModel(loaded, 'panels', 'openai/gpt-6.1-sol', 'arena-runners');
-  const flash = 'mastracode/commandcode/deepseek/deepseek-v4.1-flash';
-  assert.deepEqual(changedRows(loaded, moved), { roles: { panels: { 'arena-runners': [flash] } } });
-});
-
-test('a group model that moved sends every role it moved', () => {
-  const loaded = fresh();
-  const moved = setGroupModel(loaded, 'judgment', 'anthropic/claude-opus-5-5');
-  assert.deepEqual(changedRows(loaded, moved), {
-    roles: { judgment: { 'judgment-and-prose': 'anthropic/claude-opus-5-5', 'hardest-tasks': 'anthropic/claude-opus-5-5' } },
-  });
-});
-
-test('rows the page did not load are ignored rather than sent', () => {
-  const loaded = fresh();
-  const moved = JSON.parse(JSON.stringify(loaded));
-  moved.effort = 'small';
-  moved.groups.brandNewGroup = { model: 'openai/gpt-6.1-sol', roles: { 'new-role': 'openai/gpt-6.1-sol' } };
-  moved.groups.building.roles['new-role'] = 'openai/gpt-6.1-sol';
-  assert.deepEqual(changedRows(loaded, moved), { effort: 'small' });
-});
-
-test('applying rows replaces only the rows it names and leaves the choice alone', () => {
-  const current = fresh();
-  const flash = 'mastracode/commandcode/deepseek/deepseek-v4.1-flash';
-  const next = applyRows(current, { effort: 'small', lead: 'anthropic/claude-opus-5-5', roles: { building: { 'bug-fix': 'openai/gpt-6.1-sol' } } });
-  assert.equal(next.effort, 'small');
-  assert.equal(next.lead, 'anthropic/claude-opus-5-5');
-  assert.equal(next.groups.building.roles['bug-fix'], 'openai/gpt-6.1-sol');
-  assert.deepEqual(next.groups.judgment, current.groups.judgment);
-  assert.deepEqual(next.groups.panels, current.groups.panels);
-  assert.equal(current.effort, 'large');
-  assert.equal(current.groups.building.roles['bug-fix'], flash);
-  assert.notEqual(next.groups.building.roles, current.groups.building.roles);
-});
-
-test('a panel row is replaced whole, not merged into the list it lands on', () => {
-  const current = fresh();
-  const next = applyRows(current, { roles: { panels: { 'arena-runners': ['anthropic/claude-opus-5-5'] } } });
-  assert.deepEqual(next.groups.panels.roles['arena-runners'], ['anthropic/claude-opus-5-5']);
-  assert.deepEqual(next.groups.panels.roles['architect-runners'], current.groups.panels.roles['architect-runners']);
-  assert.deepEqual(next.groups.panels.models, current.groups.panels.models);
-});
-
-test('a patch from an older page lands on a newer choice without reverting it', () => {
-  const loaded = fresh();
-  const newer = setRoleModel(setEffort(loaded, 'small'), 'judgment', 'hardest-tasks', 'anthropic/claude-opus-5-5');
-  const page = setRoleModel(loaded, 'building', 'perf-issue', 'openai/gpt-6.1-sol');
-  const merged = applyRows(newer, changedRows(loaded, page));
-  assert.equal(merged.groups.building.roles['perf-issue'], 'openai/gpt-6.1-sol');
-  assert.equal(merged.groups.judgment.roles['hardest-tasks'], 'anthropic/claude-opus-5-5');
-  assert.equal(merged.effort, 'small');
-});
-
-test('a patch naming a row this build does not have is refused', () => {
-  const current = fresh();
-  assert.throws(() => applyRows(current, { roles: { nowhere: { 'bug-fix': 'openai/gpt-6.1-sol' } } }), /Unknown group nowhere/);
-  assert.throws(() => applyRows(current, { roles: { building: { 'no-such-role': 'openai/gpt-6.1-sol' } } }), /Unknown role no-such-role/);
-  assert.throws(() => applyRows(current, { roles: { building: { 'bug-fix': 7 } } }), /one model/);
-  assert.throws(() => applyRows(current, { roles: { panels: { 'arena-runners': 'openai/gpt-6.1-sol' } } }), new RegExp(PANEL_MODEL_ONLY));
-  assert.throws(() => applyRows(current, null), /object of rows/);
-  assert.equal(current.groups.building.roles['bug-fix'], 'mastracode/commandcode/deepseek/deepseek-v4.1-flash');
-});
-
-test('an old whole-snapshot save is refused with a reload hint', () => {
-  const current = fresh();
-  assert.throws(() => applyRows(current, { ...fresh(), card: 'JUL-276' }), { message: STALE_PAGE });
-  assert.throws(() => applyRows(current, { groups: {} }), { message: STALE_PAGE });
+  assert.equal(picksEqual(loaded, JSON.parse(JSON.stringify(loaded))), true);
+  assert.equal(picksEqual(loaded, { ...loaded, effort: 'small' }), false);
+  assert.equal(picksEqual(loaded, { ...loaded, lead: 'anthropic/claude-opus-5-5' }), false);
+  assert.equal(picksEqual(loaded, setRoleModel(loaded, 'building', 'bug-fix', 'anthropic/claude-opus-5-5')), false);
+  assert.equal(picksEqual(loaded, removePanelModel(loaded, 'panels', 'openai/gpt-6.1-sol', 'arena-runners')), false);
+  assert.equal(picksEqual(loaded, null), false);
 });

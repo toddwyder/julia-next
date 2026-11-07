@@ -66,6 +66,29 @@ export function resolveModelId(wanted, modelIds) {
   return modelIds.find(id => id.endsWith(`/${wanted}`)) ?? '';
 }
 
+// The one resolver the picker and the machine share: a saved line wins, a missing one falls
+// back to the role's default, and an offered-catalogue hit wins over a retired spelling.
+export function roleModelIds(role, stored, modelIds = []) {
+  const wanted = stored ? String(stored).split(',').map(id => id.trim()).filter(Boolean) : [role.default].flat();
+  return wanted.map(id => (modelIds.length ? resolveModelId(id, modelIds) : '') || id);
+}
+
+// Two choices name the same picks when the effort, the Lead and every role line match.
+// The saved file is the source, so a read-back that differs from what was sent is a failure.
+export function picksEqual(before, after) {
+  if (!before || !after) return false;
+  if (before.effort !== after.effort || before.lead !== after.lead) return false;
+  for (const [groupId, group] of Object.entries(before.groups ?? {})) {
+    const next = after.groups?.[groupId];
+    if (!next) return false;
+    if (JSON.stringify(group.models ?? null) !== JSON.stringify(next.models ?? null)) return false;
+    for (const [roleId, value] of Object.entries(group.roles ?? {})) {
+      if (JSON.stringify(value) !== JSON.stringify(next.roles?.[roleId])) return false;
+    }
+  }
+  return true;
+}
+
 function defaultModelFor(role, modelIds, fallback) {
   const resolved = resolveModelId(role.default, modelIds);
   return resolved || fallback;
@@ -197,61 +220,6 @@ export function removePanelModel(choice, groupId, modelId, roleId = '') {
   return next;
 }
 
-export const STALE_PAGE = 'This page is out of date. Reload it and save again.';
-
-const sameRow = (before, after) => (Array.isArray(before) || Array.isArray(after)
-  ? Array.isArray(before) && Array.isArray(after)
-    && before.length === after.length && before.every((value, at) => value === after[at])
-  : before === after);
-
-// The page sends only the rows it moved, measured against the choice it loaded, so a page
-// older than the files cannot overwrite a row it never touched.
-export function changedRows(baseline, choice) {
-  const patch = {};
-  if (baseline.effort !== choice.effort) patch.effort = choice.effort;
-  if (baseline.lead !== choice.lead) patch.lead = choice.lead;
-  const roles = {};
-  for (const [groupId, group] of Object.entries(baseline.groups ?? {})) {
-    const next = choice.groups?.[groupId];
-    if (!next) continue;
-    for (const [roleId, value] of Object.entries(group.roles ?? {})) {
-      const after = next.roles?.[roleId];
-      if (sameRow(value, after)) continue;
-      (roles[groupId] ??= {})[roleId] = Array.isArray(after) ? [...after] : after;
-    }
-  }
-  if (Object.keys(roles).length) patch.roles = roles;
-  return patch;
-}
-
-// The patch names rows, never a whole screen, so it is applied onto a fresh read. Model ids,
-// effort values and panel sizes stay formatSettings' job.
-export function applyRows(current, patch) {
-  if (!isObject(patch)) throw new Error('A save needs an object of rows.');
-  if (Object.hasOwn(patch, 'groups')) throw new Error(STALE_PAGE);
-  const next = copy(current);
-  if (Object.hasOwn(patch, 'effort')) next.effort = patch.effort;
-  if (Object.hasOwn(patch, 'lead')) next.lead = patch.lead;
-  const roles = patch.roles ?? {};
-  if (!isObject(roles)) throw new Error('A save names roles group by group.');
-  for (const [groupId, rows] of Object.entries(roles)) {
-    const group = next.groups?.[groupId];
-    if (!group) throw new Error(`Unknown group ${groupId}.`);
-    if (!isObject(rows)) throw new Error(`Unknown role in group ${groupId}.`);
-    for (const [roleId, value] of Object.entries(rows)) {
-      if (!Object.hasOwn(group.roles, roleId)) throw new Error(`Unknown role ${roleId}.`);
-      if (group.models) {
-        if (!Array.isArray(value) || !value.every(id => typeof id === 'string')) throw new Error(PANEL_MODEL_ONLY);
-        group.roles[roleId] = [...value];
-        continue;
-      }
-      if (typeof value !== 'string') throw new Error('A role holds one model.');
-      group.roles[roleId] = value;
-    }
-  }
-  return next;
-}
-
 // A saved draft is untrusted: the file may have been hand-edited, a model may have retired,
 // or a group may have changed. Anything unknown falls back to the fresh choice, and every
 // group and role in the config is always present.
@@ -267,8 +235,8 @@ export function mergeDraft({ saved, fallback, modelIds = [] }) {
       const models = Array.isArray(kept.models) ? unique(kept.models.filter(known)) : [];
       merged.groups[groupId].models = models.length ? models : [...fresh.models];
       for (const roleId of Object.keys(fresh.roles)) {
-        const roleModels = Array.isArray(kept.roles?.[roleId]) ? unique(kept.roles[roleId].filter(known)) : [];
-        merged.groups[groupId].roles[roleId] = roleModels.length ? roleModels : [...merged.groups[groupId].models];
+        const savedModels = Array.isArray(kept.roles?.[roleId]) ? unique(kept.roles[roleId].filter(known)) : [];
+        merged.groups[groupId].roles[roleId] = savedModels.length ? savedModels : [...merged.groups[groupId].models];
       }
       continue;
     }

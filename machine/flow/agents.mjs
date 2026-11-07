@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { Agent } from '@mastra/core/agent';
 import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace';
 
-import { buildModel } from './models.mjs';
+import { buildModelReader, leadModelId } from './models.mjs';
 import { agentModel, helperKey, readRoleModels } from './role-models.mjs';
 import { FREE_MODEL } from './schema.mjs';
 
@@ -33,7 +33,10 @@ export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelF
     filesystem: new LocalFilesystem({ basePath: repo }),
     sandbox: new LocalSandbox({ workingDirectory: repo, env: { HOME: homedir() } }),
   });
-  const helpers = Object.fromEntries(readRoleModels(roleModelsFile).flatMap(role => role.models.map((modelId, index) => {
+  // Mastra resolves `agents` and `model` at each call, so the picker's file and the Lead
+  // setting reach the next call without a restart. 7 Nov: the save at 15:18:07 needed the
+  // restart at 15:18:10 to take effect.
+  const helpers = () => Object.fromEntries(readRoleModels(roleModelsFile).flatMap(role => role.models.map((modelId, index) => {
     const choice = role.models.length > 1 ? `, choice ${index + 1}` : '';
     return [helperKey(role, index), new Agent({
       id: `pstack-${role.id}-${index + 1}`,
@@ -50,12 +53,15 @@ export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelF
     id: 'flow-build',
     name: 'Lead',
     instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
-    model: buildModel(leadModelFile),
+    model: buildModelReader(leadModelFile),
     workspace,
     agents: helpers,
     tools,
     defaultOptions: { maxSteps: 400 },
   });
+  // The reader runs later, so check the setting now: a missing Lead model stops Studio at boot
+  // and names the installer, as it did when the model was resolved here.
+  leadModelId(leadModelFile);
 
   const shipping = new Agent({
     id: 'flow-shipping',

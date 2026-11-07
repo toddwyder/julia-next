@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +9,7 @@ import { chromium } from '@playwright/test';
 
 import { accountModels } from '../dashboard/lib/account-models.js';
 import { displayName } from '../dashboard/lib/models.js';
-import { ROLE_GROUPS, leadModels, readSettings, settingsPaths } from '../dashboard/lib/model-settings.js';
+import { ROLE_GROUPS, leadModels, readSettings, saveSettingsChoice, settingsPaths } from '../dashboard/lib/model-settings.js';
 import { helperKey, readRoleModels } from '../machine/flow/role-models.mjs';
 import { checkStudioStart } from './check-studio-start.mjs';
 
@@ -206,6 +206,7 @@ async function browserSave(url, current, models, alternateLead, alternateCoder) 
   };
   try {
     const page = await open();
+    assert.equal(await page.getByText(/^Saved on this machine\./).count(), 0, 'A fresh Start screen claims a Save it did not make.');
     const visible = [];
     const leadName = displayName(models.find(model => model.id === current.lead));
     const leadButton = page.getByRole('button', { name: 'Change the Lead model' });
@@ -228,30 +229,12 @@ async function browserSave(url, current, models, alternateLead, alternateCoder) 
           mismatch: mismatched(`${role.name} Start row`, () => assert(actualIds.includes(wrong))) });
       }
     }
-    const stalePage = await open();
-    await choose(page, 'Change the Lead model', alternateLead);
-    await choose(page, 'Change the feature, refactoring model', alternateCoder);
-    await page.getByText('Picks are not applied until you press Save. Restart Studio after saving.').waitFor();
-    await save(page);
-    await page.getByText('Saved on this machine. Restart Studio in its terminal before the next run.').waitFor({ timeout: 20000 });
-    await save(stalePage);
-    const afterResave = readSettings({ paths: settingsPaths(), modelIds: models.map(model => model.id) });
-    assert.equal(afterResave.lead, alternateLead, 'A stale Start screen save replaced the Lead pick.');
-    assert.equal(afterResave.groups.building.roles['feature-refactoring'], alternateCoder, 'A stale Start screen save replaced the coding pick.');
-    await choose(stalePage, 'Change the hillclimb model', alternateCoder);
-    await save(stalePage);
-    const afterStale = readSettings({ paths: settingsPaths(), modelIds: models.map(model => model.id) });
-    assert.equal(afterStale.lead, alternateLead, 'A stale Start screen save replaced the Lead pick.');
-    assert.equal(afterStale.groups.building.roles['feature-refactoring'], alternateCoder, 'A stale Start screen save replaced the coding pick.');
-    assert.equal(afterStale.groups.building.roles.hillclimb, alternateCoder, 'The stale Start screen save did not land its own pick.');
     await page.reload();
     assert.equal(await page.getByRole('button', { name: 'Change the Lead model' }).getAttribute('data-current-model-id'), alternateLead);
     assert.equal(await page.getByRole('button', { name: 'Change the feature, refactoring model' }).getAttribute('data-current-model-id'), alternateCoder);
     const screenshot = resolve('docs/agents/jul-340/start-saved.png');
     await page.screenshot({ path: screenshot, fullPage: true });
-    return { url, screenshot, savedLead: alternateLead, savedCoder: alternateCoder, lead: { model: current.lead, savedVerdict: 'PASS', mismatch: leadMismatch }, visibleRoles: visible,
-      staleSave: { resaveLead: afterResave.lead, resaveCoder: afterResave.groups.building.roles['feature-refactoring'],
-        ownPick: afterStale.groups.building.roles.hillclimb, lead: afterStale.lead, coder: afterStale.groups.building.roles['feature-refactoring'] } };
+    return { url, screenshot, savedLead: alternateLead, savedCoder: alternateCoder, lead: { model: current.lead, savedVerdict: 'PASS', mismatch: leadMismatch }, visibleRoles: visible };
   } finally { await browser.close(); }
 }
 
@@ -285,15 +268,29 @@ export async function checkModelPicker() {
     const env = { ...process.env, NODE_ENV: 'development' };
     delete env.OPENAI_API_KEY;
     delete env.OPENAI_BASE_URL;
+    // 7 Nov: the save at 15:18:07 only reached the run after the restart at 15:18:10. One Studio
+    // boot serves both runs here, and the second run starts after a Save with that Studio up.
     const savedStudio = await checkStudioStart({ env, onReady: async ({ port }) => {
       const agents = await json(port, '/agents');
       const entry = Object.entries(agents).find(([, agent]) => agent.name === 'Lead');
       assert(entry, 'Studio does not list Lead.');
       const [agentId] = entry;
-      return modelRun(port, agentId, saved.lead, leadList);
+      const first = await modelRun(port, agentId, saved.lead, leadList);
+      const nextLead = wrongModel(saved.lead, leadList);
+      const screen = readSettings({ paths, modelIds: models.map(model => model.id) });
+      try {
+        const written = saveSettingsChoice({ ...screen, lead: nextLead }, { models, paths });
+        assert.equal(written.wrote, true, 'The Save with Studio running wrote nothing.');
+        assert.equal(readSettings({ paths, modelIds: models.map(model => model.id) }).lead, nextLead, 'The Save with Studio running did not land the Lead pick.');
+        const second = await modelRun(port, agentId, nextLead, leadList);
+        return { ...first, liveSave: { lead: nextLead, studioPort: port, restarted: false, run: second } };
+      } finally {
+        saveSettingsChoice({ ...screen, lead: saved.lead }, { models, paths });
+      }
     } });
     assert.deepEqual(savedStudio.failures, []);
     proof.criterion3 = savedStudio.checked;
+    proof.criterion6 = savedStudio.checked.liveSave;
 
     const helperStudio = await checkStudioStart({ env, onReady: async ({ port }) => {
       const agents = await json(port, '/agents');

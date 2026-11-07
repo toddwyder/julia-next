@@ -8,7 +8,7 @@ import { createAgents, repoRoot } from './agents.mjs';
 import { helperKey, readRoleModels } from './role-models.mjs';
 import { buildModel, leadModelId } from './models.mjs';
 import { installLeadModel } from '../../scripts/install-lead-model.mjs';
-import { ROLE_GROUPS, formatSettings } from '../../dashboard/lib/model-settings.js';
+import { ROLE_GROUPS, formatSettings, readSettings } from '../../dashboard/lib/model-settings.js';
 import { initialChoice } from '../../dashboard/lib/roles.js';
 
 const repo = process.cwd();
@@ -146,6 +146,61 @@ test('the Lead setting accepts a CommandCode model through the helper route', t 
   writeFileSync(file, 'commandcode/moonshotai/Kimi-K3.1-Pro\n');
   assert.equal(leadModelId(file), 'commandcode/moonshotai/Kimi-K3.1-Pro');
   assert.equal(buildModel(file), 'commandcode/moonshotai/Kimi-K3.1-Pro');
+});
+
+// 7 Nov: a pick saved at 15:18:07 only reached the run after Studio restarted at 15:18:10.
+test('a changed models file changes the next call without a new createAgents', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = join(dir, 'lead-role-models.md');
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  writeFileSync(roleModelsFile, 'feature, refactoring: commandcode/deepseek/deepseek-v4.1-flash\n');
+  const { build } = createAgents({ repo, leadModelFile, roleModelsFile });
+  assert.equal((await build.getModel()).modelId, 'gpt-6.1-sol');
+  assert.equal((await (await build.listAgents()).featureRefactoring.getModel()).modelId, 'deepseek/deepseek-v4.1-flash');
+
+  writeFileSync(leadModelFile, 'openai/gpt-5.4\n');
+  writeFileSync(roleModelsFile, 'feature, refactoring: commandcode/moonshotai/Kimi-K3.1-Pro\n');
+  assert.equal((await build.getModel()).modelId, 'gpt-5.4');
+  assert.equal((await (await build.listAgents()).featureRefactoring.getModel()).modelId, 'moonshotai/Kimi-K3.1-Pro');
+});
+
+test('readRoleModels reads the picker file only and ignores the pstack models file', t => {
+  const dir = temporary(t);
+  const home = join(dir, 'home');
+  const picker = join(home, '.config', 'julia', 'lead-role-models.md');
+  const pstack = join(home, '.agents', 'pstack-models.md');
+  mkdirSync(join(home, '.config', 'julia'), { recursive: true });
+  mkdirSync(join(home, '.agents'), { recursive: true });
+  writeFileSync(picker, 'feature, refactoring: commandcode/moonshotai/Kimi-K3.1-Pro\n');
+  writeFileSync(pstack, 'feature, refactoring: openai/gpt-6-astra\nbug-fix: openai/gpt-6-astra\n');
+  const previous = process.env.JULIA_LEAD_ROLE_MODELS_FILE;
+  const previousHome = process.env.HOME;
+  t.after(() => {
+    if (previous === undefined) delete process.env.JULIA_LEAD_ROLE_MODELS_FILE;
+    else process.env.JULIA_LEAD_ROLE_MODELS_FILE = previous;
+    process.env.HOME = previousHome;
+  });
+  delete process.env.JULIA_LEAD_ROLE_MODELS_FILE;
+  process.env.HOME = home;
+  const roles = readRoleModels();
+  assert.deepEqual(roles.find(role => role.id === 'feature-refactoring').models, ['commandcode/moonshotai/Kimi-K3.1-Pro']);
+  assert.notDeepEqual(roles.find(role => role.id === 'bug-fix').models, ['openai/gpt-6-astra']);
+  assert.equal(readFileSync(pstack, 'utf8'), 'feature, refactoring: openai/gpt-6-astra\nbug-fix: openai/gpt-6-astra\n');
+});
+
+test('the picker and the machine resolve the same model id for every saved role', t => {
+  const dir = temporary(t);
+  const roleModelsFile = join(dir, 'lead-role-models.md');
+  const modelIds = ['openai/gpt-6.1-sol', 'commandcode/deepseek/deepseek-v4.1-flash', 'anthropic/claude-opus-5-5'];
+  const models = modelIds.map(id => ({ id, provider: id.split('/')[0] }));
+  const choice = { ...initialChoice({ groups: ROLE_GROUPS, modelIds }), lead: modelIds[0] };
+  choice.groups.building.roles['bug-fix'] = modelIds[2];
+  writeFileSync(roleModelsFile, formatSettings(choice, models).pstack);
+  const picker = readSettings({ paths: { pstack: roleModelsFile, lead: join(dir, 'lead-model') }, modelIds });
+  for (const role of readRoleModels(roleModelsFile)) {
+    assert.deepEqual(role.models, [picker.groups[role.group].roles[role.id]].flat(), `${role.name} resolves differently in the picker and the machine.`);
+  }
 });
 
 test('installing the Lead setting twice keeps an existing model and the coder role', t => {
