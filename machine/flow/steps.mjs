@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
+import { BUILD_WORKTREE, prepareBuildWorktree } from './agents.mjs';
 import { cardState, flowData, runInput } from './schema.mjs';
 import {
   nextVerdict,
@@ -75,11 +76,22 @@ export function createStages({ agents, dir }) {
   // The build is a real agent step: `createStep(agents.build)` gives it the
   // agent's own input and output, so the card data goes through a mapper either
   // side of it instead of through the stage's shared schema.
-  const startBuild = step('start-build', async ({ inputData, state, setState }) => {
+  //
+  // This step also decides where the build runs. The card gets its own worktree,
+  // and the Lead and its helpers resolve their files onto it from the request
+  // context, so the checkout Studio runs from keeps its branch and its tree.
+  const startBuild = step('start-build', async ({ inputData, state, setState, requestContext }) => {
     const card = state.card || inputData.card;
     const buildRounds = state.buildRounds + 1;
+    const worktree = prepareBuildWorktree(card);
+    requestContext.set(BUILD_WORKTREE, worktree.path);
     await setState({ ...state, buildRounds, requestId: `${card}/build-${buildRounds}` });
-    return { ...inputData, card, detail: `build round ${buildRounds} started`, prompt: buildPrompt(card, state.kind) };
+    return {
+      ...inputData,
+      card,
+      detail: `build round ${buildRounds} started in ${worktree.path}`,
+      prompt: buildPrompt(card, state.kind),
+    };
   });
 
   const buildAgent = createStep(agents.build, { retries: BUILD_RETRIES });

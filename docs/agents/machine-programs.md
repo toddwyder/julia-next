@@ -11,8 +11,8 @@ of any size, not only a change to the sentence beside it.
 | --- | --- | --- |
 | `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `6dccaeea1b2ecfe0b390741e92db5554bbaac61495272e0e75178c9b740eaae0` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `7501664a0b3774a5ac48b0628c40f9b1157703d1b2c2b94eb589fdde1f0b5e49` |
-| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `e4a38ba53e9a0180be91361923745ffc7dec12c4c471a5f450eb2eaf3fa3354d` |
-| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `36be31f65368be87543f3f94cbd1199a85503eeb201c4090e61a2cfaabd77e6d` |
+| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `71776619b1c23333c533ff76439a7185f9956721c786ff21c0d66d37c551dcb9` |
+| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `34108da0c041ab47f3229ed7d0bba3f8e37548f922bd4577a3a811f3b9a86786` |
 | `machine/flow/models.mjs` | The Lead model, read from its independent setting and routed through its account provider. | `66c603e3907a13a5635e886b9d18ffefb2c751c536562304c68b4b64fce0d17f` |
 | `machine/flow/role-models.mjs` | The Lead helper models, read from the saved role table and routed to account providers. | `df92f74f3a13ea1a17376e92ba359d8ac3d51b3a28a69f958068f302cac41a7a` |
 | `machine/flow/schema.mjs` | What the run form asks for and what the run remembers. | `1bb30c353ed7efa0c8526e0833f5ec841e116ba1e21542191cad321e767ebd66` |
