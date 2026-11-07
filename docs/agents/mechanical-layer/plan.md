@@ -85,7 +85,8 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 **Build.**
 
 - [ ] Start red. `scripts/prove-trace-memory.mjs` drives `openMastra` with a scripted model and 1 MB tool results for 60 steps and reaches the heap limit on trunk, the same growth that ended in the 7 Nov `oom-kill` at 16:01:14.
-- [ ] Set `serializationOptions.maxStringLength` to 2000 in the `default` observability config inside `openMastra`.
+- [ ] Set `serializationOptions.maxStringLength` to 2000 in the `default` observability config inside `openMastra` (`reference-observability-tracing-configuration.md:62-70`).
+- [ ] Set `excludeSpanTypes: [SpanType.PROCESSOR_RUN]` in the same config (`reference-observability-tracing-configuration.md:56`). The stock error processors `provider-history-compat` and `unsupported-file-handler` log the whole prompt at every step, so their spans grow with the square of the step count.
 
 **You see.**
 
@@ -262,6 +263,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 - [ ] Start red. `notice.test.mjs` replays the 7 Nov 16:10:35 `AI_APICallError: The usage limit has been reached` through the Lead and expects one notice. On trunk the run failed and Todd got nothing.
 - [ ] Add one `notice` function that posts a card comment mentioning Todd and sets his `issueReminder` 30 seconds later, through the existing path in `scripts/linear-cli.mjs` and `dashboard/lib/ping.js:40-49`. The reminder uses Linear's `at` time, so no timer is needed.
 - [ ] Add one error processor with `processAPIError` to the Lead and every helper (`docs-agents-processors.md:115-131`). It sends a notice for a usage limit, a 429 after the last retry, a refused or unknown model, and an authorization block.
+- [ ] Add an output processor with `processOutputStep` that sends a notice when `finishReason` is `content-filter`, because a content refusal never reaches `processAPIError`.
 - [ ] At Studio boot, send a restart notice for each `card-path` run that storage still shows as `running`.
 
 **You see.**
@@ -426,7 +428,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 - [ ] Start red. `workflow.test.mjs` kills a child process mid-build and restarts it. On trunk the build step replays from model step 0, as the 7 Nov run `ffc3d864` did at 16:01:59 in a second trace.
 - [ ] Wrap the Lead with `createDurableAgent` and a `shouldPersistSnapshot` that includes `running` (`docs-harness-durable-agents.md:283`, `:293-306`).
 - [ ] Replace `createStep(agents.build)` with a build step that uses the run id `<workflow run id>-build`. If `listActiveRuns()` shows that id, the step calls `recover()`. Otherwise it starts the run. Keep `recovery.durableAgents` off, so the stock workflow sweep (`docs-workflows-overview.md:487-503`) is the one thing that restarts a card.
-- [ ] Lower the storage exporter's batch wait, so the steps before a kill reach the trace.
+- [ ] Set `maxBatchSize: 1` on `MastraStorageExporter`, so the steps before a kill reach the trace. DuckDB supports only the event-sourced strategy, so batch size is the one setting that does this.
 
 **You see.**
 
@@ -601,6 +603,9 @@ Every prototype ran against `@mastra/core` 1.82.0 with a scripted `MockLanguageM
 - `p1-workflow-restart.mjs` measured that the stock boot sweep restarts the build step from model step 0, with every earlier step twice in the trace.
 - `p2-durable.mjs` measured that `createStep(durable)` with `durableAgents: 'auto'` ran two copies of the build. Our own adopt-or-start step with `durableAgents` off repeated only the tool call in flight. A helper delegation in flight replays whole. Each earlier step showed once, but the last exporter batch before the kill was lost.
 - `p3-memory.mjs` measured quadratic heap growth from span serialization, ending in a heap-limit crash and one kernel kill (exit 137). With `serializationOptions.maxStringLength` 2000 the heap ended near 100 MB.
+- A rerun under a 1 GB memory cap, `p3b-memory.mjs` with output `q3b.out`, measured trace bytes, not heap, growing with the square of the step count. The two stock processor spans carried it. At 16 steps with 20 KB tool results the trace was 11162 KB, 1325 KB with `maxStringLength` 2000, and 360 KB with `excludeSpanTypes: [PROCESSOR_RUN]`. The heap grew about 300 KB per step whatever the payload, so what drove the 7 Nov peak stays a guess. The leading guess is the observe stream serializing one chunk past the V8 string limit, which matches the 158 `Invalid string length` lines in the 7 Nov journal.
+- The rerun's `q2b-batch1.out` measured that `maxBatchSize: 1` keeps every finished step's span after a kill, while the default batching lost steps 0 to 3.
+- The rerun's `q4.out` measured that a plain 429 is retried twice before it fails, while the usage-limit 429 fails at once. A content refusal returns `status=success` with empty text and reaches only `processOutputStep`.
 - `p4-errors.mjs` measured that `processAPIError` sees a 429, a usage limit, an unknown model, and a 403 within about 25 ms. A content-filter refusal does not throw and shows only in the span.
 
 **7 Nov evidence.** Folder `~/.local/state/julia-scratch/jul-342-forensics/`, queried with `q.mjs` over copies of the live Studio `state.db` and `trace.duckdb` from `src/mastra/public/.artifacts/flow/studio/`.
@@ -618,7 +623,6 @@ Every prototype ran against `@mastra/core` 1.82.0 with a scripted `MockLanguageM
 - Whether `agents` as a function lets a panel role change its helper count without a restart. P3 lane 6 settles it.
 - Whether `npx @openai/codex` gets past the refusing scripts. P6 lane 4 settles it.
 - Whether a real provider can return empty text under `toolChoice: 'none'`. P5 lane 4 covers the case either way.
-- Whether a smaller exporter batch wait keeps the last steps before a kill. P7 lane 2 settles it.
 
 ## Appendix B. Alternatives rejected
 
