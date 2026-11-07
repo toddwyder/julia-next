@@ -9,11 +9,15 @@ In the JUL-341 Studio run:
 - The Lead then ran `codex exec` on ChatGPT models through its shell, bypassing the helpers on Todd's picks.
 - Studio was killed for running out of memory, and the workflow restarted the build from step 0.
 
+## Models file
+
+The machine's one models file is the picker's own `~/.config/julia/lead-role-models.md`. pstack's `~/.agents/pstack-models.md` stays untouched for the sessions Todd runs by hand (Codex, Claude Code, CommandCode), whose harnesses can't reach every model the picker offers (Todd, 5 and 7 Nov).
+
 ## What gets removed
 
 - The Lead's and helpers' command-line route to Codex and other coding programs.
 - The Lead's control over a helper's step count.
-- The second models file and its separate defaults.
+- The machine's reading of pstack's models file, and any second set of defaults beside `dashboard/config/roles.json`.
 - The Studio restart after every pick.
 - Builds editing the folder Studio runs from.
 

@@ -3,17 +3,38 @@
 Builds started in Studio run only on Todd's model picks. Helpers always return a written report. Todd hears about a restart, a refused model, or a usage limit within a minute.
 The rule is that our code sets the mechanics on stock Mastra 1.82.0 settings, so the Lead neither picks them nor routes around them. pstack's files stay untouched.
 Each slice starts red on the 7 Nov JUL-341 failure that it fixes.
-The slices, in order, are P1 (bounded trace), P2 (build worktree), P3 (one models file, read per run), P4 (trouble notices), P5 (helpers report back), P6 (no coding programs), P7 (resume from the last step), P8 (pstack anchors in CI), and P9 (practice card proof).
+The slices, in order, are P1 (bounded trace), P2 (build worktree), P3 (the picker's models file, read per run), P4 (trouble notices), P5 (helpers report back), P6 (no coding programs), P7 (resume from the last step), P8 (pstack anchors in CI), and P9 (practice card proof).
 
 ## How to read this
 
 One box is one unit of work. Every box names the evidence that checks it. A nested box is a sub-step of the box above it. Check a box only when its evidence exists, a file, a log line, a screenshot, a test run, or a SHA. The body is a how-to. The appendices explain and record.
 
-The program runs `.agents/skills/poteto-mode/playbooks/autopilot-full.md`. The builder works by hand in Claude Code, outside Studio, as Todd asked on 7 Nov. Todd's full-autonomy grant lets each owner merge its PR once required checks pass and the root's verdict is clean. P3 changes the model picker, which Todd uses, so P3 stops at merge-ready for his review. P9 ends with Todd's UAT, and the card completes only after his yes.
+The program runs `.agents/skills/poteto-mode/playbooks/autopilot-full.md`. The builder works by hand in CommandCode, outside Studio, on `commandcode/deepseek/deepseek-v4.1-flash`, as Todd asked on 7 Nov. P5 and P7 move to a stronger model only if DeepSeek gets stuck on them, and the switch is recorded in the owner's trail. Todd's full-autonomy grant lets each owner merge its PR once required checks pass and the root's verdict is clean. P3 changes the model picker, which Todd uses, so P3 stops at merge-ready for his review. P9 ends with Todd's UAT, and the card completes only after his yes.
+
+Live lanes run on `commandcode/deepseek/deepseek-v4.1-flash`, one or two at a time. Audit lanes and Shipping run on `gpt-6-luna`, moving to `gpt-6.1-terra` if Luna misses a real failure. Their model company stays different from the builder's.
 
 Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
 Each slice is a Linear sub-issue of JUL-342, in the order above, and carries its **You see.** block as its done-means. JUL-342 completes only when the P9 sub-issue completes.
+
+## Architecture
+
+The mechanics are one path through stock Mastra 1.82.0. A run starts from the run form. The build step creates the card worktree and points the Lead and helper workspaces at it. The Lead and every helper are built with `model` and `agents` resolved per call, delegation hooks that set and protect the helper budget, a last-step processor that forces text, a workspace command gate, and error and output processors that send notices. The trace config caps every stored string. The build step adopts or starts one durable run, so a restart resumes it. Every notice leaves through one `notice` function.
+
+| Piece | What our code sets | Mastra 1.82.0 doc | Code |
+| --- | --- | --- | --- |
+| Per-run model lookup | `model` and `agents` are functions that read the picker file and the Lead setting at each call | `reference-agents-agent.md:560`, `:562`; `docs-server-request-context.md:127-153` | `machine/flow/agents.mjs`, `machine/flow/role-models.mjs`, `machine/flow/models.mjs` |
+| Build worktree | a filesystem resolver and a sandbox resolver point the Lead and helpers at the card worktree | `reference-workspace-workspace-class.md:36-38`; `reference-workspace-local-sandbox.md:47` | `machine/flow/agents.mjs`, `start-build` in `machine/flow/steps.mjs` |
+| Helper delegation hooks | `onDelegationStart` returns `modifiedMaxSteps`; `onDelegationComplete` replaces empty text and stamps `machineFault` | `docs-subagents.md:68-78`, `:136-144` | `machine/flow/agents.mjs` |
+| Last-step check | a `processInputStep` processor returns `toolChoice: 'none'` on the helper's last step | `docs-agents-processors.md:235`, `:260-269` | `machine/flow/agents.mjs` |
+| Command gate | a workspace `tools.hooks.beforeToolCall` refuses coding programs, and refusing scripts sit first on `PATH` | `reference-workspace-workspace-class.md:184-196`; `docs-sandbox-overview.md:58-76` | `machine/flow/agents.mjs`, `machine/flow/refused-programs/` |
+| Trace limits | `serializationOptions.maxStringLength` 2000 and `excludeSpanTypes: [SpanType.PROCESSOR_RUN]` | `reference-observability-tracing-configuration.md:56`, `:62-70` | `machine/flow/mastra.mjs` |
+| Resume | `createDurableAgent` persists `running` snapshots, an adopt-or-start build step calls `recover()`, and `MastraStorageExporter` writes each finished step | `docs-harness-durable-agents.md:283`, `:293-306`; `docs-workflows-overview.md:487-503` | `machine/flow/steps.mjs`, `machine/flow/mastra.mjs` |
+| Notices | `processAPIError` and `processOutputStep` processors call one `notice` function, and boot reports a run still `running` | `docs-agents-processors.md:115-131`, `:336`, `:385-407`, `:1067-1087` | `machine/flow/notice.mjs`, `src/mastra/index.ts` |
+
+The order inside a run is worktree, then models, then Lead steps. A helper call is one delegation. The Lead's hook raises the budget. The helper's last-step processor forces text. The complete hook turns empty text into a fault and a notice. The command gate runs inside both shells, so it covers the Lead and every helper. The trace limit applies to every span. Resume sits above all of them. It rebuilds the same Lead, hooks, gate, and processors from the persisted snapshot, then re-drives the build run. Notices are the only piece that leaves Mastra, and they stay behind one function.
+
+The exporter batch setting, `maxBatchSize`, has no line in the packaged 1.82.0 references. Appendix A's `q2b-batch1.out` measured it.
 
 ## Program checklist
 
@@ -29,6 +50,7 @@ Each slice is a Linear sub-issue of JUL-342, in the order above, and carries its
   - [ ] `git show origin/main:.agents/skills/interrogate/SKILL.md`
   - [ ] `git show origin/main:docs/agents/server-runbook.md`
 - [ ] On the operator's go, arm the audit tick as `/loop 1h` with the tick prompt below. Never leave the cadence to memory.
+- [ ] Record the server's memory budget before the first lane. It has 7.6 GB and no swap, so at most two candidate Studios run at once, each capped at 1 GB.
 - [ ] Use this tick prompt, verbatim. "Re-read the execution playbook from trunk. Audit the operation against it and fix drift in this tick. Probe every active lane and judge progress by side effects only. Stand down a stuck lane and dispatch its replacement now. Then post a short status message to the operator in chat only when the audit found a tracked change that no earlier status message reported, such as a PR opened, a code-ready head, a round launched or closed, a verdict, a merge, a stuck agent and the action taken, a blocker added or cleared, or a decision only the operator can make. Name every such change and nothing else. Do not repeat a table, the merged list, or an unchanged blocker. If the audit found none, end the turn with no reply text. Either way, log this tick's row in your decision trail. The row names the items reported, or none."
 - [ ] On the operator's hold or stand-down, send every owner a zero-writes order at once.
 - [ ] Put the Studio folder back on main before any slice runs. `git -C ~/julia-builder status` prints `On branch main` and a clean tree, and `jul-341-apothecary` stays on origin with its five commits. Todd's grant covers this server change.
@@ -36,7 +58,7 @@ Each slice is a Linear sub-issue of JUL-342, in the order above, and carries its
 
 ### Spawn owners
 
-- [ ] Spawn one owner per PR with the full lifecycle the execution playbook names. Each owner works in its own worktree under `~/.local/state/julia-scratch/jul-342-<pr>/`, never in `~/julia-builder`.
+- [ ] Spawn one owner per PR on `commandcode/deepseek/deepseek-v4.1-flash` with the full lifecycle the execution playbook names. P5 and P7 move to a stronger model only if DeepSeek gets stuck on them, and the owner records the switch and its reason in the trail. Each owner works in its own worktree under `~/.local/state/julia-scratch/jul-342-<pr>/`, never in `~/julia-builder`.
 - [ ] Follow this dependency graph. Start dependent work only after its parent merges.
   - [ ] P1, P2, P3, P4, and P8 are independent and first. All branch from `main`.
   - [ ] P5 after P3 and P4.
@@ -59,16 +81,16 @@ Each slice is a Linear sub-issue of JUL-342, in the order above, and carries its
 
 ### Verdict and merge, for every PR
 
-- [ ] A full swarm runs once, at the code-ready head. Another full swarm runs only for new behavior, a redesign, or a large new diff. A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head, and a wording-only change gets none. Run each full swarm per `.agents/skills/swarm/SKILL.md`. One gates lane. The ten live lanes from the PR's **Verify, live** block. The perf lane from its **Verify, perf** block. Two or more audit lanes, each with its own focus, that read the diff and the receipts and distrust the PR body. The root audits the receipts in the merge-ready report before the verdict.
+- [ ] A full swarm runs once, at the code-ready head. Another full swarm runs only for new behavior, a redesign, or a large new diff. A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head, and a wording-only change gets none. Run each full swarm per `.agents/skills/swarm/SKILL.md`. One gates lane. The ten live lanes from the PR's **Verify, live** block, on `commandcode/deepseek/deepseek-v4.1-flash`, one or two at a time. The perf lane from its **Verify, perf** block. Two or more audit lanes, each with its own focus, that read the diff and the receipts and distrust the PR body, on `gpt-6-luna`, moving to `gpt-6.1-terra` if Luna misses a real failure. Their model company stays different from the builder's. The root audits the receipts in the merge-ready report before the verdict.
 - [ ] Judge every finding by the execution playbook's blocking rule. The verdict is clean when none blocks. A failure on trunk behavior in a lane marked `Regression lane against trunk.` is recorded against trunk and does not block the PR. A new head gets a fresh verdict, except for results that stay valid under the patch-id rule in `playbooks/shipping.md`.
 - [ ] The owner squash-merges its own PR after the root's clean verdict at the exact head SHA and green required checks. If the head changes after the verdict, the patch-id rule in `playbooks/shipping.md` decides whether the verdict still covers it. P3 waits for the operator's click.
 
 ### Boot recipe, for every live lane
 
-Each live lane runs on the server at the PR head, in its own worktree. Drive the browser through `playwright-cli` and the shell through tmux. Live Studio on its own port stays on main and is never restarted by a lane.
+Each live lane runs on the server at the PR head, in its own worktree. Run one or two live lanes at a time. The server has 7.6 GB and no swap, so each candidate Studio is capped at 1 GB RSS. Drive the browser through `playwright-cli` and the shell through tmux. Live Studio on its own port stays on main and is never restarted by a lane.
 
 - [ ] `git fetch origin <head-branch> && git checkout <head SHA>`.
-- [ ] Start a candidate Studio from the worktree on its own port with `FLOW_DIR`, `JULIA_LEAD_MODEL_FILE`, and the models-file variable pointed at files in the lane folder. Pick the free model in every role. Wait for the `card-path` run form, as `node scripts/check-studio-start.mjs` checks it.
+- [ ] Start a candidate Studio from the worktree on its own port with `FLOW_DIR`, `JULIA_LEAD_MODEL_FILE`, and the models-file variable pointed at files in the lane folder, under a 1 GB memory cap. Pick the free model in every role. Wait for the `card-path` run form, as `node scripts/check-studio-start.mjs` checks it.
 - [ ] Deliver input only through Studio's run form, the dashboard Start screen, or a tmux shell. Read-only diagnostics are the run's `trace.duckdb` copied into the lane folder, `state.db` copied the same way, `journalctl --user`, and `git -C <folder> status`.
 - [ ] Save every screenshot to `~/.local/state/julia-scratch/swarm-<pr-id>/worker-<n>/<slug>.png` and return the paths with the report.
 
@@ -97,7 +119,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 
 - [ ] `machine/flow/workflow.test.mjs` gains a case that a stored span input is at most 2000 characters per string. Run `node --test machine/flow/workflow.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run the 60-step memory probe at trunk and head. Save `memory-trunk-head.png`. Pass when trunk hits the heap limit and head ends under 150 MB.
 - [ ] Lane 2. Start the practice card on the candidate Studio and let it reach 100 Lead steps. Save `long-run.png`. Pass when the run ends and the candidate process has the same PID throughout.
@@ -150,7 +172,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 
 - [ ] `machine/flow/agents.test.mjs` gains cases for the worktree path and for a second start that reuses the same worktree. Run `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run a practice build at trunk and head and record the Studio folder's branch after each. Save `folder-branch.png`. Pass when trunk leaves the folder off main and head leaves it on main and clean.
 - [ ] Lane 2. Poll `git -C <studio folder> status --porcelain` every 10 seconds during a head build. Save `folder-poll.png`. Pass when every poll is empty.
@@ -193,12 +215,12 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 - [ ] Edit `machine/flow/models.mjs`.
 - [ ] Edit `machine/flow/agents.mjs`.
 - [ ] Edit `scripts/check-model-picker.mjs`.
-- [ ] Delete `~/.config/julia/lead-role-models.md` on the server after merge.
+- [ ] Leave `~/.agents/pstack-models.md` untouched.
 
 **Build.**
 
-- [ ] Start red. `model-settings.test.mjs` asserts that an unchanged Save rewrites and reads back the files. On trunk `saveSettingsPatch` returns `wrote:false` at `dashboard/lib/model-settings.js:126`, and the screen still shows "Saved". `scripts/check-model-picker.mjs` asserts the next run uses a new pick with Studio left running. On trunk the 7 Nov save at 15:18:07 was followed by a Studio restart at 15:18:10.
-- [ ] Make `~/.agents/pstack-models.md`, the file pstack names, the one role models file. The picker writes it and `readRoleModels` reads it. The Lead's own model stays in `~/.config/julia/lead-model`. `dashboard/config/roles.json` stays the one source of defaults, and Save writes every role line, so neither reader falls back.
+- [ ] Start red. `model-settings.test.mjs` asserts that an unchanged Save rewrites and reads back the files. On trunk `saveSettingsPatch` returns `wrote:false` at `dashboard/lib/model-settings.js:128`, and the screen still shows "Saved". `scripts/check-model-picker.mjs` asserts the next run uses a new pick with Studio left running. On trunk the 7 Nov save at 15:18:07 was followed by a Studio restart at 15:18:10.
+- [ ] Keep `~/.config/julia/lead-role-models.md`, the picker's own file, as the machine's one role models file. The picker writes it and `readRoleModels` reads it. Leave `~/.agents/pstack-models.md` untouched for the sessions Todd runs by hand. The Lead's own model stays in `~/.config/julia/lead-model`. `dashboard/config/roles.json` stays the one source of defaults, and Save writes every role line, so neither reader falls back.
 - [ ] Make Save send the full choice every time, write it, read it back, and show "Saved" only when the read-back equals the choice. The first page load shows no "Saved".
 - [ ] Pass `model` and `agents` to the Lead and helpers as functions that read the files at each call (`reference-agents-agent.md:560`, `:562`). Delete the "Restart Studio" line from the screen.
 - [ ] Make the picker show the id the machine resolves for each role, by sharing one resolver between `dashboard/lib/roles.js` and `machine/flow/role-models.mjs`.
@@ -208,12 +230,13 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 - [ ] Todd changes the Lead's model, presses Save, and sees "Saved". He presses Save again with nothing changed and sees "Saved", and the file's modified time moves.
 - [ ] The next practice run, with Studio left running, shows the new Lead model in its trace.
 - [ ] Every role's model on the picker equals the model Studio shows for that agent.
+- [ ] Save leaves `~/.agents/pstack-models.md` byte for byte unchanged.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] `dashboard/lib/model-settings.test.mjs` gains cases for an unchanged Save that writes and reads back, and for a failed read-back that returns no "Saved". `machine/flow/agents.test.mjs` gains a case that a changed file changes the next call's model without a new `createAgents`. Run `npm --prefix dashboard test` and `node --test machine/flow/agents.test.mjs`.
+- [ ] `dashboard/lib/model-settings.test.mjs` gains cases for an unchanged Save that writes and reads back, for a failed read-back that returns no "Saved", and for a Save that writes only `~/.config/julia/lead-role-models.md` and `~/.config/julia/lead-model` and leaves `~/.agents/pstack-models.md` unchanged. `machine/flow/agents.test.mjs` gains a case that a changed file changes the next call's model without a new `createAgents`, and a case that `readRoleModels` ignores `~/.agents/pstack-models.md`. Run `npm --prefix dashboard test` and `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Change the Lead's pick, save, and start a run without a restart, at trunk and head. Save `next-run.png`. Pass when trunk's trace shows the old model and head's trace shows the new one.
 - [ ] Lane 2. Press Save with nothing changed. Save `unchanged-save.png`. Pass when "Saved" appears and the file's modified time moves.
@@ -221,8 +244,8 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 - [ ] Lane 4. Make the models file read-only and press Save. Save `failed-save.png`. Pass when the screen shows an error and no "Saved".
 - [ ] Lane 5. Compare every role on the picker with Studio's agent list. Save `picker-vs-studio.png`. Pass when all 17 roles match.
 - [ ] Lane 6. Change a panel role from two models to one and start a run. Save `panel.png`. Pass when Studio offers one helper for that role without a restart.
-- [ ] Lane 7. Delete `~/.config/julia/lead-role-models.md` in the lane folder and start a run. Save `one-file.png`. Pass when the run starts and reads only the pstack models file.
-- [ ] Lane 8. Edit the pstack models file by hand and reload the picker. Save `hand-edit.png`. Pass when the picker shows the hand edit.
+- [ ] Lane 7. Point `~/.agents/pstack-models.md` in the lane folder at a model the picker does not offer and start a run. Save `one-file.png`. Pass when the run's models all equal the picker file and pstack's file is unchanged.
+- [ ] Lane 8. Edit `~/.config/julia/lead-role-models.md` by hand and reload the picker. Save `hand-edit.png`. Pass when the picker shows the hand edit.
 - [ ] Lane 9. Run `node scripts/check-model-picker.mjs` at head. Save `check-picker.png`. Pass when it exits 0 without restarting Studio.
 - [ ] Lane 10. Run `npm run guard:flow` and `node scripts/machine-programs.mjs --check`. Save `guard.png`. Pass when both exit 0.
 
@@ -275,7 +298,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 
 - [ ] `machine/flow/notice.test.mjs` covers usage limit, 429, unknown model, authorization block, content filter, and boot restart, each sending one notice. Run `node --test machine/flow/notice.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Force a usage-limit error at trunk and head on a throwaway card. Save `usage-limit.png`. Pass when trunk sends nothing and head's notice reaches Todd's inbox within 60 seconds.
 - [ ] Lane 2. Pick an unknown model for the Lead and start a run. Save `refused-model.png`. Pass when the notice arrives within 60 seconds.
@@ -329,7 +352,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 
 - [ ] `machine/flow/agents.test.mjs` gains cases for the budget override, the last-step text, and the machine fault. Run `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run the practice card at trunk and head and count helper spans that end with empty text. Save `empty-helpers.png`. Pass when head has none.
 - [ ] Lane 2. Read every helper span's step count. Save `budget.png`. Pass when each helper's budget equals its own setting, whatever `maxSteps` the Lead passed.
@@ -372,7 +395,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 
 - [ ] Start red. `agents.test.mjs` sends `codex exec "do the card"` through the Lead's `execute_command`, as the Lead did nine times on 7 Nov from 15:30:21. On trunk it runs.
 - [ ] Put `machine/flow/refused-programs/` first on the `PATH` of the Lead and helper sandboxes. Each script, named `codex`, `claude`, `cursor-agent`, `mastracode`, `opencode`, `gemini`, `aider`, and `commandcode`, prints a refusal and exits 126.
-- [ ] Add a workspace `hooks.beforeToolCall` that returns `{ proceed: false, output }` for any command naming those programs, including by absolute path or through `npx` (`reference-workspace-workspace-class.md:185-200`).
+- [ ] Add a workspace `tools.hooks.beforeToolCall` that returns `{ proceed: false, output }` for any command naming those programs, including by absolute path or through `npx` (`reference-workspace-workspace-class.md:68`, `:185-200`).
 
 **You see.**
 
@@ -383,7 +406,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 
 - [ ] `machine/flow/agents.test.mjs` gains cases for the plain name, `bash -c`, a split quote, a script file, base64 through `eval`, an absolute path, and `npx @openai/codex`, each refused. Git, npm, and node still run. Run `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Plant `codex exec` in the practice card's prompt at trunk and head. Save `planted-codex.png`. Pass when trunk runs it and head's trace shows the refusal.
 - [ ] Lane 2. Plant `mastracode --model` the way the 7 Nov Lead did. Save `mastracode.png`. Pass when it is refused.
@@ -439,7 +462,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 
 - [ ] `machine/flow/workflow.test.mjs` gains a SIGKILL-and-restart case that counts model steps and finds each earlier one once. Run `node --test machine/flow/workflow.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Kill the candidate Studio after 20 Lead steps at trunk and head. Save `resume.png`. Pass when trunk restarts at step 0 and head resumes at step 20 or 21.
 - [ ] Lane 2. Count step spans per step number after lane 1. Save `once.png`. Pass when every step before the kill shows once.
@@ -495,7 +518,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 
 - [ ] `scripts/check-pstack-anchors.test.mjs` covers a missing anchor, a doubled anchor, an untouched tree, and added text under a heading. Run `node --test scripts/check-pstack-anchors.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Open a throwaway PR that edits "explicit model per role", based on trunk and on head. Save `anchor-edit.png`. Pass when trunk's CI passes and head's CI fails naming the rule.
 - [ ] Lane 2. Remove "Fresh subagents by default." Save `anchor-removed.png`. Pass when CI fails naming that rule.
@@ -536,7 +559,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 **Build.**
 
 - [ ] Create a throwaway practice card in Linear. Set every pick on the picker to the free model. Start the card from Studio's run form on main.
-- [ ] Run Shipping by hand, from a fresh agent given only the card's criteria, its UAT steps, and the code. Record its verdict per criterion.
+- [ ] Run Shipping by hand, from a fresh agent given only the card's criteria, its UAT steps, and the code, on `gpt-6-luna`, moving to `gpt-6.1-terra` if Luna misses a real failure. Record its verdict per criterion.
 - [ ] Hand the UAT steps to Todd with the preview address.
 
 **You see.**
@@ -548,7 +571,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Drive the
 
 - [ ] Every test file named in P1 to P8 passes on main. Run `node scripts/test-owners.mjs --run local`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `sonnet` at the PR head, per the boot recipe.
+**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one or two at a time, per the boot recipe.
 
 - [ ] Lane 1. Regression lane against trunk. Run the 7 Nov red queries from Appendix A on the JUL-341 trace and on the practice trace. Save `seven-nov.png`. Pass when JUL-341 shows each failure and the practice trace shows none.
 - [ ] Lane 2. List every model in the practice trace. Save `models.png`. Pass when each equals Todd's pick for its role.
@@ -632,13 +655,13 @@ Every prototype ran against `@mastra/core` 1.82.0 with a scripted `MockLanguageM
 - Turning off boot recovery leaves a crashed card stuck in `running`. P7 keeps the stock sweep and makes the build step resume.
 - `ToolCallFilter` did not bound memory in the prototype. P1 uses `serializationOptions`.
 - Restarting Studio after each pick is what the end state removes. P3 resolves models per call instead.
-- Keeping `~/.config/julia/lead-role-models.md` and copying it into pstack's file would leave two files to drift. P3 keeps pstack's file only.
-- Folding the Lead's model into pstack's file would add a line pstack does not define. The Lead's model stays in its own one-line setting.
+- Writing the machine's picks into `~/.agents/pstack-models.md` would edit the file pstack uses for hand-run sessions and leave two files to drift. P3 keeps the picker's file as the machine's one file and leaves pstack's untouched.
+- Folding the Lead's model into the picker's role file would add a line the picker does not define. The Lead's model stays in its own one-line setting.
 
 ## Appendix C. Risks
 
 - P3. Studio may show a `model` function as "dynamic" instead of an id. If it does, the criterion that the picker and Studio show the same model fails, and the owner reports it as a finding before building around it.
-- P3. The Lead reads `~/.agents/pstack-models.md` as text through poteto-mode. A pick that pstack does not recognize changes what the Lead asks for, but not what runs. P6 keeps the Lead from reaching any other model.
+- P3. The Lead's pstack instructions name `~/.agents/pstack-models.md`, which the machine no longer writes. A hand edit there could change what the Lead asks for, but not what runs. P6 keeps the Lead from reaching any other model.
 - P2. A build worktree left from a crashed run must be reused, not duplicated. P2 lane 4 checks it.
 - P4. Linear does not notify Todd about a comment posted with his own key. The `issueReminder` is the notice that reaches him, per ADR 0024.
 - P4 and P7. A restart notice must not repeat for a run that was already reported. P4 lane 8 checks repeats.
