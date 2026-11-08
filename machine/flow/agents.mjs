@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Agent } from '@mastra/core/agent';
+import { resolveCurrentSpan } from '@mastra/core/observability';
 import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace';
 
 import { buildModel } from './models.mjs';
@@ -9,6 +10,49 @@ import { agentModel, helperKey, readRoleModels } from './role-models.mjs';
 import { FREE_MODEL } from './schema.mjs';
 
 const POTETO_SKILL = '.agents/skills/poteto-mode/SKILL.md';
+
+// A helper's own step budget. The Lead can cut it with the maxSteps it sends to a delegation
+// tool, and on 8 November a helper cut to 12 stopped on a tool-calls step with empty text.
+export const HELPER_MAX_STEPS = 100;
+
+// What Lead hears instead of an empty string when a helper spends its whole budget on tool
+// calls. It names a machine fault so the model does not read the silence as a finished job.
+export function machineFault(primitiveId) {
+  return `Machine fault: the ${primitiveId} helper used its whole ${HELPER_MAX_STEPS}-step budget on tool calls and returned no text.`
+    + ' This is a machine fault, not a card result, so no work from it can be read.';
+}
+
+// Mastra counts steps from 0, so the last step of a budget-step run is budget - 1. Turning
+// tools off there makes the helper write its text instead of ending on another tool call.
+export function helperBudgetProcessor(budget = HELPER_MAX_STEPS) {
+  return {
+    id: 'helper-last-step',
+    processInputStep({ stepNumber }) {
+      if (stepNumber >= budget - 1) return { toolChoice: 'none' };
+      return {};
+    },
+  };
+}
+
+function stampMachineFault(span, fault) {
+  if (!span || typeof span.update !== 'function') return;
+  span.update({ attributes: { machineFault: fault } });
+}
+
+// The Lead's delegation settings: give every helper its own budget, whatever maxSteps the
+// model sent, and turn an empty result into a named fault on the result and the span.
+export function helperDelegation(budget = HELPER_MAX_STEPS) {
+  return {
+    onDelegationStart: () => ({ proceed: true, modifiedMaxSteps: budget }),
+    onDelegationComplete: ({ primitiveId, result }) => {
+      if (result?.text?.trim()) return undefined;
+      const fault = machineFault(primitiveId);
+      stampMachineFault(resolveCurrentSpan(), fault);
+      return { resultText: fault };
+    },
+  };
+}
+
 
 function repositoryContaining(directory) {
   if (existsSync(join(directory, POTETO_SKILL))) return directory;
@@ -42,7 +86,8 @@ export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelF
       instructions: `You are the ${role.name} pstack helper. ${role.explanation} Complete the task delegated by Lead yourself. Do not delegate it again. Report the result and evidence.`,
       model: agentModel(modelId),
       workspace: helperWorkspace,
-      defaultOptions: { maxSteps: 100 },
+      defaultOptions: { maxSteps: HELPER_MAX_STEPS },
+      inputProcessors: [helperBudgetProcessor()],
     })];
   })));
   const build = new Agent({
@@ -52,7 +97,7 @@ export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelF
     model: buildModel(leadModelFile),
     workspace,
     agents: helpers,
-    defaultOptions: { maxSteps: 400 },
+    defaultOptions: { maxSteps: 400, delegation: helperDelegation() },
   });
 
   const shipping = new Agent({
