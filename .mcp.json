@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "julia-graph": {
+      "transport": "stdio",
+      "enabled": true,
+      "command": "graphify-mcp",
+      "args": [
+        "graphify-out/graph.json"
+      ]
+    },
+    "mastra-graph": {
+      "transport": "stdio",
+      "enabled": true,
+      "command": "graphify-mcp",
+      "args": [
+        "graphify-out/mastra/graph.json"
+      ]
+    }
+  }
+}

@@ -1,0 +1,23 @@
+# Historical run records and audits. They are evidence for past cards, not
+# documentation a current question should read.
+docs/advisor-notes/
+docs/retros/
+docs/scorecards/
+docs/audits/
+
+# Throwaway sketches and generated fixtures.
+spikes/
+graph/fixtures/
+.impeccable/
+
+# Other skill catalogs duplicate the pstack skills already indexed from .agents.
+.claude/
+
+# Screenshots and diagrams are not documentation the graph answers from, and
+# image extraction spends model tokens.
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg

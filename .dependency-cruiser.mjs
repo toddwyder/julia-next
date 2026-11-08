@@ -9,6 +9,7 @@ const allowedPackages = [
   '@mastra/core',
   '@mastra/duckdb',
   '@mastra/libsql',
+  '@mastra/mcp',
   '@mastra/observability',
   '@duckdb/node-api',
   'zod',
