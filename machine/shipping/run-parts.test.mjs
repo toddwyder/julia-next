@@ -1,10 +1,11 @@
+import { execFileSync } from 'node:child_process';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { prepareDependencies } from './run-parts.mjs';
+import { prepareCheckout, prepareDependencies } from './run-parts.mjs';
 
 test('the root and dashboard trees are installed one at a time, with dev dependencies', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'shipping-install-'));
@@ -77,4 +78,37 @@ test('a checkout whose lockfile matches main links the installed trees instead o
     assert.equal(fs.lstatSync(installed).isSymbolicLink(), false);
     assert.equal(fs.existsSync(path.join(installed, '.package-lock.json')), true);
   }
+});
+
+// The 20:34 run died at checkout: a worktree directory left behind after its git
+// registration was pruned made `git worktree add` refuse with "already exists".
+test('a leftover checkout directory is cleared so the review can check out again', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'shipping-checkout-'));
+  const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  const identity = ['-c', 'user.email=a@b', '-c', 'user.name=a'];
+
+  const source = path.join(root, 'source');
+  fs.mkdirSync(source);
+  git(['init', '--quiet', '-b', 'main'], source);
+  git([...identity, 'commit', '--allow-empty', '-m', 'first'], source);
+  git([...identity, 'commit', '--allow-empty', '-m', 'reviewed'], source);
+  const head = git(['rev-parse', 'HEAD'], source).trim();
+  git(['update-ref', 'refs/pull/487/head', head], source);
+
+  // The machine's repository, with that clone as its origin.
+  const machine = path.join(root, 'machine');
+  fs.mkdirSync(machine);
+  git(['init', '--quiet', '-b', 'main'], machine);
+  git(['remote', 'add', 'origin', source], machine);
+
+  const checkout = path.join(root, 'worktree');
+  const runDir = path.join(root, 'run');
+  fs.mkdirSync(checkout, { recursive: true });
+  fs.writeFileSync(path.join(checkout, 'left-behind.txt'), 'stale\n');
+
+  const sha = prepareCheckout(487, runDir, checkout, { root: machine });
+
+  assert.equal(sha, head, 'the review is checked out at the pull request head');
+  assert.equal(fs.existsSync(path.join(checkout, 'left-behind.txt')), false, 'the leftover file is gone');
+  assert.equal(fs.existsSync(path.join(checkout, '.git')), true, 'a real worktree replaced it');
 });

@@ -14,26 +14,31 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 
 export const repoRoot = path.resolve(here, '../..');
 
-export function git(args) {
-  return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+export function git(args, root = repoRoot) {
+  return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
-export function prepareCheckout(pr, runDir, checkout) {
-  git(['fetch', '--no-tags', '--quiet', 'origin', `pull/${pr}/head`]);
-  const sha = git(['rev-parse', 'FETCH_HEAD^{commit}']);
+export function prepareCheckout(pr, runDir, checkout, { root = repoRoot } = {}) {
+  git(['fetch', '--no-tags', '--quiet', 'origin', `pull/${pr}/head`], root);
+  const sha = git(['rev-parse', 'FETCH_HEAD^{commit}'], root);
   try {
-    git(['worktree', 'remove', '--force', checkout]);
+    git(['worktree', 'remove', '--force', checkout], root);
   } catch {
     // No worktree there yet; the add below fails loudly if something else is.
   }
   try {
-    git(['worktree', 'prune']);
+    git(['worktree', 'prune'], root);
   } catch {
     // Prune is tidiness; a stale registration fails the add with a clear message.
   }
+  // A directory whose registration was already pruned survives both calls above,
+  // and `git worktree add` then refuses because the path exists. The path is the
+  // machine's own scratch checkout for one pull request, so what is there is a
+  // leftover of an earlier review, never work to keep.
+  fs.rmSync(checkout, { recursive: true, force: true });
   fs.mkdirSync(runDir, { recursive: true });
   fs.mkdirSync(path.dirname(checkout), { recursive: true });
-  git(['worktree', 'add', '--detach', '--quiet', checkout, sha]);
+  git(['worktree', 'add', '--detach', '--quiet', checkout, sha], root);
   return sha;
 }
 
