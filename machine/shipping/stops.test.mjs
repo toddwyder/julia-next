@@ -15,7 +15,9 @@ import {
   ceilingStop,
 } from './stops.mjs';
 
-const call = (toolName, input = {}) => ({ toolName, input });
+// Mastra's step result names a call's arguments `args`; the frozen step shape
+// this file was written against said `input`, which made every call look alike.
+const call = (toolName, args = {}) => ({ toolName, args });
 const step = (toolCalls, { text = '', inputTokens = 1000 } = {}) => ({ toolCalls, text, usage: { inputTokens } });
 
 const judging = n => `CRITERION ${n}: PASS — it ran`;
@@ -177,4 +179,21 @@ test('starting a criterion counts as progress, so a working review is not called
     Array.from({ length: count }, () => ({ toolCalls: [call('view', { path: 'a' })], text, usage: { inputTokens: 1000 } }));
   const steps = [...calls('CRITERION 1: judging', 10), ...calls('', 10), ...calls('CRITERION 2: judging', 10)];
   assert.equal(spinningStop(steps), null, 'a review that keeps starting new criteria is making progress');
+});
+
+test('three different commands are not called repeating, because a signature reads args', () => {
+  // The 21:04 run stopped as repeating on three different commands: every
+  // signature came out `execute_command(null)`, so they compared equal.
+  const steps = [
+    step([call('execute_command', { command: 'git rev-parse HEAD' })]),
+    step([call('execute_command', { command: 'npm run dev' })]),
+    step([call('execute_command', { command: 'curl -fsS http://127.0.0.1:4313/api/health' })]),
+  ];
+  assert.equal(repeatingStop(steps), null);
+});
+
+test('the same command three times in a row is still repeating', () => {
+  const same = [call('execute_command', { command: 'npm run dev' })];
+  const steps = [step(same), step(same), step(same)];
+  assert.equal(repeatingStop(steps)?.kind, 'repeating');
 });

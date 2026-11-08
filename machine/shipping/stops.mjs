@@ -44,9 +44,19 @@ function stable(value) {
   return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stable(value[key])}`).join(',')}}`;
 }
 
+// The call's own arguments. Mastra's step result carries them on `args`; the
+// same call inside `content` carries `input`. Both are read so a signature never
+// collapses to null and makes three different commands look like one.
+function argsOf(call) {
+  if (!call || typeof call !== 'object') return null;
+  if (call.args !== undefined) return call.args;
+  if (call.input !== undefined) return call.input;
+  return null;
+}
+
 export function stepSignature(step) {
   return toolCalls(step)
-    .map(call => `${call?.toolName ?? 'unknown'}(${stable(call?.input ?? null)})`)
+    .map(call => `${call?.toolName ?? 'unknown'}(${stable(argsOf(call))})`)
     .join(' ');
 }
 
