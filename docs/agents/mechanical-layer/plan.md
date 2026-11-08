@@ -19,6 +19,8 @@ Each slice is a Linear sub-issue of JUL-342, in the order above, and carries its
 
 The verification shape is the repo's own, recorded in `docs/pstack-deviations.md`. Run `node scripts/check-plan.mjs docs/agents/mechanical-layer/plan.md`; do not run the pstack checker on this plan.
 
+One shared trunk run serves the Build, Models, and Helpers regressions. The planted-codex and killed-build regressions get their own trunk runs. The Tell Todd piece is held out of this batch, and its two failed checks are diagnosed from saved output.
+
 ## Architecture
 
 The mechanics are one path through stock Mastra 1.82.0. A run starts from the run form. The build step creates the card worktree and points the Lead and helper workspaces at it. The Lead and every helper are built with `model` and `agents` resolved per call, delegation hooks that set and protect the helper budget, a last-step processor that forces text, a workspace command gate, and error and output processors that send notices. The trace config caps every stored string. The build step adopts or starts one durable run, so a restart resumes it. Every notice leaves through one `notice` function.
@@ -172,7 +174,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A practice build leaves the Studio folder off main at trunk; at head the folder stays on main and clean. Save `folder-branch.png`. Pass when trunk moves the folder and head does not. Reads trunk run 1 and head run 1.
+- [ ] Scenario 1. Regression against trunk. A practice build leaves the Studio folder off main at trunk; at head the folder stays on main and clean. Save `folder-branch.png`. Pass when trunk moves the folder and head does not. Reads the shared trunk run and head run 1.
 - [ ] Scenario 2. Every Lead command runs in the build worktree. Save `cwd.png`. Pass when every `execute_command` span's cwd is the worktree. Reads head run 1.
 - [ ] Scenario 3. A helper's file writes stay in the build worktree. Save `helper-writes.png`. Pass when every written path is inside it. Reads head run 1.
 - [ ] Scenario 4. A second start reuses the worktree. Save `reuse.png`. Pass when the second start creates no second worktree. Reads head run 2.
@@ -232,7 +234,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A changed Lead pick needs a Studio restart at trunk; at head the next run uses it with Studio left running. Save `next-run.png`. Pass when trunk shows the old model and head the new one. Reads trunk run 1 and head run 1.
+- [ ] Scenario 1. Regression against trunk. A changed Lead pick needs a Studio restart at trunk; at head the next run uses it with Studio left running. Save `next-run.png`. Pass when trunk shows the old model and head the new one. Reads the shared trunk run and head run 1.
 - [ ] Scenario 2. An unchanged Save writes and reads back, and the file mtime moves. Save `unchanged-save.png`. Pass when Saved appears and mtime changes. Reads head run 1.
 - [ ] Scenario 3. A fresh page shows no Saved, and a failed read-back shows an error. Save `failed-save.png`. Pass when the first load has no Saved and a read-only file shows an error. Reads head run 1.
 - [ ] Scenario 4. Every role on the picker matches Studio. Save `picker-vs-studio.png`. Pass when all 17 roles match. Reads head run 1.
@@ -290,12 +292,12 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A usage limit at trunk sends nothing; at head one notice reaches Todd within 60 seconds. Save `usage-limit.png`. Pass when trunk sends none and head sends one. Reads trunk run 1 and head run 1.
-- [ ] Scenario 2. A refused model reaches Todd within 60 seconds. Save `refused-model.png`. Pass when the notice names the model and arrives in time. Reads head run 2.
-- [ ] Scenario 3. A restart mid-run reaches Todd within 60 seconds. Save `restart.png`. Pass when the restart notice arrives after the new process. Reads head run 3.
-- [ ] Scenario 4. A 429 that recovers sends no notice; one that fails every retry sends one. Save `429.png`. Pass when the recovered case is silent and the failed case sends one. Reads head run 4 and head run 5.
-- [ ] Scenario 5. A content refusal sends a notice. Save `content-filter.png`. Pass when the notice arrives within 60 seconds. Reads head run 6.
-- [ ] Scenario 6. A repeat error sends one notice per error and no more. Save `repeat.png`. Pass when each error has exactly one notice. Reads head run 7.
+- [ ] Scenario 1. Regression against trunk. A usage limit at trunk sends nothing; at head one notice reaches Todd within 60 seconds. Save `usage-limit.png`. Pass when trunk sends none and head sends one. Held. Diagnosis only, no run in this batch.
+- [ ] Scenario 2. A refused model reaches Todd within 60 seconds. Save `refused-model.png`. Pass when the notice names the model and arrives in time. Held. Diagnosis only, no run in this batch.
+- [ ] Scenario 3. A restart mid-run reaches Todd within 60 seconds. Save `restart.png`. Pass when the restart notice arrives after the new process. Held. Diagnosis only, no run in this batch.
+- [ ] Scenario 4. A 429 that recovers sends no notice; one that fails every retry sends one. Save `429.png`. Pass when the recovered case is silent and the failed case sends one. Held. Diagnosis only, no run in this batch.
+- [ ] Scenario 5. A content refusal sends a notice. Save `content-filter.png`. Pass when the notice arrives within 60 seconds. Held. Diagnosis only, no run in this batch.
+- [ ] Scenario 6. A repeat error sends one notice per error and no more. Save `repeat.png`. Pass when each error has exactly one notice. Held. Diagnosis only, no run in this batch.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -340,7 +342,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A helper cut to 12 steps ends empty at trunk; at head it uses its full budget and ends with text. Save `empty-helpers.png`. Pass when head has no empty helper. Reads trunk run 1 and head run 1.
+- [ ] Scenario 1. Regression against trunk. A helper cut to 12 steps ends empty at trunk; at head it uses its full budget and ends with text. Save `empty-helpers.png`. Pass when head has no empty helper. Reads the shared trunk run and head run 1.
 - [ ] Scenario 2. The Lead's maxSteps cannot cut the helper's budget. Save `budget.png`. Pass when each helper's budget equals its own setting. Reads head run 1.
 - [ ] Scenario 3. The last step sends toolChoice none and ends with text. Save `last-step.png`. Pass when the last step has no tool call and has text. Reads head run 1.
 - [ ] Scenario 4. An empty report is a machine fault in the trace and a notice. Save `fault.png`. Pass when the span carries machineFault and Todd gets one notice. Reads head run 2.
@@ -389,7 +391,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A planted codex exec runs at trunk and is refused at head. Save `planted-codex.png`. Pass when trunk runs it and head refuses it. Reads trunk run 1 and head run 1.
+- [ ] Scenario 1. Regression against trunk. A planted codex exec runs at trunk and is refused at head. Save `planted-codex.png`. Pass when trunk runs it and head refuses it. Reads trunk run 2 (planted codex) and head run 1.
 - [ ] Scenario 2. An absolute path is refused. Save `abs-path.png`. Pass when the hook refuses `/usr/local/bin/codex`. No Studio. Script in the shared runner.
 - [ ] Scenario 3. npx is refused. Save `npx.png`. Pass when `npx @openai/codex` is refused. No Studio. Script in the shared runner.
 - [ ] Scenario 4. A script file calling codex exits 126. Save `script-file.png`. Pass when the refusing script answers with exit 126. No Studio. Script in the shared runner.
@@ -442,7 +444,7 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A kill restarts at step 0 at trunk; at head it resumes at step 20 or 21. Save `resume.png`. Pass when trunk restarts at 0 and head resumes at 20 or 21. Reads trunk run 1 and head run 1.
+- [ ] Scenario 1. Regression against trunk. A kill restarts at step 0 at trunk; at head it resumes at step 20 or 21. Save `resume.png`. Pass when trunk restarts at 0 and head resumes at 20 or 21. Reads trunk run 3 (build killed partway) and head run 1.
 - [ ] Scenario 2. Every earlier step shows once. Save `once.png`. Pass when no step span repeats. Reads head run 1.
 - [ ] Scenario 3. A kill during a helper delegation replays only that delegation, and the first helper call after resume has full budget and text. Save `helper-kill.png`. Pass when only that delegation replays and the next helper call has its full budget and text. Reads head run 2.
 - [ ] Scenario 4. A double kill resumes both times and finishes. Save `double-kill.png`. Pass when both resumes land and the build finishes. Reads head run 3.
