@@ -149,34 +149,25 @@ test('a review that is working is not stopped by any condition', () => {
   assert.equal(fired.stop, null);
 });
 
-test('the watch owns an abort signal, because the subagent tool reads that and nothing else', async () => {
-  const listeners = [];
-  const session = {
-    subscribe(listener) {
-      listeners.push(listener);
-      return () => {};
-    },
-  };
+test('the watch owns the abort signal and the event emitter the subagent tool reads', async () => {
   const stops = [];
   const { watchReview } = await import('./workflow.mjs');
-  const watch = watchReview(session, { idleMs: 5000, onStop: stop => stops.push(stop), log: () => {} });
+  const watch = watchReview({ idleMs: 250, onStop: stop => stops.push(stop), log: () => {} });
 
   assert.equal(watch.signal.aborted, false, 'a working review is not aborted');
-  for (const listener of listeners) listener({ type: 'tool_start' });
-  assert.equal(watch.signal.aborted, false, 'activity never aborts the review');
+  assert.equal(typeof watch.emitEvent, 'function', 'the subagent tool needs an emitter to report what it does');
 
-  await new Promise(resolve => {
-    const started = Date.now();
-    const poll = setInterval(() => {
-      if (watch.signal.aborted || Date.now() - started > 8000) {
-        clearInterval(poll);
-        resolve();
-      }
-    }, 20);
-  });
+  // Each report from the subagent keeps the clock from firing.
+  for (let index = 0; index < 4; index++) {
+    watch.emitEvent({ type: 'subagent_tool_start' });
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(watch.signal.aborted, false, 'activity never aborts the review');
+  }
+
+  await new Promise(resolve => setTimeout(resolve, 1400));
   watch.close();
 
-  assert.equal(stops.length, 1, 'the stop is reported once');
+  assert.equal(stops.length, 1, 'the stop is reported once, after the reports stop');
   assert.equal(stops[0].kind, 'stuck');
   assert.equal(watch.signal.aborted, true, 'the aborted signal is what stops the subagent run');
 });

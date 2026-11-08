@@ -18,37 +18,20 @@ const RETRY_WAITS_MS = [30_000, 90_000, 240_000];
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// The events that mean the review did something. A streaming model turn emits
-// thousands of deltas, so only these move the idle clock.
-const ACTIVITY = new Set([
-  'agent_start',
-  'agent_end',
-  'tool_start',
-  'tool_end',
-  'tool_input_start',
-  'tool_input_end',
-  'subagent_start',
-  'subagent_end',
-  'subagent_tool_start',
-  'subagent_tool_end',
-  'usage_update',
-]);
-
 // The review used to be killed by a wall clock, verdict or not. Now each way a
 // review can get nowhere has its own stop and its own reason: quiet, repeating,
 // spinning, or over budget. A review that keeps working keeps running.
 //
-// The subagent tool reads its abort signal from the request context's
-// `controller` entry (`controllerCtx?.abortSignal`), so this watch owns an
-// AbortController and the review hands its signal over. `session.abortRun()`
-// alone does nothing here: it aborts the session's own run, not the subagent
-// stream the review is waiting on.
-export function watchReview(session, { idleMs = IDLE_STOP_MS, onStop, log = () => {} } = {}) {
+// A review is a subagent, and the subagent tool reads two things from the request
+// context's `controller` entry: `abortSignal`, which stops a run, and `emitEvent`,
+// which reports what the run is doing. The session bus stays silent for a
+// subagent, so without an emitter there is no activity to watch and a busy review
+// looks exactly like a hung one. This watch supplies both, and its own emitter is
+// what touches the idle clock.
+export function watchReview({ idleMs = IDLE_STOP_MS, onStop, log = () => {} } = {}) {
   const watch = createIdleWatch({ limitMs: idleMs });
   const controller = new AbortController();
-  const unsubscribe = session.subscribe(event => {
-    if (event?.type === 'usage_update' || ACTIVITY.has(event?.type)) watch.touch();
-  });
+  const drip = () => watch.touch();
   const disarm = watch.arm({
     onIdle: stop => {
       log(`The review had no activity for ${reviewLimitWords(idleMs)}, so it was stopped as stuck.`);
@@ -58,11 +41,9 @@ export function watchReview(session, { idleMs = IDLE_STOP_MS, onStop, log = () =
   });
   return {
     signal: controller.signal,
+    emitEvent: drip,
     stop: watch.idleStop.bind(watch),
-    close() {
-      disarm();
-      unsubscribe?.();
-    },
+    close: disarm,
   };
 }
 
@@ -225,14 +206,20 @@ export async function runShipping({
       // step boundary: a review blocked inside a tool call emits nothing.
       // It owns the abort signal, so a quiet review is stopped inside its tool.
       const existing = requestContext.get('controller') ?? {};
-      stopped.watch = watchReview(session, {
+      stopped.watch = watchReview({
         idleMs,
         log,
         onStop: stop => {
           stopped.stop = stop;
         },
       });
-      requestContext.set('controller', { ...existing, abortSignal: stopped.watch.signal });
+      // The subagent tool takes its abort signal and its event emitter from this
+      // one entry, so both have to be set here for the watch to see the review.
+      requestContext.set('controller', {
+        ...existing,
+        abortSignal: stopped.watch.signal,
+        emitEvent: stopped.watch.emitEvent,
+      });
       const answer = await askVerifier(
         subagent,
         { agentType: 'execute', task, modelId },
