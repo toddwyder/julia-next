@@ -43,12 +43,44 @@ export function prepareCheckout(pr, runDir, checkout) {
 // A tree installed from the same lockfile is reused.
 const INSTALL_TREES = ['', 'dashboard'];
 
-export function prepareDependencies(checkout, { log = () => {}, timeoutMs = 15 * 60_000 } = {}) {
+function sameContents(left, right) {
+  try {
+    return fs.readFileSync(left).equals(fs.readFileSync(right));
+  } catch {
+    return false;
+  }
+}
+
+function removeTree(target) {
+  try {
+    if (fs.lstatSync(target).isSymbolicLink()) fs.unlinkSync(target);
+    else fs.rmSync(target, { recursive: true, force: true });
+  } catch {
+    // Nothing installed yet.
+  }
+}
+
+export function prepareDependencies(checkout, { log = () => {}, timeoutMs = 15 * 60_000, mainRoot = repoRoot } = {}) {
   for (const relative of INSTALL_TREES) {
     const cwd = path.join(checkout, relative);
     const lock = path.join(cwd, 'package-lock.json');
-    const marker = path.join(cwd, 'node_modules', '.package-lock.json');
+    const nodeModules = path.join(cwd, 'node_modules');
+    const marker = path.join(nodeModules, '.package-lock.json');
     if (!fs.existsSync(lock)) continue;
+
+    // A pull request that does not change the lockfile can use the tree already
+    // installed in the main checkout, so the review starts without an install.
+    const mainModules = path.join(mainRoot, relative, 'node_modules');
+    if (
+      sameContents(lock, path.join(mainRoot, relative, 'package-lock.json')) &&
+      fs.existsSync(path.join(mainModules, '.package-lock.json'))
+    ) {
+      removeTree(nodeModules);
+      fs.symlinkSync(mainModules, nodeModules, 'dir');
+      log(`Linked ${relative || 'root'} dependencies from the main checkout; the lockfile matches.`);
+      continue;
+    }
+
     try {
       if (fs.statSync(marker).mtimeMs >= fs.statSync(lock).mtimeMs) continue;
     } catch {
