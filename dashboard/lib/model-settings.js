@@ -53,7 +53,29 @@ export function readSettings({ paths = settingsPaths(), modelIds = [] } = {}) {
     else target.model = sharedModel(Object.values(target.roles));
   }
   choice.lead = readSetting(paths.lead)?.trim() || LEAD_DEFAULT_MODEL;
+  // The Shipping stage's pick is the same saved line the picker shows. The machine reads
+  // stageModels() instead, which requires the line and never falls back to this default.
+  choice.shipping = choice.groups.machine?.roles?.shipping ?? '';
   return choice;
+}
+
+const ACCOUNT_MODEL = /^[a-z][a-z0-9-]*\/[a-zA-Z0-9][a-zA-Z0-9/._:-]*$/;
+
+// The machine's stage models come from the same saved file as the picker rows. A stage with
+// no saved line stops here and names itself, so no built-in model can answer for it.
+export function stageModels(file = settingsPaths().pstack) {
+  let text = '';
+  try { text = readFileSync(file, 'utf8'); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const saved = parsePstack(text).roles;
+  const stages = ROLE_GROUPS.filter(group => group.machine).flatMap(group => group.roles);
+  return Object.fromEntries(stages.map(role => {
+    const stored = saved.get(role.name);
+    if (!stored) throw new Error(`Missing ${role.name} pick in ${file}.`);
+    const id = stored.split(',')[0].trim();
+    if (!ACCOUNT_MODEL.test(id)) throw new Error(`Invalid ${role.name} model in ${file}.`);
+    return [role.id, id];
+  }));
 }
 
 export function leadModels(models) {

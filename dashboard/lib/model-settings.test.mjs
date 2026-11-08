@@ -10,6 +10,7 @@ const models = [
   { id: 'openai/gpt-6.1-sol', provider: 'openai' },
   { id: 'openai/gpt-6-astra', provider: 'openai' },
   { id: 'commandcode/deepseek/deepseek-v4.1-flash', provider: 'commandcode' },
+  { id: 'commandcode/moonshotai/Kimi-K3.1-Pro', provider: 'commandcode' },
 ];
 const fresh = () => ({
   ...initialChoice({ groups: ROLE_GROUPS, modelIds: models.map(model => model.id) }),

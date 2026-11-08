@@ -269,7 +269,7 @@ export async function checkModelPicker() {
     assert.equal(saved.lead, alternateLead, 'The browser Save did not persist the Lead model.');
     assert.equal(saved.groups.building.roles['feature-refactoring'], alternateCoder, 'The browser Save did not persist the coding model.');
     const roles = readRoleModels();
-    assert.equal(roles.length, ROLE_GROUPS.reduce((count, group) => count + group.roles.length, 0));
+    assert.equal(roles.length, ROLE_GROUPS.filter(group => !group.machine).reduce((count, group) => count + group.roles.length, 0));
     for (const role of roles) assert.deepEqual(role.models, [saved.groups[role.group].roles[role.id]].flat());
     proof.savedHashes = Object.fromEntries(Object.entries(paths).map(([key, file]) => [key, sha(readFileSync(file))]));
 

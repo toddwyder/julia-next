@@ -26,7 +26,7 @@ test('Studio uses the CLI project root when its server works in the public direc
   assert.equal(repoRoot(), repo);
   const leadModelFile = join(temporary(t), 'lead-model');
   installLeadModel(leadModelFile);
-  assert.equal(createAgents({ leadModelFile }).build.name, 'Lead');
+  assert.equal(createAgents({ leadModelFile, model: 'openai/gpt-6.1-sol' }).build.name, 'Lead');
   process.env.FLOW_REPO = '/explicit/repository';
   assert.equal(repoRoot(), '/explicit/repository');
 });
@@ -35,6 +35,21 @@ function temporary(t) {
   const dir = mkdtempSync(join(tmpdir(), 'lead-settings-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   return dir;
+}
+
+const MODEL_IDS = [
+  'openai/gpt-6.1-sol',
+  'commandcode/deepseek/deepseek-v4.1-flash',
+  'anthropic/claude-opus-5-5',
+  'commandcode/moonshotai/Kimi-K3.1-Pro',
+];
+
+function completeRoleFile(file, mutate = () => {}) {
+  const models = MODEL_IDS.map(id => ({ id, provider: id.split('/')[0] }));
+  const choice = { ...initialChoice({ groups: ROLE_GROUPS, modelIds: MODEL_IDS }), lead: MODEL_IDS[0] };
+  mutate(choice);
+  writeFileSync(file, formatSettings(choice, models).pstack);
+  return file;
 }
 
 test('Lead shell commands find global Git settings without inheriting unrelated environment variables', async t => {
@@ -51,7 +66,7 @@ test('Lead shell commands find global Git settings without inheriting unrelated 
   writeFileSync(join(home, '.gitconfig'), '[user]\n\tname = Lead test account\n');
   const leadModelFile = join(home, 'lead-model');
   installLeadModel(leadModelFile);
-  const workspace = await createAgents({ repo, leadModelFile }).build.getWorkspace();
+  const workspace = await createAgents({ repo, leadModelFile, model: 'openai/gpt-6.1-sol' }).build.getWorkspace();
   const sandbox = workspace.sandbox;
   try {
     await sandbox.start();
@@ -79,7 +94,7 @@ test('Lead keeps the build identity and loads the full current poteto-mode file'
   mkdirSync(skills, { recursive: true });
   const original = readFileSync(join(repo, '.agents/skills/poteto-mode/SKILL.md'), 'utf8');
   writeFileSync(join(skills, 'SKILL.md'), original);
-  const options = { repo: root, leadModelFile: join(root, 'lead-model') };
+  const options = { repo: root, leadModelFile: join(root, 'lead-model'), model: 'openai/gpt-6.1-sol' };
   installLeadModel(options.leadModelFile);
   const first = createAgents(options).build;
   assert.equal(first.id, 'flow-build');
@@ -95,9 +110,9 @@ test('new Lead instances read their independent model setting', async t => {
   const file = join(dir, 'lead-model');
   writeFileSync(join(dir, 'pstack-models.md'), 'feature, refactoring: commandcode/deepseek/deepseek-v4.1-flash\n');
   writeFileSync(file, 'openai/gpt-6.1-sol\n');
-  assert.equal((await createAgents({ repo, leadModelFile: file }).build.getModel()).modelId, 'gpt-6.1-sol');
+  assert.equal((await createAgents({ repo, leadModelFile: file, model: 'openai/gpt-6.1-sol' }).build.getModel()).modelId, 'gpt-6.1-sol');
   writeFileSync(file, 'openai/gpt-5.4\n');
-  assert.equal((await createAgents({ repo, leadModelFile: file }).build.getModel()).modelId, 'gpt-5.4');
+  assert.equal((await createAgents({ repo, leadModelFile: file, model: 'openai/gpt-6.1-sol' }).build.getModel()).modelId, 'gpt-5.4');
   assert.equal(readFileSync(join(dir, 'pstack-models.md'), 'utf8'), 'feature, refactoring: commandcode/deepseek/deepseek-v4.1-flash\n');
 });
 
@@ -106,7 +121,10 @@ test('Lead exposes one stock helper per role and one per saved panel model', asy
   const leadModelFile = join(dir, 'lead-model');
   const roleModelsFile = join(dir, 'lead-role-models.md');
   writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
-  writeFileSync(roleModelsFile, 'feature, refactoring: commandcode/deepseek/deepseek-v4.1-flash\narena runners: openai/gpt-6.1-sol, commandcode/deepseek/deepseek-v4.1-flash\n');
+  completeRoleFile(roleModelsFile, choice => {
+    choice.groups.building.roles['feature-refactoring'] = 'commandcode/deepseek/deepseek-v4.1-flash';
+    choice.groups.panels.roles['arena-runners'] = ['openai/gpt-6.1-sol', 'commandcode/deepseek/deepseek-v4.1-flash'];
+  });
   const helpers = await createAgents({ repo, leadModelFile, roleModelsFile }).build.listAgents();
   assert.equal(Object.keys(helpers).length, 21);
   assert.deepEqual(Object.keys(helpers), readRoleModels(roleModelsFile).flatMap(role => role.models.map((_, index) => helperKey(role, index))));
@@ -120,14 +138,14 @@ test('Lead exposes one stock helper per role and one per saved panel model', asy
 test('the role file the Start screen writes reads back with every saved model', async t => {
   const dir = temporary(t);
   const roleModelsFile = join(dir, 'lead-role-models.md');
-  const modelIds = ['openai/gpt-6.1-sol', 'commandcode/deepseek/deepseek-v4.1-flash', 'anthropic/claude-opus-5-5'];
+  const modelIds = [...MODEL_IDS];
   const models = modelIds.map(id => ({ id, provider: id.split('/')[0] }));
   const choice = { ...initialChoice({ groups: ROLE_GROUPS, modelIds }), lead: modelIds[0] };
   choice.groups.building.roles['bug-fix'] = modelIds[2];
   choice.groups.panels.roles['arena-runners'] = [modelIds[2], modelIds[1]];
   writeFileSync(roleModelsFile, formatSettings(choice, models).pstack);
   const saved = readRoleModels(roleModelsFile);
-  assert.equal(saved.length, ROLE_GROUPS.reduce((count, group) => count + group.roles.length, 0));
+  assert.equal(saved.length, ROLE_GROUPS.filter(group => !group.machine).reduce((count, group) => count + group.roles.length, 0));
   for (const role of saved) {
     assert.deepEqual(role.models, [choice.groups[role.group].roles[role.id]].flat(), `${role.name} read back a different model.`);
   }
@@ -154,13 +172,15 @@ test('a changed models file changes the next call without a new createAgents', a
   const leadModelFile = join(dir, 'lead-model');
   const roleModelsFile = join(dir, 'lead-role-models.md');
   writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
-  writeFileSync(roleModelsFile, 'feature, refactoring: commandcode/deepseek/deepseek-v4.1-flash\n');
+  completeRoleFile(roleModelsFile);
   const { build } = createAgents({ repo, leadModelFile, roleModelsFile });
   assert.equal((await build.getModel()).modelId, 'gpt-6.1-sol');
   assert.equal((await (await build.listAgents()).featureRefactoring.getModel()).modelId, 'deepseek/deepseek-v4.1-flash');
 
   writeFileSync(leadModelFile, 'openai/gpt-5.4\n');
-  writeFileSync(roleModelsFile, 'feature, refactoring: commandcode/moonshotai/Kimi-K3.1-Pro\n');
+  completeRoleFile(roleModelsFile, choice => {
+    choice.groups.building.roles['feature-refactoring'] = 'commandcode/moonshotai/Kimi-K3.1-Pro';
+  });
   assert.equal((await build.getModel()).modelId, 'gpt-5.4');
   assert.equal((await (await build.listAgents()).featureRefactoring.getModel()).modelId, 'moonshotai/Kimi-K3.1-Pro');
 });
@@ -172,7 +192,9 @@ test('readRoleModels reads the picker file only and ignores the pstack models fi
   const pstack = join(home, '.agents', 'pstack-models.md');
   mkdirSync(join(home, '.config', 'julia'), { recursive: true });
   mkdirSync(join(home, '.agents'), { recursive: true });
-  writeFileSync(picker, 'feature, refactoring: commandcode/moonshotai/Kimi-K3.1-Pro\n');
+  completeRoleFile(picker, choice => {
+    choice.groups.building.roles['feature-refactoring'] = 'commandcode/moonshotai/Kimi-K3.1-Pro';
+  });
   writeFileSync(pstack, 'feature, refactoring: openai/gpt-6-astra\nbug-fix: openai/gpt-6-astra\n');
   const previous = process.env.JULIA_LEAD_ROLE_MODELS_FILE;
   const previousHome = process.env.HOME;
@@ -192,7 +214,7 @@ test('readRoleModels reads the picker file only and ignores the pstack models fi
 test('the picker and the machine resolve the same model id for every saved role', t => {
   const dir = temporary(t);
   const roleModelsFile = join(dir, 'lead-role-models.md');
-  const modelIds = ['openai/gpt-6.1-sol', 'commandcode/deepseek/deepseek-v4.1-flash', 'anthropic/claude-opus-5-5'];
+  const modelIds = [...MODEL_IDS];
   const models = modelIds.map(id => ({ id, provider: id.split('/')[0] }));
   const choice = { ...initialChoice({ groups: ROLE_GROUPS, modelIds }), lead: modelIds[0] };
   choice.groups.building.roles['bug-fix'] = modelIds[2];
@@ -214,4 +236,32 @@ test('installing the Lead setting twice keeps an existing model and the coder ro
   assert.equal(installLeadModel(file).created, false);
   assert.equal(readFileSync(file, 'utf8'), 'openai/gpt-5.4\n');
   assert.equal(readFileSync(pstack, 'utf8'), 'feature, refactoring: coder-model\n');
+});
+
+test('the machine stages take their models from the saved picks', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'), choice => {
+    choice.groups.machine.roles.shipping = 'commandcode/moonshotai/Kimi-K3.1-Pro';
+    choice.groups.machine.roles.remediation = 'openai/gpt-6.1-sol';
+    choice.groups.machine.roles.retro = 'openai/gpt-6.1-sol';
+  });
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  const { shipping, remediation, retro } = createAgents({ repo, leadModelFile, roleModelsFile });
+  assert.equal((await shipping.getModel()).modelId, 'moonshotai/Kimi-K3.1-Pro');
+  assert.equal((await remediation.getModel()).modelId, 'gpt-6.1-sol');
+  assert.equal((await retro.getModel()).modelId, 'gpt-6.1-sol');
+});
+
+test('a missing stage pick stops before the stage starts and names the stage', t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  const withoutShipping = readFileSync(roleModelsFile, 'utf8')
+    .split('\n')
+    .filter(line => !line.startsWith('Shipping:'))
+    .join('\n');
+  writeFileSync(roleModelsFile, withoutShipping);
+  assert.throws(() => createAgents({ repo, leadModelFile, roleModelsFile }), /Missing Shipping pick/);
 });

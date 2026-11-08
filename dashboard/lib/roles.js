@@ -135,6 +135,7 @@ export function initialChoice({ card = '', groups, modelIds, fallback = '', effo
     const roleModels = Object.fromEntries(group.roles.map(role => [role.id, defaultModelFor(role, modelIds, fallback)]));
     choice.groups[group.id] = { model: sharedModel(Object.values(roleModels)), roles: roleModels };
   }
+  choice.shipping = choice.groups.machine?.roles?.shipping ?? '';
   return choice;
 }
 

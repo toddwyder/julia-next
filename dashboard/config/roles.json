@@ -138,6 +138,31 @@
           "explanation": "Parallel helpers for many small jobs and for checking work."
         }
       ]
+    },
+    {
+      "id": "machine",
+      "name": "Machine stages",
+      "machine": true,
+      "roles": [
+        {
+          "id": "shipping",
+          "name": "Shipping",
+          "default": "commandcode/moonshotai/Kimi-K3.1-Pro",
+          "explanation": "The independent review of a pull request."
+        },
+        {
+          "id": "remediation",
+          "name": "Remediation",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
+          "explanation": "The fix after a Shipping FAIL."
+        },
+        {
+          "id": "retro",
+          "name": "Retro",
+          "default": "openai/gpt-6.1-sol",
+          "explanation": "The lesson pass after a card lands."
+        }
+      ]
     }
   ]
 }
