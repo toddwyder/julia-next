@@ -1,11 +1,8 @@
-// A real Studio run for JUL-342: Lead delegates a long tool-calling job to one helper with
-// maxSteps 12. On main the helper stops at 12 on a tool-calls step and returns empty text; the
-// branch gives it its own 100-step budget and it ends with text. Run from a repository root:
+// A Studio API diagnostic for the helper budget. Run from a repository root:
 //
 //   node scripts/check-helper-budget.mjs [output.json]
 //
-// It boots its own Studio on a spare port and writes the run's own trace file under the
-// scratch directory, so the live Studio on 4111 is not touched.
+// Set JUL342_KEEP_TRACE=1 to retain the scratch trace database.
 
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -50,6 +47,8 @@ function descendant(span, ancestorId, byId) {
 async function traceFor(port, runId) {
   const deadline = Date.now() + 240000;
   let last;
+  let stable = 0;
+  let previous = '';
   do {
     const list = await json(port, '/observability/traces');
     for (const item of list.spans ?? list.traces ?? []) {
@@ -58,8 +57,11 @@ async function traceFor(port, runId) {
       last = trace;
       const byId = new Map((trace.spans ?? []).map(span => [span.spanId, span]));
       const agents = trace.spans?.filter(span => span.spanType === 'agent_run') ?? [];
-      if (agents.length && agents.every(agent => trace.spans.some(span => span.spanType === 'model_inference'
-        && span.endedAt && descendant(span, agent.spanId, byId)))) return trace;
+      const allEnded = agents.length && agents.every(agent => agent.endedAt && trace.spans.some(span => span.spanType === 'model_inference' && span.endedAt && descendant(span, agent.spanId, byId))) && trace.spans.every(span => span.endedAt);
+      const fingerprint = JSON.stringify(trace.spans.map(span => [span.spanId, span.endedAt]).sort((a, b) => a[0].localeCompare(b[0])));
+      stable = allEnded && fingerprint === previous ? stable + 1 : 0;
+      previous = fingerprint;
+      if (stable >= 2) return trace;
     }
     await delay(2000);
   } while (Date.now() < deadline);
@@ -123,21 +125,20 @@ export async function checkHelperBudget() {
     writeFileSync(join(chain, `${name}.txt`), `${next}\n`);
   }
   const brief = [
-    'HELPER TASK. Ignore the coordinator instructions above; they are not yours and nothing above names a tool you need.',
+    'You are the delegated helper. Follow the file chain below and report what you found.',
     'You have the mastra_workspace_read_file tool. Follow the chain below one file per tool call, in order.',
     `Call mastra_workspace_read_file on .jul342-probe/01.txt. Each file names the next file. Read that next file with another call, and keep going until a file says "end".`,
-    'Make exactly one read call per file, one after another. Do not stop early and do not guess. When you reach the file that says "end", reply with only the name of that last file.',
+    'Use only mastra_workspace_read_file. Do not list files, search, grep, use a shell, or use any other tool. Make exactly one read call per file, one after another. Do not stop early and do not guess. When you reach the file that says "end", reply with only the name of that last file.',
   ].join(' ');
   const prompt = [
-    'This is the JUL-342 helper budget check, a machine check, not a card. Do not edit the repository.',
+    'Do not edit the repository.',
     `Hand this job to the ${HELPER} helper and pass maxSteps: ${STEPS} in the delegation call. Do not do the work yourself and do not use any other helper.`,
     `Copy this job text to the helper word for word, adding nothing: ${JSON.stringify(brief)}`,
     'When the helper returns, repeat its answer in one line and stop.',
   ].join(' ');
 
-  const runDir = process.env.JUL342_RUN_DIR ?? join(resolve(process.cwd()), '..', `jul-342-studio-${MODE}`);
-  return checkStudioStart({ root: process.cwd(), timeoutMs: 240000, keepRun: Boolean(SHOTS), dir: resolve(runDir),
-    env: { ...process.env, NODE_ENV: 'development' }, onReady: async ({ port }) => {
+  return checkStudioStart({ root: process.cwd(), timeoutMs: 240000,
+    env: { ...process.env, NODE_ENV: 'development' }, onReady: async ({ port, dir }) => {
     const agents = await json(port, '/agents');
     const entry = Object.entries(agents).find(([, agent]) => agent.name === 'Lead');
     assert(entry, 'Studio does not list Lead.');
@@ -171,8 +172,9 @@ export async function checkHelperBudget() {
     return {
       runId: run.runId, traceId: helperRun.traceId, studioPort: port, maxStepsSent: STEPS,
       helper: HELPER_ID,
-      runDir,
+      traceDir: process.env.JUL342_KEEP_TRACE ? dir : null,
       delegationArgs: delegationCall?.payload?.args ?? null,
+      helperDelegations: run.trace.spans.filter(span => span.spanType === 'agent_run' && span.name === `agent run: '${HELPER_ID}'`).length,
       helperSteps: helperInferences.length,
       helperToolCalls: toolCalls.length,
       helperFinishReason: finish,
@@ -192,6 +194,12 @@ if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pat
     const output = JSON.stringify({ checkedAt: new Date().toISOString(), ...result }, null, 2) + '\n';
     if (outputFile) writeFileSync(resolve(outputFile), output);
     console.log(output);
+    if (process.env.JUL342_EXPECT_100) {
+      assert.equal(result.checked.helperDelegations, 1, 'Expected exactly one helper delegation');
+      assert.equal(result.checked.helperSteps, 100, 'Expected 100 helper inferences');
+      assert.ok(result.checked.resultText && !result.checked.resultText.includes('DSML')
+        && !result.checked.resultText.startsWith('Machine fault:'), 'Expected a written report');
+    }
   } catch (error) {
     console.error(error.stack ?? error.message);
     process.exitCode = 1;

@@ -91,7 +91,7 @@ export async function checkStudioStart({ root = process.cwd(), timeoutMs = 18000
       process.kill(-child.pid, 'SIGTERM');
     } catch {}
     await new Promise(done => setTimeout(done, 2000));
-    rmSync(dir, { recursive: true, force: true });
+    if (!process.env.JUL342_KEEP_TRACE) rmSync(dir, { recursive: true, force: true });
   }
 }
 

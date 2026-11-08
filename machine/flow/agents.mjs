@@ -15,20 +15,21 @@ const POTETO_SKILL = '.agents/skills/poteto-mode/SKILL.md';
 // tool, and on 8 November a helper cut to 12 stopped on a tool-calls step with empty text.
 export const HELPER_MAX_STEPS = 100;
 
-// What Lead hears instead of an empty string when a helper spends its whole budget on tool
-// calls. It names a machine fault so the model does not read the silence as a finished job.
+// What Lead hears instead of a successful helper result without a report.
 export function machineFault(primitiveId) {
-  return `Machine fault: the ${primitiveId} helper used its whole ${HELPER_MAX_STEPS}-step budget on tool calls and returned no text.`
+  return `Machine fault: the ${primitiveId} helper returned no written report.`
     + ' This is a machine fault, not a card result, so no work from it can be read.';
 }
 
-// Mastra counts steps from 0, so the last step of a budget-step run is budget - 1. Turning
-// tools off there makes the helper write its text instead of ending on another tool call.
+// Mastra counts steps from 0, so the last step of a budget-step run is budget - 1.
 export function helperBudgetProcessor(budget = HELPER_MAX_STEPS) {
   return {
     id: 'helper-last-step',
-    processInputStep({ stepNumber }) {
-      if (stepNumber >= budget - 1) return { toolChoice: 'none' };
+    processInputStep({ stepNumber, messageList }) {
+      if (stepNumber >= budget - 1) {
+        messageList.add({ role: 'user', content: 'Your tool budget is exhausted. Stop using tools and write your final report now. State what you completed, the evidence, and what remains unfinished. Do not claim unfinished work is complete.' }, 'input');
+        return { toolChoice: 'none' };
+      }
       return {};
     },
   };
@@ -44,8 +45,11 @@ function stampMachineFault(span, fault) {
 export function helperDelegation(budget = HELPER_MAX_STEPS) {
   return {
     onDelegationStart: () => ({ proceed: true, modifiedMaxSteps: budget }),
-    onDelegationComplete: ({ primitiveId, result }) => {
-      if (result?.text?.trim()) return undefined;
+    messageFilter: () => [],
+    onDelegationComplete: ({ primitiveId, result, success }) => {
+      if (!success) return undefined;
+      const text = result?.text?.trim();
+      if (text && !/^<｜DSML｜\s*calls>[\s\S]*<\/｜DSML｜\s*calls>$/.test(text)) return undefined;
       const fault = machineFault(primitiveId);
       stampMachineFault(resolveCurrentSpan(), fault);
       return { resultText: fault };

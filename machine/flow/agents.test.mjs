@@ -208,14 +208,19 @@ test('a helper the Lead cuts to maxSteps 12 still spends its own budget and ends
   let leadCalls = 0;
   const helperModel = scriptedModel(options => {
     helperSteps += 1;
-    if (options.toolChoice?.type === 'none') return { content: [{ type: 'text', text: 'checked every file' }], reason: 'stop' };
+    assert.match(JSON.stringify(options.prompt), /delegated task marker/);
+    assert.doesNotMatch(JSON.stringify(options.prompt), /parent conversation marker/);
+    if (options.toolChoice?.type === 'none') {
+      assert.match(JSON.stringify(options.prompt.at(-1)), /tool budget is exhausted.*write your final report/i);
+      return { content: [{ type: 'text', text: 'checked every file' }], reason: 'stop' };
+    }
     return { content: [{ type: 'tool-call', toolCallId: `tick-${helperSteps}`, toolName: 'tick', input: '{}' }], reason: 'tool-calls' };
   });
   const leadModel = scriptedModel(() => {
     leadCalls += 1;
     if (leadCalls === 1) {
       return { content: [{ type: 'tool-call', toolCallId: 'delegate-1', toolName: 'agent-featureRefactoring',
-        input: JSON.stringify({ prompt: 'Keep calling tick until you are done.', maxSteps: 12 }) }], reason: 'tool-calls' };
+        input: JSON.stringify({ prompt: 'Keep calling tick until you are done. delegated task marker', maxSteps: 12 }) }], reason: 'tool-calls' };
     }
     return { content: [{ type: 'text', text: 'delegated' }], reason: 'stop' };
   });
@@ -231,7 +236,7 @@ test('a helper the Lead cuts to maxSteps 12 still spends its own budget and ends
     agents: { featureRefactoring: scriptedHelper }, defaultOptions: await build.getDefaultOptions(),
   });
 
-  const result = await scriptedLead.generate('Delegate to the feature, refactoring helper.');
+  const result = await scriptedLead.generate('Delegate to the feature, refactoring helper. parent conversation marker');
   const delegated = result.toolResults.find(item => item.payload?.toolName === 'agent-featureRefactoring');
   assert.ok(delegated, 'The Lead did not call the helper.');
   assert.ok(helperSteps > 12, `The helper stopped at ${helperSteps} steps, the maxSteps 12 the Lead sent, instead of its own ${helperOptions.maxSteps}-step budget.`);
@@ -274,5 +279,30 @@ test('a helper result with text is passed through and leaves no machine fault', 
   t.after(() => setCurrentSpanResolver(undefined));
   const answer = await delegation.onDelegationComplete({ primitiveId: 'pstack-feature-refactoring-1',
     result: { text: 'checked every file' }, success: true, iteration: 1, messages: [] });
+  assert.equal(answer, undefined);
+});
+
+test('raw DeepSeek tool-call markup is reported as a machine fault', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  const delegation = (await createAgents({ repo, leadModelFile }).build.getDefaultOptions()).delegation;
+  const span = { attributes: {}, update({ attributes }) { Object.assign(this.attributes, attributes); } };
+  setCurrentSpanResolver(() => span);
+  t.after(() => setCurrentSpanResolver(undefined));
+  const markup = '<｜DSML｜ calls>\n<｜DSML｜ invoke name="mastra_workspace_read_file">\n<｜DSML｜ parameter name="path" string="true">.jul342-probe/99.txt</｜DSML｜ parameter>\n</｜DSML｜ invoke>\n</｜DSML｜ calls>';
+  const answer = await delegation.onDelegationComplete({ primitiveId: 'helper', result: { text: markup }, success: true });
+  assert.match(answer.resultText, /machine fault.*no written report/i);
+  assert.equal(span.attributes.machineFault, answer.resultText);
+  assert.equal(await delegation.onDelegationComplete({ primitiveId: 'helper', result: { text: `The provider returned this markup: ${markup}` }, success: true }), undefined);
+});
+
+test('a failed delegation preserves its original error', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  const delegation = (await createAgents({ repo, leadModelFile }).build.getDefaultOptions()).delegation;
+  const error = new Error('provider unavailable');
+  const answer = await delegation.onDelegationComplete({ primitiveId: 'helper', result: { text: '' }, success: false, error });
   assert.equal(answer, undefined);
 });
