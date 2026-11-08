@@ -37,6 +37,7 @@ export const PROGRAMS = [
   ['machine/flow/run.mjs', 'Answers a waiting card, reads a run, writes its cost. No way to start one.'],
   ['machine/flow/trace.mjs', 'Turns the trace file into the run cost record.'],
   ['scripts/julia-agents.mjs', 'Runs a machine command with the Julia keys it needs.'],
+  ['scripts/run-lane.mjs', 'Runs a named lane scenario against a capped candidate Studio, one at a time under the live lock.'],
 ].map(([path, what]) => ({ path, what }));
 
 // Every plain program in the workflow folder belongs on the list, so a piece

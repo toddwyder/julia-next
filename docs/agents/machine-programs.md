@@ -22,3 +22,4 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/run.mjs` | Answers a waiting card, reads a run, writes its cost. No way to start one. | `6a76edaa92fdbadfbb55dd581e77c2556b33f9ccb4744c89e5fded579ab36e44` |
 | `machine/flow/trace.mjs` | Turns the trace file into the run cost record. | `38e5e5c9c3497e0f1ea05f0a6eb89910262ca487b5dfdce03adfc23f9679ba1b` |
 | `scripts/julia-agents.mjs` | Runs a machine command with the Julia keys it needs. | `20eab0f08a59b8ba2651d9feac811bcf0d57fd86b9a079ceebf471c417abc3e5` |
+| `scripts/run-lane.mjs` | Runs a named lane scenario against a capped candidate Studio, one at a time under the live lock. | `8ab0dee63af578a05e398c32a14af0840c14171690954679b1ca60ae82208dad` |
