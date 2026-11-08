@@ -25,15 +25,27 @@ export function criteriaFromCard(description) {
 // criterion the reviewer only started, with no verdict on it, stays open.
 export function judgedCriteria(answer) {
   const found = new Set();
-  for (const match of String(answer ?? '').matchAll(/^[ \t>*#-]*criterion[ \t]*(\d+)[ \t]*:[ \t>]*(PASS\+NOTES|PASS|FAIL)\b/gim)) {
-    found.add(Number(match[1]));
+  for (const line of splitMarkers(answer).split(/\r?\n/)) {
+    const match = line.match(/^[ \t>*#-]*criterion[ \t]*(\d+)[ \t]*:[ \t>]*(PASS\+NOTES|PASS|FAIL)\b/i);
+    if (match) found.add(Number(match[1]));
   }
   return [...found].sort((a, b) => a - b);
 }
 
+// A review writes `CRITERION 1: judging` and then `CRITERION 1: PASS`, and the
+// two can arrive glued together with no newline between them. Splitting on the
+// markers first means every reader below sees one marker per line, so a real
+// verdict is never hidden inside the line that started the criterion.
+function splitMarkers(text) {
+  return String(text ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]*(?=(?:CRITERION[ \t]*\d+[ \t]*:|VERDICT[ \t]*:|NOTES[ \t]*:))/gi, '\n')
+    .trim();
+}
+
 export function parseVerdict(answer) {
   const raw = String(answer ?? '').trim();
-  const lines = raw.split(/\r?\n/);
+  const lines = splitMarkers(raw).split(/\r?\n/);
   let verdict = null;
   let notes = '';
   let inNotes = false;
@@ -50,7 +62,12 @@ export function parseVerdict(answer) {
     if (criterionLine) {
       const found = VERDICT.exec(criterionLine[2].toUpperCase());
       const reason = criterionLine[3].replace(/^[—–:-]+[ \t]*/, '').trim();
-      criteria.push({ number: Number(criterionLine[1]), verdict: found ? found[1].toUpperCase() : null, reason });
+      const judged = { number: Number(criterionLine[1]), verdict: found ? found[1].toUpperCase() : null, reason };
+      // A criterion can be started and later judged. The last word on a number
+      // is the one that counts, so a start line never overwrites a verdict.
+      const already = criteria.find(item => item.number === judged.number);
+      if (!already) criteria.push(judged);
+      else if (judged.verdict) Object.assign(already, judged);
       inNotes = false;
       continue;
     }

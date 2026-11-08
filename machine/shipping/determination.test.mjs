@@ -309,3 +309,18 @@ test('the per-turn table flags a turn at or above the 83,000 of the review this 
   assert.match(comment, /2 turns, 90,000 input tokens at the highest, which is at or above the 83,000 a turn/);
   assert.match(comment, /\| 0 \| 16,299 \| 253 \|/);
 });
+
+test('a verdict glued onto the line that started the criterion is still read', () => {
+  // The 20:17 run answered exactly this: the progress line and the verdict ran
+  // together with no newline, and the verdict was reported as no verdict.
+  const glued = 'CRITERION 1: judgingCRITERION 1: PASS — the live page showed the saved picks.';
+  assert.deepEqual(parseVerdict(glued).criteria, [
+    { number: 1, verdict: 'PASS', reason: 'the live page showed the saved picks.' },
+  ]);
+  assert.deepEqual(judgedCriteria(glued), [1]);
+});
+
+test('a start line never overwrites the verdict on the same criterion', () => {
+  const answer = 'CRITERION 1: PASS — it printed the line\nCRITERION 1: judging';
+  assert.deepEqual(parseVerdict(answer).criteria, [{ number: 1, verdict: 'PASS', reason: 'it printed the line' }]);
+});
