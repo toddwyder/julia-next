@@ -72,12 +72,9 @@ test('a checkout whose lockfile matches main links the installed trees instead o
   }
 
   assert.equal(fs.existsSync(calls), false);
-  assert.equal(
-    fs.realpathSync(path.join(checkout, 'node_modules')),
-    fs.realpathSync(path.join(mainRoot, 'node_modules'))
-  );
-  assert.equal(
-    fs.realpathSync(path.join(checkout, 'dashboard', 'node_modules')),
-    fs.realpathSync(path.join(mainRoot, 'dashboard', 'node_modules'))
-  );
+  for (const relative of ['', 'dashboard']) {
+    const installed = path.join(checkout, relative, 'node_modules');
+    assert.equal(fs.lstatSync(installed).isSymbolicLink(), false);
+    assert.equal(fs.existsSync(path.join(installed, '.package-lock.json')), true);
+  }
 });

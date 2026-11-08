@@ -76,8 +76,10 @@ export function prepareDependencies(checkout, { log = () => {}, timeoutMs = 15 *
       fs.existsSync(path.join(mainModules, '.package-lock.json'))
     ) {
       removeTree(nodeModules);
-      fs.symlinkSync(mainModules, nodeModules, 'dir');
-      log(`Linked ${relative || 'root'} dependencies from the main checkout; the lockfile matches.`);
+      // A hardlink clone is a real directory, so Next's Turbopack accepts it;
+      // a symlink to an external tree is rejected as an invalid external path.
+      execFileSync('cp', ['-al', mainModules, nodeModules]);
+      log(`Cloned ${relative || 'root'} dependencies from the main checkout; the lockfile matches.`);
       continue;
     }
 
