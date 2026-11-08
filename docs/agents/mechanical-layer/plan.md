@@ -17,6 +17,8 @@ Tests alone are not sufficient verification. A PR is verified only when its unit
 
 Each slice is a Linear sub-issue of JUL-342, in the order above, and carries its **You see.** block as its done-means. JUL-342 completes only when the P9 sub-issue completes.
 
+The verification shape is the repo's own, recorded in `docs/pstack-deviations.md`. Run `node scripts/check-plan.mjs docs/agents/mechanical-layer/plan.md`; do not run the pstack checker on this plan.
+
 ## Architecture
 
 The mechanics are one path through stock Mastra 1.82.0. A run starts from the run form. The build step creates the card worktree and points the Lead and helper workspaces at it. The Lead and every helper are built with `model` and `agents` resolved per call, delegation hooks that set and protect the helper budget, a last-step processor that forces text, a workspace command gate, and error and output processors that send notices. The trace config caps every stored string. The build step adopts or starts one durable run, so a restart resumes it. Every notice leaves through one `notice` function.
@@ -82,7 +84,7 @@ The exporter batch setting, `maxBatchSize`, has no line in the packaged 1.82.0 r
 
 ### Verdict and merge, for every PR
 
-- [ ] A full swarm runs once, at the code-ready head. Another full swarm runs only for new behavior, a redesign, or a large new diff. A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head, and a wording-only change gets none. Run each full swarm per `.agents/skills/swarm/SKILL.md`. One gates lane. The ten live lanes from the PR's **Verify, live** block, on `commandcode/deepseek/deepseek-v4.1-flash`, one at a time. The perf lane from its **Verify, perf** block. Two or more audit lanes, each with its own focus, that read the diff and the receipts and distrust the PR body, on `gpt-6-luna`, moving to `gpt-6.1-terra` if Luna misses a real failure. Their model company stays different from the builder's. The root audits the receipts in the merge-ready report before the verdict.
+- [ ] One independent live checker runs once, at the code-ready head. It did not write the PR and it runs in a fresh session. Another checker runs only for new behavior, a redesign, or a large new diff. A rebase, a merge-conflict resolution, or a minor fix gets a single verifier at the new head, and a wording-only change gets none. The checker runs the PR's scenarios from its **Verify, live** block through the shared lane runner, one Studio copy at a time. The perf check from its **Verify, perf** block. One audit lane on `gpt-6-luna`, moving to `gpt-6.1-terra` if Luna misses a real failure, and a second only for a named risk. Their model company stays different from the builder's. The root audits the receipts in the merge-ready report before the verdict.
 - [ ] Judge every finding by the execution playbook's blocking rule. The verdict is clean when none blocks. A failure on trunk behavior in a lane marked `Regression lane against trunk.` is recorded against trunk and does not block the PR. A new head gets a fresh verdict, except for results that stay valid under the patch-id rule in `playbooks/shipping.md`.
 - [ ] The owner squash-merges its own PR after the root's clean verdict at the exact head SHA and green required checks. If the head changes after the verdict, the patch-id rule in `playbooks/shipping.md` decides whether the verdict still covers it. P3 waits for the operator's click.
 
@@ -120,18 +122,13 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 - [ ] `machine/flow/workflow.test.mjs` gains a case that a stored span input is at most 2000 characters per string. Run `node --test machine/flow/workflow.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
+**Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Lane 1. Regression lane against trunk. Run the 60-step memory probe at trunk and head. Save `memory-trunk-head.png`. Pass when trunk hits the heap limit and head ends under 150 MB.
-- [ ] Lane 2. Start the practice card on the candidate Studio and let it reach 100 Lead steps. Save `long-run.png`. Pass when the run ends and the candidate process has the same PID throughout.
-- [ ] Lane 3. Read the longest span input in the lane trace. Save `span-cap.png`. Pass when no string field is longer than 2000 characters.
-- [ ] Lane 4. Open the run's trace in Studio. Save `studio-trace.png`. Pass when Studio shows every step with its model name.
-- [ ] Lane 5. Run `node scripts/scorecard.mjs` against the lane trace. Save `scorecard.png`. Pass when it prints a positive cost and the same models as Studio.
-- [ ] Lane 6. Watch the Studio journal during the long run. Save `journal.png`. Pass when no `Invalid string length` line appears.
-- [ ] Lane 7. Measure `trace.duckdb` size after 100 steps. Save `trace-size.png`. Pass when it is under 50 MB.
-- [ ] Lane 8. Read a helper's span output. Save `helper-span.png`. Pass when the text field is present and cut at 2000 characters.
-- [ ] Lane 9. Run `npm run guard:flow`. Save `guard.png`. Pass when it exits 0.
-- [ ] Lane 10. Run `node scripts/machine-programs.mjs --check`. Save `programs.png`. Pass when it exits 0.
+- [ ] Scenario 1. Regression against trunk. The 60-step memory probe hits the heap limit on trunk, and at head it ends under 150 MB heap. Save `memory-trunk-head.png`. Pass when trunk dies at the limit and head stays under 150 MB.
+- [ ] Scenario 2. A stored span keeps no string over 2,000 characters. Save `span-cap.png`. Pass when every string field in the trace is at most 2,000 characters.
+- [ ] Scenario 3. A 100-step practice run finishes without a Studio restart, under 2.2 GB RSS. Save `long-run.png`. Pass when the run ends and the candidate PID is unchanged.
+- [ ] Scenario 4. The trace after 100 steps stays under 50 MB. Save `trace-size.png`. Pass when `trace.duckdb` is under 50 MB.
+- [ ] Scenario 5. A helper's span text is cut at 2,000 characters. Save `helper-span.png`. Pass when the helper's text field exists and is at most 2,000 characters.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -173,18 +170,14 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 - [ ] `machine/flow/agents.test.mjs` gains cases for the worktree path and for a second start that reuses the same worktree. Run `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
+**Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Lane 1. Regression lane against trunk. Run a practice build at trunk and head and record the Studio folder's branch after each. Save `folder-branch.png`. Pass when trunk leaves the folder off main and head leaves it on main and clean.
-- [ ] Lane 2. Poll `git -C <studio folder> status --porcelain` every 10 seconds during a head build. Save `folder-poll.png`. Pass when every poll is empty.
-- [ ] Lane 3. List the build worktree after the build. Save `worktree.png`. Pass when it holds the card branch with the build's commits.
-- [ ] Lane 4. Start the same card twice. Save `reuse.png`. Pass when the second start reuses the worktree and creates no second one.
-- [ ] Lane 5. Read the Lead's `execute_command` spans. Save `cwd.png`. Pass when every command ran in the build worktree.
-- [ ] Lane 6. Read a helper's file-write spans. Save `helper-writes.png`. Pass when every path is inside the build worktree.
-- [ ] Lane 7. Push from the build worktree. Save `push.png`. Pass when the card branch reaches origin.
-- [ ] Lane 8. Check the Studio folder's reflog after the build. Save `reflog.png`. Pass when no new checkout entry appears.
-- [ ] Lane 9. Run `npm run guard:flow`. Save `guard.png`. Pass when it exits 0.
-- [ ] Lane 10. Run `node scripts/machine-programs.mjs --check`. Save `programs.png`. Pass when it exits 0.
+- [ ] Scenario 1. Regression against trunk. A practice build leaves the Studio folder off main at trunk; at head the folder stays on main and clean. Save `folder-branch.png`. Pass when trunk moves the folder and head does not.
+- [ ] Scenario 2. Every Lead command runs in the build worktree. Save `cwd.png`. Pass when every `execute_command` span's cwd is the worktree.
+- [ ] Scenario 3. A helper's file writes stay in the build worktree. Save `helper-writes.png`. Pass when every written path is inside it.
+- [ ] Scenario 4. A second start reuses the worktree. Save `reuse.png`. Pass when the second start creates no second worktree.
+- [ ] Scenario 5. A push from the worktree reaches origin. Save `push.png`. Pass when the card branch is on origin.
+- [ ] Scenario 6. The Studio folder's reflog gains no checkout. Save `reflog.png`. Pass when no new checkout entry appears.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -237,18 +230,13 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 - [ ] `dashboard/lib/model-settings.test.mjs` gains cases for an unchanged Save that writes and reads back, for a failed read-back that returns no "Saved", and for a Save that writes only `~/.config/julia/lead-role-models.md` and `~/.config/julia/lead-model` and leaves `~/.agents/pstack-models.md` unchanged. `machine/flow/agents.test.mjs` gains a case that a changed file changes the next call's model without a new `createAgents`, and a case that `readRoleModels` ignores `~/.agents/pstack-models.md`. Run `npm --prefix dashboard test` and `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
+**Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Lane 1. Regression lane against trunk. Change the Lead's pick, save, and start a run without a restart, at trunk and head. Save `next-run.png`. Pass when trunk's trace shows the old model and head's trace shows the new one.
-- [ ] Lane 2. Press Save with nothing changed. Save `unchanged-save.png`. Pass when "Saved" appears and the file's modified time moves.
-- [ ] Lane 3. Load the Start screen fresh. Save `fresh-load.png`. Pass when no "Saved" line shows.
-- [ ] Lane 4. Make the models file read-only and press Save. Save `failed-save.png`. Pass when the screen shows an error and no "Saved".
-- [ ] Lane 5. Compare every role on the picker with Studio's agent list. Save `picker-vs-studio.png`. Pass when all 17 roles match.
-- [ ] Lane 6. Change a panel role from two models to one and start a run. Save `panel.png`. Pass when Studio offers one helper for that role without a restart.
-- [ ] Lane 7. Point `~/.agents/pstack-models.md` in the lane folder at a model the picker does not offer and start a run. Save `one-file.png`. Pass when the run's models all equal the picker file and pstack's file is unchanged.
-- [ ] Lane 8. Edit `~/.config/julia/lead-role-models.md` by hand and reload the picker. Save `hand-edit.png`. Pass when the picker shows the hand edit.
-- [ ] Lane 9. Run `node scripts/check-model-picker.mjs` at head. Save `check-picker.png`. Pass when it exits 0 without restarting Studio.
-- [ ] Lane 10. Run `npm run guard:flow` and `node scripts/machine-programs.mjs --check`. Save `guard.png`. Pass when both exit 0.
+- [ ] Scenario 1. Regression against trunk. A changed Lead pick needs a Studio restart at trunk; at head the next run uses it with Studio left running. Save `next-run.png`. Pass when trunk shows the old model and head the new one.
+- [ ] Scenario 2. An unchanged Save writes and reads back, and the file mtime moves. Save `unchanged-save.png`. Pass when Saved appears and mtime changes.
+- [ ] Scenario 3. A fresh page shows no Saved, and a failed read-back shows an error. Save `failed-save.png`. Pass when the first load has no Saved and a read-only file shows an error.
+- [ ] Scenario 4. Every role on the picker matches Studio. Save `picker-vs-studio.png`. Pass when all 17 roles match.
+- [ ] Scenario 5. pstack's file stays unchanged and the picker's file is the only one read. Save `one-file.png`. Pass when a pstack edit does not change the run and the picker file does.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -300,18 +288,14 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 - [ ] `machine/flow/notice.test.mjs` covers usage limit, 429, unknown model, authorization block, content filter, and boot restart, each sending one notice. Run `node --test machine/flow/notice.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
+**Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Lane 1. Regression lane against trunk. Force a usage-limit error at trunk and head on a throwaway card. Save `usage-limit.png`. Pass when trunk sends nothing and head's notice reaches Todd's inbox within 60 seconds.
-- [ ] Lane 2. Pick an unknown model for the Lead and start a run. Save `refused-model.png`. Pass when the notice arrives within 60 seconds.
-- [ ] Lane 3. Kill the candidate Studio with SIGKILL mid-run and let it restart. Save `restart.png`. Pass when the restart notice arrives within 60 seconds of the new process.
-- [ ] Lane 4. Force a 429 that recovers on retry. Save `429-recovers.png`. Pass when no notice is sent.
-- [ ] Lane 5. Force a 429 that fails every retry. Save `429-fails.png`. Pass when one notice is sent.
-- [ ] Lane 6. Read the notice as Todd sees it in Linear. Save `inbox.png`. Pass when it names the card, the model, the error, and the run id.
-- [ ] Lane 7. Restart Studio with no run in flight. Save `quiet-restart.png`. Pass when no notice is sent.
-- [ ] Lane 8. Force the same error twice in one run. Save `repeat.png`. Pass when each error sends one notice and no more.
-- [ ] Lane 9. Read `~/.local/state/julia/stops.jsonl`. Save `stops.png`. Pass when each notice has its line.
-- [ ] Lane 10. Run `npm run guard:flow` and `node scripts/machine-programs.mjs --check`. Save `guard.png`. Pass when both exit 0.
+- [ ] Scenario 1. Regression against trunk. A usage limit at trunk sends nothing; at head one notice reaches Todd within 60 seconds. Save `usage-limit.png`. Pass when trunk sends none and head sends one.
+- [ ] Scenario 2. A refused model reaches Todd within 60 seconds. Save `refused-model.png`. Pass when the notice names the model and arrives in time.
+- [ ] Scenario 3. A restart mid-run reaches Todd within 60 seconds. Save `restart.png`. Pass when the restart notice arrives after the new process.
+- [ ] Scenario 4. A 429 that recovers sends no notice; one that fails every retry sends one. Save `429.png`. Pass when the recovered case is silent and the failed case sends one.
+- [ ] Scenario 5. A content refusal sends a notice. Save `content-filter.png`. Pass when the notice arrives within 60 seconds.
+- [ ] Scenario 6. A repeat error sends one notice per error and no more. Save `repeat.png`. Pass when each error has exactly one notice.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -354,18 +338,13 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 - [ ] `machine/flow/agents.test.mjs` gains cases for the budget override, the last-step text, and the machine fault. Run `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
+**Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Lane 1. Regression lane against trunk. Run the practice card at trunk and head and count helper spans that end with empty text. Save `empty-helpers.png`. Pass when head has none.
-- [ ] Lane 2. Read every helper span's step count. Save `budget.png`. Pass when each helper's budget equals its own setting, whatever `maxSteps` the Lead passed.
-- [ ] Lane 3. Read the last step of a helper that used its whole budget. Save `last-step.png`. Pass when that step sent `toolChoice: 'none'` and ended with text.
-- [ ] Lane 4. Force a helper model that returns empty text under `toolChoice: 'none'`. Save `fault.png`. Pass when the span carries `machineFault` and the Lead's tool result names the fault.
-- [ ] Lane 5. Read Todd's Linear inbox after lane 4. Save `fault-notice.png`. Pass when the notice arrived within 60 seconds.
-- [ ] Lane 6. Delegate to a panel helper. Save `panel-helper.png`. Pass when it ends with text.
-- [ ] Lane 7. Read the helper's report as the Lead received it. Save `report.png`. Pass when the Lead's next step quotes it.
-- [ ] Lane 8. Compare helper models with the picker. Save `helper-models.png`. Pass when every helper ran on its role's pick.
-- [ ] Lane 9. Run `node scripts/check-lead.mjs`. Save `check-lead.png`. Pass when it exits 0.
-- [ ] Lane 10. Run `npm run guard:flow` and `node scripts/machine-programs.mjs --check`. Save `guard.png`. Pass when both exit 0.
+- [ ] Scenario 1. Regression against trunk. A helper cut to 12 steps ends empty at trunk; at head it uses its full budget and ends with text. Save `empty-helpers.png`. Pass when head has no empty helper.
+- [ ] Scenario 2. The Lead's maxSteps cannot cut the helper's budget. Save `budget.png`. Pass when each helper's budget equals its own setting.
+- [ ] Scenario 3. The last step sends toolChoice none and ends with text. Save `last-step.png`. Pass when the last step has no tool call and has text.
+- [ ] Scenario 4. An empty report is a machine fault in the trace and a notice. Save `fault.png`. Pass when the span carries machineFault and Todd gets one notice.
+- [ ] Scenario 5. A panel helper ends with text and the Lead quotes its report. Save `panel-helper.png`. Pass when the panel helper has text and the Lead's next step quotes it.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -408,18 +387,14 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 - [ ] `machine/flow/agents.test.mjs` gains cases for the plain name, `bash -c`, a split quote, a script file, base64 through `eval`, an absolute path, and `npx @openai/codex`, each refused. Git, npm, and node still run. Run `node --test machine/flow/agents.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
+**Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Lane 1. Regression lane against trunk. Plant `codex exec` in the practice card's prompt at trunk and head. Save `planted-codex.png`. Pass when trunk runs it and head's trace shows the refusal.
-- [ ] Lane 2. Plant `mastracode --model` the way the 7 Nov Lead did. Save `mastracode.png`. Pass when it is refused.
-- [ ] Lane 3. Plant `/usr/local/bin/codex`. Save `abs-path.png`. Pass when the hook refuses it.
-- [ ] Lane 4. Plant `npx @openai/codex`. Save `npx.png`. Pass when the hook refuses it.
-- [ ] Lane 5. Plant a script file that calls `codex`. Save `script-file.png`. Pass when the refusing script answers with exit 126.
-- [ ] Lane 6. List `~/.codex/sessions` for the run's day. Save `codex-sessions.png`. Pass when no session falls inside the run's time window.
-- [ ] Lane 7. Run the practice build end to end. Save `normal-build.png`. Pass when git, npm, and tests ran.
-- [ ] Lane 8. List every model in the run's trace. Save `models.png`. Pass when each one is a pick on the picker.
-- [ ] Lane 9. Plant `codex` in a helper's delegated task. Save `helper-codex.png`. Pass when it is refused.
-- [ ] Lane 10. Run `npm run guard:flow` and `node scripts/machine-programs.mjs --check`. Save `guard.png`. Pass when both exit 0.
+- [ ] Scenario 1. Regression against trunk. A planted codex exec runs at trunk and is refused at head. Save `planted-codex.png`. Pass when trunk runs it and head refuses it.
+- [ ] Scenario 2. An absolute path is refused. Save `abs-path.png`. Pass when the hook refuses `/usr/local/bin/codex`.
+- [ ] Scenario 3. npx is refused. Save `npx.png`. Pass when `npx @openai/codex` is refused.
+- [ ] Scenario 4. A script file calling codex exits 126. Save `script-file.png`. Pass when the refusing script answers with exit 126.
+- [ ] Scenario 5. A helper's delegated codex is refused. Save `helper-codex.png`. Pass when the helper's codex call is refused.
+- [ ] Scenario 6. Git, npm, and node still run, and `~/.codex/sessions` gains nothing. Save `normal-build.png`. Pass when the build runs and no codex session lands in the run window.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -465,18 +440,13 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 - [ ] `machine/flow/workflow.test.mjs` gains a SIGKILL-and-restart case that counts model steps and finds each earlier one once. Run `node --test machine/flow/workflow.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
+**Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Lane 1. Regression lane against trunk. Kill the candidate Studio after 20 Lead steps at trunk and head. Save `resume.png`. Pass when trunk restarts at step 0 and head resumes at step 20 or 21.
-- [ ] Lane 2. Count step spans per step number after lane 1. Save `once.png`. Pass when every step before the kill shows once.
-- [ ] Lane 3. Kill during a helper delegation and restart the candidate Studio. Save `helper-kill.png`. Pass when only that delegation replays, no earlier Lead step repeats, and the first helper call after the resume has its full step budget and ends with text.
-- [ ] Lane 4. Kill twice in one build. Save `double-kill.png`. Pass when the build resumes both times and finishes.
-- [ ] Lane 5. Kill while the card waits for Todd's answer. Save `waiting-kill.png`. Pass when the wait comes back unanswered and the build does not rerun.
-- [ ] Lane 6. Read the restart notice from P4 after lane 1. Save `notice.png`. Pass when it names the resume step.
-- [ ] Lane 7. Read `state.db` after the build. Save `state.png`. Pass when the run is `success` and no second build run exists.
-- [ ] Lane 8. Check the build worktree after a resume. Save `worktree.png`. Pass when it holds one copy of each commit.
-- [ ] Lane 9. Run a build with no kill. Save `no-kill.png`. Pass when it finishes as before.
-- [ ] Lane 10. Run `npm run guard:flow` and `node scripts/machine-programs.mjs --check`. Save `guard.png`. Pass when both exit 0.
+- [ ] Scenario 1. Regression against trunk. A kill restarts at step 0 at trunk; at head it resumes at step 20 or 21. Save `resume.png`. Pass when trunk restarts at 0 and head resumes at 20 or 21.
+- [ ] Scenario 2. Every earlier step shows once. Save `once.png`. Pass when no step span repeats.
+- [ ] Scenario 3. A kill during a helper delegation replays only that delegation, and the first helper call after resume has full budget and text. Save `helper-kill.png`. Pass when only that delegation replays and the next helper call has its full budget and text.
+- [ ] Scenario 4. A double kill resumes both times and finishes. Save `double-kill.png`. Pass when both resumes land and the build finishes.
+- [ ] Scenario 5. A kill while the card waits for Todd does not rerun the build. Save `waiting-kill.png`. Pass when the wait comes back unanswered and the build does not rerun.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -521,18 +491,14 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 - [ ] `scripts/check-pstack-anchors.test.mjs` covers a missing anchor, a doubled anchor, an untouched tree, and added text under a heading. Run `node --test scripts/check-pstack-anchors.test.mjs`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
+**Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Lane 1. Regression lane against trunk. Open the same throwaway PR that edits "explicit model per role" on trunk and on head. Save `anchor-edit.png`. Pass when the head's anchor check fails naming the rule. The pin check is expected to go red because the test edits pstack without updating the pin, and that red is accepted. On trunk, record that no anchor step exists. Record both results.
-- [ ] Lane 2. Remove "Fresh subagents by default." Save `anchor-removed.png`. Pass when CI fails naming that rule.
-- [ ] Lane 3. Duplicate "Write the resume note off-context." Save `anchor-doubled.png`. Pass when CI fails.
-- [ ] Lane 4. Add a sentence under a `##` heading in `SKILL.md` and bump `PSTACK-SOURCE.md`. Save `new-text.png`. Pass when the PR comment lists that sentence under its heading.
-- [ ] Lane 5. Add a sentence under a `###` heading in `playbooks/feature.md`. Save `playbook-text.png`. Pass when the comment lists it.
-- [ ] Lane 6. Change only a non-pstack file. Save `no-pstack.png`. Pass when no comment is posted.
-- [ ] Lane 7. Move an anchor to another line, unchanged. Save `moved.png`. Pass when CI passes.
-- [ ] Lane 8. Run the script locally on main. Save `local.png`. Pass when it exits 0 and prints seven anchors found.
-- [ ] Lane 9. Close every throwaway PR and delete its branch. Save `cleanup.png`. Pass when `node scripts/check-branch-pr.mjs` passes.
-- [ ] Lane 10. Run the CI hygiene job on the head PR. Save `ci.png`. Pass when it is green.
+- [ ] Scenario 1. Regression against trunk. A test PR that edits an anchor passes on trunk and fails at head, with the anchor check naming the rule. The pin red is accepted. Save `anchor-edit.png`. Pass when trunk has no anchor step, head names the rule, and both results are recorded.
+- [ ] Scenario 2. A removed anchor fails naming the rule. Save `anchor-removed.png`. Pass when CI names the rule.
+- [ ] Scenario 3. A doubled anchor fails. Save `anchor-doubled.png`. Pass when CI names the rule.
+- [ ] Scenario 4. New pstack text under a heading is listed in the PR comment. Save `new-text.png`. Pass when the comment lists the added line under its heading.
+- [ ] Scenario 5. A non-pstack change posts no comment. Save `no-pstack.png`. Pass when no comment is posted.
+- [ ] Scenario 6. A moved anchor still passes. Save `moved.png`. Pass when CI passes.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -574,18 +540,16 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 - [ ] Every test file named in P1 to P8 passes on main. Run `node scripts/test-owners.mjs --run local`.
 
-**Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `commandcode/deepseek/deepseek-v4.1-flash` at the PR head, one at a time, per the boot recipe.
+**Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Lane 1. Regression lane against trunk. Run the 7 Nov red queries from Appendix A on the JUL-341 trace and on the practice trace. Save `seven-nov.png`. Pass when JUL-341 shows each failure and the practice trace shows none.
-- [ ] Lane 2. List every model in the practice trace. Save `models.png`. Pass when each equals Todd's pick for its role.
-- [ ] Lane 3. Count Lead steps and read Studio's restart count. Save `long.png`. Pass when the run has at least 100 Lead steps and `NRestarts` did not change.
-- [ ] Lane 4. Restart Studio mid-run once. Save `restart.png`. Pass when the run resumes, each earlier step shows once, and Todd's notice arrives within 60 seconds.
-- [ ] Lane 5. Poll the Studio folder through the run. Save `folder.png`. Pass when it stays on main and clean.
-- [ ] Lane 6. Read every helper span. Save `helpers.png`. Pass when each ends with text.
-- [ ] Lane 7. Plant `codex exec` in the practice card. Save `codex.png`. Pass when the trace shows the refusal and `~/.codex/sessions` gains nothing.
-- [ ] Lane 8. Follow UAT steps 1 and 2 on the picker. Save `uat-save.png`. Pass when "Saved" shows both times and the file holds the picks.
-- [ ] Lane 9. Follow UAT steps 3 and 4. Save `uat-run.png`. Pass when the Lead runs on the new pick with Studio left running.
-- [ ] Lane 10. Run P8's anchor-edit PR again on main. Save `anchors.png`. Pass when the anchor check fails naming the rule. The pin red is accepted.
+- [ ] Scenario 1. Regression against trunk. The 7 Nov red queries show each failure on JUL-341 and none on the practice trace. Save `seven-nov.png`. Pass when JUL-341 shows each failure and the practice trace shows none.
+- [ ] Scenario 2. Every model in the practice trace equals Todd's pick. Save `models.png`. Pass when each model matches its role.
+- [ ] Scenario 3. The run has at least 100 Lead steps and no Studio restart. Save `long.png`. Pass when the step count is at least 100 and NRestarts is unchanged.
+- [ ] Scenario 4. A restart mid-run resumes, each earlier step once, and a notice arrives within 60 seconds. Save `restart.png`. Pass when the run resumes, no step repeats, and the notice arrives.
+- [ ] Scenario 5. The Studio folder stays on main and clean. Save `folder.png`. Pass when it is on main and clean through the run.
+- [ ] Scenario 6. Every helper span ends with text. Save `helpers.png`. Pass when no helper ends empty.
+- [ ] Scenario 7. A planted codex exec is refused and no codex session lands. Save `codex.png`. Pass when the trace shows the refusal and the sessions gain nothing.
+- [ ] Scenario 8. Shipping's verdict lists all 13 criteria and the UAT steps pass. Save `uat-run.png`. Pass when the verdict has 13 criteria and the picker and run UAT steps pass.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
