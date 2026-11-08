@@ -13,6 +13,9 @@ graph/fixtures/
 # Other skill catalogs duplicate the pstack skills already indexed from .agents.
 .claude/
 
+# Comparison evidence is model input, not project documentation.
+docs/agents/graphify-evidence/
+
 # Screenshots and diagrams are not documentation the graph answers from, and
 # image extraction spends model tokens.
 *.png

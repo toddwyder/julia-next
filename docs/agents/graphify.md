@@ -77,9 +77,12 @@ node scripts/julia-agents.mjs -- bash -lc '
 ## Keep it current
 
 Run `graphify hook install` once in a fresh clone. This server already has the
-hooks. They rebuild the code graph after commits, checkouts, merges, and rebases
-with no model calls. Graphify rewrites the graph in the background, so a query
-right after a commit can briefly see the previous graph.
+hooks. A clone that inherits this server's `core.hooksPath` also needs the chain
+files in `/home/ubuntu/.config/git/julia-hooks` described under Limits, because
+git ignores `.git/hooks` when that setting is present. The hooks rebuild the code
+graph after commits, checkouts, merges, and rebases with no model calls. Graphify
+rewrites the graph in the background, so a query right after a commit can
+briefly see the previous graph.
 
 Markdown changes need the extract command above. Graphify's own docs state that
 `update` and the hooks re-extract code only; there is no automatic trigger for
@@ -105,7 +108,8 @@ in total. The Mastra build used 1,691,473 input and 2,065,540 output tokens,
 semantic cache and only changed Markdown is re-extracted.
 
 `graphify-out/mastra/versions.json` records the installed package versions the
-Mastra graph was built from.
+Mastra graph was built from. The three-question comparison is in
+[graphify-comparison](./graphify-comparison.md).
 
 ## Limits
 
