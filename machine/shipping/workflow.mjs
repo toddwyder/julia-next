@@ -1,7 +1,8 @@
 // The Shipping run as a Mastra workflow. One step gathers what the card asks
 // for and where the code is; the next starts a fresh Execute subagent on the
-// free Beam model and lets it run the card's own commands. Neither step judges
-// anything: the answer comes back as text and the machine writes it down.
+// Shipping pick saved on the Start screen and lets it run the card's own
+// commands. Neither step judges anything: the answer comes back as text and the
+// machine writes it down.
 
 import { getIssue } from '../../scripts/linear-cli.mjs';
 import { bootHarness, loadMastra, stopHarness } from './harness.mjs';
@@ -84,7 +85,8 @@ export function reviewTask({ pr, sha, checkout, card, criteria }) {
   ].join('\n');
 }
 
-export async function runShipping({ pr, sha, checkout, card, cardRecord = null, modelId = FREE_MODEL, storage, timeLimitMs = REVIEW_TIME_LIMIT_MS, log = console.log }) {
+export async function runShipping({ pr, sha, checkout, card, cardRecord = null, modelId, storage, timeLimitMs = REVIEW_TIME_LIMIT_MS, log = console.log }) {
+  if (!modelId) throw new Error('runShipping needs the Shipping pick saved on the Start screen; the machine carries no default.');
   const { z, createWorkflow, createStep } = await loadMastra();
   const traceFile = process.env.MASTRA_OBSERVABILITY_DB_PATH ?? null;
   const { booted, session, mastra, requestContext, subagent } = await bootHarness({ cwd: checkout, storage });

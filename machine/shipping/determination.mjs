@@ -167,6 +167,7 @@ export function determinationComment({
   sha,
   card,
   model,
+  answeredModel = null,
   playbook,
   workflowRunId,
   workflowId,
@@ -185,7 +186,8 @@ export function determinationComment({
   lines.push(`**Card** ${card?.identifier ?? 'unknown'} · **Pull request** #${pr} · **Commit** ${code(sha)}`, '');
   if (failed) lines.push(`The machine could not get a verdict: ${failed}`, '');
   lines.push('| Which | What |', '| --- | --- |');
-  lines.push(`| Model that decided | ${code(model)} (Beam, free on CommandCode) |`);
+  lines.push(`| Model requested | ${code(model)} |`);
+  lines.push(`| Model that answered | ${code(answeredModel ?? 'not recorded')} |`);
   lines.push(`| pstack playbook | ${code(playbook)} (stock Shipping) |`);
   lines.push(`| Mastra workflow run | ${code(workflowRunId)} (workflow ${code(workflowId)}) |`);
   lines.push(`| Mastra's record of the run | ${code(traceFile)} |`, '');

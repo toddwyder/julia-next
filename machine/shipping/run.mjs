@@ -14,6 +14,7 @@ import path from 'node:path';
 
 import { postComment, prepareCheckout, prepareDependencies, repoRoot, savedPosting, traceFileFor } from './run-parts.mjs';
 import { scratchDir } from '../../scripts/scratch-dir.mjs';
+import { stageModels } from '../../dashboard/lib/model-settings.js';
 
 const USAGE = `usage: node machine/shipping/run.mjs --pr <number> --card <JUL-number> [--model <id>] [--no-post] [--force]`;
 
@@ -61,12 +62,13 @@ async function main() {
   if (!process.env.MASTRA_DB_PATH) process.env.MASTRA_DB_PATH = path.join(runDir, 'state.db');
   console.log(`Mastra writes this run's record to ${traceFile}.`);
 
-  const { runShipping, WORKFLOW_ID, PLAYBOOK, FREE_MODEL } = await import('./workflow.mjs');
+  const { runShipping, WORKFLOW_ID, PLAYBOOK } = await import('./workflow.mjs');
   const { stopHarness } = await import('./harness.mjs');
   const { readSpans, workflowRun } = await import('./trace-record.mjs');
   const { commandsFromSpans, determinationComment, playbookSteps } = await import('./determination.mjs');
 
-  const modelId = options.model ?? FREE_MODEL;
+  // The Shipping review runs on Todd's saved Shipping pick; the machine carries no default.
+  const modelId = options.model ?? stageModels().shipping;
   const run = await runShipping({
     pr: options.pr,
     sha,
@@ -80,6 +82,21 @@ async function main() {
   const spans = await readSpans(traceFile);
   const workflowSpan = workflowRun(spans, WORKFLOW_ID);
   const { commands, otherTools } = commandsFromSpans(spans);
+  const answeredModel = (() => {
+    for (const span of [...spans].reverse()) {
+      if (span.spanType !== 'model_inference' || span.eventType !== 'end') continue;
+      try {
+        const attributes = JSON.parse(span.attributes || '{}');
+        if (attributes.model) {
+          const provider = String(attributes.provider ?? '').split('.')[0];
+          return provider ? `${provider}/${attributes.model}` : attributes.model;
+        }
+      } catch {
+        // A row without JSON attributes cannot name a model.
+      }
+    }
+    return null;
+  })();
   let steps = [];
   try {
     steps = playbookSteps(fs.readFileSync(path.join(checkout, PLAYBOOK), 'utf8'));
@@ -93,6 +110,7 @@ async function main() {
     sha,
     card: run.output?.card ?? { identifier: options.card },
     model: run.output?.modelId ?? modelId,
+    answeredModel,
     playbook: PLAYBOOK,
     workflowRunId: workflowSpan?.runId ?? run.runId,
     workflowId: WORKFLOW_ID,
@@ -115,6 +133,7 @@ async function main() {
     card: run.output?.card ?? { identifier: options.card },
     criteria: run.output?.criteria ?? [],
     modelId: run.output?.modelId ?? modelId,
+    answeredModel,
     playbook: PLAYBOOK,
     workflowId: WORKFLOW_ID,
     workflowRunId: workflowSpan?.runId ?? run.runId,
