@@ -7,7 +7,7 @@ Julia uses pstack (adopted 22 October 2026). pstack builds and proves. This file
 - Before planning a card, read [docs/plans/path-forward.md](docs/plans/path-forward.md) for Todd's delivery flow and decisions.
 - When pstack slices a card, each slice is a Linear sub-issue of that card, in order, carrying that slice's done-means from the plan. The parent completes only when its last sub-issue does.
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
-- Every card's PR includes its scorecard, built with `node scripts/scorecard.mjs JUL-<n> --write`, and every stop pings Todd; the rest is in [docs/adr/0024-run-scorecard-and-stop-ping.md](docs/adr/0024-run-scorecard-and-stop-ping.md). Money never stops a card.
+- Money never stops a card. Cost and which model answered come from Studio's own run trace, not a per-card scorecard.
 - Framework facts come from the installed packages and their version-matched official docs.
 - A rule or an acceptance criterion names a kind of model, a free model or a paid model. A specific model lives in the pstack models file and in the dated decision that chose it; Triage runs `node scripts/check-agent-brief.mjs`, which flags a criterion that names one.
 - A card begins in Mastra Studio's run form and nowhere else; no script starts one. [docs/agents/machine-programs.md](docs/agents/machine-programs.md) names every program that begins a card or carries a stage.
@@ -34,7 +34,7 @@ A build is done when a run produced a record, not when the builder says it passe
 ## Finish
 A card is finished when its PR is merged to main (after Todd's UAT yes when the card changes something he uses), main CI is green on the merge commit, and the card is Complete in Linear with that commit in a comment.
 
-After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Nothing in the retro touches the trace store: every session writes its own trace file, and the daily trace-fold timer folds finished files into the archive beside them, so a slice's prompt payloads leave the disk without anyone remembering and its cost rows stay for the scorecard. `node scripts/trace-store.mjs status` answers the size question. The next slice does not wait for that PR.
+After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Nothing in the retro touches the trace store: every session writes its own trace file, and the daily trace-fold timer folds finished files into the archive beside them, so a slice's prompt payloads leave the disk without anyone remembering. `node scripts/trace-store.mjs status` answers the size question. The next slice does not wait for that PR.
 
 ## Enforced rules
 
@@ -43,7 +43,6 @@ After a slice merges, run the retro skill on that slice's session and put its fi
 | Skill names are unique across the installed catalogs. | `node scripts/check-skill-names.mjs` rejects duplicate frontmatter names. |
 | Current agent-read files point only at paths that exist. | `node scripts/check-agent-links.mjs` checks the entry points, pstack skills, and `ask-matt`. |
 | Every branch except `main` has an open pull request to `main`. | `node scripts/check-branch-pr.mjs` audits GitHub branches and open pull requests in CI. |
-| A pull request that names a card carries that card's scorecard with a measured cost. | `node scripts/check-branch-pr.mjs` fails the branch when the scorecard is missing, its cost is unknown, or its cost is zero. A scorecard that states a measured cost and says on a `- Cost incomplete:` line why that cost is short passes, and the check prints the reason so it stays on the record. A pull request that names no card passes on a `No card: <reason>` line in its body. |
 | The machine program list names every program that begins a card or carries a stage, and stays current. | `node scripts/machine-programs.mjs --check` fails when a listed program's file changed, when a listed program is gone, or when `machine/flow` holds a program the list never names. CI runs it in the hygiene job, and the failure names the program and the `--write` command. |
 | The workflow folder keeps the stock shape: no old stage, no library outside the allowed set, no piece the entry cannot reach, no timer or retry loop, no hand-built progress file, no comment that switches a guard off. | `npm run guard:flow` runs ESLint and dependency-cruiser on `machine/flow` as the one CI guard check. `machine/guards/guard.test.mjs` plants one violation per kind and fails if a rule stops catching it. |
 

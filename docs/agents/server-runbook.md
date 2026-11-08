@@ -130,19 +130,15 @@ program, so a script that needs the program's own packages reads `MASTRACODE_PRO
 
 A session started any other way, by a Mastra Code update that replaces the launcher or by a command
 that skips it, records nothing and leaves no file of its own. Nothing on the machine notices that, so
-the card says it. A session that started after the launcher was installed and left no cost rows makes
-the scorecard print `- Cost incomplete:` with the reason. `scripts/check-branch-pr.mjs` passes that
-branch's pull request and prints the reason, because those sessions have no rows to price; a cost
-that is unknown, zero or missing still refuses it. The launcher's install time is the cutover, so a
-run from before it is history and not a loss.
+the card says it. The launcher's install time is the cutover, so a run from before it is history and
+not a loss.
 
 ```sh
 node scripts/trace-store.mjs status
 node scripts/trace-store.mjs fold [--quiet]
 ```
 
-`fold` copies each finished file's `metric_events` rows, the per-call tokens and cost a scorecard
-prices from, into `traces/archive.duckdb`, then deletes the file. `archive.duckdb` holds cost rows
+`fold` copies each finished file's `metric_events` rows, the per-call tokens and cost, into `traces/archive.duckdb`, then deletes the file. `archive.duckdb` holds cost rows
 and nothing else: no prompt payloads, no spans. A file a running session still holds is skipped and
 its PID reported, because that session holds it for writing. A finished file is only ever attached
 `READ_ONLY`: attaching one for writing and detaching it checkpointed the file, and on 2 November that
@@ -151,8 +147,7 @@ replaces its rows instead of adding a second copy, so an interrupted fold is saf
 left as `<name>.folding` is picked up by the next fold. One file that cannot be folded is recorded in
 `traces/left-behind.json` with its reason and the run carries on with the rest: on 2 November one
 trace stopped every fold behind it for two days, so the traces of 31 October to 2 November all waited
-on the one that had failed. `status` lists what is still left behind and why, and the scorecard of a
-card whose threads such a file answers says its cost may be short, until a later fold clears it.
+on the one that had failed. `status` lists what is still left behind and why.
 
 The single store the launcher replaced,
 `~/.local/share/mastracode/observability.duckdb`, is folded and deleted the same way; that happened
@@ -162,8 +157,7 @@ Deleting a file is what returns the disk. A delete inside a file gives nothing b
 `CHECKPOINT`: on 30 October 52,443 rows were deleted and checkpointed and the file was 5,955,137,536
 B before and after, with 99.9% of it freed blocks the next writes would reuse.
 
-The daily timer folds finished traces without a session id or card. The scorecard prices a
-card from every file in that directory, the archive included, and the archive is only as big as
+The daily timer folds finished traces without a session id or card. The archive is only as big as
 the cost rows.
 
 `fold` prints one JSON answer and exits 0. When the traces directory is over 15 GB after a fold it

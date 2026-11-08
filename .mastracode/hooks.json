@@ -1,9 +1,0 @@
-{
-  "Notification": [
-    {
-      "type": "command",
-      "command": "node scripts/julia-agents.mjs -- node scripts/stop-ping.mjs",
-      "timeout": 30000
-    }
-  ]
-}

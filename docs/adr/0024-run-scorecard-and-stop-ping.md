@@ -2,7 +2,11 @@
 
 Date: 2026-10-26
 
-Status: Accepted (JUL-274). Replaces the spend ledger of [0023](0023-actual-spend-card-cap.md), which left `main` with the old build machine in #354.
+Status: Superseded on 7 November 2026 by Todd. The scorecard, its pull-request check and the stop ping are removed.
+
+Why: the scorecard was built for cards run by hand in Mastra Code. Studio runs and outside sessions do not feed it, so its cost often read "unknown", and the pull-request check then refused working code over missing paperwork. The stop ping sent Todd about 30 Linear notifications on 7 November, which he ignores as noise. Cost and which model answered now come from Studio's own run trace (`machine/flow/trace.mjs`, `node machine/flow/run.mjs cost`), and the run view card carries the stuck, stopped, quota and token warnings.
+
+Originally accepted (JUL-274). Replaced the spend ledger of [0023](0023-actual-spend-card-cap.md), which left `main` with the old build machine in #354.
 
 ## Context
 
