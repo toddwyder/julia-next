@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratchDir } from '../../scripts/scratch-dir.mjs';
 import { fileURLToPath } from 'node:url';
+import { stageModels } from '../../dashboard/lib/model-settings.js';
 
 import { getIssue, postComment, setIssueState } from '../../scripts/linear-cli.mjs';
 import { alreadyCompleted, completeCard, deleteRemoteBranch, gh, mainRunsFor, mergePullRequest, prepareMainCheckout, publishDocs, pullRequestComments, readPullRequest, waitForMainCi, waitForMerged, waitForPullChecks } from './land.mjs';
@@ -159,10 +160,13 @@ async function main() {
     });
   };
 
+  // Every stage reads Todd's saved pick; a missing pick stops here and names the stage.
+  const stages = stageModels();
+
   const deps = {
     runDir,
     runId: null,
-    modelId: args.model ?? undefined,
+    modelId: args.model ?? stages.retro,
     getIssue: readCard,
     readPull: pr => readPullRequest(pr),
     readComments: pr => pullRequestComments(pr),
@@ -179,7 +183,7 @@ async function main() {
     saveRecord: async record => writeRecord(runDir, { ...record, updatedAt: new Date().toISOString() }),
     retro: async input => {
       process.env.MASTRA_OBSERVABILITY_DB_PATH = traceFileFor(args.pr, 'merge-retro');
-      return runRetro({ ...input, modelId: args.model ?? undefined, root, log: console.log });
+      return runRetro({ ...input, modelId: args.model ?? stages.retro, root, log: console.log });
     },
     sweep: async ({ card, pr, head, checkout, changed }) => {
       const plan = collectLeftovers({ card, pr, head, checkout, changed });

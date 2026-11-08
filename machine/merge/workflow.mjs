@@ -9,13 +9,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadMastra } from '../shipping/harness.mjs';
-import { FREE_MODEL } from '../shipping/workflow.mjs';
 import { decideLanding, gateNote, parseShippingComment } from './gate.mjs';
 import { landingLines, landingPath, landingRecord, writeLanding } from './metrics.mjs';
 import { assertLandable, completionComment, retroPathFor } from './land.mjs';
 
 export const WORKFLOW_ID = 'merge';
-export const MERGE_MODEL = FREE_MODEL;
 
 export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
   const { z, createWorkflow, createStep } = await loadMastra();

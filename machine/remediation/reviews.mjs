@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { stopHarness } from '../shipping/harness.mjs';
-import { runShipping, REVIEW_TIME_LIMIT_MS, reviewLimitNote, FREE_MODEL, PLAYBOOK, WORKFLOW_ID } from '../shipping/workflow.mjs';
+import { runShipping, REVIEW_TIME_LIMIT_MS, reviewLimitNote, PLAYBOOK, WORKFLOW_ID } from '../shipping/workflow.mjs';
 import { commandsFromSpans, determinationComment, playbookSteps } from '../shipping/determination.mjs';
 import { readSpans, workflowRun } from '../shipping/trace-record.mjs';
 import { postComment, traceFileFor } from '../shipping/run-parts.mjs';
@@ -20,7 +20,7 @@ export const REVIEW_ATTEMPTS = 3;
 
 const firstLine = text => String(text ?? '').trim().split(/\r?\n/)[0].slice(0, 300);
 
-export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL, post = true, timeLimitMs = REVIEW_TIME_LIMIT_MS, log = console.log }) {
+export async function reviewRound({ record, round, runDir, modelId, post = true, timeLimitMs = REVIEW_TIME_LIMIT_MS, log = console.log }) {
   let attemptUsed = null;
   for (let attempt = 1; attempt <= REVIEW_ATTEMPTS; attempt++) {
     const name = attempt === 1 ? `review-${round}` : `review-${round}-try-${attempt}`;

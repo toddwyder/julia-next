@@ -64,7 +64,7 @@ async function main() {
 
   const { runShipping, WORKFLOW_ID, PLAYBOOK } = await import('./workflow.mjs');
   const { stopHarness } = await import('./harness.mjs');
-  const { readSpans, workflowRun } = await import('./trace-record.mjs');
+  const { answerModel, readSpans, workflowRun } = await import('./trace-record.mjs');
   const { commandsFromSpans, determinationComment, playbookSteps } = await import('./determination.mjs');
 
   // The Shipping review runs on Todd's saved Shipping pick; the machine carries no default.
@@ -82,21 +82,7 @@ async function main() {
   const spans = await readSpans(traceFile);
   const workflowSpan = workflowRun(spans, WORKFLOW_ID);
   const { commands, otherTools } = commandsFromSpans(spans);
-  const answeredModel = (() => {
-    for (const span of [...spans].reverse()) {
-      if (span.spanType !== 'model_inference' || span.eventType !== 'end') continue;
-      try {
-        const attributes = JSON.parse(span.attributes || '{}');
-        if (attributes.model) {
-          const provider = String(attributes.provider ?? '').split('.')[0];
-          return provider ? `${provider}/${attributes.model}` : attributes.model;
-        }
-      } catch {
-        // A row without JSON attributes cannot name a model.
-      }
-    }
-    return null;
-  })();
+  const answeredModel = answerModel(spans);
   let steps = [];
   try {
     steps = playbookSteps(fs.readFileSync(path.join(checkout, PLAYBOOK), 'utf8'));

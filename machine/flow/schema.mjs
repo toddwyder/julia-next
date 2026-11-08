@@ -11,8 +11,6 @@ export const SMOKE_LOOP = 'smoke-loop';
 export const SMOKE_ROUND = 'smoke-round';
 export const FIX_AND_LAND = 'fix-and-land';
 
-export const FREE_MODEL = 'commandcode/reflection/beam:free';
-
 // What a run is asked for when it is started. This is the whole form a person
 // fills in: which card, and whether it is a product card or a machine card.
 export const runInput = z.object({
