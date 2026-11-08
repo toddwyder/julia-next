@@ -124,11 +124,11 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. The 60-step memory probe hits the heap limit on trunk, and at head it ends under 150 MB heap. Save `memory-trunk-head.png`. Pass when trunk dies at the limit and head stays under 150 MB.
-- [ ] Scenario 2. A stored span keeps no string over 2,000 characters. Save `span-cap.png`. Pass when every string field in the trace is at most 2,000 characters.
-- [ ] Scenario 3. A 100-step practice run finishes without a Studio restart, under 2.2 GB RSS. Save `long-run.png`. Pass when the run ends and the candidate PID is unchanged.
-- [ ] Scenario 4. The trace after 100 steps stays under 50 MB. Save `trace-size.png`. Pass when `trace.duckdb` is under 50 MB.
-- [ ] Scenario 5. A helper's span text is cut at 2,000 characters. Save `helper-span.png`. Pass when the helper's text field exists and is at most 2,000 characters.
+- [ ] Scenario 1. Regression against trunk. The 60-step memory probe hits the heap limit on trunk, and at head it ends under 150 MB heap. Save `memory-trunk-head.png`. Pass when trunk dies at the limit and head stays under 150 MB. No Studio. Script in the shared runner.
+- [ ] Scenario 2. A stored span keeps no string over 2,000 characters. Save `span-cap.png`. Pass when every string field in the trace is at most 2,000 characters. Reads head run 1.
+- [ ] Scenario 3. A 100-step practice run finishes without a Studio restart, under 2.2 GB RSS. Save `long-run.png`. Pass when the run ends and the candidate PID is unchanged. Reads head run 1.
+- [ ] Scenario 4. The trace after 100 steps stays under 50 MB. Save `trace-size.png`. Pass when `trace.duckdb` is under 50 MB. Reads head run 1.
+- [ ] Scenario 5. A helper's span text is cut at 2,000 characters. Save `helper-span.png`. Pass when the helper's text field exists and is at most 2,000 characters. Reads head run 1.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -172,12 +172,12 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A practice build leaves the Studio folder off main at trunk; at head the folder stays on main and clean. Save `folder-branch.png`. Pass when trunk moves the folder and head does not.
-- [ ] Scenario 2. Every Lead command runs in the build worktree. Save `cwd.png`. Pass when every `execute_command` span's cwd is the worktree.
-- [ ] Scenario 3. A helper's file writes stay in the build worktree. Save `helper-writes.png`. Pass when every written path is inside it.
-- [ ] Scenario 4. A second start reuses the worktree. Save `reuse.png`. Pass when the second start creates no second worktree.
-- [ ] Scenario 5. A push from the worktree reaches origin. Save `push.png`. Pass when the card branch is on origin.
-- [ ] Scenario 6. The Studio folder's reflog gains no checkout. Save `reflog.png`. Pass when no new checkout entry appears.
+- [ ] Scenario 1. Regression against trunk. A practice build leaves the Studio folder off main at trunk; at head the folder stays on main and clean. Save `folder-branch.png`. Pass when trunk moves the folder and head does not. Reads trunk run 1 and head run 1.
+- [ ] Scenario 2. Every Lead command runs in the build worktree. Save `cwd.png`. Pass when every `execute_command` span's cwd is the worktree. Reads head run 1.
+- [ ] Scenario 3. A helper's file writes stay in the build worktree. Save `helper-writes.png`. Pass when every written path is inside it. Reads head run 1.
+- [ ] Scenario 4. A second start reuses the worktree. Save `reuse.png`. Pass when the second start creates no second worktree. Reads head run 2.
+- [ ] Scenario 5. A push from the worktree reaches origin. Save `push.png`. Pass when the card branch is on origin. Reads head run 1.
+- [ ] Scenario 6. The Studio folder's reflog gains no checkout. Save `reflog.png`. Pass when no new checkout entry appears. Reads head run 1.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -232,11 +232,11 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A changed Lead pick needs a Studio restart at trunk; at head the next run uses it with Studio left running. Save `next-run.png`. Pass when trunk shows the old model and head the new one.
-- [ ] Scenario 2. An unchanged Save writes and reads back, and the file mtime moves. Save `unchanged-save.png`. Pass when Saved appears and mtime changes.
-- [ ] Scenario 3. A fresh page shows no Saved, and a failed read-back shows an error. Save `failed-save.png`. Pass when the first load has no Saved and a read-only file shows an error.
-- [ ] Scenario 4. Every role on the picker matches Studio. Save `picker-vs-studio.png`. Pass when all 17 roles match.
-- [ ] Scenario 5. pstack's file stays unchanged and the picker's file is the only one read. Save `one-file.png`. Pass when a pstack edit does not change the run and the picker file does.
+- [ ] Scenario 1. Regression against trunk. A changed Lead pick needs a Studio restart at trunk; at head the next run uses it with Studio left running. Save `next-run.png`. Pass when trunk shows the old model and head the new one. Reads trunk run 1 and head run 1.
+- [ ] Scenario 2. An unchanged Save writes and reads back, and the file mtime moves. Save `unchanged-save.png`. Pass when Saved appears and mtime changes. Reads head run 1.
+- [ ] Scenario 3. A fresh page shows no Saved, and a failed read-back shows an error. Save `failed-save.png`. Pass when the first load has no Saved and a read-only file shows an error. Reads head run 1.
+- [ ] Scenario 4. Every role on the picker matches Studio. Save `picker-vs-studio.png`. Pass when all 17 roles match. Reads head run 1.
+- [ ] Scenario 5. pstack's file stays unchanged and the picker's file is the only one read. Save `one-file.png`. Pass when a pstack edit does not change the run and the picker file does. Reads head run 1.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -290,12 +290,12 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A usage limit at trunk sends nothing; at head one notice reaches Todd within 60 seconds. Save `usage-limit.png`. Pass when trunk sends none and head sends one.
-- [ ] Scenario 2. A refused model reaches Todd within 60 seconds. Save `refused-model.png`. Pass when the notice names the model and arrives in time.
-- [ ] Scenario 3. A restart mid-run reaches Todd within 60 seconds. Save `restart.png`. Pass when the restart notice arrives after the new process.
-- [ ] Scenario 4. A 429 that recovers sends no notice; one that fails every retry sends one. Save `429.png`. Pass when the recovered case is silent and the failed case sends one.
-- [ ] Scenario 5. A content refusal sends a notice. Save `content-filter.png`. Pass when the notice arrives within 60 seconds.
-- [ ] Scenario 6. A repeat error sends one notice per error and no more. Save `repeat.png`. Pass when each error has exactly one notice.
+- [ ] Scenario 1. Regression against trunk. A usage limit at trunk sends nothing; at head one notice reaches Todd within 60 seconds. Save `usage-limit.png`. Pass when trunk sends none and head sends one. Reads trunk run 1 and head run 1.
+- [ ] Scenario 2. A refused model reaches Todd within 60 seconds. Save `refused-model.png`. Pass when the notice names the model and arrives in time. Reads head run 2.
+- [ ] Scenario 3. A restart mid-run reaches Todd within 60 seconds. Save `restart.png`. Pass when the restart notice arrives after the new process. Reads head run 3.
+- [ ] Scenario 4. A 429 that recovers sends no notice; one that fails every retry sends one. Save `429.png`. Pass when the recovered case is silent and the failed case sends one. Reads head run 4 and head run 5.
+- [ ] Scenario 5. A content refusal sends a notice. Save `content-filter.png`. Pass when the notice arrives within 60 seconds. Reads head run 6.
+- [ ] Scenario 6. A repeat error sends one notice per error and no more. Save `repeat.png`. Pass when each error has exactly one notice. Reads head run 7.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -340,11 +340,11 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A helper cut to 12 steps ends empty at trunk; at head it uses its full budget and ends with text. Save `empty-helpers.png`. Pass when head has no empty helper.
-- [ ] Scenario 2. The Lead's maxSteps cannot cut the helper's budget. Save `budget.png`. Pass when each helper's budget equals its own setting.
-- [ ] Scenario 3. The last step sends toolChoice none and ends with text. Save `last-step.png`. Pass when the last step has no tool call and has text.
-- [ ] Scenario 4. An empty report is a machine fault in the trace and a notice. Save `fault.png`. Pass when the span carries machineFault and Todd gets one notice.
-- [ ] Scenario 5. A panel helper ends with text and the Lead quotes its report. Save `panel-helper.png`. Pass when the panel helper has text and the Lead's next step quotes it.
+- [ ] Scenario 1. Regression against trunk. A helper cut to 12 steps ends empty at trunk; at head it uses its full budget and ends with text. Save `empty-helpers.png`. Pass when head has no empty helper. Reads trunk run 1 and head run 1.
+- [ ] Scenario 2. The Lead's maxSteps cannot cut the helper's budget. Save `budget.png`. Pass when each helper's budget equals its own setting. Reads head run 1.
+- [ ] Scenario 3. The last step sends toolChoice none and ends with text. Save `last-step.png`. Pass when the last step has no tool call and has text. Reads head run 1.
+- [ ] Scenario 4. An empty report is a machine fault in the trace and a notice. Save `fault.png`. Pass when the span carries machineFault and Todd gets one notice. Reads head run 2.
+- [ ] Scenario 5. A panel helper ends with text and the Lead quotes its report. Save `panel-helper.png`. Pass when the panel helper has text and the Lead's next step quotes it. Reads head run 1.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -389,12 +389,12 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A planted codex exec runs at trunk and is refused at head. Save `planted-codex.png`. Pass when trunk runs it and head refuses it.
-- [ ] Scenario 2. An absolute path is refused. Save `abs-path.png`. Pass when the hook refuses `/usr/local/bin/codex`.
-- [ ] Scenario 3. npx is refused. Save `npx.png`. Pass when `npx @openai/codex` is refused.
-- [ ] Scenario 4. A script file calling codex exits 126. Save `script-file.png`. Pass when the refusing script answers with exit 126.
-- [ ] Scenario 5. A helper's delegated codex is refused. Save `helper-codex.png`. Pass when the helper's codex call is refused.
-- [ ] Scenario 6. Git, npm, and node still run, and `~/.codex/sessions` gains nothing. Save `normal-build.png`. Pass when the build runs and no codex session lands in the run window.
+- [ ] Scenario 1. Regression against trunk. A planted codex exec runs at trunk and is refused at head. Save `planted-codex.png`. Pass when trunk runs it and head refuses it. Reads trunk run 1 and head run 1.
+- [ ] Scenario 2. An absolute path is refused. Save `abs-path.png`. Pass when the hook refuses `/usr/local/bin/codex`. No Studio. Script in the shared runner.
+- [ ] Scenario 3. npx is refused. Save `npx.png`. Pass when `npx @openai/codex` is refused. No Studio. Script in the shared runner.
+- [ ] Scenario 4. A script file calling codex exits 126. Save `script-file.png`. Pass when the refusing script answers with exit 126. No Studio. Script in the shared runner.
+- [ ] Scenario 5. A helper's delegated codex is refused. Save `helper-codex.png`. Pass when the helper's codex call is refused. Reads head run 1.
+- [ ] Scenario 6. Git, npm, and node still run, and `~/.codex/sessions` gains nothing. Save `normal-build.png`. Pass when the build runs and no codex session lands in the run window. Reads head run 1.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -442,11 +442,11 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A kill restarts at step 0 at trunk; at head it resumes at step 20 or 21. Save `resume.png`. Pass when trunk restarts at 0 and head resumes at 20 or 21.
-- [ ] Scenario 2. Every earlier step shows once. Save `once.png`. Pass when no step span repeats.
-- [ ] Scenario 3. A kill during a helper delegation replays only that delegation, and the first helper call after resume has full budget and text. Save `helper-kill.png`. Pass when only that delegation replays and the next helper call has its full budget and text.
-- [ ] Scenario 4. A double kill resumes both times and finishes. Save `double-kill.png`. Pass when both resumes land and the build finishes.
-- [ ] Scenario 5. A kill while the card waits for Todd does not rerun the build. Save `waiting-kill.png`. Pass when the wait comes back unanswered and the build does not rerun.
+- [ ] Scenario 1. Regression against trunk. A kill restarts at step 0 at trunk; at head it resumes at step 20 or 21. Save `resume.png`. Pass when trunk restarts at 0 and head resumes at 20 or 21. Reads trunk run 1 and head run 1.
+- [ ] Scenario 2. Every earlier step shows once. Save `once.png`. Pass when no step span repeats. Reads head run 1.
+- [ ] Scenario 3. A kill during a helper delegation replays only that delegation, and the first helper call after resume has full budget and text. Save `helper-kill.png`. Pass when only that delegation replays and the next helper call has its full budget and text. Reads head run 2.
+- [ ] Scenario 4. A double kill resumes both times and finishes. Save `double-kill.png`. Pass when both resumes land and the build finishes. Reads head run 3.
+- [ ] Scenario 5. A kill while the card waits for Todd does not rerun the build. Save `waiting-kill.png`. Pass when the wait comes back unanswered and the build does not rerun. Reads head run 4.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -493,12 +493,12 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 **Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
 
-- [ ] Scenario 1. Regression against trunk. A test PR that edits an anchor passes on trunk and fails at head, with the anchor check naming the rule. The pin red is accepted. Save `anchor-edit.png`. Pass when trunk has no anchor step, head names the rule, and both results are recorded.
-- [ ] Scenario 2. A removed anchor fails naming the rule. Save `anchor-removed.png`. Pass when CI names the rule.
-- [ ] Scenario 3. A doubled anchor fails. Save `anchor-doubled.png`. Pass when CI names the rule.
-- [ ] Scenario 4. New pstack text under a heading is listed in the PR comment. Save `new-text.png`. Pass when the comment lists the added line under its heading.
-- [ ] Scenario 5. A non-pstack change posts no comment. Save `no-pstack.png`. Pass when no comment is posted.
-- [ ] Scenario 6. A moved anchor still passes. Save `moved.png`. Pass when CI passes.
+- [ ] Scenario 1. Regression against trunk. A test PR that edits an anchor passes on trunk and fails at head, with the anchor check naming the rule. The pin red is accepted. Save `anchor-edit.png`. Pass when trunk has no anchor step, head names the rule, and both results are recorded. No Studio. CI script in the shared runner.
+- [ ] Scenario 2. A removed anchor fails naming the rule. Save `anchor-removed.png`. Pass when CI names the rule. No Studio. CI script in the shared runner.
+- [ ] Scenario 3. A doubled anchor fails. Save `anchor-doubled.png`. Pass when CI names the rule. No Studio. CI script in the shared runner.
+- [ ] Scenario 4. New pstack text under a heading is listed in the PR comment. Save `new-text.png`. Pass when the comment lists the added line under its heading. No Studio. CI script in the shared runner.
+- [ ] Scenario 5. A non-pstack change posts no comment. Save `no-pstack.png`. Pass when no comment is posted. No Studio. CI script in the shared runner.
+- [ ] Scenario 6. A moved anchor still passes. Save `moved.png`. Pass when CI passes. No Studio. CI script in the shared runner.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
@@ -540,16 +540,16 @@ Each live lane runs on the server at the PR head, in its own worktree. Run one l
 
 - [ ] Every test file named in P1 to P8 passes on main. Run `node scripts/test-owners.mjs --run local`.
 
-**Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it.
+**Verify, live.** One independent live checker at the PR head, in a fresh session, never the author. It runs the shared lane runner for each scenario and judges only the saved evidence against the pass condition. One practice run per piece of work feeds every scenario that reads it. All scenarios below read this piece's one head practice run.
 
-- [ ] Scenario 1. Regression against trunk. The 7 Nov red queries show each failure on JUL-341 and none on the practice trace. Save `seven-nov.png`. Pass when JUL-341 shows each failure and the practice trace shows none.
-- [ ] Scenario 2. Every model in the practice trace equals Todd's pick. Save `models.png`. Pass when each model matches its role.
-- [ ] Scenario 3. The run has at least 100 Lead steps and no Studio restart. Save `long.png`. Pass when the step count is at least 100 and NRestarts is unchanged.
-- [ ] Scenario 4. A restart mid-run resumes, each earlier step once, and a notice arrives within 60 seconds. Save `restart.png`. Pass when the run resumes, no step repeats, and the notice arrives.
-- [ ] Scenario 5. The Studio folder stays on main and clean. Save `folder.png`. Pass when it is on main and clean through the run.
-- [ ] Scenario 6. Every helper span ends with text. Save `helpers.png`. Pass when no helper ends empty.
-- [ ] Scenario 7. A planted codex exec is refused and no codex session lands. Save `codex.png`. Pass when the trace shows the refusal and the sessions gain nothing.
-- [ ] Scenario 8. Shipping's verdict lists all 13 criteria and the UAT steps pass. Save `uat-run.png`. Pass when the verdict has 13 criteria and the picker and run UAT steps pass.
+- [ ] Scenario 1. Regression against trunk. The 7 Nov red queries show each failure on JUL-341 and none on the practice trace. Save `seven-nov.png`. Pass when JUL-341 shows each failure and the practice trace shows none. Reads head run 1.
+- [ ] Scenario 2. Every model in the practice trace equals Todd's pick. Save `models.png`. Pass when each model matches its role. Reads head run 1.
+- [ ] Scenario 3. The run has at least 100 Lead steps and no Studio restart. Save `long.png`. Pass when the step count is at least 100 and NRestarts is unchanged. Reads head run 1.
+- [ ] Scenario 4. A restart mid-run resumes, each earlier step once, and a notice arrives within 60 seconds. Save `restart.png`. Pass when the run resumes, no step repeats, and the notice arrives. Reads head run 1.
+- [ ] Scenario 5. The Studio folder stays on main and clean. Save `folder.png`. Pass when it is on main and clean through the run. Reads head run 1.
+- [ ] Scenario 6. Every helper span ends with text. Save `helpers.png`. Pass when no helper ends empty. Reads head run 1.
+- [ ] Scenario 7. A planted codex exec is refused and no codex session lands. Save `codex.png`. Pass when the trace shows the refusal and the sessions gain nothing. Reads head run 1.
+- [ ] Scenario 8. Shipping's verdict lists all 13 criteria and the UAT steps pass. Save `uat-run.png`. Pass when the verdict has 13 criteria and the picker and run UAT steps pass. Reads head run 1.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
