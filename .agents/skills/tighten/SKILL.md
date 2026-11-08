@@ -35,7 +35,6 @@ Done when every criterion names its evidence and its outside check.
 
 List every dependency the agent will meet: credentials, permissions, access, a human click, a vault it cannot see. Settle each one in the draft. Reduce a human action to one atomic approval, and design a secret out of the path instead of passing it to Todd.
 
-When the agent will open a pull request, tell it to name only the card its branch ships in the description. CI asks for a scorecard for every card key it finds, so a card mentioned in passing costs a full CI cycle.
 
 Done when the agent holds every answer it needs.
 

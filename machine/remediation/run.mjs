@@ -9,8 +9,6 @@ import path from 'node:path';
 
 import { getIssue, postComment as postCardComment } from '../../scripts/linear-cli.mjs';
 import { scratchDir } from '../../scripts/scratch-dir.mjs';
-import { handleStop } from '../../scripts/stop-ping.mjs';
-import { stopPingDeps } from './ping.mjs';
 import { loadMastra } from '../shipping/harness.mjs';
 import { FREE_MODEL } from '../shipping/workflow.mjs';
 import { prepareCheckout, repoRoot, traceFileFor } from '../shipping/run-parts.mjs';
@@ -151,12 +149,9 @@ async function main() {
       }
       return comment.url;
     },
-    ping: async ({ record, message }) => {
-      const thread = record.stop?.threadId ?? record.builder?.threadId ?? null;
-      if (!thread) return { posted: false, error: 'no session thread to hang the stop on' };
-      const deps = stopPingDeps({ thread, card: record.card.identifier, projectPath: root });
-      return handleStop({ session_id: thread, cwd: root, reason: 'agent_done', message }, process.env, deps);
-    },
+    // The stop ping was removed on 7 Nov 2026 (ADR 0024). A stop is still written to the run
+    // record; nothing posts to Linear.
+    ping: async () => ({ posted: false, error: 'stop ping removed' }),
     saveRecord: record => writeRecord(runDir, { ...record, pr: options.pr, runDir }),
   };
 

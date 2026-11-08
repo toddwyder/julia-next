@@ -41,8 +41,8 @@ run before it is ended (default 20).
    session was missing.
 6. A second fail starts one more session on the Investigation playbook, given
    both determinations and told to write down the fault in the work and the
-   fault in the process, then `finish` records the stop and pings Todd through
-   `scripts/stop-ping.mjs` with the pull request link and the root cause.
+   fault in the process, then `finish` records the stop with the pull request link and the root
+   cause. (The stop ping that used to post it to Linear was removed on 7 Nov 2026.)
 
 The review limit is one constant, `MAX_REVIEWS = 2` in `workflow.mjs`. A review
 that has not answered after twenty minutes is ended by the clock in

@@ -80,9 +80,9 @@ After a squash merge the branch is not an ancestor of `main`, so `git branch -d`
 
 ## Hooks
 
-Mastra Code loads hooks from the session's project directory and from the user-level `~/.mastracode/hooks.json`. A session started outside the repository, such as `/home/ubuntu`, loads no project hooks at all, so a hook wired only in the repository never runs there: Julia's stop ping posted nothing for sessions opened from `~`.
+Mastra Code loads hooks from the session's project directory and from the user-level `~/.mastracode/hooks.json`.
 
-`node scripts/install-hooks.mjs` writes the user-level entry: a `Notification` hook that runs `stop-ping.mjs --global`, which exits silently where the project already wires the ping. It keeps every other global hook and is safe to re-run after an upgrade. Verify it from a session opened outside the repository, then read `~/.local/state/julia/stops.jsonl` to see whether the stop was recorded.
+Julia's stop ping hook was removed on 7 November 2026 (ADR 0024). The repository no longer wires a `Notification` hook. A server still carrying the old user-level entry, a `Notification` hook that runs `stop-ping.mjs --global`, should have that entry deleted: the script it calls is gone. The `SessionStart` hook that re-applies the retry patch (below) stays.
 
 ## A reset, a retry, and a retry that never comes back
 
