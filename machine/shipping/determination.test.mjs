@@ -324,3 +324,21 @@ test('a start line never overwrites the verdict on the same criterion', () => {
   const answer = 'CRITERION 1: PASS — it printed the line\nCRITERION 1: judging';
   assert.deepEqual(parseVerdict(answer).criteria, [{ number: 1, verdict: 'PASS', reason: 'it printed the line' }]);
 });
+
+test('a stopped review that only started a criterion is not said to have judged it', () => {
+  const comment = determinationComment({
+    pr: 401,
+    sha: 'dc62b45',
+    card: { identifier: 'JUL-358' },
+    model: 'commandcode/moonshotai/Kimi-K3.1-Pro',
+    playbook: '.agents/skills/poteto-mode/playbooks/shipping.md',
+    workflowRunId: 'run-1',
+    workflowId: 'shipping',
+    traceFile: '/tmp/trace.duckdb',
+    criteria: criteriaFromCard(CARD),
+    verdict: parseVerdict('CRITERION 1: judging'),
+    stop: { kind: 'stuck', detail: 'no activity for 7 minutes', idleMs: 420848 },
+  });
+  assert.match(comment, /It judged no criterion before it stopped, so the next review covers all of them\./);
+  assert.doesNotMatch(comment, /It judged criterion 1/);
+});

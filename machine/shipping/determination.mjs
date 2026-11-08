@@ -216,8 +216,9 @@ export function determinationComment({
   lines.push(`**Card** ${card?.identifier ?? 'unknown'} · **Pull request** #${pr} · **Commit** ${code(sha)}`, '');
   if (stop) {
     // A review that stopped says so before anything else, so a reader never
-    // reads a partial determination as a finished one.
-    const judged = (verdict?.criteria ?? []).map(item => item.number);
+    // reads a partial determination as a finished one. Only criteria with an
+    // actual verdict count as judged: one the review merely started stays open.
+    const judged = (verdict?.criteria ?? []).filter(item => item.verdict).map(item => item.number);
     lines.push(
       `**Stopped as ${stop.kind}.** ${stop.detail.charAt(0).toUpperCase()}${stop.detail.slice(1)}.` +
         (judged.length > 0
