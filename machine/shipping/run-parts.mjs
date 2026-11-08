@@ -37,6 +37,37 @@ export function prepareCheckout(pr, runDir, checkout) {
   return sha;
 }
 
+// A review runs the card's checks, and those need the dev dependencies. Install
+// the root and dashboard trees one after the other, never together: two npm ci
+// runs at once took 3.4 GB on this 7.6 GB server and the kernel killed Studio.
+// A tree installed from the same lockfile is reused.
+const INSTALL_TREES = ['', 'dashboard'];
+
+export function prepareDependencies(checkout, { log = () => {}, timeoutMs = 15 * 60_000 } = {}) {
+  for (const relative of INSTALL_TREES) {
+    const cwd = path.join(checkout, relative);
+    const lock = path.join(cwd, 'package-lock.json');
+    const marker = path.join(cwd, 'node_modules', '.package-lock.json');
+    if (!fs.existsSync(lock)) continue;
+    try {
+      if (fs.statSync(marker).mtimeMs >= fs.statSync(lock).mtimeMs) continue;
+    } catch {
+      // No installed tree yet; install it.
+    }
+    log(`Installing ${relative || 'root'} dependencies once, with dev dependencies.`);
+    execFileSync('npm', ['ci', '--include=dev', '--no-audit', '--no-fund'], {
+      cwd,
+      stdio: ['ignore', 'inherit', 'inherit'],
+      env: {
+        ...process.env,
+        npm_config_omit: '',
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--max-old-space-size=2048'].filter(Boolean).join(' '),
+      },
+      timeout: timeoutMs,
+    });
+  }
+}
+
 export function traceFileFor(pr, label = 'shipping') {
   const dir = process.env.JULIA_TRACES_DIR || path.join(os.homedir(), '.local', 'share', 'mastracode', 'traces');
   fs.mkdirSync(dir, { recursive: true });
