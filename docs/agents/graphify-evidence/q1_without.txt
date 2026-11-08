@@ -1,0 +1,165 @@
+### grep leadModel/buildModel/createAgents in machine/flow, src/mastra, scripts
+src/mastra/index.ts:10:import { createAgents } from '../../machine/flow/agents.mjs';
+src/mastra/index.ts:20:const agents = createAgents({ tools: await graphifyTools() });
+machine/flow/agents.mjs:7:import { buildModel } from './models.mjs';
+machine/flow/agents.mjs:24:export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {} } = {}) {
+machine/flow/agents.mjs:53:    model: buildModel(leadModelFile),
+machine/flow/models.mjs:13:export function leadModelPath() {
+machine/flow/models.mjs:14:  return process.env.JULIA_LEAD_MODEL_FILE ?? join(homedir(), '.config', 'julia', 'lead-model');
+machine/flow/models.mjs:17:export function leadModelId(file = leadModelPath()) {
+machine/flow/models.mjs:33:export function buildModel(file) {
+machine/flow/models.mjs:34:  return agentModel(leadModelId(file));
+scripts/install-lead-model.mjs:6:import { leadModelPath } from '../machine/flow/models.mjs';
+
+### FILE src/mastra/index.ts
+// The Studio entry. Registering the card-path workflow here is what puts it on
+// Studio's run form, and that form is the one place a card is started.
+//
+// FLOW_DIR overrides the durable Studio run folder under .artifacts/flow.
+
+process.env.CMD_API_KEY ??= process.env.COMMANDCODE_API_KEY;
+
+import { resolve } from 'node:path';
+
+import { createAgents } from '../../machine/flow/agents.mjs';
+import { graphifyTools } from '../../machine/flow/graphify.mjs';
+import { openMastra } from '../../machine/flow/mastra.mjs';
+import { CARD_PATH } from '../../machine/flow/schema.mjs';
+import { openScratch } from '../../machine/flow/scratch.mjs';
+import { buildCardPath } from '../../machine/flow/workflow.mjs';
+
+const dir = resolve(process.env.FLOW_DIR ?? '.artifacts/flow/studio');
+
+openScratch(dir);
+const agents = createAgents({ tools: await graphifyTools() });
+const workflow = buildCardPath({ agents, dir });
+
+// Storage and observability come from the same place a resumed run uses, so the
+// model calls a Studio run makes are written to this run folder's trace file.
+export const mastra = await openMastra({
+  card: process.env.FLOW_CARD ?? '',
+  agents,
+  workflow,
+  stateDb: resolve(dir, 'state.db'),
+  traceDb: resolve(dir, 'trace.duckdb'),
+});
+### FILE machine/flow/agents.mjs
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { Agent } from '@mastra/core/agent';
+import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace';
+
+import { buildModel } from './models.mjs';
+import { agentModel, helperKey, readRoleModels } from './role-models.mjs';
+import { FREE_MODEL } from './schema.mjs';
+
+const POTETO_SKILL = '.agents/skills/poteto-mode/SKILL.md';
+
+function repositoryContaining(directory) {
+  if (existsSync(join(directory, POTETO_SKILL))) return directory;
+  const parent = dirname(directory);
+  if (parent === directory) throw new Error('Cannot find the repository poteto-mode skill. Set FLOW_REPO to the repository root.');
+  return repositoryContaining(parent);
+}
+
+export function repoRoot() {
+  return process.env.FLOW_REPO ?? repositoryContaining(resolve(process.env.MASTRA_PROJECT_ROOT ?? process.cwd()));
+}
+
+export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {} } = {}) {
+  const workspace = new Workspace({
+    id: 'machine-repo',
+    filesystem: new LocalFilesystem({ basePath: repo }),
+    sandbox: new LocalSandbox({ workingDirectory: repo, env: { HOME: homedir() } }),
+    skills: ['.agents/skills'],
+  });
+  const helperWorkspace = new Workspace({
+    id: 'machine-repo-helper',
+    filesystem: new LocalFilesystem({ basePath: repo }),
+    sandbox: new LocalSandbox({ workingDirectory: repo, env: { HOME: homedir() } }),
+  });
+  const helpers = Object.fromEntries(readRoleModels(roleModelsFile).flatMap(role => role.models.map((modelId, index) => {
+    const choice = role.models.length > 1 ? `, choice ${index + 1}` : '';
+    return [helperKey(role, index), new Agent({
+      id: `pstack-${role.id}-${index + 1}`,
+      name: role.name,
+      description: `${role.name} pstack role on ${modelId}${choice}. ${role.explanation} Use this helper when delegating ${role.name} work.`,
+      instructions: `You are the ${role.name} pstack helper. ${role.explanation} Complete the task delegated by Lead yourself. Do not delegate it again. For questions about code structure or where something lives, call the graphify tools before reading files. Report the result and evidence.`,
+      model: agentModel(modelId),
+      workspace: helperWorkspace,
+      tools,
+      defaultOptions: { maxSteps: 100 },
+    })];
+  })));
+  const build = new Agent({
+    id: 'flow-build',
+    name: 'Lead',
+    instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
+    model: buildModel(leadModelFile),
+    workspace,
+    agents: helpers,
+    tools,
+    defaultOptions: { maxSteps: 400 },
+  });
+
+  const shipping = new Agent({
+    id: 'flow-shipping',
+    name: 'Flow shipping stand-in',
+    instructions:
+      'You glance at one short file and say in one sentence whether it reads as a recipe title. You do not decide pass or fail; a fixed rule does that. No tools.',
+    model,
+  });
+
+  const remediation = new Agent({
+    id: 'flow-remediation',
+    name: 'Flow remediation stand-in',
+    instructions: 'You rewrite one short line so it reads better. Reply with the new line only. No tools.',
+    model,
+  });
+
+  const retro = new Agent({
+    id: 'flow-retro',
+    name: 'Flow retro stand-in',
+    instructions: 'You write one sentence about what this throwaway run did. No tools.',
+    model,
+  });
+
+  return { build, shipping, remediation, retro };
+}
+### FILE machine/flow/models.mjs
+// The Lead's own model is one account model, read from its independent setting.
+// CommandCode models use the same raw id route as the helpers; Claude and ChatGPT
+// use their subscription providers.
+
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
+import { agentModel } from './role-models.mjs';
+
+const ACCOUNT_MODEL = /^[a-z][a-z0-9-]*\/[a-zA-Z0-9][a-zA-Z0-9/._:-]*$/;
+
+export function leadModelPath() {
+  return process.env.JULIA_LEAD_MODEL_FILE ?? join(homedir(), '.config', 'julia', 'lead-model');
+}
+
+export function leadModelId(file = leadModelPath()) {
+  let value;
+  try {
+    value = readFileSync(file, 'utf8').trim();
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      error.message = `Lead model setting ${file} is missing. Run node scripts/install-lead-model.mjs before starting Studio.`;
+    }
+    throw error;
+  }
+  if (!ACCOUNT_MODEL.test(value)) {
+    throw new Error(`Lead model setting ${file} must contain one account model id, such as openai/gpt-6.1-sol or commandcode/moonshotai/Kimi-K3.1-Pro.`);
+  }
+  return value;
+}
+
+export function buildModel(file) {
+  return agentModel(leadModelId(file));
+}

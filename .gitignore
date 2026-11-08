@@ -32,6 +32,15 @@ ui-debug.log
 # TLA+ model checker downloaded by scripts/check-recipes-model.mjs
 formal/.tools/
 
+# Graphify output: commit the two graphs, not the caches, reports or the
+# per-package intermediate graphs.
+graphify-out/*
+!graphify-out/graph.json
+!graphify-out/mastra/
+graphify-out/mastra/*
+!graphify-out/mastra/graph.json
+!graphify-out/mastra/versions.json
+
 # proof project credentials and the vault template written while provisioning
 .firebase-proof.json
 .firebase-proof-keys/

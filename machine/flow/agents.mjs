@@ -21,7 +21,7 @@ export function repoRoot() {
   return process.env.FLOW_REPO ?? repositoryContaining(resolve(process.env.MASTRA_PROJECT_ROOT ?? process.cwd()));
 }
 
-export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelFile, roleModelsFile } = {}) {
+export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {} } = {}) {
   const workspace = new Workspace({
     id: 'machine-repo',
     filesystem: new LocalFilesystem({ basePath: repo }),
@@ -39,9 +39,10 @@ export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelF
       id: `pstack-${role.id}-${index + 1}`,
       name: role.name,
       description: `${role.name} pstack role on ${modelId}${choice}. ${role.explanation} Use this helper when delegating ${role.name} work.`,
-      instructions: `You are the ${role.name} pstack helper. ${role.explanation} Complete the task delegated by Lead yourself. Do not delegate it again. Report the result and evidence.`,
+      instructions: `You are the ${role.name} pstack helper. ${role.explanation} Complete the task delegated by Lead yourself. Do not delegate it again. For questions about code structure or where something lives, call the graphify tools before reading files. Report the result and evidence.`,
       model: agentModel(modelId),
       workspace: helperWorkspace,
+      tools,
       defaultOptions: { maxSteps: 100 },
     })];
   })));
@@ -52,6 +53,7 @@ export function createAgents({ model = FREE_MODEL, repo = repoRoot(), leadModelF
     model: buildModel(leadModelFile),
     workspace,
     agents: helpers,
+    tools,
     defaultOptions: { maxSteps: 400 },
   });
 

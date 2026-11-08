@@ -1,0 +1,745 @@
+=== client-js
+[graphify extract] scanning /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/client-js/dist/docs
+[graphify extract] found 1 code, 36 docs, 0 papers, 0 images
+[graphify extract] AST extraction on 1 code files...
+  AST cache: 0/1 files served from cache (0%); 1 to extract
+[graphify extract] semantic extraction on 36 files via openai...
+[graphify extract] chunk 4/12 done
+[graphify extract] chunk 1/12 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-harness-agent-controller.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-harness-schedules.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 2/12 done
+[graphify extract] chunk 5/12 done
+[graphify] chunk of 4 truncated at depth 0, splitting into halves of 2 and 2
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-observability.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-memory.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-responses.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-tools.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-vectors.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 8/12 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-agents.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 7/12 done
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+[graphify] chunk of 2 truncated at depth 1, splitting into halves of 1 and 1
+[graphify extract] chunk 9/12 done
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+[graphify extract] chunk 11/12 done
+[graphify] slice of /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/client-js/dist/docs/references/reference-client-js-agents.md truncated at depth 1; splitting the slice and retrying
+[graphify extract] chunk 3/12 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-observability-tracing-advanced-queries.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 10/12 done
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-agent-controller.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-conversations.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-datasets.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-error-handling.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-logs.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-mastra-client.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 6/12 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-observability-metrics-queries.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 12/12 done
+[graphify] note: node 'references_reference_client_js_agents_details' was extracted twice from 'references/reference-client-js-agents.md' under different labels — keeping 'details()', dropping 'StoredAgent.details()'.
+[graphify] note: node 'references_reference_client_js_agents_usechat' was extracted twice from 'references/reference-client-js-agents.md' under different labels — keeping 'useChat', dropping 'useChat() (React SDK)'.
+[graphify] note: node 'references_reference_client_js_agents_agent' was extracted twice from 'references/reference-client-js-agents.md' under different labels — keeping 'Agent', dropping 'Agent instance'.
+[graphify] note: node 'references_reference_client_js_agents_client_tools' was extracted twice from 'references/reference-client-js-agents.md' under different labels — keeping 'clientTools', dropping 'Client tools'.
+[graphify] note: node 'references_reference_observability_metrics_queries_mastraclient' was extracted twice from 'references/reference-observability-metrics-queries.md' under different labels — keeping 'MastraClient', dropping 'MastraClient (@mastra/client-js)'.
+[graphify] note: node 'references_reference_observability_metrics_queries_observability_store' was extracted twice from 'references/reference-observability-metrics-queries.md' under different labels — keeping 'Observability store', dropping 'Observability storage domain store'.
+[graphify] note: node 'references_reference_observability_tracing_advanced_queries_time_buckets' was extracted twice from 'references/reference-observability-tracing-advanced-queries.md' under different labels — keeping 'Time buckets', dropping 'Time buckets (interval)'.
+[graphify] Deduplicated 3 node(s) (1 exact, 2 fuzzy).
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/client-js/graphify-out/graph.json: 711 nodes, 851 edges, 86 communities
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/client-js/graphify-out/.graphify_analysis.json
+[graphify extract] tokens: 123,851 in / 180,896 out, est. cost (~openai): $0.3390
+[graphify extract] next: run `graphify cluster-only /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/client-js` to generate GRAPH_REPORT.md and name communities
+=== core
+[graphify extract] scanning /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/core/dist/docs
+[graphify extract] found 1 code, 471 docs, 0 papers, 0 images
+[graphify extract] AST extraction on 1 code files...
+  AST cache: 0/1 files served from cache (0%); 1 to extract
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-agents-human-in-the-loop.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] semantic extraction on 471 files via openai...
+[graphify extract] chunk 4/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'SKILL.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 3/115 done
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-agents-guardrails.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-agents-networks.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-agents-overview.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 5/115 done
+[graphify extract] chunk 6/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-agents-tools.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 8/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-auth-composite-auth.md'; the file was not dispatched for extraction
+  _scs(
+[graphify] slice of /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/core/dist/docs/SKILL.md truncated at depth 1; splitting the slice and retrying
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-agents-processors.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-agents-structured-output.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 7/115 done
+[graphify] slice of /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/core/dist/docs/SKILL.md truncated at depth 1; splitting the slice and retrying
+[graphify extract] chunk 9/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-channels.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-auth-workers.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-browser.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 10/115 done
+[graphify extract] chunk 11/115 done
+[graphify extract] chunk 12/115 done
+[graphify extract] chunk 1/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-evals-experiments.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-evals-evals-with-memory.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 14/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-agents-code-mode.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 2/115 done
+[graphify extract] chunk 15/115 done
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+[graphify extract] chunk 18/115 done
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+[graphify] chunk of 4 truncated at depth 0, splitting into halves of 2 and 2
+[graphify extract] chunk 19/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-evals-custom-scorers.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-evals-datasets.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 13/115 done
+[graphify extract] chunk 20/115 done
+[graphify extract] chunk 16/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-guides-context-engineering.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-guides-build-an-eval-loop.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 17/115 done
+[graphify extract] chunk 22/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-harness-durable-agents.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-harness-goals.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-harness-overview.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 21/115 done
+[graphify extract] chunk 23/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-memory-observational-memory.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 25/115 done
+[graphify] 2 semantic node(s) had no evidence in the source and were flagged verification=unverified
+[graphify extract] chunk 26/115 done
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+[graphify] chunk of 4 truncated at depth 0, splitting into halves of 2 and 2
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-sandbox-overview.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-sandbox-search.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-sandbox-skills.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 28/115 done
+[graphify] 1 semantic node(s) had no evidence in the source and were flagged verification=unverified
+[graphify extract] chunk 29/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-memory-overview.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 24/115 done
+[graphify extract] chunk 30/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-server-request-context.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-signals-notifications.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-signals-overview.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 31/115 done
+[graphify extract] chunk 27/115 done
+[graphify] chunk of 4 truncated at depth 0, splitting into halves of 2 and 2
+[graphify extract] chunk 33/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-subagents.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 35/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-workflows-agents-and-tools.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 34/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-workflows-overview.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 37/115 done
+[graphify extract] chunk 32/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-workflows-dynamic-workflows.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-workflows-error-handling.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-workflows-human-in-the-loop.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-workflows-scheduled-workflows.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-workflows-snapshots.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-workflows-suspend-and-resume.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 38/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-workflows-time-travel.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 36/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-agentic-ui-copilotkit.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-workflows-workflow-state.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-agentic-ui-assistant-ui.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 39/115 done
+[graphify extract] chunk 41/115 done
+[graphify extract] chunk 42/115 done
+[graphify extract] chunk 40/115 done
+[graphify extract] chunk 44/115 done
+[graphify extract] chunk 46/115 done
+[graphify extract] chunk 43/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-databases-postgresql.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-databases-redis.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-databases-spanner.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-databases-upstash.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 45/115 done
+[graphify extract] chunk 47/115 done
+[graphify extract] chunk 49/115 done
+[graphify extract] chunk 48/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agent-controller-session.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 50/115 done
+[graphify extract] chunk 52/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-channels.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-durable-agent.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-agent.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-createSkill.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 53/115 done
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-generate.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 55/115 done
+[graphify extract] chunk 56/115 done
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+[graphify extract] chunk 57/115 done
+[graphify extract] chunk 58/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-client-js-agents.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-coding-agent-build-base-prompt.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 60/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agent-controller-agent-controller-class.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 51/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-generateLegacy.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-getDefaultGenerateOptions.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-getDefaultOptions.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-getDefaultStreamOptions.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-getDescription.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-getInstructions.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-getLLM.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-getMemory.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-getMetadata.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-getModel.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-getSkill.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-getVoice.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-agents-listAgents.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 54/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-configuration.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 61/115 done
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+[graphify] chunk of 14 truncated at depth 0, splitting into halves of 7 and 7
+[graphify extract] chunk 63/115 done
+[graphify] chunk of 13 truncated at depth 0, splitting into halves of 6 and 7
+[graphify extract] chunk 59/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-coding-agent-create-coding-agent.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-addDynamicWorkflow.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-addDynamicWorkflows.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-addGateway.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-getAgent.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-getAgentById.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-getClassifier.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-getClassifierById.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-getDeployer.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-getEditor.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-getGateway.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-getGatewayById.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-getLogger.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 62/115 done
+[graphify extract] chunk 65/115 done
+[graphify extract] chunk 66/115 done
+[graphify extract] chunk 67/115 done
+[graphify extract] chunk 68/115 done
+[graphify extract] chunk 64/115 done
+[graphify extract] chunk 69/115 done
+[graphify extract] chunk 70/115 done
+[graphify extract] chunk 71/115 done
+[graphify] chunk of 7 truncated at depth 0, splitting into halves of 3 and 4
+[graphify extract] chunk 75/115 done
+[graphify extract] chunk 74/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-observational-memory.md'; the file was not dispatched for extraction
+  _scs(
+[graphify] chunk of 11 truncated at depth 0, splitting into halves of 5 and 6
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-logging-pino-logger.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-manual-install.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-deleteMessages.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-memory-class.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-serialized-memory-config.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-settled.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-migrations-agentnetwork.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-migrations-ai-sdk-v4-to-v5.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 76/115 done
+[graphify extract] chunk 77/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-evals-trajectory-accuracy.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-file-based-agents-config.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-file-based-agents-instructions.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-file-based-agents-logger.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-file-based-agents-memory.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-file-based-agents-observability.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 72/115 done
+[graphify extract] chunk 73/115 done
+[graphify extract] chunk 78/115 done
+[graphify extract] chunk 79/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-observability-metrics-queries.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-observability-feedback.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 81/115 done
+[graphify extract] chunk 80/115 done
+[graphify extract] chunk 85/115 done
+[graphify extract] chunk 84/115 done
+[graphify] chunk of 6 truncated at depth 0, splitting into halves of 3 and 3
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+[graphify extract] chunk 86/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-processors-processor-interface.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 88/115 done
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+[graphify extract] chunk 89/115 done
+[graphify extract] chunk 82/115 done
+[graphify extract] chunk 83/115 done
+[graphify extract] chunk 90/115 done
+[graphify extract] chunk 92/115 done
+[graphify extract] chunk 91/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-rag-vector-databases.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 93/115 done
+[graphify extract] chunk 95/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-rag-retrieval.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 94/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-storage-retention.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-storage-overview.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 96/115 done
+[graphify] chunk of 2 truncated at depth 1, splitting into halves of 1 and 1
+[graphify extract] chunk 98/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-tools-create-tool.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-tools-bedrock-kb-tool.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-tools-create-code-mode.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-tools-graph-rag-tool.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 99/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-streaming-ChunkType.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-streaming-agents-MastraModelOutput.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 97/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-processors-moderation-processor.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-processors-pii-detector.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-processors-prefill-error-handler.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-processors-prompt-injection-detector.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 87/115 done
+[graphify extract] chunk 100/115 done
+[graphify extract] chunk 101/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-tools-mcp-server.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 102/115 done
+[graphify extract] chunk 105/115 done
+[graphify extract] chunk 106/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-voice-overview.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 104/115 done
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-voice-composite-voice.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-voice-mastra-voice.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-voice-speech-to-speech.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-voice-speech-to-text.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 107/115 done
+[graphify extract] chunk 109/115 done
+[graphify extract] chunk 108/115 done
+[graphify extract] chunk 110/115 done
+[graphify extract] chunk 111/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-tools-mcp-client.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-tools-submit-plan-tool.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-tools-task-tools.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-tools-vector-query-tool.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 103/115 done
+[graphify extract] chunk 112/115 done
+[graphify extract] chunk 113/115 done
+[graphify] chunk of 4 truncated at depth 0, splitting into halves of 2 and 2
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+[graphify] LLM returned invalid JSON, skipping chunk (first 200 chars: '{"nodes":[{"id":"references_reference_workspace_works')
+[graphify] chunk of 2 truncated at depth 1, splitting into halves of 1 and 1
+[graphify] slice of /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/core/dist/docs/references/reference.md truncated at depth 1; splitting the slice and retrying
+[graphify] slice of /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/core/dist/docs/references/reference.md truncated at depth 2; splitting the slice and retrying
+[graphify extract] chunk 114/115 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference.md'; the file was not dispatched for extraction
+  _scs(
+[graphify] slice of /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/core/dist/docs/references/reference.md truncated at depth 2; splitting the slice and retrying
+[graphify] slice of /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/core/dist/docs/references/reference.md truncated at depth 1; splitting the slice and retrying
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-workspace-workspace-class.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 115/115 done
+[graphify] WARNING: 5/471 dispatched file(s) produced no nodes and are absent from the graph: reference-schedules-overview.md, reference-server-mastra-server.md, reference-server-register-api-route.md, reference-signals-create-notification-inbox-tool.md, reference-signals-notifications.md. The model returned a response but omitted them; a re-run will retry them.
+[graphify extract] semantic extraction is incomplete: 5 dispatched file(s) produced no nodes and 0 came back truncated or hollow. None of this run's chunks came back truncated — the model returned complete, well-formed responses that simply did not address every file. Retrying with the same --token-budget will likely omit the same files again; try a smaller --token-budget to split the corpus into more, smaller chunks. The shrink guard stays armed for this write; pass --allow-partial to overwrite a larger existing graph anyway.
+[graphify] note: node 'skill' was extracted twice from 'SKILL.md' under different labels — keeping 'SKILL.md', dropping 'Mastra skill index'.
+[graphify] note: node 'references_docs_agents_processors_guardrails' was extracted twice from 'references/docs-agents-processors.md' under different labels — keeping 'Guardrails', dropping 'Guardrails docs'.
+[graphify] note: node 'references_docs_agents_processors_memory_processors' was extracted twice from 'references/docs-agents-processors.md' under different labels — keeping 'Memory Processors', dropping 'Memory Processors docs'.
+[graphify] note: node 'references_docs_agents_processors_tool_search_processor' was extracted twice from 'references/docs-agents-processors.md' under different labels — keeping 'ToolSearchProcessor', dropping 'ToolSearchProcessor reference'.
+[graphify] note: node 'references_docs_memory_observational_memory_buffer_tokens' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'bufferTokens', dropping 'bufferTokens setting'.
+[graphify] note: node 'references_docs_memory_observational_memory_buffer_activation' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'bufferActivation', dropping 'bufferActivation setting'.
+[graphify] note: node 'references_docs_memory_observational_memory_block_after' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'blockAfter', dropping 'blockAfter setting'.
+[graphify] note: node 'references_docs_memory_observational_memory_prompt_caching' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'Prompt caching', dropping 'Prompt Caching Benefit'.
+[graphify] note: node 'references_reference_agents_durable_agent_stream' was extracted twice from 'references/reference-agents-durable-agent.md' under different labels — keeping 'stream()', dropping 'DurableAgent.stream()'.
+[graphify] note: node 'references_reference_agents_durable_agent_resume' was extracted twice from 'references/reference-agents-durable-agent.md' under different labels — keeping 'resume()', dropping 'DurableAgent.resume()'.
+[graphify] note: node 'references_reference_agents_durable_agent_observe' was extracted twice from 'references/reference-agents-durable-agent.md' under different labels — keeping 'observe()', dropping 'DurableAgent.observe()'.
+[graphify] note: node 'references_reference_memory_observational_memory_observational_memory' was extracted twice from 'references/reference-memory-observational-memory.md' under different labels — keeping 'Observational Memory', dropping 'Observational Memory (OM)'.
+[graphify] note: node 'references_reference_memory_observational_memory_observational_memory' was extracted twice from 'references/reference-memory-observational-memory.md' under different labels — keeping 'Observational Memory', dropping 'ObservationalMemory class'.
+[graphify] note: node 'references_reference_memory_observational_memory_memory' was extracted twice from 'references/reference-memory-observational-memory.md' under different labels — keeping 'Memory', dropping 'Memory class'.
+[graphify] note: node 'references_reference_memory_observational_memory_agent' was extracted twice from 'references/reference-memory-observational-memory.md' under different labels — keeping 'Agent', dropping 'Agent class'.
+[graphify] note: node 'references_reference_memory_observational_memory_observer' was extracted twice from 'references/reference-memory-observational-memory.md' under different labels — keeping 'Observer', dropping 'Observer agent'.
+[graphify] note: node 'references_reference_memory_observational_memory_reflector' was extracted twice from 'references/reference-memory-observational-memory.md' under different labels — keeping 'Reflector', dropping 'Reflector agent'.
+[graphify] note: node 'references_reference_observability_tracing_interfaces_spaninput' was extracted twice from 'references/reference-observability-tracing-interfaces.md' under different labels — keeping 'SpanInput', dropping 'SpanInput<TType>'.
+[graphify] note: node 'references_reference_observability_tracing_interfaces_spanoutput' was extracted twice from 'references/reference-observability-tracing-interfaces.md' under different labels — keeping 'SpanOutput', dropping 'SpanOutput<TType>'.
+[graphify] note: node 'references_reference_processors_processor_interface_processor' was extracted twice from 'references/reference-processors-processor-interface.md' under different labels — keeping 'Processor', dropping 'Processor interface'.
+[graphify] note: node 'references_reference_processors_processor_interface_tripwire' was extracted twice from 'references/reference-processors-processor-interface.md' under different labels — keeping 'TripWire', dropping 'TripWire error'.
+[graphify] note: node 'references_reference_rag_vector_databases_upsert' was extracted twice from 'references/reference-rag-vector-databases.md' under different labels — keeping 'upsert()', dropping 'store.upsert()'.
+[graphify] note: node 'references_reference_tools_mcp_client_tasks' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'MCP tasks', dropping 'tasks Property'.
+[graphify] note: node 'references_reference_tools_mcp_client_input_requests' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'Input requests', dropping 'Answering Input Requests'.
+[graphify] note: node 'references_reference_tools_mcp_client_authenticate' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'authenticate()', dropping 'MCPClient.authenticate()'.
+[graphify] note: node 'references_reference_tools_mcp_client_listtools' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'listTools()', dropping 'MCPClient.listTools()'.
+[graphify] note: node 'references_reference_tools_mcp_client_listtoolsets' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'listToolsets()', dropping 'MCPClient.listToolsets()'.
+[graphify] note: node 'references_reference_tools_mcp_client_disconnect' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'disconnect()', dropping 'MCPClient.disconnect()'.
+[graphify] note: node 'references_reference_tools_mcp_client_getserverauthstate' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'getServerAuthState()', dropping 'MCPClient.getServerAuthState()'.
+[graphify] note: node 'references_reference_tools_mcp_client_agent' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'Agent', dropping 'Agent (@mastra/core/agent)'.
+[graphify] note: node 'references_reference_tools_mcp_server_createtool' was extracted twice from 'references/reference-tools-mcp-server.md' under different labels — keeping 'createTool', dropping 'createTool (@mastra/core/tools)'.
+[graphify] note: node 'references_reference_tools_mcp_server_starthttp' was extracted twice from 'references/reference-tools-mcp-server.md' under different labels — keeping 'startHTTP()', dropping 'server.startHTTP()'.
+[graphify] note: node 'references_reference_tools_mcp_server_mcpclient' was extracted twice from 'references/reference-tools-mcp-server.md' under different labels — keeping 'MCPClient', dropping 'MCPClient (@mastra/mcp)'.
+[graphify] note: node 'references_reference_tools_mcp_server_mcpclient' was extracted twice from 'references/reference-tools-mcp-server.md' under different labels — keeping 'MCPClient', dropping 'MCPClient documentation'.
+[graphify] note: node 'references_reference_tools_mcp_server_authinfo' was extracted twice from 'references/reference-tools-mcp-server.md' under different labels — keeping 'authInfo', dropping 'context.mcp.extra.authInfo'.
+[graphify] note: node 'references_reference_tools_mcp_server_appresources' was extracted twice from 'references/reference-tools-mcp-server.md' under different labels — keeping 'AppResources', dropping 'appResources option'.
+[graphify] note: node 'references_reference_tools_mcp_server_suspend' was extracted twice from 'references/reference-tools-mcp-server.md' under different labels — keeping 'context.suspend', dropping 'webhook suspend policy'.
+[graphify] note: node 'references_reference_tools_mcp_server_mastra' was extracted twice from 'references/reference-tools-mcp-server.md' under different labels — keeping 'Mastra', dropping 'Mastra class'.
+[graphify] note: node 'references_reference' was extracted twice from 'references/reference.md' under different labels — keeping 'Mastra Reference Index', dropping 'Mastra API Reference Index'.
+[graphify] note: node 'references_reference_tools' was extracted twice from 'references/reference.md' under different labels — keeping 'Tools', dropping 'Upgrade to v1: Tools'.
+[graphify] note: node 'references_reference_memory' was extracted twice from 'references/reference.md' under different labels — keeping 'Memory', dropping 'Upgrade to v1: Memory'.
+[graphify] note: node 'references_reference_processors' was extracted twice from 'references/reference.md' under different labels — keeping 'Processors', dropping 'Upgrade to v1: Processors'.
+[graphify] note: node 'references_reference_storage' was extracted twice from 'references/reference.md' under different labels — keeping 'Storage', dropping 'Upgrade to v1: Storage'.
+[graphify] note: node 'references_reference_workflows' was extracted twice from 'references/reference.md' under different labels — keeping 'Workflows', dropping 'Upgrade to v1: Workflows'.
+[graphify] Deduplicated 153 node(s) (141 exact, 12 fuzzy).
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/core/graphify-out/graph.json: 5953 nodes, 6707 edges, 620 communities
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/core/graphify-out/.graphify_analysis.json
+[graphify extract] tokens: 1,189,620 in / 1,437,225 out, est. cost (~openai): $2.7754
+[graphify extract] next: run `graphify cluster-only /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/core` to generate GRAPH_REPORT.md and name communities
+=== duckdb
+[graphify extract] incremental scan of /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/duckdb/dist/docs
+[graphify extract] 0 code, 0 docs, 0 papers, 0 images changed; 5 unchanged; 0 deleted
+[graphify] backed up semantic graph (5 files) -> 2026-11-08/
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/duckdb/graphify-out/graph.json: 31 nodes, 38 edges, 5 communities
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/duckdb/graphify-out/.graphify_analysis.json
+[graphify extract] incremental summary: 5 files cached/unchanged, 0 re-extracted, 0 deleted
+[graphify extract] next: run `graphify cluster-only /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/duckdb` to generate GRAPH_REPORT.md and name communities
+=== libsql
+[graphify extract] scanning /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/libsql/dist/docs
+[graphify extract] found 1 code, 29 docs, 0 papers, 0 images
+[graphify extract] AST extraction on 1 code files...
+  AST cache: 0/1 files served from cache (0%); 1 to extract
+[graphify extract] semantic extraction on 29 files via openai...
+[graphify extract] chunk 4/9 done
+[graphify extract] chunk 3/9 done
+[graphify extract] chunk 2/9 done
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+[graphify extract] chunk 7/9 done
+[graphify extract] chunk 5/9 done
+[graphify extract] chunk 6/9 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-storage-retention.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-storage-composite.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 9/9 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-rag-retrieval.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-memory-class.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 8/9 done
+[graphify] chunk of 2 truncated at depth 1, splitting into halves of 1 and 1
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-agents-human-in-the-loop.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'SKILL.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 1/9 done
+[graphify] Deduplicated 15 node(s) (15 exact).
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/libsql/graphify-out/graph.json: 396 nodes, 490 edges, 23 communities
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/libsql/graphify-out/.graphify_analysis.json
+[graphify extract] tokens: 94,699 in / 97,180 out, est. cost (~openai): $0.1934
+[graphify extract] next: run `graphify cluster-only /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/libsql` to generate GRAPH_REPORT.md and name communities
+=== mcp
+[graphify extract] scanning /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/mcp/dist/docs
+[graphify extract] found 1 code, 10 docs, 0 papers, 0 images
+[graphify extract] AST extraction on 1 code files...
+  AST cache: 1/1 files served from cache (100%); 0 to extract
+[graphify extract] semantic cache: 4 hit / 6 miss
+[graphify extract] semantic extraction on 6 files via openai...
+[graphify extract] chunk 2/4 done
+[graphify extract] chunk 1/4 done
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+[graphify] slice of /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/mcp/dist/docs/references/reference-tools-mcp-server.md truncated at depth 1; splitting the slice and retrying
+[graphify extract] chunk 3/4 done
+[graphify] slice of /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/mcp/dist/docs/references/reference-tools-mcp-server.md truncated at depth 1; splitting the slice and retrying
+[graphify extract] chunk 4/4 done
+[graphify] note: node 'references_reference_tools_mcp_client_tasks' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'tasks', dropping 'MCP tasks'.
+[graphify] note: node 'references_reference_tools_mcp_client_input_requests' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'Answering input requests', dropping 'Input requests (elicitation)'.
+[graphify] note: node 'references_reference_tools_mcp_client_authenticate' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'authenticate()', dropping 'MCPClient.authenticate()'.
+[graphify] note: node 'references_reference_tools_mcp_client_listtools' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'listTools()', dropping 'MCPClient.listTools()'.
+[graphify] note: node 'references_reference_tools_mcp_client_listtoolsets' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'listToolsets()', dropping 'MCPClient.listToolsets()'.
+[graphify] note: node 'references_reference_tools_mcp_client_getserverauthstate' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'getServerAuthState()', dropping 'MCPClient.getServerAuthState()'.
+[graphify] note: node 'references_reference_tools_mcp_client_disconnect' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'disconnect()', dropping 'MCPClient.disconnect()'.
+[graphify] note: node 'references_reference_tools_mcp_client_agent' was extracted twice from 'references/reference-tools-mcp-client.md' under different labels — keeping 'Agent', dropping 'Agent (@mastra/core/agent)'.
+[graphify] note: node 'references_reference_tools_mcp_server_mastra' was extracted twice from 'references/reference-tools-mcp-server.md' under different labels — keeping 'Mastra', dropping 'Mastra Instance'.
+[graphify] note: node 'references_reference_tools_mcp_server_studio' was extracted twice from 'references/reference-tools-mcp-server.md' under different labels — keeping 'Studio', dropping 'Studio task page'.
+[graphify] note: node 'references_reference_tools_mcp_server_tracing' was extracted twice from 'references/reference-tools-mcp-server.md' under different labels — keeping 'Tracing', dropping 'Task Tracing'.
+[graphify] Deduplicated 2 node(s) (2 exact).
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/mcp/graphify-out/graph.json: 416 nodes, 527 edges, 35 communities
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/mcp/graphify-out/.graphify_analysis.json
+[graphify extract] semantic cache: 4 cached, 6 re-extracted
+[graphify extract] tokens: 43,775 in / 69,529 out, est. cost (~openai): $0.1288
+[graphify extract] next: run `graphify cluster-only /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/mcp` to generate GRAPH_REPORT.md and name communities
+=== memory
+[graphify extract] scanning /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/memory/dist/docs
+[graphify extract] found 1 code, 47 docs, 0 papers, 0 images
+[graphify extract] AST extraction on 1 code files...
+  AST cache: 0/1 files served from cache (0%); 1 to extract
+[graphify extract] semantic extraction on 47 files via openai...
+[graphify extract] chunk 4/15 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-guides-context-engineering.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-agents-networks.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-evals-evals-with-memory.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 2/15 done
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-memory-observational-memory.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 6/15 done
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-harness-background-tasks.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-harness-goals.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 3/15 done
+[graphify extract] chunk 7/15 done
+[graphify] chunk of 2 truncated at depth 1, splitting into halves of 1 and 1
+[graphify] slice of /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/memory/dist/docs/references/docs-memory-observational-memory.md truncated at depth 1; splitting the slice and retrying
+[graphify extract] chunk 9/15 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-subagents.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-storage.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-channels-github.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 8/15 done
+[graphify extract] chunk 10/15 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-agents-human-in-the-loop.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'SKILL.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 1/15 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-databases-postgresql.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-databases-redis.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-databases-upstash.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-databases-valkey.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-getMemory.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-core-listMemory.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-file-based-agents-memory.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 11/15 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/docs-memory-overview.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 5/15 done
+[graphify extract] chunk 13/15 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-observational-memory.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 12/15 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-memory-class.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-clone-utilities.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-cloneThread.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-copyThread.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-createThread.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-getThreadById.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-listThreads.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-settled.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-summarizeConversation.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-summarizeThread.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-memory-updateThreadResourceId.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 14/15 done
+[graphify extract] chunk 15/15 done
+[graphify] note: node 'references_docs_agents_human_in_the_loop_storage_provider' was extracted twice from 'references/docs-agents-human-in-the-loop.md' under different labels — keeping 'Storage provider', dropping 'Persistent Storage Provider'.
+[graphify] note: node 'references_docs_harness_background_tasks_storage' was extracted twice from 'references/docs-harness-background-tasks.md' under different labels — keeping 'Storage', dropping 'Storage Backend'.
+[graphify] note: node 'references_docs_memory_observational_memory_observational_memory' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'Observational Memory', dropping 'Observational Memory (OM)'.
+[graphify] note: node 'references_docs_memory_observational_memory_observational_memory' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'Observational Memory', dropping 'Observational Memory (OM)'.
+[graphify] note: node 'references_docs_memory_observational_memory_memory' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'Memory', dropping 'Memory class (@mastra/memory)'.
+[graphify] note: node 'references_docs_memory_observational_memory_buffer_tokens' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'bufferTokens', dropping 'bufferTokens option'.
+[graphify] note: node 'references_docs_memory_observational_memory_buffer_tokens' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'bufferTokens', dropping 'observation.bufferTokens'.
+[graphify] note: node 'references_docs_memory_observational_memory_block_after' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'blockAfter', dropping 'blockAfter option'.
+[graphify] note: node 'references_docs_memory_observational_memory_block_after' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'blockAfter', dropping 'observation.blockAfter'.
+[graphify] note: node 'references_docs_memory_observational_memory_buffer_activation' was extracted twice from 'references/docs-memory-observational-memory.md' under different labels — keeping 'bufferActivation option', dropping 'observation.bufferActivation'.
+[graphify] note: node 'references_reference_memory_observational_memory_observational_memory' was extracted twice from 'references/reference-memory-observational-memory.md' under different labels — keeping 'ObservationalMemory', dropping 'Observational Memory (OM)'.
+[graphify] Deduplicated 22 node(s) (22 exact).
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/memory/graphify-out/graph.json: 733 nodes, 892 edges, 46 communities
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/memory/graphify-out/.graphify_analysis.json
+[graphify extract] tokens: 154,905 in / 191,008 out, est. cost (~openai): $0.3676
+[graphify extract] next: run `graphify cluster-only /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/memory` to generate GRAPH_REPORT.md and name communities
+=== pg
+[graphify extract] scanning /home/ubuntu/<concealed by 1Password>-builder/node_modules/@mastra/pg/dist/docs
+[graphify extract] found 1 code, 22 docs, 0 papers, 0 images
+[graphify extract] AST extraction on 1 code files...
+  AST cache: 0/1 files served from cache (0%); 1 to extract
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-databases-postgresql.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-databases-neon.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] semantic extraction on 22 files via openai...
+[graphify extract] chunk 3/7 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/integrations-vectors-pg.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 4/7 done
+[graphify extract] chunk 2/7 done
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-rag-retrieval.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-rag-metadata-filters.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-rag-overview.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 5/7 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-storage-retention.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 7/7 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-tools-vector-query-tool.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-rag-vector-databases.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 6/7 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'references/reference-storage-composite.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 1/7 done
+[graphify] Deduplicated 12 node(s) (11 exact, 1 fuzzy).
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/pg/graphify-out/graph.json: 345 nodes, 410 edges, 17 communities
+[graphify extract] wrote /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/pg/graphify-out/.graphify_analysis.json
+[graphify extract] tokens: 74,637 in / 80,965 out, est. cost (~openai): $0.1594
+[graphify extract] next: run `graphify cluster-only /home/ubuntu/.local/state/<concealed by 1Password>-scratch/graphify-setup/graphify-out/mastra-src/pg` to generate GRAPH_REPORT.md and name communities
+Merged 7 graphs -> 8585 nodes, 9915 edges
+Written to: graphify-out/mastra/graph.json

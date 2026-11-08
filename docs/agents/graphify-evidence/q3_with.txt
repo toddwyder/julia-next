@@ -1,0 +1,81 @@
+Graph: graphify-out/mastra/graph.json (8585 nodes) | Traversal: BFS depth=2 | Start: ['MCPClient', 'tools()', 'Tools', 'Server', 'Agent', 'Stdio subprocess environment isolation'] | 208 nodes found
+
+[!] TRUNCATED: showing 22 of 208 nodes (~700-token budget). The answer may be among the 186 cut nodes — raise the token budget to 6410 to get all 208 (CLI: --budget 6410, MCP: token_budget=6410) or narrow the query (e.g. context_filter=['call'], or get_node for a specific symbol).
+
+NODE MCPClient [src=references/reference-tools-mcp-client.md loc=None community=741]
+NODE Stdio subprocess environment isolation [src=references/reference-tools-mcp-client.md loc=None community=737]
+NODE tools() [src=references/reference-tools-mcp-server.md loc=None community=108]
+NODE Tools [src=references/docs-guides-context-engineering.md loc=None community=776]
+NODE Agent [src=references/docs-agents-overview.md loc=None community=289]
+NODE Server [src=SKILL.md loc=None community=88]
+NODE tools [src=references/reference-tools-mcp-client.md loc=None community=741]
+NODE Agent [src=references/reference-tools-mcp-client.md loc=None community=757]
+NODE MCPClientServerProxy [src=references/reference-tools-mcp-client.md loc=None community=758]
+NODE MCPClientTasksOptions [src=references/reference-tools-mcp-client.md loc=None community=737]
+NODE MCPClientOptions [src=references/reference-tools-mcp-client.md loc=None community=743]
+NODE MCPClient instance management [src=references/reference-tools-mcp-client.md loc=None community=741]
+NODE MCPClientWebhookOptions [src=references/reference-tools-mcp-client.md loc=None community=743]
+NODE MCPClientCapabilities [src=references/reference-tools-mcp-client.md loc=None community=737]
+NODE toolsFromDefinitions() [src=references/reference-tools-mcp-client.md loc=None community=741]
+NODE Server instructions forwarding [src=references/reference-tools-mcp-client.md loc=None community=737]
+NODE serverNames filter [src=references/reference-tools-mcp-client.md loc=None community=749]
+NODE tools.onListChanged() [src=references/reference-tools-mcp-client.md loc=None community=741]
+NODE MastraMCPServerDefinition [src=references/reference-tools-mcp-client.md loc=None community=737]
+NODE listTools() [src=references/reference-tools-mcp-client.md loc=None community=757]
+NODE listToolsetsWithErrors() [src=references/reference-tools-mcp-client.md loc=None community=749]
+NODE toMCPServerProxies() [src=references/reference-tools-mcp-client.md loc=None community=758]
+... (truncated — 186 more nodes cut by ~700-token budget. Narrow with context_filter=['call'] or use get_node for a specific symbol)
+Ambiguous: 'MCPClient' matches 10 nodes in different files.
+  core/references/reference.md
+    id: core::references_reference_mcpclient
+  core/references/docs-connections-overview.md
+    id: core::references_docs_connections_overview_mcp_client
+  core/references/reference-tools-mcp-server.md
+    id: core::references_reference_tools_mcp_server_mcpclient
+  core/references/reference-tools-mcp-client.md
+    id: core::references_reference_tools_mcp_client_mcpclient
+  core/references/docs-guides-mcp-authentication-authorization.md
+    id: core::references_docs_guides_mcp_authentication_authorization_mcpclient
+  mcp/references/docs-guides-mcp-authentication-authorization.md
+    id: mcp::references_docs_guides_mcp_authentication_authorization_mcpclient
+  mcp/references/docs-connections-overview.md
+    id: mcp::references_docs_connections_overview_mcpclient
+  mcp/references/reference-tools-mcp-server.md
+    id: mcp::references_reference_tools_mcp_server_mcpclient
+  mcp/references/docs-connections-mcp.md
+    id: mcp::references_docs_connections_mcp_mcpclient
+  mcp/references/reference-tools-mcp-client.md
+    id: mcp::references_reference_tools_mcp_client_mcpclient
+Retry with the full node id: the same path exists in more than one repo, so a path cannot tell them apart.
+### FILE node_modules/@mastra/core/dist/docs/references/reference-tools-mcp-client.md lines 411-420 and 645-665
+## Methods
+
+### `listTools()`
+
+Retrieves all tools from all configured servers, with tool names namespaced by their server name (in the format `serverName_toolName`) to prevent conflicts. Intended to be passed onto an Agent definition.
+
+```ts
+new Agent({ id: 'agent', tools: await mcp.listTools() })
+```
+
+```typescript
+import { Mastra } from '@mastra/core/mastra'
+import { MCPClient } from '@mastra/mcp'
+
+const mcpClient = new MCPClient({
+  servers: {
+    'color-mixer': {
+      command: 'node',
+      args: ['path/to/color-mixer-server.js'],
+    },
+  },
+})
+
+export const mastra = new Mastra({
+  mcpServers: {
+    ...(await mcpClient.toMCPServerProxies()),
+  },
+})
+```
+
+This is useful for connecting external MCP servers that implement the MCP Apps extension or other features to Studio without wrapping them in a Mastra `MCPServer`.

@@ -1,0 +1,234 @@
+[graphify extract] incremental scan of /home/ubuntu/.local/state/julia-scratch/graphify-setup
+[graphify extract] 9 code, 315 docs, 0 papers, 0 images changed; 304 unchanged; 0 deleted
+[graphify extract] 80 path(s) ignored by ignore rules (pruned directories count once): '.agents/docs/guide/images/design.jpg', '.agents/docs/guide/images/overnight.jpg', '.agents/docs/guide/images/recipes.jpg' (+77 more)
+[graphify extract] Review ignore rules if source is missing; --no-gitignore bypasses VCS ignore rules only; .graphifyignore and --exclude still apply.
+[graphify extract] 361 file(s) not classified (no supported extension or shebang), skipped: .env.example, .git, .gitattributes, .gitignore, .graphifyignore, Braces.mmd (+355 more)
+[graphify extract] warning: 361 of 989 files seen (37%) have no supported extractor and are missing from this graph entirely. It may look complete while representing only part of the codebase.
+[graphify extract] AST extraction on 9 code files...
+  AST cache: 0/9 files served from cache (0%); 9 to extract
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/README.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/docs/guide/01-setup.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] semantic cache: 25 hit / 290 miss
+[graphify extract] semantic extraction on 290 files via openai...
+[graphify extract] chunk 2/48 done
+[graphify] chunk of 5 truncated at depth 0, splitting into halves of 2 and 3
+[graphify] chunk of 6 truncated at depth 0, splitting into halves of 3 and 3
+[graphify] chunk of 5 truncated at depth 0, splitting into halves of 2 and 3
+[graphify] chunk of 10 truncated at depth 0, splitting into halves of 5 and 5
+[graphify] chunk of 3 truncated at depth 1, splitting into halves of 1 and 2
+[graphify] chunk of 3 truncated at depth 1, splitting into halves of 1 and 2
+[graphify extract] chunk 3/48 done
+[graphify extract] chunk 6/48 done
+[graphify extract] chunk 5/48 done
+[graphify extract] chunk 1/48 done
+[graphify] chunk of 3 truncated at depth 1, splitting into halves of 1 and 2
+[graphify extract] chunk 9/48 done
+[graphify] chunk of 4 truncated at depth 0, splitting into halves of 2 and 2
+[graphify] chunk of 5 truncated at depth 0, splitting into halves of 2 and 3
+[graphify extract] chunk 4/48 done
+[graphify] chunk of 4 truncated at depth 0, splitting into halves of 2 and 2
+[graphify] chunk of 2 truncated at depth 1, splitting into halves of 1 and 1
+[graphify] chunk of 8 truncated at depth 0, splitting into halves of 4 and 4
+[graphify] chunk of 3 truncated at depth 1, splitting into halves of 1 and 2
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/reference/new-work.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 10/48 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/reference/live.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 7/48 done
+[graphify extract] chunk 13/48 done
+[graphify] chunk of 4 truncated at depth 1, splitting into halves of 2 and 2
+[graphify] chunk of 4 truncated at depth 0, splitting into halves of 2 and 2
+[graphify] chunk of 2 truncated at depth 2, splitting into halves of 1 and 1
+[graphify] chunk of 8 truncated at depth 0, splitting into halves of 4 and 4
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/reference/init.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/reference/region-map.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/reference/visualize.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'PRODUCT.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/scripts/impeccable'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/LICENSE.txt'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/NOTICE.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/SKILL.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/reference/mode-operate.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/reference/mode-persuade.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/reference/mode-read.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/reference/onboard.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/reference/operate.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 8/48 done
+[graphify] chunk of 2 truncated at depth 2, splitting into halves of 1 and 1
+[graphify] chunk of 2 truncated at depth 1, splitting into halves of 1 and 1
+[graphify extract] chunk 15/48 done
+[graphify extract] chunk 14/48 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/poteto-mode/SKILL.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/poteto-mode/playbooks/authoring-a-skill.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/poteto-mode/playbooks/autonomous-run.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/poteto-mode/playbooks/autopilot-full.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/poteto-mode/playbooks/autopilot-stack.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 17/48 done
+[graphify] chunk of 3 truncated at depth 0, splitting into halves of 1 and 2
+[graphify] chunk of 2 truncated at depth 1, splitting into halves of 1 and 1
+[graphify] chunk of 2 truncated at depth 2, splitting into halves of 1 and 1
+[graphify] chunk of 8 truncated at depth 0, splitting into halves of 4 and 4
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file '.agents/skills/impeccable/reference/component-review.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 12/48 done
+[graphify extract] chunk 16/48 done
+[graphify extract] chunk 20/48 done
+[graphify extract] chunk 19/48 done
+[graphify extract] chunk 18/48 done
+[graphify extract] chunk 21/48 done
+[graphify extract] chunk 22/48 done
+[graphify] chunk of 4 truncated at depth 1, splitting into halves of 2 and 2
+[graphify extract] chunk 24/48 done
+[graphify extract] chunk 23/48 done
+[graphify] chunk of 8 truncated at depth 0, splitting into halves of 4 and 4
+[graphify extract] chunk 11/48 done
+[graphify] chunk of 10 truncated at depth 0, splitting into halves of 5 and 5
+[graphify] chunk of 26 truncated at depth 0, splitting into halves of 13 and 13
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/docs/scorecards/JUL-276.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 28/48 done
+[graphify extract] chunk 25/48 done
+[graphify extract] chunk 26/48 done
+[graphify] slice of /home/ubuntu/.local/state/julia-scratch/graphify-setup/dashboard/docs/scorecards/JUL-276.md truncated at depth 0; splitting the slice and retrying
+[graphify extract] chunk 30/48 done
+[graphify extract] chunk 27/48 done
+[graphify extract] chunk 33/48 done
+[graphify extract] chunk 32/48 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/lib/fixtures/commandcode-pricing.html'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 34/48 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/lib/fixtures/anthropic-pricing.html'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/lib/fixtures/openai-pricing.html'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 35/48 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/docs/scorecards/jul-276/pr-2/verification.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/docs/scorecards/jul-276/pr-3/verification.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 31/48 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/docs/decisions/0019.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/docs/decisions/0020.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/docs/decisions/0021.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/docs/decisions/0022.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/docs/scorecards/jul-276/pr-1/self-proof.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'dashboard/docs/scorecards/jul-276/pr-1/verification.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 29/48 done
+[graphify] chunk of 11 truncated at depth 0, splitting into halves of 5 and 6
+[graphify] chunk of 8 truncated at depth 0, splitting into halves of 4 and 4
+[graphify] chunk of 7 truncated at depth 0, splitting into halves of 3 and 4
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+[graphify extract] chunk 38/48 done
+[graphify] slice of /home/ubuntu/.local/state/julia-scratch/graphify-setup/docs/design/vintage/DESIGN-LANGUAGE.md truncated at depth 1; splitting the slice and retrying
+[graphify extract] chunk 37/48 done
+[graphify] chunk of 6 truncated at depth 1, splitting into halves of 3 and 3
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'docs/research/flavorgraph-flavor-equation.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'docs/principles/inverse-pyramid.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 41/48 done
+[graphify] chunk of 4 truncated at depth 0, splitting into halves of 2 and 2
+[graphify extract] chunk 42/48 done
+[graphify extract] chunk 36/48 done
+[graphify extract] chunk 39/48 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'docs/plans/path-forward.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'docs/harness/mastra-code.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'docs/practice/README.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 40/48 done
+[graphify extract] chunk 44/48 done
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'docs/research/offline-sync-service.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 45/48 done
+[graphify extract] chunk 48/48 done
+[graphify] chunk of 2 truncated at depth 0, splitting into halves of 1 and 1
+[graphify] chunk of 4 truncated at depth 0, splitting into halves of 2 and 2
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'prototypes/voice-add.html'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'machine/shipping/README.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 47/48 done
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'docs/research/pairing-source-comparison.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 43/48 done
+[graphify] chunk of 2 truncated at depth 1, splitting into halves of 1 and 1
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'docs/research/voice-to-list.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'machine/merge/README.md'; the file was not dispatched for extraction
+  _scs(
+/home/ubuntu/.local/share/uv/tools/graphifyy/lib/python3.12/site-packages/graphify/llm.py:2922: RuntimeWarning: semantic cache skipped out-of-scope source_file 'machine/remediation/README.md'; the file was not dispatched for extraction
+  _scs(
+[graphify extract] chunk 46/48 done
+[graphify] WARNING: dropped 6 out-of-scope node(s) attributed to file(s) not dispatched for extraction: component-review.md, impeccable, init.md. The model mis-attributed them to another corpus file; they were excluded from the graph (#1895).
+[graphify] Replaced 77 node(s) from re-extracted source file(s).
+[graphify] WARNING: node 'skill_create_skill' was minted by several files and renamed per file; 1 reference(s) from other files could not be attributed and were left unresolved.
+[graphify] WARNING: node 'ref_next' is minted by two different files — keeping 'next' from 'package.json', dropping 'ref_next' from ''. An ID is derived from the source path plus the entity name, so this one does not identify a single entity and the dropped node is lost. To keep them distinct, run 'graphify extract' per subfolder and merge with 'graphify merge-graphs'.
+[graphify] WARNING: node 'ref_react' is minted by two different files — keeping 'react' from 'package.json', dropping 'ref_react' from ''. An ID is derived from the source path plus the entity name, so this one does not identify a single entity and the dropped node is lost. To keep them distinct, run 'graphify extract' per subfolder and merge with 'graphify merge-graphs'.
+[graphify] WARNING: node 'ref_mastra_code_sdk' is minted by two different files — keeping '@mastra/code-sdk' from 'package.json', dropping 'ref_mastra_code_sdk' from ''. An ID is derived from the source path plus the entity name, so this one does not identify a single entity and the dropped node is lost. To keep them distinct, run 'graphify extract' per subfolder and merge with 'graphify merge-graphs'.
+[graphify] WARNING: node 'ref_playwright_test' is minted by two different files — keeping '@playwright/test' from 'package.json', dropping 'ref_playwright_test' from ''. An ID is derived from the source path plus the entity name, so this one does not identify a single entity and the dropped node is lost. To keep them distinct, run 'graphify extract' per subfolder and merge with 'graphify merge-graphs'.
+[graphify] WARNING: node 'ref_eslint' is minted by two different files — keeping 'eslint' from 'package.json', dropping 'ref_eslint' from ''. An ID is derived from the source path plus the entity name, so this one does not identify a single entity and the dropped node is lost. To keep them distinct, run 'graphify extract' per subfolder and merge with 'graphify merge-graphs'.
+[graphify] note: node 'agents_skills_impeccable_reference_new_work' was extracted twice from '.agents/skills/impeccable/reference/new-work.md' under different labels — keeping 'New Work Reference', dropping 'New Visual Work Flow'.
+[graphify] note: node 'agents_skills_impeccable_reference_region_map__ref__agents_skills_impeccable_reference_region_map' was extracted twice from '.agents/skills/impeccable/reference/region-map.md' under different labels — keeping 'Region Map', dropping 'region-map.md'.
+[graphify] note: node 'agents_skills_impeccable_reference_visualize__ref__agents_skills_impeccable_reference_visualize' was extracted twice from '.agents/skills/impeccable/reference/visualize.md' under different labels — keeping 'visualize.md', dropping 'Visualize: Direction Comps & Asset Production'.
+[graphify] note: node 'dashboard_docs_scorecards_jul_276_jul_276' was extracted twice from 'dashboard/docs/scorecards/JUL-276.md' under different labels — keeping 'JUL-276', dropping 'JUL-276: Start a build from the dashboard and stop it'.
+[graphify] note: node 'dashboard_docs_scorecards_jul_276_jul_276' was extracted twice from 'dashboard/docs/scorecards/JUL-276.md' under different labels — keeping 'JUL-276', dropping 'JUL-276 Card'.
+[graphify] note: node 'dashboard_docs_scorecards_jul_276_model_picker' was extracted twice from 'dashboard/docs/scorecards/JUL-276.md' under different labels — keeping '/model picker', dropping 'Mastra Code Model Picker'.
+[graphify] note: node 'dashboard_docs_scorecards_jul_276_kimi_k3_1_pro' was extracted twice from 'dashboard/docs/scorecards/JUL-276.md' under different labels — keeping 'Kimi K3.1 Pro', dropping 'mastracode/commandcode/moonshotai/Kimi-K3.1-Pro'.
+[graphify] note: node 'dashboard_docs_scorecards_jul_276_deepseek_v4_1_flash' was extracted twice from 'dashboard/docs/scorecards/JUL-276.md' under different labels — keeping 'DeepSeek V4.1 Flash', dropping 'commandcode/deepseek/deepseek-v4.1-flash'.
+[graphify] note: node 'dashboard_docs_scorecards_jul_276_pr_1' was extracted twice from 'dashboard/docs/scorecards/JUL-276.md' under different labels — keeping 'PR-1', dropping 'PR-1 (#372)'.
+[graphify] note: node 'dashboard_docs_scorecards_jul_276_pr_6' was extracted twice from 'dashboard/docs/scorecards/JUL-276.md' under different labels — keeping 'PR-6', dropping 'PR-6 (#373)'.
+[graphify] note: node 'dashboard_docs_scorecards_jul_276_thread_1ed0e477' was extracted twice from 'dashboard/docs/scorecards/JUL-276.md' under different labels — keeping 'Thread 1ed0e477 (JUL-276 execution)', dropping 'Thread 1ed0e477-12d4-44fe-bd96-7c77b307346c'.
+[graphify] note: node 'dashboard_docs_scorecards_jul_276_handoff_comment' was extracted twice from 'dashboard/docs/scorecards/JUL-276.md' under different labels — keeping 'JUL-276 handoff comment', dropping 'JUL-276 handoff comment 67bb93e8'.
+[graphify] note: node 'dashboard_lib_fixtures_anthropic_pricing_service_tiers' was extracted twice from 'dashboard/lib/fixtures/anthropic-pricing.html' under different labels — keeping 'Service Tiers', dropping 'API Service Tiers'.
+[graphify] note: node 'docs_design_vintage_design_language' was extracted twice from 'docs/design/vintage/DESIGN-LANGUAGE.md' under different labels — keeping 'Vintage Design Language', dropping 'The Julia vintage design language'.
+[graphify] note: node 'docs_design_vintage_design_language_page_tsx' was extracted twice from 'docs/design/vintage/DESIGN-LANGUAGE.md' under different labels — keeping 'page.tsx', dropping 'page.tsx (Library page)'.
+[graphify] note: node 'docs_design_vintage_design_language_new_page' was extracted twice from 'docs/design/vintage/DESIGN-LANGUAGE.md' under different labels — keeping 'new/page', dropping 'new/page (Recipe form)'.
+[graphify] note: node 'docs_design_vintage_design_language_prep_page' was extracted twice from 'docs/design/vintage/DESIGN-LANGUAGE.md' under different labels — keeping 'prep/page', dropping 'prep/page (Prep Execution Engine)'.
+[graphify] note: node 'docs_design_vintage_design_language_menus_page' was extracted twice from 'docs/design/vintage/DESIGN-LANGUAGE.md' under different labels — keeping 'menus/page', dropping 'menus/page (Menu Planning Hub)'.
+[graphify] note: node 'docs_plans_path_forward_remediation' was extracted twice from 'docs/plans/path-forward.md' under different labels — keeping 'Remediation', dropping 'Remediation column'.
+[graphify] note: node 'docs_plans_path_forward_inverse_pyramid' was extracted twice from 'docs/plans/path-forward.md' under different labels — keeping 'Inverse pyramid', dropping 'poteto's inverse pyramid'.
+[graphify] note: node 'docs_plans_path_forward_verify_julia' was extracted twice from 'docs/plans/path-forward.md' under different labels — keeping 'verify-julia', dropping 'verify-julia checks'.
+[graphify] note: node 'docs_plans_path_forward_dashboard' was extracted twice from 'docs/plans/path-forward.md' under different labels — keeping 'dashboard', dropping 'Dashboard (port 4313)'.
+[graphify] note: node 'docs_research_offline_sync_service_zero' was extracted twice from 'docs/research/offline-sync-service.md' under different labels — keeping 'Zero', dropping 'Zero (Rocicorp)'.
+[graphify] note: node 'docs_research_offline_sync_service_turso' was extracted twice from 'docs/research/offline-sync-service.md' under different labels — keeping 'Turso', dropping 'Turso (browser sync)'.
+[graphify] note: node 'docs_research_offline_sync_service_turso' was extracted twice from 'docs/research/offline-sync-service.md' under different labels — keeping 'Turso', dropping 'Turso (browser sync)'.
+[graphify] note: node 'docs_research_pairing_source_comparison_taste_axes' was extracted twice from 'docs/research/pairing-source-comparison.md' under different labels — keeping 'Taste axes', dropping 'Epicure taste axes'.
+[graphify] note: node 'docs_research_voice_to_list' was extracted twice from 'docs/research/voice-to-list.md' under different labels — keeping 'Voice-to-List Research', dropping 'Voice-to-List Research Sources'.
+[graphify extract] dropped 3 out-of-scope item(s) attributed to 3 file(s) not dispatched this run: .impeccable/build/spec.json, DESIGN.md, visualize.md
+[graphify] Deduplicated 116 node(s) (112 exact, 4 fuzzy).
+[graphify] Pruned 6 node(s) from 6 deleted or excluded source file(s).
+[graphify extract] wrote /home/ubuntu/.local/state/julia-scratch/graphify-setup/graphify-out/graph.json: 5666 nodes, 11386 edges, 352 communities
+[graphify extract] wrote /home/ubuntu/.local/state/julia-scratch/graphify-setup/graphify-out/.graphify_analysis.json
+[graphify extract] incremental summary: 329 files cached/unchanged, 299 re-extracted, 0 deleted
+[graphify extract] tokens: 523,817 in / 849,440 out, est. cost (~openai): $1.5686
+[graphify extract] next: run `graphify cluster-only /home/ubuntu/.local/state/julia-scratch/graphify-setup` to generate GRAPH_REPORT.md and name communities

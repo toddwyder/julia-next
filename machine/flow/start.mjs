@@ -20,10 +20,14 @@ async function assemble({ dir, card, model, agents: injected }) {
   const { openScratch } = await import('./scratch.mjs');
   const { buildCardPath } = await import('./workflow.mjs');
   const { openMastra } = await import('./mastra.mjs');
+  const { graphifyTools } = await import('./graphify.mjs');
 
   openScratch(dir);
   const agents =
-    injected ?? (await import('./agents.mjs')).createAgents(model ? { model } : undefined);
+    injected ?? (await import('./agents.mjs')).createAgents({
+      ...(model ? { model } : {}),
+      tools: await graphifyTools(),
+    });
   const workflow = buildCardPath({ agents, dir });
   const mastra = await openMastra({
     card,

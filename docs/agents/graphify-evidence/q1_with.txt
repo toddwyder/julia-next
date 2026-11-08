@@ -1,0 +1,80 @@
+Graph: graphify-out/graph.json (5666 nodes) | Traversal: BFS depth=2 | Start: ['createAgents()', 'buildModel()', 'model()', 'leadModels()', 'agents.mjs'] | 175 nodes found
+
+[!] TRUNCATED: showing 25 of 175 nodes (~700-token budget). The answer may be among the 150 cut nodes — raise the token budget to 4381 to get all 175 (CLI: --budget 4381, MCP: token_budget=4381) or narrow the query (e.g. context_filter=['call'], or get_node for a specific symbol).
+
+NODE createAgents() [src=machine/flow/agents.mjs loc=L24 community=51]
+NODE agents.mjs [src=machine/flow/agents.mjs loc=L1 community=51]
+NODE buildModel() [src=machine/flow/models.mjs loc=L33 community=51]
+NODE model() [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L60 community=4]
+NODE leadModels() [src=dashboard/lib/model-settings.js loc=L57 community=37]
+NODE repoRoot() [src=machine/flow/agents.mjs loc=L20 community=51]
+NODE repositoryContaining() [src=machine/flow/agents.mjs loc=L13 community=51]
+NODE leadModelId() [src=machine/flow/models.mjs loc=L17 community=51]
+NODE leadModelPath() [src=machine/flow/models.mjs loc=L13 community=51]
+NODE models.mjs [src=machine/flow/models.mjs loc=L1 community=51]
+NODE models [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L59 community=4]
+NODE value.ts [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L1 community=4]
+NODE parseValue() [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L66 community=4]
+NODE tokenEnd() [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L22 community=4]
+NODE isSpace() [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L15 community=4]
+NODE unreadable() [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L45 community=4]
+NODE isDigit() [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L17 community=4]
+NODE isWord() [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L18 community=4]
+NODE BRACKET [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L3 community=4]
+NODE isLineEnd() [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L20 community=4]
+NODE PUNCT [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L6 community=4]
+NODE UNESCAPED [src=.agents/skills/statechart/scripts/frontends/value.ts loc=L50 community=4]
+NODE LEAD_DEFAULT_MODEL [src=dashboard/lib/model-settings.js loc=L13 community=37]
+NODE model-settings.js [src=dashboard/lib/model-settings.js loc=L1 community=37]
+NODE formatSettings() [src=dashboard/lib/model-settings.js loc=L61 community=37]
+... (truncated — 150 more nodes cut by ~700-token budget. Narrow with context_filter=['call'] or use get_node for a specific symbol)
+Node: buildModel()
+  ID:        machine_flow_models_buildmodel
+  Source:    machine/flow/models.mjs L33
+  Type:      code
+  Community: 51
+  Degree:    6
+
+Connections (6):
+  <-- agents.test.mjs [imports] [EXTRACTED] machine/flow/agents.test.mjs:L9
+  <-- agents.mjs [imports] [EXTRACTED] machine/flow/agents.mjs:L7
+  <-- models.mjs [contains] [EXTRACTED] machine/flow/models.mjs:L33
+  <-- createAgents() [calls] [EXTRACTED] machine/flow/agents.mjs:L53
+  --> leadModelId() [calls] [EXTRACTED] machine/flow/models.mjs:L34
+  --> agentModel() [calls] [EXTRACTED] machine/flow/models.mjs:L34
+### FILE machine/flow/models.mjs
+// The Lead's own model is one account model, read from its independent setting.
+// CommandCode models use the same raw id route as the helpers; Claude and ChatGPT
+// use their subscription providers.
+
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
+import { agentModel } from './role-models.mjs';
+
+const ACCOUNT_MODEL = /^[a-z][a-z0-9-]*\/[a-zA-Z0-9][a-zA-Z0-9/._:-]*$/;
+
+export function leadModelPath() {
+  return process.env.JULIA_LEAD_MODEL_FILE ?? join(homedir(), '.config', 'julia', 'lead-model');
+}
+
+export function leadModelId(file = leadModelPath()) {
+  let value;
+  try {
+    value = readFileSync(file, 'utf8').trim();
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      error.message = `Lead model setting ${file} is missing. Run node scripts/install-lead-model.mjs before starting Studio.`;
+    }
+    throw error;
+  }
+  if (!ACCOUNT_MODEL.test(value)) {
+    throw new Error(`Lead model setting ${file} must contain one account model id, such as openai/gpt-6.1-sol or commandcode/moonshotai/Kimi-K3.1-Pro.`);
+  }
+  return value;
+}
+
+export function buildModel(file) {
+  return agentModel(leadModelId(file));
+}

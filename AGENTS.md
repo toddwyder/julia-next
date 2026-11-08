@@ -13,6 +13,13 @@ Julia uses pstack (adopted 22 October 2026). pstack builds and proves. This file
 - A card begins in Mastra Studio's run form and nowhere else; no script starts one. [docs/agents/machine-programs.md](docs/agents/machine-programs.md) names every program that begins a card or carries a stage.
 - Commit and push as you go, and open the pull request in the same step: `check-branch-pr` fails any branch that is pushed without one. Publish with gh using the ordinary signed-in GitHub access.
 
+## Graphify
+This repository has two knowledge graphs built with [Graphify](https://docs.graphify.com).
+- Julia code, Julia docs and the pstack skills are in `graphify-out/graph.json`. Ask it with `graphify query "<question>"` before grepping or reading files.
+- The Mastra documentation installed here is in `graphify-out/mastra/graph.json`. Ask it with `graphify query "<question>" --graph graphify-out/mastra/graph.json`.
+- For one symbol, use `graphify explain "<symbol>"`. For what depends on it, use `graphify affected "<symbol>"`.
+- Code rebuilds after each commit through the installed git hooks. Markdown changes and Mastra upgrades need the commands in [docs/agents/graphify.md](docs/agents/graphify.md).
+
 ## Todd
 Todd decides what Julia does for the household and gives UAT. Everything else is yours: decide it and record it in the decision log. When a step truly needs his own account, show that nothing else can do it, reduce it to one approval he clicks, and keep working while it is pending.
 Todd gives every builder session pstack's full-autonomy grant. It pre-approves deleting server files and folders from finished or closed work, changing server configuration and schedulers, and merging to main once required checks pass. Bring Todd only decisions about what Julia does for the household, UAT, steps requiring his own account, and deletion of household data.
