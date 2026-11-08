@@ -37,6 +37,71 @@ export function prepareCheckout(pr, runDir, checkout) {
   return sha;
 }
 
+// A review runs the card's checks, and those need the dev dependencies. Install
+// the root and dashboard trees one after the other, never together: two npm ci
+// runs at once took 3.4 GB on this 7.6 GB server and the kernel killed Studio.
+// A tree installed from the same lockfile is reused.
+const INSTALL_TREES = ['', 'dashboard'];
+
+function sameContents(left, right) {
+  try {
+    return fs.readFileSync(left).equals(fs.readFileSync(right));
+  } catch {
+    return false;
+  }
+}
+
+function removeTree(target) {
+  try {
+    if (fs.lstatSync(target).isSymbolicLink()) fs.unlinkSync(target);
+    else fs.rmSync(target, { recursive: true, force: true });
+  } catch {
+    // Nothing installed yet.
+  }
+}
+
+export function prepareDependencies(checkout, { log = () => {}, timeoutMs = 15 * 60_000, mainRoot = repoRoot } = {}) {
+  for (const relative of INSTALL_TREES) {
+    const cwd = path.join(checkout, relative);
+    const lock = path.join(cwd, 'package-lock.json');
+    const nodeModules = path.join(cwd, 'node_modules');
+    const marker = path.join(nodeModules, '.package-lock.json');
+    if (!fs.existsSync(lock)) continue;
+
+    // A pull request that does not change the lockfile can use the tree already
+    // installed in the main checkout, so the review starts without an install.
+    const mainModules = path.join(mainRoot, relative, 'node_modules');
+    if (
+      sameContents(lock, path.join(mainRoot, relative, 'package-lock.json')) &&
+      fs.existsSync(path.join(mainModules, '.package-lock.json'))
+    ) {
+      removeTree(nodeModules);
+      // A hardlink clone is a real directory, so Next's Turbopack accepts it;
+      // a symlink to an external tree is rejected as an invalid external path.
+      execFileSync('cp', ['-al', mainModules, nodeModules]);
+      log(`Cloned ${relative || 'root'} dependencies from the main checkout; the lockfile matches.`);
+      continue;
+    }
+
+    try {
+      if (fs.statSync(marker).mtimeMs >= fs.statSync(lock).mtimeMs) continue;
+    } catch {
+      // No installed tree yet; install it.
+    }
+    log(`Installing ${relative || 'root'} dependencies once, with dev dependencies.`);
+    execFileSync('npm', ['ci', '--include=dev', '--no-audit', '--no-fund'], {
+      cwd,
+      stdio: ['ignore', 'inherit', 'inherit'],
+      env: {
+        ...process.env,
+        npm_config_omit: '',
+        NODE_OPTIONS: [process.env.NODE_OPTIONS, '--max-old-space-size=2048'].filter(Boolean).join(' '),
+      },
+      timeout: timeoutMs,
+    });
+  }
+}
+
 export function traceFileFor(pr, label = 'shipping') {
   const dir = process.env.JULIA_TRACES_DIR || path.join(os.homedir(), '.local', 'share', 'mastracode', 'traces');
   fs.mkdirSync(dir, { recursive: true });

@@ -72,7 +72,7 @@ export function reviewTask({ pr, sha, checkout, card, criteria }) {
     card.description ?? '',
     '--- end card ---',
     '',
-    'For each criterion, run the command it names, exactly as written, inside this checkout. Decide from what the command printed and the exit code it gave. You may also run read-only commands to look around (cat, ls, git show, git diff, git log). Do not edit, commit, push, or otherwise change the checkout.',
+    'For each criterion, run the command it names, exactly as written, inside this checkout. Decide from what the command printed and the exit code it gave. You may also run read-only commands to look around (cat, ls, git show, git diff, git log). Dependencies are already installed in the root and in dashboard/. Do not run npm ci, npm install, or any installer, and do not edit, commit, push, or otherwise change the checkout.',
     '',
     `The card lists ${criteria.length} ${criteria.length === 1 ? 'criterion' : 'criteria'}. Judge every one of them.`,
     '',

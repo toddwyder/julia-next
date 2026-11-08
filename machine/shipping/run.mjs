@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { postComment, prepareCheckout, repoRoot, savedPosting, traceFileFor } from './run-parts.mjs';
+import { postComment, prepareCheckout, prepareDependencies, repoRoot, savedPosting, traceFileFor } from './run-parts.mjs';
 import { scratchDir } from '../../scripts/scratch-dir.mjs';
 
 const USAGE = `usage: node machine/shipping/run.mjs --pr <number> --card <JUL-number> [--model <id>] [--no-post] [--force]`;
@@ -44,6 +44,9 @@ async function main() {
   console.log(`Fetching pull request #${options.pr} and checking it out at ${checkout}.`);
   const sha = prepareCheckout(options.pr, runDir, checkout);
   console.log(`Pull request #${options.pr} is at ${sha}.`);
+
+  console.log('Preparing the review checkout dependencies one tree at a time.');
+  prepareDependencies(checkout, { log: message => console.log(message) });
 
   if (options.post && !options.force) {
     const saved = savedPosting(runDir, options.pr, sha, options.card);
