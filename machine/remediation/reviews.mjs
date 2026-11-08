@@ -5,9 +5,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { stopHarness } from '../shipping/harness.mjs';
-import { runShipping, REVIEW_TIME_LIMIT_MS, reviewLimitNote, FREE_MODEL, PLAYBOOK, WORKFLOW_ID } from '../shipping/workflow.mjs';
-import { commandsFromSpans, determinationComment, playbookSteps } from '../shipping/determination.mjs';
-import { readSpans, workflowRun } from '../shipping/trace-record.mjs';
+import { runShipping, FREE_MODEL, PLAYBOOK, WORKFLOW_ID } from '../shipping/workflow.mjs';
+import { IDLE_STOP_MS } from '../shipping/stops.mjs';
+import { commandsFromSpans, determinationComment, judgedCriteria, playbookSteps } from '../shipping/determination.mjs';
+import { readSpans, workflowRun, tokensPerTurn } from '../shipping/trace-record.mjs';
 import { postComment, traceFileFor } from '../shipping/run-parts.mjs';
 import { MAX_REVIEWS, failedCriteria } from './workflow.mjs';
 
@@ -20,8 +21,20 @@ export const REVIEW_ATTEMPTS = 3;
 
 const firstLine = text => String(text ?? '').trim().split(/\r?\n/)[0].slice(0, 300);
 
-export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL, post = true, timeLimitMs = REVIEW_TIME_LIMIT_MS, log = console.log }) {
+// The criteria a round still has to judge. A stopped review keeps the verdicts
+// it reached, so the next round covers only what it did not get to.
+export function openCriteria(record, uptoRound = record.reviews.length) {
+  const judged = new Set();
+  for (const review of record.reviews.slice(0, uptoRound)) {
+    for (const number of review?.judged ?? []) judged.add(Number(number));
+  }
+  const all = record.criteria ?? [];
+  return all.map((_, index) => index + 1).filter(number => !judged.has(number));
+}
+
+export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL, post = true, idleMs = IDLE_STOP_MS, log = console.log }) {
   let attemptUsed = null;
+  const stillOpen = round > 1 ? openCriteria(record) : null;
   for (let attempt = 1; attempt <= REVIEW_ATTEMPTS; attempt++) {
     const name = attempt === 1 ? `review-${round}` : `review-${round}-try-${attempt}`;
     const traceFile = traceFileFor(record.pr, `remediation-${name}`);
@@ -40,9 +53,10 @@ export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL,
       checkout: record.checkout,
       card: record.card.identifier,
       cardRecord: record.card,
+      criteria: stillOpen,
       modelId,
       storage,
-      timeLimitMs,
+      idleMs,
       log,
     });
     if (run.booted) await stopHarness(run.booted);
@@ -50,9 +64,10 @@ export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL,
     const verdict = run.verdict ?? null;
     attemptUsed = { run, verdict, traceFile };
     if (verdict?.verdict) break;
-    // A review the clock ended is a hang, not the provider hiccup a fresh
-    // session fixes: asking another reviewer would hang the same way.
-    if (run.timedOut) break;
+    // A stopped review is a result, not the provider hiccup a fresh session
+    // fixes: asking another reviewer would stop the same way, or spend another
+    // budget finding out. The loop carries the stop instead.
+    if (run.stop) break;
     if (attempt === REVIEW_ATTEMPTS) break;
     log(`The reviewer answered without a verdict: ${firstLine(verdict?.raw ?? run.error ?? 'no answer')}. Asking a new one (${attempt + 1} of ${REVIEW_ATTEMPTS}).`);
   }
@@ -60,9 +75,7 @@ export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL,
   const { run, verdict, traceFile } = attemptUsed;
   // The round still writes and posts its determination with no verdict, so the
   // answer says what actually happened instead of pretending the review ran.
-  const timedOutNote = run.timedOut
-    ? `the review ran ${reviewLimitNote(timeLimitMs)} and was ended without a verdict`
-    : null;
+  const stoppedNote = run.stop ? `the review stopped as ${run.stop.kind}: ${run.stop.detail}` : null;
   const spans = await readSpans(traceFile);
   const workflowSpan = workflowRun(spans, WORKFLOW_ID);
   const { commands, otherTools } = commandsFromSpans(spans);
@@ -75,6 +88,7 @@ export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL,
 
   const failed = failedCriteria(verdict, run.output?.criteria ?? record.criteria);
   const failure = run.output ? null : `the workflow ended ${run.status}: ${run.error ?? 'no answer'}`;
+  const turnTokens = tokensPerTurn(spans);
 
   const body = determinationComment({
     pr: record.pr,
@@ -92,6 +106,8 @@ export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL,
     steps,
     failed: failure,
     review: { round, of: MAX_REVIEWS },
+    stop: run.stop,
+    turnTokens,
   });
 
   fs.mkdirSync(runDir, { recursive: true });
@@ -109,8 +125,10 @@ export async function reviewRound({ record, round, runDir, modelId = FREE_MODEL,
   return {
     modelId: run.output?.modelId ?? modelId,
     verdict: verdict?.verdict ?? null,
-    answer: timedOutNote ?? verdict?.raw ?? run.output?.answer ?? '',
+    answer: stoppedNote ?? verdict?.raw ?? run.output?.answer ?? '',
     failed,
+    judged: run.output?.judged ?? judgedCriteria(verdict?.raw),
+    stop: run.stop,
     determination,
     postedUrl,
     traceFile,

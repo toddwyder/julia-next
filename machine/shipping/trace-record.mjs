@@ -54,3 +54,28 @@ export function workflowRun(spans, workflowId) {
   ) ?? spans.find(item => item.spanType === 'workflow_run' && item.eventType === 'start');
   return span ? { runId: span.runId, startedAt: span.timestamp, name: span.name } : null;
 }
+
+// What each model turn cost to send. The review this card was found in averaged
+// 83,000 input tokens a turn across 31 turns, and the growth came from tool
+// results piling up in the history rather than from the model. Recording it per
+// turn keeps that visible instead of hiding it in a total.
+export function tokensPerTurn(spans) {
+  const turns = [];
+  for (const span of spans ?? []) {
+    if (span.spanType !== 'model_inference' || span.eventType !== 'end') continue;
+    try {
+      const attributes = JSON.parse(span.attributes || '{}');
+      const usage = attributes.usage ?? {};
+      if (usage.inputTokens === undefined) continue;
+      turns.push({
+        step: Number(attributes.stepIndex ?? turns.length),
+        model: attributes.model ?? null,
+        inputTokens: Number(usage.inputTokens) || 0,
+        outputTokens: Number(usage.outputTokens) || 0,
+      });
+    } catch {
+      // A row without JSON attributes cannot name what it spent.
+    }
+  }
+  return turns;
+}

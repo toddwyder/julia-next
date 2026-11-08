@@ -10,7 +10,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { bootHarness, loadMastra, stopHarness } from '../shipping/harness.mjs';
-import { FREE_MODEL, reviewLimitNote, runWithinTimeLimit } from '../shipping/workflow.mjs';
+import { FREE_MODEL } from '../shipping/workflow.mjs';
+import { limitNote, runWithinTimeLimit } from '../shipping/stops.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const repoRoot = path.resolve(here, '../..');
@@ -124,7 +125,7 @@ export async function runRetro({
       { limitMs: timeLimitMs, log, onLimit: () => stopHarness(booted) }
     );
     if (answer.timedOut) {
-      return { ok: false, reason: `the retro ran ${reviewLimitNote(timeLimitMs)} and was ended`, answer: null, file: null };
+      return { ok: false, reason: `the retro ran ${limitNote(timeLimitMs)} and was ended`, answer: null, file: null };
     }
     const outcome = retroOutcome({ ...answer.value, file, failed });
     log(outcome.ok ? `The retro doc is at ${file}.` : `The retro did not finish: ${outcome.reason}`);

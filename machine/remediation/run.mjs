@@ -27,11 +27,11 @@ const USAGE = `Usage: node machine/remediation/run.mjs --pr <n> --card <JUL-n> [
   --no-post           write the determinations and the stop in the run folder, post nothing
   --force             ignore a saved record and start the loop again
   --card-file <path>  read the card from this JSON file instead of Linear, for practice runs
-  --review-timeout-min <n> end a review that has not answered after this many minutes (default 20)
+  --idle-min <n>      stop a review that shows no activity for this many minutes (default 7)
 `;
 
 function parseArgs(argv) {
-  const options = { pr: null, card: null, model: null, builderModel: null, post: true, force: false, cardFile: null, reviewTimeoutMin: 20 };
+  const options = { pr: null, card: null, model: null, builderModel: null, post: true, force: false, cardFile: null, idleMin: 7 };
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
     if (arg === '--pr') options.pr = Number(argv[++index]);
@@ -39,7 +39,7 @@ function parseArgs(argv) {
     else if (arg === '--card-file') options.cardFile = argv[++index];
     else if (arg === '--model') options.model = argv[++index];
     else if (arg === '--builder-model') options.builderModel = argv[++index];
-    else if (arg === '--review-timeout-min') options.reviewTimeoutMin = Number(argv[++index]);
+    else if (arg === '--idle-min') options.idleMin = Number(argv[++index]);
     else if (arg === '--no-post') options.post = false;
     else if (arg === '--force') options.force = true;
     else if (arg === '--help' || arg === '-h') options.help = true;
@@ -114,7 +114,7 @@ async function main() {
         runDir,
         modelId,
         post,
-        timeLimitMs: Math.round(options.reviewTimeoutMin * 60_000),
+        idleMs: Math.round(options.idleMin * 60_000),
         log: console.log,
       }),
     handToBuilder: async material => {

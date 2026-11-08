@@ -15,6 +15,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { installBlockingWaitRefusal } from './tools.mjs';
+
 const programDir = process.env.MASTRACODE_PROGRAM_DIR || path.join(os.homedir(), '.local', 'lib', 'mastracode-program');
 const modules = path.join(programDir, 'node_modules');
 const NEEDED = ['@mastra/code-sdk', '@mastra/core', '@mastra/libsql', '@libsql/client', 'zod'];
@@ -40,8 +42,15 @@ export const SUBAGENT_MAX_STEPS = 1000;
 
 // A definition that already names its own limit keeps it; the stock ones get the
 // interactive limit written down so no stage depends on the controller default.
-export function subagentDefinitions(loaded) {
-  return loaded.map(definition => ({ ...definition, maxSteps: definition.maxSteps ?? SUBAGENT_MAX_STEPS }));
+// A caller that supplies stop conditions gets them on every definition, because
+// the controller reads `definition.stopWhen` (`streamStopWhen`) per run and the
+// stage that supplies them is the stage that wants them.
+export function subagentDefinitions(loaded, { stopWhen } = {}) {
+  return loaded.map(definition => ({
+    ...definition,
+    maxSteps: definition.maxSteps ?? SUBAGENT_MAX_STEPS,
+    ...(stopWhen && !definition.stopWhen ? { stopWhen } : {}),
+  }));
 }
 
 async function load(relative) {
@@ -89,16 +98,17 @@ export async function loadMastra() {
 
 // A caller that supplies storage owns the database the harness reads and writes,
 // so a run can be given its own file instead of the one the store defaults to.
-export async function bootHarness({ cwd, storage, createInitialThread = true, modes }) {
+export async function bootHarness({ cwd, storage, createInitialThread = true, modes, stopWhen, refuseBlockingWait = false }) {
   const [mastraTools, subagents] = await Promise.all([
     loadMastra(),
     Promise.all(SUBAGENTS.map(async ([file, name]) => (await load(`@mastra/code-sdk/dist/agents/subagents/${file}.js`))[name])),
   ]);
-  const config = { cwd, createInitialThread, subagents: subagentDefinitions(subagents) };
+  const config = { cwd, createInitialThread, subagents: subagentDefinitions(subagents, { stopWhen }) };
   if (storage) config.storage = storage;
   if (modes !== undefined) config.modes = modes;
   const booted = await mastraTools.bootLocalAgentController(config);
   const session = booted.session;
+  if (refuseBlockingWait) installBlockingWaitRefusal(session.getWorkspace());
   const mastra = booted.controller.getMastra?.() ?? booted.mastra;
   const requestContext = new mastraTools.RequestContext();
   const toolsets = await session.machinery.buildToolsets(requestContext);

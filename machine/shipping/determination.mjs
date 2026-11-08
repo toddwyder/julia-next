@@ -20,6 +20,16 @@ export function criteriaFromCard(description) {
     .filter(line => line.length > 0);
 }
 
+// The criteria a review got as far as judging, from the answer it wrote. A
+// stopped review keeps these, so the next review covers only the rest.
+export function judgedCriteria(answer) {
+  const found = new Set();
+  for (const match of String(answer ?? '').matchAll(/^[ \t>*#-]*criterion[ \t]*(\d+)[ \t]*:/gim)) {
+    found.add(Number(match[1]));
+  }
+  return [...found].sort((a, b) => a - b);
+}
+
 export function parseVerdict(answer) {
   const raw = String(answer ?? '').trim();
   const lines = raw.split(/\r?\n/);
@@ -179,11 +189,26 @@ export function determinationComment({
   steps = [],
   failed = null,
   review = null,
+  stop = null,
+  turnTokens = [],
 }) {
   const badge = verdict?.verdict ?? 'NO VERDICT';
   const lines = [];
   lines.push(`Shipping agent: ${badge}${review ? ` (review ${review.round} of ${review.of})` : ''}`, '');
   lines.push(`**Card** ${card?.identifier ?? 'unknown'} · **Pull request** #${pr} · **Commit** ${code(sha)}`, '');
+  if (stop) {
+    // A review that stopped says so before anything else, so a reader never
+    // reads a partial determination as a finished one.
+    const judged = (verdict?.criteria ?? []).map(item => item.number);
+    lines.push(
+      `**Stopped as ${stop.kind}.** ${stop.detail.charAt(0).toUpperCase()}${stop.detail.slice(1)}.` +
+        (judged.length > 0
+          ? ` It judged ${judged.length === 1 ? 'criterion' : 'criteria'} ${judged.join(', ')} before it stopped, and the next review covers only the rest.`
+          : ' It judged no criterion before it stopped, so the next review covers all of them.'),
+      ''
+    );
+    if (stop.tokensUsed !== undefined) lines.push(`Tokens used: ${code(stop.tokensUsed.toLocaleString('en-US'))} of ${code(stop.ceiling.toLocaleString('en-US'))}.`, '');
+  }
   if (failed) lines.push(`The machine could not get a verdict: ${failed}`, '');
   lines.push('| Which | What |', '| --- | --- |');
   lines.push(`| Model requested | ${code(model)} |`);
@@ -219,6 +244,23 @@ export function determinationComment({
   }
   if (otherTools.length > 0) {
     lines.push(`Also ran, without a shell: ${otherTools.map(item => `${code(item.name)} (${item.count})`).join(', ')}.`, '');
+  }
+
+  if (turnTokens.length > 0) {
+    // The review this card was found in sent 83,000 input tokens a turn, on
+    // average, over 31 turns. One line per turn keeps the cost of the history
+    // visible instead of hiding it inside a total.
+    const highest = Math.max(...turnTokens.map(turn => turn.inputTokens));
+    lines.push('### What each model turn sent', '');
+    lines.push(
+      `${turnTokens.length} turns, ${highest.toLocaleString('en-US')} input tokens at the highest${
+        highest >= 83_000 ? ', which is at or above the 83,000 a turn of the review this card was found in' : ''
+      }.`,
+      ''
+    );
+    lines.push('| Turn | Input tokens | Output tokens |', '| --- | --- | --- |');
+    turnTokens.forEach(turn => lines.push(`| ${turn.step} | ${turn.inputTokens.toLocaleString('en-US')} | ${turn.outputTokens.toLocaleString('en-US')} |`));
+    lines.push('');
   }
 
   const missing = commands.filter(item => item.returned === null || item.returned === undefined);

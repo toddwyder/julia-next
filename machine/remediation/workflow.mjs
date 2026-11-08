@@ -111,6 +111,8 @@ export async function createRemediationWorkflow({ mastra, deps, log = console.lo
     failed: z
       .array(z.object({ number: z.number(), criterion: z.string().nullable().default(null), reason: z.string().default('') }))
       .default([]),
+    judged: z.array(z.number()).default([]),
+    stop: z.object({ kind: z.string(), detail: z.string() }).passthrough().nullable().default(null),
     determination: z.string().nullable().default(null),
     postedUrl: z.string().nullable().default(null),
     traceFile: z.string().nullable().default(null),
@@ -205,10 +207,27 @@ export async function createRemediationWorkflow({ mastra, deps, log = console.lo
           verdict: outcome.verdict,
           answer: outcome.answer ?? '',
           failed: outcome.failed ?? [],
+          judged: outcome.judged ?? [],
+          stop: outcome.stop ?? null,
           determination: outcome.determination ?? null,
           postedUrl: outcome.postedUrl ?? null,
           traceFile: outcome.traceFile ?? null,
         };
+        // A review that stopped scored nothing, so sending the builder after it
+        // would be a fix for a verdict nobody gave. The loop stops and says why.
+        if (review.stop) {
+          log(`Review ${round} stopped as ${review.stop.kind}, so the loop stops instead of failing the card.`);
+          return persist({
+            ...record,
+            reviews: [...record.reviews, review],
+            stop: {
+              reason: `Shipping review ${round} of ${MAX_REVIEWS} stopped as ${review.stop.kind} (${review.stop.detail}), so ${record.card.identifier} was not judged`,
+              rootCause: review.stop.detail,
+              threadId: null,
+              ping: null,
+            },
+          });
+        }
         if (!review.verdict) {
           log(`Review ${round} came back without a verdict, so the loop stops instead of failing the card.`);
           return persist({ ...record, reviews: [...record.reviews, review], stop: unjudgedStop(record, review) });

@@ -6,9 +6,11 @@ import {
   describeReturn,
   criteriaFromCard,
   determinationComment,
+  judgedCriteria,
   parseVerdict,
   playbookSteps,
 } from './determination.mjs';
+import { tokensPerTurn } from './trace-record.mjs';
 
 const CARD = `One letter, so a machine can tell whether the check ran.
 
@@ -217,4 +219,88 @@ test('the older criteria heading still reads its bullets', () => {
 - [ ] Open the pull request and read the comment.
 `;
   assert.deepEqual(criteriaFromCard(card), ['The comment lists each verdict.']);
+});
+
+test('a stopped review says which criteria it judged, so the next one covers only the rest', () => {
+  const stopped = parseVerdict('CRITERION 1: PASS — the command printed the line\nCRITERION 3: FAIL — it exited 1');
+  assert.deepEqual(judgedCriteria(stopped.raw), [1, 3]);
+  assert.deepEqual(judgedCriteria('nothing judged yet'), []);
+});
+
+test('a stopped review posts its verdicts, its reason and its tokens', () => {
+  const comment = determinationComment({
+    pr: 401,
+    sha: 'dc62b45',
+    card: { identifier: 'JUL-305' },
+    model: 'commandcode/reflection/beam:free',
+    playbook: '.agents/skills/poteto-mode/playbooks/shipping.md',
+    workflowRunId: 'run-1',
+    workflowId: 'shipping',
+    traceFile: '/tmp/trace.duckdb',
+    criteria: criteriaFromCard(CARD),
+    verdict: parseVerdict('CRITERION 1: PASS — the command printed the line'),
+    commands: [],
+    otherTools: [],
+    steps: [],
+    stop: { kind: 'stuck', detail: 'no activity for 7 minutes' },
+  });
+  assert.ok(comment.startsWith('Shipping agent: NO VERDICT\n'), comment.slice(0, 40));
+  assert.match(comment, /\*\*Stopped as stuck\.\*\* No activity for 7 minutes\./);
+  assert.match(comment, /It judged criterion 1 before it stopped, and the next review covers only the rest\./);
+  assert.match(comment, /\*\*1\. PASS\*\* — the command printed the line/);
+});
+
+test('a stop at the ceiling names the tokens it used', () => {
+  const comment = determinationComment({
+    pr: 401,
+    sha: 'dc62b45',
+    card: { identifier: 'JUL-305' },
+    model: 'commandcode/reflection/beam:free',
+    playbook: '.agents/skills/poteto-mode/playbooks/shipping.md',
+    workflowRunId: 'run-1',
+    workflowId: 'shipping',
+    traceFile: '/tmp/trace.duckdb',
+    criteria: criteriaFromCard(CARD),
+    verdict: null,
+    stop: { kind: 'ceiling', detail: '10,000,000 input tokens, at the 10,000,000 ceiling', tokensUsed: 10_000_000, ceiling: 10_000_000 },
+  });
+  assert.match(comment, /\*\*Stopped as ceiling\.\*\*/);
+  assert.match(comment, /Tokens used: `10,000,000` of `10,000,000`\./);
+  assert.match(comment, /It judged no criterion before it stopped, so the next review covers all of them\./);
+});
+
+test('each model turn is written down with what it sent', () => {
+  const attribute = usage => JSON.stringify({ stepIndex: usage.step, model: 'moonshotai/Kimi-K3.1-Pro', usage });
+  const spans = [
+    { spanType: 'model_inference', eventType: 'end', attributes: attribute({ step: 0, inputTokens: 16_299, outputTokens: 253 }) },
+    { spanType: 'model_inference', eventType: 'end', attributes: attribute({ step: 1, inputTokens: 83_000, outputTokens: 466 }) },
+    { spanType: 'model_inference', eventType: 'start', attributes: '{}' },
+    { spanType: 'tool_call', eventType: 'end', attributes: attribute({ step: 2, inputTokens: 1, outputTokens: 1 }) },
+  ];
+  assert.deepEqual(tokensPerTurn(spans), [
+    { step: 0, model: 'moonshotai/Kimi-K3.1-Pro', inputTokens: 16_299, outputTokens: 253 },
+    { step: 1, model: 'moonshotai/Kimi-K3.1-Pro', inputTokens: 83_000, outputTokens: 466 },
+  ]);
+});
+
+test('the per-turn table flags a turn at or above the 83,000 of the review this card came from', () => {
+  const comment = determinationComment({
+    pr: 401,
+    sha: 'dc62b45',
+    card: { identifier: 'JUL-305' },
+    model: 'commandcode/reflection/beam:free',
+    playbook: '.agents/skills/poteto-mode/playbooks/shipping.md',
+    workflowRunId: 'run-1',
+    workflowId: 'shipping',
+    traceFile: '/tmp/trace.duckdb',
+    criteria: criteriaFromCard(CARD),
+    verdict: null,
+    turnTokens: [
+      { step: 0, inputTokens: 16_299, outputTokens: 253 },
+      { step: 1, inputTokens: 90_000, outputTokens: 466 },
+    ],
+  });
+  assert.match(comment, /### What each model turn sent/);
+  assert.match(comment, /2 turns, 90,000 input tokens at the highest, which is at or above the 83,000 a turn/);
+  assert.match(comment, /\| 0 \| 16,299 \| 253 \|/);
 });

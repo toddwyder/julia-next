@@ -64,7 +64,7 @@ async function main() {
 
   const { runShipping, WORKFLOW_ID, PLAYBOOK } = await import('./workflow.mjs');
   const { stopHarness } = await import('./harness.mjs');
-  const { readSpans, workflowRun } = await import('./trace-record.mjs');
+  const { readSpans, workflowRun, tokensPerTurn } = await import('./trace-record.mjs');
   const { commandsFromSpans, determinationComment, playbookSteps } = await import('./determination.mjs');
 
   // The Shipping review runs on Todd's saved Shipping pick; the machine carries no default.
@@ -77,10 +77,13 @@ async function main() {
     modelId,
     log: message => console.log(message),
   });
-  await stopHarness(run.booted);
+  // A run that never booted has nothing to stop, and the timeout path used to
+  // crash here on a null boot after it had already written no verdict.
+  if (run.booted) await stopHarness(run.booted);
 
   const spans = await readSpans(traceFile);
   const workflowSpan = workflowRun(spans, WORKFLOW_ID);
+  const turnTokens = tokensPerTurn(spans);
   const { commands, otherTools } = commandsFromSpans(spans);
   const answeredModel = (() => {
     for (const span of [...spans].reverse()) {
@@ -121,6 +124,8 @@ async function main() {
     otherTools,
     steps,
     failed,
+    stop: run.stop,
+    turnTokens,
   });
 
   const recordPath = path.join(runDir, 'record.json');
@@ -140,9 +145,12 @@ async function main() {
     traceFile,
     status: run.status,
     error: run.error,
+    stop: run.stop,
     elapsedMs: run.elapsedMs,
     verdict: run.verdict?.verdict ?? null,
     answer: run.verdict?.raw ?? null,
+    judged: run.output?.judged ?? [],
+    turnTokens,
     commands,
     otherTools,
     determination: commentPath,

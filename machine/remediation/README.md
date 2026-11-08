@@ -15,8 +15,9 @@ runs are made. `--model` sets the Shipping model (default is the free Beam model
 below), `--builder-model` the model a fresh builder or the investigation gets.
 `--force` starts the loop again when the saved record says it already stopped.
 `--card-file <path>` reads the card from JSON instead of Linear, for a machine
-whose Linear key is gone. `--review-timeout-min <n>` sets how long one review may
-run before it is ended (default 20).
+whose Linear key is gone. `--idle-min <n>` sets how long one review may show no
+activity before it is stopped as stuck (default 7); a review is not ended by a
+wall clock.
 
 ## What happens, in order
 
