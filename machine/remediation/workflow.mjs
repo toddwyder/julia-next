@@ -273,6 +273,8 @@ export async function createRemediationWorkflow({ mastra, deps, log = console.lo
           reason: stopReason(record),
           rootCause,
           threadId: findings.threadId ?? null,
+          modelId: findings.modelId ?? null,
+          answeredModel: findings.answeredModel ?? null,
           ping: null,
         },
       });
