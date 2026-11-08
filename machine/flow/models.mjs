@@ -33,3 +33,9 @@ export function leadModelId(file = leadModelPath()) {
 export function buildModel(file) {
   return agentModel(leadModelId(file));
 }
+
+// Mastra calls a `model` function at every model call, so a Lead setting saved while Studio
+// runs reaches the next call without a restart.
+export function buildModelReader(file) {
+  return () => buildModel(file ?? leadModelPath());
+}

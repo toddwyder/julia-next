@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { applyRows, initialChoice, sharedModel } from './roles.js';
+import { initialChoice, picksEqual, roleModelIds, sharedModel } from './roles.js';
 import ROLES from '../config/roles.json' with { type: 'json' };
 
 export const ROLE_GROUPS = ROLES.groups;
@@ -44,14 +44,38 @@ export function readSettings({ paths = settingsPaths(), modelIds = [] } = {}) {
   for (const group of ROLE_GROUPS) {
     const target = choice.groups[group.id];
     for (const role of group.roles) {
-      const value = parsed.roles.get(role.name);
-      if (value) target.roles[role.id] = group.panel ? value.split(',').map(id => id.trim()) : value;
+      const stored = parsed.roles.get(role.name);
+      if (!stored) continue;
+      const ids = roleModelIds(role, stored, modelIds);
+      target.roles[role.id] = group.panel ? ids : ids[0];
     }
     if (group.panel) target.models = [...new Set(Object.values(target.roles).flat())];
     else target.model = sharedModel(Object.values(target.roles));
   }
   choice.lead = readSetting(paths.lead)?.trim() || LEAD_DEFAULT_MODEL;
+  // The Shipping stage's pick is the same saved line the picker shows. The machine reads
+  // stageModels() instead, which requires the line and never falls back to this default.
+  choice.shipping = choice.groups.machine?.roles?.shipping ?? '';
   return choice;
+}
+
+const ACCOUNT_MODEL = /^[a-z][a-z0-9-]*\/[a-zA-Z0-9][a-zA-Z0-9/._:-]*$/;
+
+// The machine's stage models come from the same saved file as the picker rows. A stage with
+// no saved line stops here and names itself, so no built-in model can answer for it.
+export function stageModels(file = settingsPaths().pstack) {
+  let text = '';
+  try { text = readFileSync(file, 'utf8'); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const saved = parsePstack(text).roles;
+  const stages = ROLE_GROUPS.filter(group => group.machine).flatMap(group => group.roles);
+  return Object.fromEntries(stages.map(role => {
+    const stored = saved.get(role.name);
+    if (!stored) throw new Error(`Missing ${role.name} pick in ${file}.`);
+    const id = stored.split(',')[0].trim();
+    if (!ACCOUNT_MODEL.test(id)) throw new Error(`Invalid ${role.name} model in ${file}.`);
+    return [role.id, id];
+  }));
 }
 
 export function leadModels(models) {
@@ -60,12 +84,22 @@ export function leadModels(models) {
 
 export function formatSettings(choice, models) {
   const offered = new Set(models.map(model => model.id));
+  const known = new Map(ROLE_GROUPS.map(group => [group.id, group]));
   const check = (id, role) => {
     if (typeof id !== 'string' || !offered.has(id) || /[\r\n,]/.test(id)) {
       throw new Error(`Choose an available account model for ${role}.`);
     }
     return id;
   };
+  // Save takes the whole screen from the browser, so a row the config does not name is refused
+  // before either file is written.
+  for (const [groupId, rows] of Object.entries(choice?.groups ?? {})) {
+    const group = known.get(groupId);
+    if (!group) throw new Error(`Unknown group ${groupId}.`);
+    for (const roleId of Object.keys(rows?.roles ?? {})) {
+      if (!group.roles.some(role => role.id === roleId)) throw new Error(`Unknown role ${roleId} in group ${groupId}.`);
+    }
+  }
   if (!Object.hasOwn(EFFORT, choice?.effort)) throw new Error('Choose a valid effort.');
   if (!leadModels(models).some(model => model.id === choice.lead)) {
     throw new Error('Choose an available account model for Lead.');
@@ -117,16 +151,13 @@ export function saveSettings(choice, { models, paths = settingsPaths() }) {
   return { updatedAt: new Date().toISOString() };
 }
 
-// The patch was measured against a page that may already be older than the files, so it lands
-// on a fresh read. An empty patch writes nothing, which keeps a stale page from restamping.
-export function saveSettingsPatch(patch, { models, paths = settingsPaths() }) {
+// A Save is the whole screen every time: it writes both files, reads them back, and fails
+// unless the read-back is the choice it was given. Nothing is skipped for looking unchanged,
+// because a Save that writes nothing leaves the operator with no record of the press.
+export function saveSettingsChoice(choice, { models, paths = settingsPaths(), read = readSettings }) {
   const modelIds = models.map(model => model.id);
-  const current = readSettings({ paths, modelIds });
-  const merged = applyRows(current, patch);
-  const namesRows = Object.hasOwn(patch, 'effort') || Object.hasOwn(patch, 'lead')
-    || Object.values(patch.roles ?? {}).some(rows => Object.keys(rows ?? {}).length);
-  if (!namesRows) return { choice: current, updatedAt: null, wrote: false };
-  formatSettings(merged, models);
-  const { updatedAt } = saveSettings(merged, { models, paths });
-  return { choice: readSettings({ paths, modelIds }), updatedAt, wrote: true };
+  const { updatedAt } = saveSettings(choice, { models, paths });
+  const saved = read({ paths, modelIds });
+  if (!picksEqual(saved, choice)) throw new Error('The models did not read back as written. Check both settings files before the next run.');
+  return { choice: saved, updatedAt, wrote: true };
 }

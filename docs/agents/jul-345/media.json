@@ -1,0 +1,24 @@
+{
+  "root": "/home/ubuntu/.local/state/julia-scratch/jul-342-p3",
+  "dashboardPort": 45415,
+  "studioPort": 38645,
+  "runId": "1e2e804a-a3ac-4a95-bd20-baaeb995bba2",
+  "traceId": "dd18c57cc423eda4f8c1385bd7b9b41e",
+  "lead": {
+    "before": "openai/gpt-6.1-sol",
+    "next": "commandcode/MiniMaxAI/MiniMax-M2.5",
+    "saved": "commandcode/MiniMaxAI/MiniMax-M2.5"
+  },
+  "reportedByProvider": [
+    "commandcode/MiniMaxAI/MiniMax-M2.5"
+  ],
+  "screenshots": [
+    "/home/ubuntu/.local/state/julia-scratch/jul-345-proof/media/01-start-before-save.png",
+    "/home/ubuntu/.local/state/julia-scratch/jul-345-proof/media/02-start-dirty.png",
+    "/home/ubuntu/.local/state/julia-scratch/jul-345-proof/media/03-start-after-save.png",
+    "/home/ubuntu/.local/state/julia-scratch/jul-345-proof/media/04-start-unchanged-save.png",
+    "/home/ubuntu/.local/state/julia-scratch/jul-345-proof/media/05-start-reloaded.png",
+    "/home/ubuntu/.local/state/julia-scratch/jul-345-proof/media/06-studio-trace.png"
+  ],
+  "video": "/home/ubuntu/.local/state/julia-scratch/jul-345-proof/video/page@7a8454ceaf355d706d7675a1619bd514.webm"
+}
