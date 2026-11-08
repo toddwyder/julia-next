@@ -21,10 +21,11 @@ export function criteriaFromCard(description) {
 }
 
 // The criteria a review got as far as judging, from the answer it wrote. A
-// stopped review keeps these, so the next review covers only the rest.
+// stopped review keeps these, so the next review covers only the rest. A
+// criterion the reviewer only started, with no verdict on it, stays open.
 export function judgedCriteria(answer) {
   const found = new Set();
-  for (const match of String(answer ?? '').matchAll(/^[ \t>*#-]*criterion[ \t]*(\d+)[ \t]*:/gim)) {
+  for (const match of String(answer ?? '').matchAll(/^[ \t>*#-]*criterion[ \t]*(\d+)[ \t]*:[ \t>]*(PASS\+NOTES|PASS|FAIL)\b/gim)) {
     found.add(Number(match[1]));
   }
   return [...found].sort((a, b) => a - b);

@@ -180,3 +180,10 @@ test('the watch owns an abort signal, because the subagent tool reads that and n
   assert.equal(stops[0].kind, 'stuck');
   assert.equal(watch.signal.aborted, true, 'the aborted signal is what stops the subagent run');
 });
+
+test('starting a criterion counts as progress, so a working review is not called spinning', () => {
+  const calls = (text, count) =>
+    Array.from({ length: count }, () => ({ toolCalls: [call('view', { path: 'a' })], text, usage: { inputTokens: 1000 } }));
+  const steps = [...calls('CRITERION 1: judging', 10), ...calls('', 10), ...calls('CRITERION 2: judging', 10)];
+  assert.equal(spinningStop(steps), null, 'a review that keeps starting new criteria is making progress');
+});

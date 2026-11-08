@@ -227,6 +227,11 @@ test('a stopped review says which criteria it judged, so the next one covers onl
   assert.deepEqual(judgedCriteria('nothing judged yet'), []);
 });
 
+test('a criterion the review only started stays open, because nothing judged it', () => {
+  assert.deepEqual(judgedCriteria('CRITERION 1: judging\nCRITERION 2: PASS — it printed the line'), [2]);
+  assert.deepEqual(judgedCriteria('CRITERION 1: judging'), []);
+});
+
 test('a stopped review posts its verdicts, its reason and its tokens', () => {
   const comment = determinationComment({
     pr: 401,

@@ -6,7 +6,7 @@
 
 import { getIssue } from '../../scripts/linear-cli.mjs';
 import { bootHarness, loadMastra, stopHarness } from './harness.mjs';
-import { criteriaFromCard, parseVerdict } from './determination.mjs';
+import { criteriaFromCard, judgedCriteria, parseVerdict } from './determination.mjs';
 import { createIdleWatch, reviewStops, IDLE_STOP_MS } from './stops.mjs';
 
 export const WORKFLOW_ID = 'shipping';
@@ -111,6 +111,10 @@ export function reviewTask({ pr, sha, checkout, card, criteria, open = [] }) {
     `Judge exactly ${numbers.length === 1 ? 'this criterion' : `these ${numbers.length} criteria`}, and use the number shown beside each one:`,
     '',
     listed,
+    '',
+    'As you begin each criterion, write a line of its own reading `CRITERION <number>: judging`, then run its command. That line is how the machine can see you are making progress: a review that runs thirty tool calls without starting a new criterion is stopped as spinning, and one that takes a long break is stopped as stuck. Finish with the verdict on the same number, so a criterion you started is never left unnamed.',
+    '',
+    'Start judging before you explore. Write `CRITERION 1: judging` and begin its command straight away, and read only what that criterion needs as you go, rather than surveying the repository first. A survey with no criterion started looks like a review going nowhere, and it is stopped.',
     '',
     'Answer in exactly this shape, with nothing before it and nothing after it:',
     '',
