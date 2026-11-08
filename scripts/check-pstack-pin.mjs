@@ -7,6 +7,7 @@ import { scratchDir } from './scratch-dir.mjs';
 export const MIRROR = 'https://github.com/backnotprop/pstack';
 export const JULIA_SKILLS = new Set([
   'adversarial-review',
+  'graphify',
   'impeccable',
   'playwright-cli',
   'tighten',
