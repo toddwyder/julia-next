@@ -1,0 +1,98 @@
+{
+  "card": "JUL-360",
+  "title": "attributable slice costs",
+  "verifiedAt": "2026-11-09T16:32:38.246Z",
+  "testSuites": {
+    "machine/budget/control.test.mjs": {
+      "total": 49,
+      "pass": 49,
+      "fail": 0
+    },
+    "machine/flow/budget-integration.test.mjs": {
+      "total": 16,
+      "pass": 16,
+      "fail": 0
+    },
+    "machine/flow/exploration.test.mjs": {
+      "total": 61,
+      "pass": 61,
+      "fail": 0
+    },
+    "scripts/julia-agents.test.mjs": {
+      "total": 12,
+      "pass": 12,
+      "fail": 0
+    },
+    "machine/budget/formal/verify.mjs": {
+      "node": "v24.14.1",
+      "checkedSource": "machine/budget/control.mjs",
+      "sourceSha256": "794969b02d906f1c74146e1441e38c25fc7a833aaaa21f809742042cfe983cb3",
+      "checks": [
+        {
+          "name": "real sequential stop, reconstruction, retry and attributed clear",
+          "pass": true
+        },
+        {
+          "name": "real-code mutation removes admission guards; same property detects illegal slice_start",
+          "pass": true,
+          "mutantPropertyPass": false
+        },
+        {
+          "name": "real two-process stop/admission interleaving",
+          "pass": true,
+          "finding": null,
+          "finalPhase": "stopped",
+          "latchPresent": true
+        }
+      ],
+      "model": {
+        "tool": "explicit-state BFS (Node.js)",
+        "node": "v24.14.1",
+        "states": 5655,
+        "exhausted": true,
+        "property": "No persisted slice_start while stop.lock exists until attributed clear removes it",
+        "bounds": {
+          "processes": 2,
+          "stops": 1,
+          "clears": 1,
+          "retries": 1,
+          "crashesPerProcess": 1
+        },
+        "pass": true,
+        "counterexample": []
+      },
+      "mutantModel": {
+        "tool": "explicit-state BFS (Node.js)",
+        "node": "v24.14.1",
+        "states": 3402,
+        "exhausted": true,
+        "property": "No persisted slice_start while stop.lock exists until attributed clear removes it",
+        "bounds": {
+          "processes": 2,
+          "stops": 1,
+          "clears": 1,
+          "retries": 1,
+          "crashesPerProcess": 1
+        },
+        "pass": false,
+        "counterexample": [
+          "process 0: check clear.lock (assertStart:93)",
+          "process 0: check stop.lock (assertStart:94)",
+          "process 0: check local stopped phase (:95)",
+          "process 0: exclusive active.lock create (:98)",
+          "process 0: recheck clear.lock (:113)",
+          "process 0: recheck stop.lock (:114)",
+          "process 0: reload record (:115)",
+          "stop: prepare reason (:75-78)",
+          "stop: acquire latch.lock (:80)",
+          "stop: atomically publish stop.lock (:82)",
+          "stop: persist stopped record (:83)",
+          "process 0: acquire latch.lock (:120)",
+          "process 0: persist slice_start (:121-125)"
+        ]
+      },
+      "pass": true
+    }
+  },
+  "status": "PASSED"
+}
