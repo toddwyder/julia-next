@@ -1,0 +1,19 @@
+{
+  "openai/gpt-6.1-sol": {
+    "input": 2,
+    "cachedInput": 0.1,
+    "cacheWrite": 2.5,
+    "output": 10,
+    "longInputThreshold": 272000,
+    "longInputMultiplier": 2,
+    "longOutputMultiplier": 1.5,
+    "source": "JUL-360, Todd's dated price decision, 9 November 2026"
+  },
+  "commandcode/reflection/beam:free": {
+    "input": 0,
+    "cachedInput": 0,
+    "cacheWrite": 0,
+    "output": 0,
+    "source": "JUL-360, Todd's dated free-memory-model decision, 9 November 2026"
+  }
+}
