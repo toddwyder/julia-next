@@ -31,7 +31,13 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 export function watchReview({ idleMs = IDLE_STOP_MS, onStop, log = () => {} } = {}) {
   const watch = createIdleWatch({ limitMs: idleMs });
   const controller = new AbortController();
-  const drip = () => watch.touch();
+  // What the review has written so far. A stopped review loses its step's
+  // output, so its partial answer is kept here as it streams.
+  const written = { text: '' };
+  const drip = event => {
+    if (event?.type === 'subagent_text_delta' && typeof event.textDelta === 'string') written.text += event.textDelta;
+    watch.touch();
+  };
   const disarm = watch.arm({
     onIdle: stop => {
       log(`The review had no activity for ${reviewLimitWords(idleMs)}, so it was stopped as stuck.`);
@@ -42,6 +48,7 @@ export function watchReview({ idleMs = IDLE_STOP_MS, onStop, log = () => {} } = 
   return {
     signal: controller.signal,
     emitEvent: drip,
+    written,
     stop: watch.idleStop.bind(watch),
     close: disarm,
   };
@@ -130,8 +137,10 @@ export async function runShipping({
     refuseBlockingWait: true,
   });
   // A review can be stopped by the watch while it is blocked inside a tool, so
-  // the stop is held here and read after the run settles either way.
-  const stopped = { stop: null, watch: null };
+  // the stop is held here and read after the run settles either way. The gathered
+  // criteria are held too: a stopped review must still post what it was asked to
+  // judge, even when the step itself never returned.
+  const stopped = { stop: null, watch: null, gathered: null, written: '' };
 
   const inputSchema = z.object({ pr: z.number(), sha: z.string(), checkout: z.string(), card: z.string() });
   const cardSchema = z.object({
@@ -179,16 +188,21 @@ export async function runShipping({
       const open = wanted.size > 0 ? [...wanted].sort((a, b) => a - b) : criteria.map((_, index) => index + 1);
       if (open.length === 0) throw new Error(`${inputData.card} has no criterion left open, so there is nothing to judge.`);
       log(`Card ${issue.identifier} names ${criteria.length} criterion(s), ${open.length} of them open; the code is at ${inputData.sha}.`);
-      return {
-        pr: inputData.pr,
-        sha: inputData.sha,
-        checkout: inputData.checkout,
+      stopped.gathered = {
         card: {
           identifier: issue.identifier,
           title: issue.title,
           description: issue.description ?? '',
           url: issue.url ?? null,
         },
+        criteria,
+        open,
+      };
+      return {
+        pr: inputData.pr,
+        sha: inputData.sha,
+        checkout: inputData.checkout,
+        card: stopped.gathered.card,
         criteria,
         open,
       };
@@ -227,6 +241,7 @@ export async function runShipping({
         { log }
       );
       stopped.watch.close();
+      stopped.written = stopped.watch.written.text;
       stopped.watch = null;
       log(`The Shipping agent answered: ${answer.text.split(/\r?\n/)[0]}`);
       return { ...inputData, answer: answer.text, modelId, judged: judgedCriteria(answer.text) };
@@ -256,14 +271,19 @@ export async function runShipping({
   // first, before anything the run itself reports.
   const stop = stopped.stop ?? stops.fired.stop ?? runStopped(result);
   const output = result?.status === 'success' ? result.result : null;
+  // A stopped review that never returned still reports the card, the criteria it
+  // was asked to judge, and the answer it had written, so its comment names them
+  // instead of saying nothing.
+  const written = stopped.written ?? stopped.watch?.written.text ?? '';
+  const gathered = output ?? (stopped.gathered ? { ...stopped.gathered, answer: written, modelId, judged: judgedCriteria(written) } : null);
   // A stopped review's text is quoted as it came: the verdicts it reached are
   // still read from it, and the reason it stopped is written beside them.
   return {
     runId: run.runId,
     status: stop ? 'stopped' : result?.status ?? 'stopped',
     elapsedMs,
-    output,
-    verdict: output?.answer ? parseVerdict(output.answer) : null,
+    output: gathered,
+    verdict: gathered?.answer ? parseVerdict(gathered.answer) : null,
     stop,
     error: stop ? stop.detail : result?.status === 'success' ? null : JSON.stringify(result?.error ?? result?.status),
     traceFile,

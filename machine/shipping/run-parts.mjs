@@ -126,6 +126,22 @@ export function savedPosting(runDir, pr, sha, card) {
   }
 }
 
+// A stopped review keeps the verdicts it reached, so the next one covers only
+// what is left. The record carries both the criteria and which of them were
+// judged, so this reads the saved run rather than guessing.
+export function openCriteriaFrom(runDir, pr, sha, card) {
+  try {
+    const saved = JSON.parse(fs.readFileSync(path.join(runDir, 'record.json'), 'utf8'));
+    if (saved.pr !== pr || saved.sha !== sha || saved.card?.identifier !== card) return null;
+    const all = Array.isArray(saved.criteria) ? saved.criteria : [];
+    if (all.length === 0) return null;
+    const judged = new Set((saved.judged ?? []).map(Number));
+    return all.map((_, index) => index + 1).filter(number => !judged.has(number));
+  } catch {
+    return null;
+  }
+}
+
 export function postComment(pr, bodyFile) {
   const url = execFileSync('gh', ['pr', 'comment', String(pr), '--body-file', bodyFile], {
     cwd: repoRoot,

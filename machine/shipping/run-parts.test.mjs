@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { prepareCheckout, prepareDependencies } from './run-parts.mjs';
+import { openCriteriaFrom, prepareCheckout, prepareDependencies } from './run-parts.mjs';
 
 test('the root and dashboard trees are installed one at a time, with dev dependencies', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'shipping-install-'));
@@ -111,4 +111,34 @@ test('a leftover checkout directory is cleared so the review can check out again
   assert.equal(sha, head, 'the review is checked out at the pull request head');
   assert.equal(fs.existsSync(path.join(checkout, 'left-behind.txt')), false, 'the leftover file is gone');
   assert.equal(fs.existsSync(path.join(checkout, '.git')), true, 'a real worktree replaced it');
+});
+
+// A stopped review keeps its verdicts, so a rerun of the same commit covers only
+// what is left. The saved record is the only place that knows which those are.
+test('a rerun of the same commit is handed only the criteria the last review left open', () => {
+  const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shipping-open-'));
+  const record = {
+    pr: 487,
+    sha: 'ef96aea',
+    card: { identifier: 'JUL-358' },
+    criteria: ['one', 'two', 'three', 'four'],
+    judged: [1, 3],
+    stop: { kind: 'spinning', detail: '30 tool calls and still 2 criteria judged' },
+  };
+  fs.writeFileSync(path.join(runDir, 'record.json'), JSON.stringify(record));
+
+  assert.deepEqual(openCriteriaFrom(runDir, 487, 'ef96aea', 'JUL-358'), [2, 4]);
+});
+
+test('a record for another commit, card or pull request is not carried forward', () => {
+  const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shipping-open-'));
+  fs.writeFileSync(
+    path.join(runDir, 'record.json'),
+    JSON.stringify({ pr: 487, sha: 'ef96aea', card: { identifier: 'JUL-358' }, criteria: ['one'], judged: [1] })
+  );
+
+  assert.equal(openCriteriaFrom(runDir, 487, 'bbbbbbb', 'JUL-358'), null, 'a moved head is reviewed afresh');
+  assert.equal(openCriteriaFrom(runDir, 488, 'ef96aea', 'JUL-358'), null);
+  assert.equal(openCriteriaFrom(runDir, 487, 'ef96aea', 'JUL-359'), null);
+  assert.equal(openCriteriaFrom(runDir, 999, 'ef96aea', 'JUL-358'), null, 'no record at all');
 });

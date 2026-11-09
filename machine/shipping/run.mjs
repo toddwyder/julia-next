@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { postComment, prepareCheckout, prepareDependencies, repoRoot, savedPosting, traceFileFor } from './run-parts.mjs';
+import { postComment, openCriteriaFrom, prepareCheckout, prepareDependencies, repoRoot, savedPosting, traceFileFor } from './run-parts.mjs';
 import { scratchDir } from '../../scripts/scratch-dir.mjs';
 import { stageModels } from '../../dashboard/lib/model-settings.js';
 
@@ -69,11 +69,18 @@ async function main() {
 
   // The Shipping review runs on Todd's saved Shipping pick; the machine carries no default.
   const modelId = options.model ?? stageModels().shipping;
+  // A review that stopped last time keeps the verdicts it reached, so this one
+  // covers only the criteria still open on the same commit. When the saved run
+  // judged all of them there is nothing to carry forward, so it reviews again.
+  const open = openCriteriaFrom(runDir, options.pr, sha, options.card);
+  const only = open && open.length > 0 ? open : null;
+  if (only) console.log(`The last review left ${only.length} criterion(s) open: ${only.join(', ')}.`);
   const run = await runShipping({
     pr: options.pr,
     sha,
     checkout,
     card: options.card,
+    criteria: only,
     modelId,
     log: message => console.log(message),
   });
