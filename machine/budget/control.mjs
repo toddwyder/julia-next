@@ -152,13 +152,54 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
     if (atCap()) refuse('cap_reached', { ...record.totals });
     return snapshot();
   }
-  function begin({ model, role, modelId = model, provider } = {}) {
+  function begin({
+    model,
+    role,
+    modelId = model,
+    provider,
+    inputTokens = 0,
+    outputTokens = 0,
+    maxTokens = outputTokens,
+    maxOutputTokens = maxTokens,
+  } = {}) {
     assertStart();
     if (record.phase === 'calling') refuse('unrecorded_call_cost', { pending: record.pending });
     if (!Object.hasOwn(prices, model ?? '')) refuse('no_price', { model: model ?? null, role: role ?? null });
     try { priceUsage({ inputTokens: 0, outputTokens: 0 }, prices[model]); }
     catch (error) { refuse(error.message, { model, role }); }
     if (!role || !modelId) refuse('missing_call_identity', { model, role: role ?? null });
+
+    // Todd, 9 Nov 2026: caps stay hard. Admit only if spent-so-far + worst-case fits under both caps.
+    // Provider setting bounding output: max_completion_tokens (AI SDK maxTokens / maxOutputTokens).
+    // OpenAI doc: "An upper bound for the number of tokens that can be generated for a completion, including visible output tokens and reasoning tokens."
+    const price = prices[model];
+    const knownInput = Number.isSafeInteger(inputTokens) && inputTokens >= 0 ? inputTokens : 0;
+    const maxOutput = Number.isSafeInteger(maxOutputTokens) && maxOutputTokens >= 0
+      ? maxOutputTokens
+      : (Number.isSafeInteger(maxTokens) && maxTokens >= 0 ? maxTokens : 0);
+
+    const longInput = price.longInputThreshold !== undefined && knownInput > price.longInputThreshold;
+    const inputMultiplier = longInput ? price.longInputMultiplier : 1;
+    const outputMultiplier = longInput ? price.longOutputMultiplier : 1;
+    const worstCaseDollars = (knownInput * price.input * inputMultiplier + maxOutput * price.output * outputMultiplier) / 1e6;
+    const worstCaseTokens = knownInput + maxOutput;
+
+    const projectedDollars = record.totals.dollars + worstCaseDollars;
+    const projectedTokens = record.totals.tokens + worstCaseTokens;
+    const rounding = Number.EPSILON * Math.max(projectedDollars, dollarCap) * Math.max(1, record.calls.length + 1);
+
+    if (
+      (tokenCap !== undefined && projectedTokens > tokenCap) ||
+      (dollarCap !== undefined && projectedDollars - dollarCap > rounding)
+    ) {
+      refuse('cap_reached', {
+        ...record.totals,
+        projectedDollars,
+        projectedTokens,
+        worstCase: { dollars: worstCaseDollars, tokens: worstCaseTokens, inputTokens: knownInput, outputTokens: maxOutput },
+      });
+    }
+
     record.phase = 'calling';
     record.pending = { id: randomUUID(), model, role, modelId, provider, startedAt: new Date().toISOString() };
     accounting = new Promise(resolve => { settle = resolve; });
@@ -240,7 +281,23 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
       }
       return async options => {
         while (record.phase === 'calling') await accounting;
-        begin({ model: id, role, modelId: target.modelId, provider: target.provider });
+        const inputTokens = options?.inputTokens ?? options?.promptTokens ?? 0;
+        const maxOutputTokens = options?.maxTokens
+          ?? options?.maxOutputTokens
+          ?? options?.maxCompletionTokens
+          ?? options?.providerOptions?.openai?.maxCompletionTokens
+          ?? options?.providerOptions?.openai?.max_completion_tokens
+          ?? options?.outputTokens
+          ?? 0;
+        begin({
+          model: id,
+          role,
+          modelId: target.modelId,
+          provider: target.provider,
+          inputTokens,
+          maxTokens: maxOutputTokens,
+          maxOutputTokens,
+        });
         const signal = options?.abortSignal
           ? AbortSignal.any([options.abortSignal, abortController.signal]) : abortController.signal;
         const onAbort = () => stop('model_call_aborted', { model: id, role });

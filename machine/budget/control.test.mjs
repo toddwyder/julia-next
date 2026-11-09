@@ -239,3 +239,44 @@ test('finished slice releases lock and a fresh slice archives its ledger', t => 
   assert.equal(next.snapshot().calls.length, 1);
   assert.equal(next.snapshot().slices[0].calls.length, 1);
 });
+
+test('a planted call whose worst case token count would cross a token cap is refused before it is sent', async t => {
+  const { control } = fixture(t, { tokenCap: 1000000 });
+  let invoked = false;
+  const wrapped = control.wrapModel({ modelId: sol, async doGenerate() { invoked = true; return {}; } }, { id: sol, role: 'lead' });
+  await assert.rejects(wrapped.doGenerate({ maxTokens: 1000001 }), /cap_reached/);
+  assert.equal(invoked, false);
+  assert.equal(control.snapshot().calls.length, 0);
+  assert.equal(control.snapshot().phase, 'stopped');
+  assert.equal(control.snapshot().stop.reason, 'cap_reached');
+  assert.ok(existsSync(control.stopPath));
+});
+
+test('a planted call whose worst case dollar cost would cross a dollar cap is refused before it is sent', async t => {
+  const { control } = fixture(t, { dollarCap: 4.0, tokenCap: 2000000 });
+  let invoked = false;
+  const wrapped = control.wrapModel({ modelId: sol, async doGenerate() { invoked = true; return {}; } }, { id: sol, role: 'lead' });
+  await assert.rejects(wrapped.doGenerate({ maxTokens: 500000 }), /cap_reached/);
+  assert.equal(invoked, false);
+  assert.equal(control.snapshot().calls.length, 0);
+  assert.equal(control.snapshot().phase, 'stopped');
+  assert.equal(control.snapshot().stop.reason, 'cap_reached');
+});
+
+test('a planted call whose worst case with long-input threshold crossed is refused before it is sent', async t => {
+  const { control } = fixture(t, { dollarCap: 4.0, tokenCap: 2000000 });
+  let invoked = false;
+  const wrapped = control.wrapModel({ modelId: sol, async doGenerate() { invoked = true; return {}; } }, { id: sol, role: 'lead' });
+  await assert.rejects(wrapped.doGenerate({ inputTokens: 300000, maxTokens: 200000 }), /cap_reached/);
+  assert.equal(invoked, false);
+  assert.equal(control.snapshot().calls.length, 0);
+  assert.equal(control.snapshot().phase, 'stopped');
+  assert.equal(control.snapshot().stop.reason, 'cap_reached');
+});
+
+test('a direct begin call whose worst case would cross a cap is refused', t => {
+  const { control } = fixture(t, { tokenCap: 500 });
+  assert.throws(() => control.begin({ model: sol, role: 'lead', maxTokens: 501 }), /cap_reached/);
+  assert.equal(control.snapshot().calls.length, 0);
+  assert.equal(control.snapshot().phase, 'stopped');
+});

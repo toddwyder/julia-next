@@ -4,8 +4,8 @@
   "verifiedAt": "2026-11-09T16:32:38.246Z",
   "testSuites": {
     "machine/budget/control.test.mjs": {
-      "total": 49,
-      "pass": 49,
+      "total": 53,
+      "pass": 53,
       "fail": 0
     },
     "machine/flow/budget-integration.test.mjs": {
@@ -26,7 +26,7 @@
     "machine/budget/formal/verify.mjs": {
       "node": "v24.14.1",
       "checkedSource": "machine/budget/control.mjs",
-      "sourceSha256": "794969b02d906f1c74146e1441e38c25fc7a833aaaa21f809742042cfe983cb3",
+      "sourceSha256": "99ebed51bb49a29df0d035c51afd4838c2b4219c12e69414f8daa98f1e6f578e",
       "checks": [
         {
           "name": "real sequential stop, reconstruction, retry and attributed clear",

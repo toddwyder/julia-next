@@ -15,5 +15,12 @@
     "cacheWrite": 0,
     "output": 0,
     "source": "JUL-360, Todd's dated free-memory-model decision, 9 November 2026"
+  },
+  "commandcode/deepseek/deepseek-v4.1-flash": {
+    "input": 0.15,
+    "cachedInput": 0.003,
+    "cacheWrite": 0,
+    "output": 0.6,
+    "source": "@mastra/observability pricing-data.json:14027, CommandCode deepseek/deepseek-v4.1-flash"
   }
 }

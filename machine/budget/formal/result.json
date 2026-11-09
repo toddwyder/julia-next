@@ -1,7 +1,7 @@
 {
   "node": "v24.14.1",
   "checkedSource": "machine/budget/control.mjs",
-  "sourceSha256": "794969b02d906f1c74146e1441e38c25fc7a833aaaa21f809742042cfe983cb3",
+  "sourceSha256": "99ebed51bb49a29df0d035c51afd4838c2b4219c12e69414f8daa98f1e6f578e",
   "checks": [
     {
       "name": "real sequential stop, reconstruction, retry and attributed clear",
