@@ -53,7 +53,7 @@ async function fixture(t, { dollarCap = 4, tokenCap = 2e6, id = MODEL, fail = fa
   let nativeMemory;
   if (memory) {
     const actor = role => control.wrapModel(createMockModel({ mockText: '<observations>Observed hello.</observations><current-task>Reply hello</current-task><suggested-response>Hello</suggested-response>' }),
-      { id: memory.unpriced === role ? 'unpriced/memory' : 'commandcode/reflection/beam:free', role });
+      { id: memory.unpriced === role ? 'unpriced/memory' : 'openai/gpt-6-luna', role });
     nativeMemory = new Memory({ options: { observationalMemory: {
       observation: { model: actor('observer'), messageTokens: 1, bufferTokens: false, maxRetries: 0 },
       reflection: { model: actor('reflector'), observationTokens: memory.reflect ? 1 : 1e5, maxRetries: 0 },
@@ -150,8 +150,8 @@ test('native observational memory invokes explicitly priced wrapped Observer', a
   const record = await f.budget.finish();
   assert.ok(record.calls.some(call => call.role === 'observer'));
   for (const call of record.calls.filter(call => call.role === 'observer')) {
-    assert.equal(call.model, 'commandcode/reflection/beam:free');
-    assert.equal(call.dollars, 0);
+    assert.equal(call.model, 'openai/gpt-6-luna');
+    assert.ok(call.dollars > 0);
     assert.ok(call.tokens > 0);
   }
 });
@@ -212,8 +212,8 @@ test('native Reflector uses its own explicitly priced wrapped model', async t =>
   const record = await f.budget.finish();
   assert.ok(record.calls.some(call => call.role === 'reflector'));
   for (const call of record.calls.filter(call => call.role === 'reflector')) {
-    assert.equal(call.model, 'commandcode/reflection/beam:free');
-    assert.equal(call.dollars, 0);
+    assert.equal(call.model, 'openai/gpt-6-luna');
+    assert.ok(call.dollars > 0);
     assert.ok(call.tokens > 0);
   }
 });

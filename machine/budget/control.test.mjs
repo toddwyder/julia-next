@@ -3,16 +3,18 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { createSliceControl, priceUsage } from './control.mjs';
 
 const sol = 'openai/gpt-6.1-sol';
 const beam = 'commandcode/reflection/beam:free';
+const luna = 'openai/gpt-6-luna';
 const price = { input: 2, cachedInput: 0.1, cacheWrite: 2.5, output: 10,
   longInputThreshold: 272000, longInputMultiplier: 2, longOutputMultiplier: 1.5 };
-const testRoot = new URL('../../.artifacts/budget-unit/', import.meta.url);
+const testRoot = fileURLToPath(new URL('../../.artifacts/budget-unit/', import.meta.url));
 mkdirSync(testRoot, { recursive: true });
 function fixture(t, options = {}) {
-  const directory = mkdtempSync(join(testRoot.pathname, 'slice-'));
+  const directory = mkdtempSync(join(testRoot, 'slice-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const config = { directory, dollarCap: 4, tokenCap: 2e6, ...options };
   return { control: createSliceControl(config), config, directory };
@@ -62,12 +64,14 @@ for (const role of ['lead', 'observer', 'reflector']) test(`unpriced ${role} ref
   assert.equal(invoked, false);
   assert.equal(control.snapshot().stop.numbers.role, role);
 });
-test('Beam free calls still consume tokens and are recorded', t => {
+test('Luna memory calls consume tokens and dollars and are recorded', t => {
   const { control } = fixture(t);
-  control.begin({ model: beam, role: 'observer' });
-  control.recordSpan(span(beam));
-  assert.deepEqual(control.snapshot().totals, { dollars: 0, tokens: 110 });
+  control.begin({ model: luna, role: 'observer' });
+  control.recordSpan(span(luna));
+  assert.ok(control.snapshot().totals.dollars > 0);
+  assert.equal(control.snapshot().totals.tokens, 110);
   assert.equal(control.snapshot().calls[0].role, 'observer');
+  assert.ok(control.snapshot().calls[0].dollars > 0);
   control.finish();
 });
 for (const caps of [{ tokenCap: 110 }, { tokenCap: 109 }, { dollarCap: 0.0003 }, { dollarCap: 0.00029 }]) {
@@ -92,8 +96,8 @@ test('clear requires attribution, records reason, and permits a new slice', t =>
   assert.throws(() => control.clear({ reason: 'reviewed' }), /reason and actor/);
   control.clear({ reason: 'planted failure cleared after review', actor: 'operator' });
   assert.equal(control.signal.aborted, false);
-  const next = createSliceControl(config); next.begin({ model: beam, role: 'observer' });
-  next.recordSpan(span(beam, { inputTokens: 1, outputTokens: 1 })); next.finish();
+  const next = createSliceControl(config); next.begin({ model: luna, role: 'observer' });
+  next.recordSpan(span(luna, { inputTokens: 1, outputTokens: 1 })); next.finish();
   const saved = JSON.parse(readFileSync(next.recordPath, 'utf8'));
   assert.equal(saved.events.filter(e => e.kind === 'clear').length, 1);
   assert.equal(saved.slices[0].stop.reason, 'cap_reached');
@@ -190,10 +194,10 @@ test('completed inference with unknown usage stops before another provider call'
 });
 test('a stopped background memory call with priced late usage is still costed', t => {
   const { control } = fixture(t);
-  control.begin({ model: beam, role: 'reflector' });
+  control.begin({ model: luna, role: 'reflector' });
   control.stop('planted_memory_failure', { observed: true });
-  control.recordSpan(span(beam));
-  assert.equal(control.snapshot().calls[0].dollars, 0);
+  control.recordSpan(span(luna));
+  assert.ok(control.snapshot().calls[0].dollars > 0);
   assert.equal(control.snapshot().calls[0].tokens, 110);
   assert.equal(control.snapshot().stop.reason, 'planted_memory_failure');
 });

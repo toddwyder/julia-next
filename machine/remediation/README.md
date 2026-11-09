@@ -11,8 +11,8 @@ node scripts/julia-agents.mjs -- node machine/remediation/run.mjs --pr 412 --car
 
 `--no-post` writes every determination, the card note and the stop into
 `.artifacts/remediation/pr-<n>` instead of commenting, which is how the practice
-runs are made. `--model` sets the Shipping model (default is the free Beam model
-below), `--builder-model` the model a fresh builder or the investigation gets.
+runs are made. `--model` sets the Shipping model (default is GPT-6 Luna),
+`--builder-model` the model a fresh builder or the investigation gets.
 `--force` starts the loop again when the saved record says it already stopped.
 `--card-file <path>` reads the card from JSON instead of Linear, for a machine
 whose Linear key is gone. `--review-timeout-min <n>` sets how long one review may

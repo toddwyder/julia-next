@@ -32,8 +32,8 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
   const memoryFor = role => {
     if (!budget) return {};
     const memory = new Memory({ options: { observationalMemory: {
-      observation: { model: wrapped('commandcode/reflection/beam:free', `${role}:observer`), maxRetries: 0, failurePolicy: 'abort' },
-      reflection: { model: wrapped('commandcode/reflection/beam:free', `${role}:reflector`), maxRetries: 0, failurePolicy: 'abort' },
+      observation: { model: wrapped('openai/gpt-6-luna', `${role}:observer`), maxRetries: 0, failurePolicy: 'abort' },
+      reflection: { model: wrapped('openai/gpt-6-luna', `${role}:reflector`), maxRetries: 0, failurePolicy: 'abort' },
     } } });
     budget.addMemory(memory);
     return { memory };
