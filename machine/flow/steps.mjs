@@ -56,6 +56,8 @@ const buildPrompt = (card, kind) =>
   ].join('\n');
 
 export function createStages({ agents, dir }) {
+  const budget = agents.budget;
+  const modelStep = (id, execute) => budget ? step(id, execute, { retries: 0 }) : agentStep(id, execute);
   const cardDir = (card) => join(dir, card);
 
   // The first stage of a run. It takes the two things the run form asks for
@@ -76,13 +78,14 @@ export function createStages({ agents, dir }) {
   // agent's own input and output, so the card data goes through a mapper either
   // side of it instead of through the stage's shared schema.
   const startBuild = step('start-build', async ({ inputData, state, setState }) => {
+    budget?.start();
     const card = state.card || inputData.card;
     const buildRounds = state.buildRounds + 1;
     await setState({ ...state, buildRounds, requestId: `${card}/build-${buildRounds}` });
     return { ...inputData, card, detail: `build round ${buildRounds} started`, prompt: buildPrompt(card, state.kind) };
   });
 
-  const buildAgent = createStep(agents.build, { retries: BUILD_RETRIES });
+  const buildAgent = createStep(agents.build, { retries: budget ? 0 : BUILD_RETRIES });
 
   const finishBuild = createStep({
     id: 'finish-build',
@@ -90,13 +93,14 @@ export function createStages({ agents, dir }) {
     outputSchema: flowData,
     execute: async ({ inputData, state }) => {
       const card = state.card;
+      const accounting = await budget?.finish();
       const text = inputData.text ?? '';
       writeArtifact(cardDir(card), card, text);
-      return { card, kind: state.kind, detail: text, failCount: state.failCount };
+      return { card, kind: state.kind, detail: text, failCount: state.failCount, ...(accounting ? { budget: accounting } : {}) };
     },
   });
 
-  const shipping = agentStep('shipping', async ({ inputData, state, tracingContext }) => {
+  const shipping = modelStep('shipping', async ({ inputData, state, tracingContext }) => {
     const artifact = readArtifact(cardDir(state.card), state.card);
     const result = await agents.shipping.generate(
       `File follows. Is it a plausible recipe title?\n\n${artifact}`,
@@ -118,7 +122,7 @@ export function createStages({ agents, dir }) {
     };
   });
 
-  const remediation = agentStep('remediation', async ({ inputData, state, tracingContext }) => {
+  const remediation = modelStep('remediation', async ({ inputData, state, tracingContext }) => {
     const artifact = readArtifact(cardDir(state.card), state.card);
     const result = await agents.remediation.generate(
       `Rewrite this line so it reads better.\n\n${artifact}`,
@@ -208,7 +212,7 @@ export function createStages({ agents, dir }) {
     return { ...inputData, stopped: true, finished: true, detail: `stop report at ${path}` };
   });
 
-  const retro = agentStep('retro', async ({ inputData, state, tracingContext }) => {
+  const retro = modelStep('retro', async ({ inputData, state, tracingContext }) => {
     const result = await agents.retro.generate(
       `Card ${state.card} landed after ${state.reviewRound} shipping rounds and ${state.buildRounds} build rounds. Say in one sentence what this run did.`,
       { tracingContext },

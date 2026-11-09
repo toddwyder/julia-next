@@ -5,9 +5,10 @@ import { readJsonRecord, watchdogRecordFile, writeJsonRecord } from '../lib/stat
 import { sendDashboardNotice } from '../lib/ping.js';
 
 export const FAILURES_BEFORE_NOTICE = 3;
+export const NOTICE_RETRY_MS = 60 * 60 * 1000;
 export const DEFAULT_HOST = '127.0.0.1';
 export const DEFAULT_PORT = '4313';
-export const VAULT_WRAPPER = '/home/ubuntu/julia-mastra/scripts/julia-agents.mjs';
+export const VAULT_WRAPPER = '/home/ubuntu/julia-dashboard/scripts/julia-agents.mjs';
 
 const self = fileURLToPath(import.meta.url);
 
@@ -19,7 +20,7 @@ export function healthAddress(env = process.env) {
 
 export const EMPTY_WATCHDOG_STATE = Object.freeze({
   consecutiveFailures: 0, down: false, downSince: null, lastProbeAt: null, lastOkAt: null,
-  lastDetail: null, lastNoticeAt: null, lastNoticeKind: null, lastRecoveredAt: null,
+  lastDetail: null, lastNoticeAt: null, lastNoticeKind: null, lastRecoveredAt: null, lastNoticeFailureAt: null,
 });
 
 export async function probeHealth({ url, fetchImpl = fetch, timeoutMs = 5000 }) {
@@ -72,7 +73,7 @@ export function nextWatchdogState(previous, result, now = new Date().toISOString
 
 export function sendThroughVault(notice, { env = process.env } = {}) {
   const wrapper = env.DASHBOARD_VAULT_WRAPPER || VAULT_WRAPPER;
-  const child = spawnSync(process.execPath, [wrapper, '--', process.execPath, self, '--notify', notice.kind, JSON.stringify({
+  const child = spawnSync(process.execPath, [wrapper, '--linear', '--', process.execPath, self, '--notify', notice.kind, JSON.stringify({
     detail: notice.detail ?? '', address: notice.address ?? '', at: notice.at ?? '', downSince: notice.downSince ?? null,
   })], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], timeout: 180000, env });
   if (child.error) throw new Error(`could not run the notice sender: ${child.error.message}`);
@@ -94,13 +95,23 @@ export async function runWatchdog({ env = process.env, probe, send, store, log =
   let sent = null;
   let sendError = '';
   if (notice) {
-    try {
-      sent = await deliver({ kind: notice, detail: result.detail, address: address.url, at: state.lastProbeAt, downSince });
-      state.lastNoticeAt = state.lastProbeAt;
-      state.lastNoticeKind = notice;
-    } catch (error) {
-      sendError = String(error.message ?? error);
+    const retryReady = !state.lastNoticeFailureAt || Date.parse(state.lastProbeAt) - Date.parse(state.lastNoticeFailureAt) >= NOTICE_RETRY_MS;
+    let delivered = false;
+    if (retryReady) {
+      try {
+        sent = await deliver({ kind: notice, detail: result.detail, address: address.url, at: state.lastProbeAt, downSince });
+        delivered = true;
+        state.lastNoticeAt = state.lastProbeAt;
+        state.lastNoticeKind = notice;
+        state.lastNoticeFailureAt = null;
+      } catch (error) {
+        sendError = String(error.message ?? error);
+        state.lastNoticeFailureAt = state.lastProbeAt;
+      }
+    }
+    if (!delivered) {
       state.down = previous?.down ?? false;
+      state.downSince = previous?.downSince ?? null;
     }
   }
   write(state);

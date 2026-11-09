@@ -17,15 +17,17 @@ export const cardStamper = card => ({
   },
 });
 
-export async function openMastra({ card, agents, workflow, stateDb, traceDb }) {
+export async function openMastra({ card, agents, workflow, stateDb, traceDb, budget }) {
   const storage = new MastraCompositeStore({
     id: 'flow-storage',
     default: new LibSQLStore({ id: 'flow-state', url: `file:${stateDb}` }),
     domains: { observability: await new DuckDBStore({ path: traceDb }).getStore('observability') },
   });
 
+  const { budget: agentBudget, ...registeredAgents } = agents ?? {};
+  budget ??= agentBudget;
   return new Mastra({
-    agents,
+    agents: registeredAgents,
     workflows: { [workflow.id]: workflow },
     storage,
     observability: new Observability({
@@ -33,7 +35,7 @@ export async function openMastra({ card, agents, workflow, stateDb, traceDb }) {
         default: {
           serviceName: 'jul-336-card-path',
           exporters: [new MastraStorageExporter()],
-          spanOutputProcessors: [cardStamper(card)],
+          spanOutputProcessors: [cardStamper(card), ...(budget ? [budget.processor] : [])],
           logging: { enabled: false },
         },
       },
