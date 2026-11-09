@@ -34,7 +34,7 @@ export async function runWithinTimeLimit(start, { limitMs, onLimit = null, log =
   }
 }
 
-const CRITERION = /CRITERION\s+(\d+)\s*:/gi;
+const CRITERION = /(?:CRITERION|criterion)\s+(\d+)\b/gi;
 
 const toolCalls = step => (Array.isArray(step?.toolCalls) ? step.toolCalls : []);
 

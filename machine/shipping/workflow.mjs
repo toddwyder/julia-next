@@ -79,7 +79,7 @@ export function reviewTask({ pr, sha, checkout, card, criteria, open = [] }) {
   return [
     `You are the Shipping agent for pull request #${pr} in this checkout.`,
     '',
-    `Read ${PLAYBOOK} first and follow it. You are reviewing code you did not write, and only a verdict from an agent that runs the change itself counts. A green pipeline is not a verdict.`,
+    `Follow ${PLAYBOOK}. You are reviewing code you did not write, and only a verdict from an agent that runs the change itself counts. A green pipeline is not a verdict.`,
     '',
     `The code under review is already checked out here: ${checkout}`,
     `Commit under review: ${sha}`,
