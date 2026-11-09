@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FAILURES_BEFORE_NOTICE, healthAddress, nextWatchdogState, probeHealth, runWatchdog } from './watchdog.mjs';
+import { FAILURES_BEFORE_NOTICE, NOTICE_RETRY_MS, VAULT_WRAPPER, healthAddress, nextWatchdogState, probeHealth, runWatchdog, sendThroughVault } from './watchdog.mjs';
 
 const ok = { ok: true, detail: 'answered ok' };
 const bad = { ok: false, detail: 'HTTP 503 from /api/health (failing: runs)' };
@@ -85,7 +85,7 @@ test('three failing probes send exactly one notice and a return sends one recove
   assert.equal(log.length, 6);
 });
 
-test('a notice that could not be sent is not recorded as sent, so the next probe tries again', async () => {
+test('a notice that could not be sent stays pending until the retry cooldown expires', async () => {
   let stored = null;
   const store = { read: () => stored, write: state => { stored = state; } };
   const attempts = [];
@@ -99,11 +99,66 @@ test('a notice that could not be sent is not recorded as sent, so the next probe
   assert.equal(attempts.length, 1);
   assert.equal(stored.down, false);
   assert.equal(stored.consecutiveFailures, 3);
-  const retried = await runWatchdog({ env: {}, probe: () => Promise.resolve(bad), send: () => Promise.resolve({ delivered: 'ok' }), store, now: () => '2026-10-29T10:01:00.000Z', log: () => {} });
+  assert.equal(stored.lastNoticeFailureAt, '2026-10-29T10:00:00.000Z');
+  const waiting = await runWatchdog({ env: {}, probe: () => Promise.resolve(bad), send, store, now: () => '2026-10-29T10:01:00.000Z', log: () => {} });
+  assert.equal(waiting.notice, 'down');
+  assert.equal(waiting.sent, null);
+  assert.equal(attempts.length, 1);
+  const retried = await runWatchdog({ env: {}, probe: () => Promise.resolve(bad), send: () => Promise.resolve({ delivered: 'ok' }), store, now: () => '2026-10-29T11:00:00.000Z', log: () => {} });
   assert.equal(retried.notice, 'down');
   assert.equal(retried.sent.delivered, 'ok');
   assert.equal(stored.down, true);
   assert.equal(stored.lastNoticeKind, 'down');
+  assert.equal(stored.lastNoticeFailureAt, null);
+});
+
+test('failed recovery delivery survives repeated healthy probes and retries at the persisted deadline', async () => {
+  let stored = JSON.stringify({ down: true, downSince: '2026-10-29T09:00:00.000Z' });
+  const store = { read: () => JSON.parse(stored), write: state => { stored = JSON.stringify(state); } };
+  let attempts = 0;
+  let current = Date.parse('2026-10-29T10:00:00.000Z');
+  const send = () => { attempts += 1; throw new Error('the notice sender exited 1'); };
+  const options = { env: {}, probe: async () => ok, send, store, now: () => new Date(current).toISOString(), log: () => {} };
+  for (let minute = 0; minute < 60; minute += 1) {
+    current = Date.parse('2026-10-29T10:00:00.000Z') + minute * 60000;
+    const result = await runWatchdog(options);
+    assert.equal(result.notice, 'recovery');
+    assert.equal(result.state.down, true);
+    assert.equal(result.state.downSince, '2026-10-29T09:00:00.000Z');
+    assert.equal(result.state.lastNoticeFailureAt, '2026-10-29T10:00:00.000Z');
+    assert.equal(result.state.lastNoticeAt, null);
+  }
+  assert.equal(attempts, 1);
+  current = Date.parse('2026-10-29T10:00:00.000Z') + NOTICE_RETRY_MS;
+  await runWatchdog(options);
+  assert.equal(attempts, 2);
+  current += NOTICE_RETRY_MS;
+  const recovered = await runWatchdog({ ...options, send: () => { attempts += 1; return { delivered: 'ok' }; } });
+  assert.equal(recovered.sent.delivered, 'ok');
+  assert.equal(recovered.state.down, false);
+  assert.equal(recovered.state.lastNoticeFailureAt, null);
+  current += 60000;
+  assert.equal((await runWatchdog(options)).notice, null);
+  assert.equal(attempts, 3);
+});
+
+test('notification delivery uses the deployed wrapper with Linear-only scope', async () => {
+  const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  assert.equal(VAULT_WRAPPER, '/home/ubuntu/julia-dashboard/scripts/julia-agents.mjs');
+  const root = mkdtempSync(join(tmpdir(), 'watchdog-vault-'));
+  try {
+    const wrapper = join(root, 'wrapper.mjs');
+    writeFileSync(wrapper, 'console.log(JSON.stringify(process.argv.slice(2)))');
+    const result = sendThroughVault({ kind: 'recovery' }, { env: { ...process.env, DASHBOARD_VAULT_WRAPPER: wrapper } });
+    const args = JSON.parse(result.delivered);
+    assert.deepEqual(args.slice(0, 3), ['--linear', '--', process.execPath]);
+    assert.equal(args[4], '--notify');
+    assert.equal(args[5], 'recovery');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('the state file lives under the state folder from the env file', async () => {

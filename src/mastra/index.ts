@@ -5,7 +5,9 @@
 
 process.env.CMD_API_KEY ??= process.env.COMMANDCODE_API_KEY;
 
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
+import { homedir } from 'node:os';
+import { createSliceControl } from '../../machine/budget/control.mjs';
 
 import { createAgents } from '../../machine/flow/agents.mjs';
 import { graphifyTools } from '../../machine/flow/graphify.mjs';
@@ -17,7 +19,12 @@ import { buildCardPath } from '../../machine/flow/workflow.mjs';
 const dir = resolve(process.env.FLOW_DIR ?? '.artifacts/flow/studio');
 
 openScratch(dir);
-const agents = createAgents({ tools: await graphifyTools() });
+const budget = createSliceControl({
+  directory: join(homedir(), '.local/state/julia/budget'),
+  dollarCap: Number(process.env.FLOW_DOLLAR_CAP),
+  tokenCap: Number(process.env.FLOW_TOKEN_CAP),
+});
+const agents = createAgents({ tools: await graphifyTools(), budget });
 const workflow = buildCardPath({ agents, dir });
 
 // Storage and observability come from the same place a resumed run uses, so the
@@ -25,6 +32,7 @@ const workflow = buildCardPath({ agents, dir });
 export const mastra = await openMastra({
   card: process.env.FLOW_CARD ?? '',
   agents,
+  budget: agents.budget,
   workflow,
   stateDb: resolve(dir, 'state.db'),
   traceDb: resolve(dir, 'trace.duckdb'),
