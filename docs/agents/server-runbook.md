@@ -41,6 +41,7 @@ In Studio, pick the `card-path` workflow and press run. The form asks for `card`
 (`product` or `machine`) and nothing else; the workflow copies both into saved state and opens
 `<FLOW_DIR>/<card>/` for that card's artifacts, verdict queues and stop report.
 Because the saved state starts empty, a run started here needs no preparation.
+Each card slice starts under built-in limits of $4 and 2,000,000 tokens, defined as `STUDIO_DOLLAR_CAP` and `STUDIO_TOKEN_CAP` in `src/mastra/index.ts`. Studio does not read `FLOW_DOLLAR_CAP` or `FLOW_TOKEN_CAP` from the environment.
 
 A card that waits for Todd is answered from the command line, which reads the card out of the run's
 saved snapshot:
