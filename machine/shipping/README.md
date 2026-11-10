@@ -10,8 +10,8 @@ node scripts/julia-agents.mjs -- node machine/shipping/run.mjs --pr 401 --card J
 ```
 
 `--no-post` writes the determination to `.artifacts/shipping/pr-<n>/determination.md`
-instead of commenting. `--model` overrides the model (default is the free Beam
-model below). `--force` reviews and posts again when the saved record already
+instead of commenting. The review runs on Todd's saved Shipping pick, and a
+missing pick stops the run before it starts and names the stage. `--force` reviews and posts again when the saved record already
 covers that commit; without it a rerun reads `record.json` first and stops, so a
 run that died after commenting cannot comment twice.
 
@@ -26,8 +26,8 @@ run that died after commenting cannot comment twice.
    session.
 3. `workflow.mjs` builds the stock Mastra workflow `shipping` with two steps.
    `gather` reads the card from Linear and takes its criteria. `review` calls
-   the stock `subagent` tool with `agentType: "execute"` on
-   `commandcode/reflection/beam:free`, giving it the pull request number, the
+   the stock `subagent` tool with `agentType: "execute"` on the saved Shipping
+   pick, giving it the pull request number, the
    commit, the checkout, the card verbatim and the stock Shipping playbook. The
    agent is fresh and is never given the builder's reasoning or evidence.
 4. The run stops writing, and `trace-record.mjs` reads the trace back.
@@ -54,8 +54,8 @@ than from this repository's dependencies, because the machine must run the same
 harness that made the code it reviews. The departures from stock pstack and
 stock Mastra Code are rows in `docs/pstack-deviations.md`.
 
-Beam is free on Command Code, which this machine reaches through the Command
-Code custom provider in the harness settings. A 429 waits 30s, 90s and 240s and
+The saved pick is whichever account model Todd chose for Shipping in the
+picker. A 429 waits 30s, 90s and 240s and
 asks the same model again.
 
 ## The cards it reads

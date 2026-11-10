@@ -22,8 +22,6 @@ const USAGE = `Usage: node machine/remediation/run.mjs --pr <n> --card <JUL-n> [
 
   --pr <n>            pull request to review and remediate
   --card <JUL-n>      card the pull request names, read from Linear
-  --model <id>        model for the Shipping reviews (default: the saved Shipping pick)
-  --builder-model <id> model for a fresh builder or the investigation (default: the saved Remediation pick)
   --no-post           write the determinations and the stop in the run folder, post nothing
   --force             ignore a saved record and start the loop again
   --card-file <path>  read the card from this JSON file instead of Linear, for practice runs
@@ -31,14 +29,12 @@ const USAGE = `Usage: node machine/remediation/run.mjs --pr <n> --card <JUL-n> [
 `;
 
 function parseArgs(argv) {
-  const options = { pr: null, card: null, model: null, builderModel: null, post: true, force: false, cardFile: null, reviewTimeoutMin: 20 };
+  const options = { pr: null, card: null, post: true, force: false, cardFile: null, reviewTimeoutMin: 20 };
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
     if (arg === '--pr') options.pr = Number(argv[++index]);
     else if (arg === '--card') options.card = argv[++index];
     else if (arg === '--card-file') options.cardFile = argv[++index];
-    else if (arg === '--model') options.model = argv[++index];
-    else if (arg === '--builder-model') options.builderModel = argv[++index];
     else if (arg === '--review-timeout-min') options.reviewTimeoutMin = Number(argv[++index]);
     else if (arg === '--no-post') options.post = false;
     else if (arg === '--force') options.force = true;
@@ -67,9 +63,9 @@ async function main() {
   const runDir = path.join(root, '.artifacts', 'remediation', `pr-${options.pr}`);
   const checkout = path.join(scratchDir, 'remediation', `pr-${options.pr}`, 'worktree');
   // Every stage reads Todd's saved pick; a missing pick stops here and names the stage.
-  const stages = stageModels();
-  const modelId = options.model ?? stages.shipping;
-  const builderModel = options.builderModel ?? stages.remediation;
+  const stages = stageModels(undefined, ['shipping', 'remediation']);
+  const modelId = stages.shipping;
+  const builderModel = stages.remediation;
 
   const saved = readRecord(runDir);
   if (!options.force && alreadyFinished(saved, { pr: options.pr, card: options.card })) {

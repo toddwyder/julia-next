@@ -7,7 +7,7 @@ import path from 'node:path';
 import { stopHarness } from '../shipping/harness.mjs';
 import { runShipping, REVIEW_TIME_LIMIT_MS, reviewLimitNote, PLAYBOOK, WORKFLOW_ID } from '../shipping/workflow.mjs';
 import { commandsFromSpans, determinationComment, playbookSteps } from '../shipping/determination.mjs';
-import { readSpans, workflowRun } from '../shipping/trace-record.mjs';
+import { answerModel, readSpans, workflowRun } from '../shipping/trace-record.mjs';
 import { postComment, traceFileFor } from '../shipping/run-parts.mjs';
 import { MAX_REVIEWS, failedCriteria } from './workflow.mjs';
 
@@ -66,6 +66,7 @@ export async function reviewRound({ record, round, runDir, modelId, post = true,
   const spans = await readSpans(traceFile);
   const workflowSpan = workflowRun(spans, WORKFLOW_ID);
   const { commands, otherTools } = commandsFromSpans(spans);
+  const answeredModel = answerModel(spans);
   let steps = [];
   try {
     steps = playbookSteps(fs.readFileSync(path.join(record.checkout, PLAYBOOK), 'utf8'));
@@ -81,6 +82,7 @@ export async function reviewRound({ record, round, runDir, modelId, post = true,
     sha: record.head,
     card: run.output?.card ?? record.card,
     model: run.output?.modelId ?? modelId,
+    answeredModel,
     playbook: PLAYBOOK,
     workflowRunId: workflowSpan?.runId ?? run.runId,
     workflowId: WORKFLOW_ID,
@@ -108,6 +110,7 @@ export async function reviewRound({ record, round, runDir, modelId, post = true,
 
   return {
     modelId: run.output?.modelId ?? modelId,
+    answeredModel,
     verdict: verdict?.verdict ?? null,
     answer: timedOutNote ?? verdict?.raw ?? run.output?.answer ?? '',
     failed,

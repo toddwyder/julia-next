@@ -236,12 +236,12 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
         if (outcome.answer) log(`The retro agent ended with: ${String(outcome.answer).trim().slice(-600)}`);
         return persist({
           ...record,
-          retro: { ok: false, reason: outcome.reason, file: null, commit: null },
+          retro: { ok: false, reason: outcome.reason, file: null, commit: null, modelId: outcome.modelId ?? null, answeredModel: outcome.answeredModel ?? null },
           stop: record.stop ?? { reason: outcome.reason },
         });
       }
       log(`The retro is written at ${retroPath}.`);
-      return persist({ ...record, retro: { ok: true, reason: outcome.reason, file: retroPath } });
+      return persist({ ...record, retro: { ok: true, reason: outcome.reason, file: retroPath, modelId: outcome.modelId ?? null, answeredModel: outcome.answeredModel ?? null } });
     },
   });
 

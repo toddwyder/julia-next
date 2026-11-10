@@ -16,15 +16,14 @@ import { postComment, prepareCheckout, prepareDependencies, repoRoot, savedPosti
 import { scratchDir } from '../../scripts/scratch-dir.mjs';
 import { stageModels } from '../../dashboard/lib/model-settings.js';
 
-const USAGE = `usage: node machine/shipping/run.mjs --pr <number> --card <JUL-number> [--model <id>] [--no-post] [--force]`;
+const USAGE = `usage: node machine/shipping/run.mjs --pr <number> --card <JUL-number> [--no-post] [--force]`;
 
 function parseArgs(argv) {
-  const options = { pr: null, card: null, model: null, post: true, force: false };
+  const options = { pr: null, card: null, post: true, force: false };
   for (let index = 0; index < argv.length; index++) {
     const flag = argv[index];
     if (flag === '--pr') options.pr = Number(argv[++index]);
     else if (flag === '--card') options.card = argv[++index];
-    else if (flag === '--model') options.model = argv[++index];
     else if (flag === '--no-post') options.post = false;
     else if (flag === '--force') options.force = true;
     else if (flag === '--help' || flag === '-h') {
@@ -39,6 +38,8 @@ function parseArgs(argv) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  // The Shipping review runs on Todd's saved Shipping pick; a missing pick stops here, before any checkout.
+  const modelId = stageModels(undefined, ['shipping']).shipping;
   const runDir = path.join(repoRoot, '.artifacts', 'shipping', `pr-${options.pr}`);
   const checkout = path.join(scratchDir, 'shipping', `pr-${options.pr}`, 'worktree');
 
@@ -67,8 +68,6 @@ async function main() {
   const { answerModel, readSpans, workflowRun } = await import('./trace-record.mjs');
   const { commandsFromSpans, determinationComment, playbookSteps } = await import('./determination.mjs');
 
-  // The Shipping review runs on Todd's saved Shipping pick; the machine carries no default.
-  const modelId = options.model ?? stageModels().shipping;
   const run = await runShipping({
     pr: options.pr,
     sha,

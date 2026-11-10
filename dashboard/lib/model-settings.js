@@ -62,13 +62,15 @@ export function readSettings({ paths = settingsPaths(), modelIds = [] } = {}) {
 const ACCOUNT_MODEL = /^[a-z][a-z0-9-]*\/[a-zA-Z0-9][a-zA-Z0-9/._:-]*$/;
 
 // The machine's stage models come from the same saved file as the picker rows. A stage with
-// no saved line stops here and names itself, so no built-in model can answer for it.
-export function stageModels(file = settingsPaths().pstack) {
+// no saved line stops here and names itself, so no built-in model can answer for it. A program
+// passes the stage ids it runs, so a missing pick for another stage cannot stop it or be named.
+export function stageModels(file = settingsPaths().pstack, only = null) {
   let text = '';
   try { text = readFileSync(file, 'utf8'); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
   const saved = parsePstack(text).roles;
-  const stages = ROLE_GROUPS.filter(group => group.machine).flatMap(group => group.roles);
+  const stages = ROLE_GROUPS.filter(group => group.machine).flatMap(group => group.roles)
+    .filter(role => !only || only.includes(role.id));
   return Object.fromEntries(stages.map(role => {
     const stored = saved.get(role.name);
     if (!stored) throw new Error(`Missing ${role.name} pick in ${file}.`);

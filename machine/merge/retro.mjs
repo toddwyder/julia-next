@@ -135,7 +135,7 @@ export async function runRetro({
       { limitMs: timeLimitMs, log, onLimit: () => stopHarness(booted) }
     );
     if (answer.timedOut) {
-      result = { ok: false, reason: `the retro ran ${reviewLimitNote(timeLimitMs)} and was ended`, answer: null, file: null };
+      result = { ok: false, reason: `the retro ran ${reviewLimitNote(timeLimitMs)} and was ended`, answer: null, file: null, modelId };
     } else {
       const outcome = retroOutcome({ ...answer.value, file, failed });
       log(outcome.ok ? `The retro doc is at ${file}.` : `The retro did not finish: ${outcome.reason}`);
