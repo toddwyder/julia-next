@@ -109,14 +109,14 @@ test('unpriced identity refuses actual Agent call without provider execution', a
   assert.equal(f.control.snapshot().stop.reason, 'no_price');
 });
 
-test('completed trace overshoot latches stop and prevents the next call', async t => {
+test('a cap with no room for any call stops before the provider is called', async t => {
   const f = await fixture(t, { tokenCap: 1 });
   f.budget.start();
   await f.agent.generate('hello').catch(() => {});
-  assert.equal(f.control.snapshot().stop?.reason, 'cap_reached');
+  assert.equal(f.control.snapshot().stop?.reason, 'no_room_under_caps');
   await f.agent.generate('again').catch(() => {});
   await assert.rejects(f.budget.finish());
-  assert.equal(f.calls(), 1);
+  assert.equal(f.calls(), 0);
   assert.equal(f.control.snapshot().exitCode, 1);
 });
 
@@ -182,13 +182,13 @@ test('native Observer with no price stops the shared build budget', async t => {
   assert.throws(() => f.budget.start());
 });
 
-test('native card workflow stops on dollar overshoot before Shipping', async t => {
+test('native card workflow stops before Shipping when the dollar cap leaves no room', async t => {
   const f = await fixture(t, { dollarCap: 0.000001, fullWorkflow: true });
   const run = await f.mastra.getWorkflow(f.workflow.id).createRun();
   const result = await run.start({ inputData: { card: 'JUL-360', kind: 'product' } });
   assert.equal(result.status, 'failed');
   assert.equal(f.stageCalls(), 0);
-  assert.equal(f.calls(), 1);
+  assert.equal(f.calls(), 0);
   assert.equal(f.control.snapshot().exitCode, 1);
 });
 

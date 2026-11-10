@@ -22,7 +22,15 @@ function fixture(t, options = {}) {
 function span(model = sol, usage = { inputTokens: 100, outputTokens: 10 }, id = 'span-1') {
   return { type: 'model_inference', id, traceId: 'trace-1', endTime: new Date(), attributes: { model, usage } };
 }
-function call(control, usage, id) { control.begin({ model: sol, role: 'lead' }); return control.recordSpan(span(sol, usage, id)); }
+const count = (value, fallback) => (Number.isSafeInteger(value) && value >= 0 ? value : fallback);
+function call(control, usage, id) {
+  control.begin({ model: sol, role: 'lead', inputTokens: count(usage?.inputTokens, 100), maxOutputTokens: count(usage?.outputTokens, 10) });
+  return control.recordSpan(span(sol, usage, id));
+}
+function settleAll(control) {
+  control.snapshot().reservations?.forEach((r, index) => control.recordSpan({ type: 'model_inference', id: `settle-${index}-${r.id}`, traceId: 't', endTime: new Date(),
+    attributes: { model: r.modelId, provider: r.provider, usage: { inputTokens: 1, outputTokens: 1 } } }));
+}
 
 test('Sol cache and reasoning accounting includes reasoning once', () => {
   const result = priceUsage({ inputTokens: 1000, outputTokens: 200,
@@ -85,14 +93,14 @@ for (const caps of [{ tokenCap: 110 }, { tokenCap: 109 }, { dollarCap: 0.0003 },
   });
 }
 test('cap record survives independent Node process relaunch', t => {
-  const { control, config } = fixture(t, { tokenCap: 100 }); call(control);
+  const { control, config } = fixture(t, { tokenCap: 100 }); call(control, { inputTokens: 90, outputTokens: 10 });
   const code = `import {createSliceControl} from ${JSON.stringify(new URL('./control.mjs', import.meta.url).href)};
     try { createSliceControl(${JSON.stringify(config)}).begin({model:${JSON.stringify(sol)},role:'lead'});process.exitCode=0; }
     catch {process.exitCode=9;}`;
   assert.equal(spawnSync(process.execPath, ['--input-type=module', '-e', code]).status, 9);
 });
 test('clear requires attribution, records reason, and permits a new slice', t => {
-  const { control, config } = fixture(t, { tokenCap: 100 }); call(control);
+  const { control, config } = fixture(t, { tokenCap: 100 }); call(control, { inputTokens: 90, outputTokens: 10 });
   assert.throws(() => control.clear({ reason: 'reviewed' }), /reason and actor/);
   control.clear({ reason: 'planted failure cleared after review', actor: 'operator' });
   assert.equal(control.signal.aborted, false);
@@ -109,11 +117,10 @@ test('a second controller cannot enter or clear a live controller lock', t => {
   assert.throws(() => other.clear({ reason: 'bad', actor: 'operator' }), /live process/);
   assert.equal(control.snapshot().phase, 'idle'); control.finish();
 });
-test('unresolved accounting blocks direct next admission and finish', t => {
+test('unrecorded accounting holds a reservation and blocks finish', t => {
   const { control } = fixture(t); control.begin({ model: sol, role: 'lead' });
-  assert.throws(() => control.begin({ model: sol, role: 'lead' }), /unrecorded_call_cost/);
-  assert.equal(control.snapshot().pending.model, sol);
-  assert.throws(() => control.finish(), /slice_stopped/);
+  assert.equal(control.snapshot().reservations[0].model, sol);
+  assert.throws(() => control.finish(), /unrecorded_call_cost/);
 });
 test('only completed inference spans count and duplicate exports count once', t => {
   const { control } = fixture(t); control.begin({ model: sol, role: 'lead' });
@@ -132,21 +139,22 @@ test('an unadmitted inference fails closed', t => {
   const { control } = fixture(t); control.recordSpan(span());
   assert.equal(control.snapshot().stop.reason, 'unexpected_model_call');
 });
-test('wrapped concurrent calls serialize through completed trace, not provider result', async t => {
+test('wrapped concurrent calls are admitted together and each span releases its own reservation', async t => {
   const { control } = fixture(t); let calls = 0;
   const wrapped = control.wrapModel({ modelId: 'sol', provider: 'openai', async doGenerate() { calls++; return { value: calls }; } }, { id: sol, role: 'lead' });
-  assert.deepEqual(await wrapped.doGenerate({}), { value: 1 });
-  const second = wrapped.doGenerate({});
-  await Promise.resolve(); assert.equal(calls, 1);
+  const results = await Promise.all([wrapped.doGenerate({ maxOutputTokens: 100 }), wrapped.doGenerate({ maxOutputTokens: 100 })]);
+  assert.equal(calls, 2); assert.equal(results.length, 2);
+  assert.equal(control.snapshot().reservations.length, 2);
   control.recordSpan({ ...span(), attributes: { model: 'sol', provider: 'openai', usage: { inputTokens: 10, outputTokens: 1 } } });
-  assert.deepEqual(await second, { value: 2 });
+  assert.equal(control.snapshot().reservations.length, 1);
   control.recordSpan({ ...span(sol, undefined, 'second'), attributes: { model: 'sol', provider: 'openai', usage: { inputTokens: 10, outputTokens: 1 } } });
   assert.equal(control.snapshot().calls.length, 2); control.finish();
 });
-test('missing trace cost deadline stops and wakes waiting calls without invoking them', async t => {
+test('missing trace cost deadline stops the slice and later calls are not invoked', async t => {
   const { control } = fixture(t, { traceTimeoutMs: 10 }); let calls = 0;
   const wrapped = control.wrapModel({ modelId: 'sol', provider: 'openai', async doGenerate() { calls++; return {}; } }, { id: sol, role: 'lead' });
   await wrapped.doGenerate({});
+  await new Promise(resolve => setTimeout(resolve, 40));
   await assert.rejects(wrapped.doGenerate({}), /slice_stopped/);
   assert.equal(calls, 1); assert.equal(control.snapshot().stop.reason, 'unrecorded_call_cost');
 });
@@ -177,7 +185,7 @@ test('interrupted process leaves a durable stop on relaunch and explicit clear a
   assert.throws(() => next.assertStart(), /interrupted_slice/);
   assert.equal(next.snapshot().stop.reason, 'interrupted_slice');
   next.clear({ reason: 'interrupted worker confirmed gone', actor: 'operator' });
-  assert.equal(next.snapshot().slices[0].pending.model, sol);
+  assert.equal(next.snapshot().slices[0].pending[0].model, sol);
   control.assertStart(); control.finish();
 });
 test('invalid price values refuse admission and create a stop record', t => {
@@ -201,11 +209,14 @@ test('a stopped background memory call with priced late usage is still costed', 
   assert.equal(control.snapshot().calls[0].tokens, 110);
   assert.equal(control.snapshot().stop.reason, 'planted_memory_failure');
 });
-test('repeated fractional-dollar calls stop at the exhausted cap despite binary roundoff', t => {
+test('repeated fractional-dollar calls never take spend past the dollar cap despite binary roundoff', t => {
   const { control } = fixture(t, { dollarCap: 0.003 });
-  for (let index = 0; index < 10; index++) call(control, undefined, `span-${index}`);
-  assert.equal(control.snapshot().calls.length, 10);
-  assert.equal(control.snapshot().stop.reason, 'cap_reached');
+  for (let index = 0; index < 40 && control.snapshot().phase !== 'stopped'; index++) {
+    try { call(control, { inputTokens: 100, outputTokens: 5 }, `span-${index}`); } catch { break; }
+  }
+  assert.ok(control.snapshot().calls.length >= 9);
+  assert.ok(control.snapshot().totals.dollars <= 0.003 * (1 + 1e-9));
+  assert.equal(control.snapshot().phase, 'stopped');
   assert.throws(() => control.begin({ model: sol, role: 'lead' }), /slice_stopped/);
 });
 test('a clear-in-progress refuses admissions and competing clears', t => {
@@ -239,48 +250,77 @@ test('a stale controller stop preserves spend and the owner costs its late trace
 test('finished slice releases lock and a fresh slice archives its ledger', t => {
   const { control, config } = fixture(t); call(control); control.finish();
   assert.equal(existsSync(control.lockPath), false);
-  const next = createSliceControl(config); call(next, { inputTokens: 1, outputTokens: 0 }, 'next'); next.finish();
+  const next = createSliceControl(config); call(next, { inputTokens: 1, outputTokens: 1 }, 'next'); next.finish();
   assert.equal(next.snapshot().calls.length, 1);
   assert.equal(next.snapshot().slices[0].calls.length, 1);
 });
 
-test('a planted call whose worst case token count would cross a token cap is refused before it is sent', async t => {
-  const { control } = fixture(t, { tokenCap: 1000000 });
-  let invoked = false;
-  const wrapped = control.wrapModel({ modelId: sol, async doGenerate() { invoked = true; return {}; } }, { id: sol, role: 'lead' });
-  await assert.rejects(wrapped.doGenerate({ maxTokens: 1000001 }), /cap_reached/);
-  assert.equal(invoked, false);
-  assert.equal(control.snapshot().calls.length, 0);
-  assert.equal(control.snapshot().phase, 'stopped');
-  assert.equal(control.snapshot().stop.reason, 'cap_reached');
-  assert.ok(existsSync(control.stopPath));
+function recorder(control, id = sol) {
+  const seen = [];
+  const wrapped = control.wrapModel({ modelId: 'sol', provider: 'openai', async doGenerate(options) { seen.push(options); return {}; } }, { id, role: 'lead' });
+  return { wrapped, seen };
+}
+const bigPrompt = characters => [{ role: 'user', content: [{ type: 'text', text: 'x'.repeat(characters) }] }];
+
+test('planted: an oversized request is clamped so spent plus worst case stays under the token cap', async t => {
+  const { control } = fixture(t, { tokenCap: 1000000 }); const { wrapped, seen } = recorder(control);
+  await wrapped.doGenerate({ prompt: bigPrompt(100), maxOutputTokens: 1000001 });
+  const [reservation] = control.snapshot().reservations;
+  assert.ok(seen[0].maxOutputTokens <= 1000000 - reservation.inputTokens);
+  assert.ok(reservation.worstTokens <= 1000000);
+  settleAll(control);
 });
 
-test('a planted call whose worst case dollar cost would cross a dollar cap is refused before it is sent', async t => {
-  const { control } = fixture(t, { dollarCap: 4.0, tokenCap: 2000000 });
-  let invoked = false;
-  const wrapped = control.wrapModel({ modelId: sol, async doGenerate() { invoked = true; return {}; } }, { id: sol, role: 'lead' });
-  await assert.rejects(wrapped.doGenerate({ maxTokens: 500000 }), /cap_reached/);
-  assert.equal(invoked, false);
-  assert.equal(control.snapshot().calls.length, 0);
-  assert.equal(control.snapshot().phase, 'stopped');
-  assert.equal(control.snapshot().stop.reason, 'cap_reached');
+test('planted: a request with no output limit still gets a limit that fits both caps', async t => {
+  const { control } = fixture(t, { dollarCap: 4, tokenCap: 2000000 }); const { wrapped, seen } = recorder(control);
+  await wrapped.doGenerate({ prompt: bigPrompt(100) });
+  const [reservation] = control.snapshot().reservations;
+  assert.ok(Number.isSafeInteger(seen[0].maxOutputTokens) && seen[0].maxOutputTokens > 0);
+  assert.ok(reservation.worstDollars <= 4); assert.ok(reservation.worstTokens <= 2000000);
+  settleAll(control);
 });
 
-test('a planted call whose worst case with long-input threshold crossed is refused before it is sent', async t => {
-  const { control } = fixture(t, { dollarCap: 4.0, tokenCap: 2000000 });
-  let invoked = false;
-  const wrapped = control.wrapModel({ modelId: sol, async doGenerate() { invoked = true; return {}; } }, { id: sol, role: 'lead' });
-  await assert.rejects(wrapped.doGenerate({ inputTokens: 300000, maxTokens: 200000 }), /cap_reached/);
-  assert.equal(invoked, false);
-  assert.equal(control.snapshot().calls.length, 0);
-  assert.equal(control.snapshot().phase, 'stopped');
-  assert.equal(control.snapshot().stop.reason, 'cap_reached');
+test('planted: the estimate counts the prompt when no input field is sent, including the long-input surcharge', async t => {
+  const { control } = fixture(t, { dollarCap: 4, tokenCap: 2000000 }); const { wrapped, seen } = recorder(control);
+  await wrapped.doGenerate({ prompt: bigPrompt(300000) });
+  const [reservation] = control.snapshot().reservations;
+  assert.ok(reservation.inputTokens >= 300000);
+  assert.ok(reservation.worstDollars <= 4);
+  assert.ok(seen[0].maxOutputTokens < (4 - 300000 * 2 / 1e6) * 1e6 / 10);
+  settleAll(control);
 });
 
-test('a direct begin call whose worst case would cross a cap is refused', t => {
+test('planted: when nothing fits under the caps the provider is called zero times', async t => {
+  const { control } = fixture(t, { tokenCap: 100 }); const { wrapped, seen } = recorder(control);
+  await assert.rejects(wrapped.doGenerate({ prompt: bigPrompt(1000) }), /no_room_under_caps/);
+  assert.equal(seen.length, 0);
+  assert.equal(control.snapshot().stop.reason, 'no_room_under_caps');
+  assert.equal(control.snapshot().exitCode, 1);
+});
+
+test('planted: concurrent calls reserve against the same caps; the call that no longer fits is refused', async t => {
+  const { control } = fixture(t, { tokenCap: 2000 }); const { wrapped, seen } = recorder(control);
+  const outcomes = await Promise.allSettled([wrapped.doGenerate({ prompt: bigPrompt(100) }), wrapped.doGenerate({ prompt: bigPrompt(100) })]);
+  assert.equal(outcomes[0].status, 'fulfilled'); assert.equal(outcomes[1].status, 'rejected');
+  assert.match(outcomes[1].reason.message, /no_room_under_caps/);
+  assert.equal(seen.length, 1);
+  assert.ok(control.snapshot().reservations.reduce((n, r) => n + r.worstTokens, 0) <= 2000);
+  settleAll(control);
+});
+
+test('a direct begin call that cannot fit any output is refused', t => {
   const { control } = fixture(t, { tokenCap: 500 });
-  assert.throws(() => control.begin({ model: sol, role: 'lead', maxTokens: 501 }), /cap_reached/);
+  assert.throws(() => control.begin({ model: sol, role: 'lead', inputTokens: 500 }), /no_room_under_caps/);
   assert.equal(control.snapshot().calls.length, 0);
   assert.equal(control.snapshot().phase, 'stopped');
+});
+
+test('planted: a provider that reports more than the limit it was sent stops the slice', async t => {
+  const { control } = fixture(t, { tokenCap: 1000 }); const { wrapped } = recorder(control);
+  await wrapped.doGenerate({ prompt: bigPrompt(100), maxOutputTokens: 50 });
+  const [reservation] = control.snapshot().reservations;
+  control.recordSpan({ type: 'model_inference', id: 'over', traceId: 't', endTime: new Date(),
+    attributes: { model: 'sol', provider: 'openai', usage: { inputTokens: reservation.inputTokens, outputTokens: 51 } } });
+  assert.equal(control.snapshot().stop.reason, 'usage_exceeded_reservation');
+  assert.equal(control.snapshot().exitCode, 1);
 });
