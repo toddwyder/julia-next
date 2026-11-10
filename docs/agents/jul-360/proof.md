@@ -10,7 +10,7 @@ node --test machine/flow/budget-integration.test.mjs
 node --test machine/flow/exploration.test.mjs
 node --test scripts/julia-agents.test.mjs
 ```
-Expected: 142 passing tests across unit, integration, and sandbox suites; formal verification prints `pass: true`.
+Expected: 156 passing tests (53 + 16 + 61 + 12, from the four `node --test` commands above, run on 2026-11-10 at 09d5c4d); formal verification prints `pass: true`.
 
 ## 2. Gate 1 & 2: Planted Failures (Caps & Pricing)
 ```sh
@@ -43,4 +43,4 @@ node --test machine/flow/exploration.test.mjs
 
 ## 6. Model Notes
 * `moonshotai/Kimi-K3` is in `@mastra/observability`'s pricing table, but `moonshotai/Kimi-K3.1-Pro` has no entry in the price list.
-* `AGENTS.md:10` states money never stops a card; the November 8 decision locks hard cost ceilings per slice. `AGENTS.md:10` is left unchanged in code and recorded in the PR.
+* `AGENTS.md:10` now holds the gates line: "A build slice stops at its caps and exploration gates per JUL-360". It replaces the old "money never stops a card" rule, and `scripts/agent-docs.test.mjs` asserts it. Memory (observation and reflection) runs on `openai/gpt-6-luna`.
