@@ -77,11 +77,14 @@ export function createStages({ agents, dir }) {
   // The build is a real agent step: `createStep(agents.build)` gives it the
   // agent's own input and output, so the card data goes through a mapper either
   // side of it instead of through the stage's shared schema.
-  const startBuild = step('start-build', async ({ inputData, state, setState }) => {
+  const startBuild = step('start-build', async ({ inputData, state, setState, requestContext }) => {
     budget?.start();
     const card = state.card || inputData.card;
     const buildRounds = state.buildRounds + 1;
-    await setState({ ...state, buildRounds, requestId: `${card}/build-${buildRounds}` });
+    const requestId = `${card}/build-${buildRounds}`;
+    requestContext?.set?.('mastra__threadId', requestId);
+    requestContext?.set?.('mastra__resourceId', card);
+    await setState({ ...state, buildRounds, requestId });
     return { ...inputData, card, detail: `build round ${buildRounds} started`, prompt: buildPrompt(card, state.kind) };
   });
 

@@ -11,7 +11,7 @@ node --test machine/flow/exploration.test.mjs
 node --test scripts/julia-agents.test.mjs
 node scripts/check-real-budget-caps.mjs
 ```
-Expected: 147 passing tests (56 + 16 + 61 + 12 from unit suites, 2 real-call checks from `check-real-budget-caps.mjs`); formal verification prints `pass: true`.
+Expected: 148 passing tests (56 + 17 + 61 + 12 from unit suites, 2 real-call checks from `check-real-budget-caps.mjs`); formal verification prints `pass: true`.
 
 ## 2. Gate 1 & 2: Planted Failures (Caps & Pricing)
 ```sh

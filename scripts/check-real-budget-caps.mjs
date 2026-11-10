@@ -61,10 +61,12 @@ async function testConcurrentCallsWithinLimit() {
         prompt: [{ role: 'user', content: [{ type: 'text', text }] }]
       });
       let out = '';
+      let usage = null;
       for await (const chunk of res.stream) {
         if (chunk.type === 'text-delta') out += chunk.delta;
+        if (chunk.type === 'finish') usage = chunk.usage ?? null;
       }
-      return out;
+      return { out, usage };
     };
 
     const results = await Promise.all([
@@ -73,8 +75,10 @@ async function testConcurrentCallsWithinLimit() {
     ]);
 
     assert.equal(results.length, 2, 'Expected 2 concurrent call results');
-    assert.ok(results[0].length > 0, 'Call 1 returned non-empty output');
-    assert.ok(results[1].length > 0, 'Call 2 returned non-empty output');
+    assert.ok(results[0].out.length > 0, 'Call 1 returned non-empty output');
+    assert.ok(results[1].out.length > 0, 'Call 2 returned non-empty output');
+    assert.ok(results[0].usage, 'Call 1 returned real provider usage');
+    assert.ok(results[1].usage, 'Call 2 returned real provider usage');
 
     const snapshot = control.snapshot();
     // Verify reservations were tracked concurrently
@@ -85,8 +89,15 @@ async function testConcurrentCallsWithinLimit() {
     assert.ok(reservedTokens <= tokenCap, `Reserved tokens ${reservedTokens} exceeded token cap ${tokenCap}`);
     assert.ok(reservedDollars <= dollarCap, `Reserved dollars ${reservedDollars} exceeded dollar cap ${dollarCap}`);
 
-    // Settle each reservation with real simulated spans matching the calls
-    for (const resv of reservations) {
+    // Settle each reservation with real provider usage from the finish chunk
+    for (let i = 0; i < reservations.length; i++) {
+      const resv = reservations[i];
+      const u = results[i].usage;
+      const inputTokens = u?.inputTokens?.total ?? u?.inputTokens ?? resv.inputTokens;
+      const outputTokens = u?.outputTokens?.total ?? u?.outputTokens ?? 0;
+      const cachedInputTokens = u?.inputTokens?.cacheRead ?? u?.cachedInputTokens ?? 0;
+      const reasoningTokens = u?.outputTokens?.reasoning ?? u?.reasoningTokens ?? 0;
+      assert.ok(outputTokens > 0, `Expected real provider outputTokens > 0 for call ${i + 1}`);
       control.recordSpan({
         type: 'model_inference',
         id: 'span-' + resv.id,
@@ -95,7 +106,7 @@ async function testConcurrentCallsWithinLimit() {
         attributes: {
           model: resv.modelId,
           provider: resv.provider,
-          usage: { inputTokens: resv.inputTokens, outputTokens: 5 }
+          usage: { inputTokens, outputTokens, cachedInputTokens, reasoningTokens }
         }
       });
     }

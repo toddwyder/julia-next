@@ -203,6 +203,17 @@ test('successful build budget finishes before stand-in Shipping and Retro', asyn
   assert.equal(f.budget.active, false);
 });
 
+test('native card workflow with observational memory stops at the budget cap (no_room_under_caps)', async t => {
+  const f = await fixture(t, { tokenCap: 100, dollarCap: 0.0001, fullWorkflow: true, memory: true });
+  const run = await f.mastra.getWorkflow(f.workflow.id).createRun();
+  const result = await run.start({ inputData: { card: 'JUL-360', kind: 'product' } });
+  assert.ok(['failed', 'tripwire'].includes(result.status), `Expected stopped workflow status, got ${result.status}`);
+  assert.equal(f.stageCalls(), 0);
+  assert.equal(f.calls(), 0);
+  assert.equal(f.control.snapshot().exitCode, 1);
+  assert.equal(f.control.snapshot().stop?.reason, 'no_room_under_caps');
+});
+
 test('native Reflector uses its own explicitly priced wrapped model', async t => {
   const f = await fixture(t, { memory: { reflect: true } });
   f.budget.start();
