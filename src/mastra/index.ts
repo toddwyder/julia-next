@@ -16,13 +16,16 @@ import { CARD_PATH } from '../../machine/flow/schema.mjs';
 import { openScratch } from '../../machine/flow/scratch.mjs';
 import { buildCardPath } from '../../machine/flow/workflow.mjs';
 
+export const STUDIO_DOLLAR_CAP = 4;
+export const STUDIO_TOKEN_CAP = 2_000_000;
+
 const dir = resolve(process.env.FLOW_DIR ?? '.artifacts/flow/studio');
 
 openScratch(dir);
 const budget = createSliceControl({
   directory: join(homedir(), '.local/state/julia/budget'),
-  dollarCap: Number(process.env.FLOW_DOLLAR_CAP),
-  tokenCap: Number(process.env.FLOW_TOKEN_CAP),
+  dollarCap: STUDIO_DOLLAR_CAP,
+  tokenCap: STUDIO_TOKEN_CAP,
 });
 const agents = createAgents({ tools: await graphifyTools(), budget });
 const workflow = buildCardPath({ agents, dir });
