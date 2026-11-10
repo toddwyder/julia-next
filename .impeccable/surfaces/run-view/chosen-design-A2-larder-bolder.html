@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Run view: the larder, bolder (A2, chosen 7 Nov 2026, sample data)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@600;700&amp;family=Source+Sans+3:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1D3B27}a:hover{color:#0F2216}
+</style>
+</head>
+<body>
+<div style="min-height: 1100px; background: #C7D6BE; color: #1A2A1E; font-family: 'Source Sans 3', sans-serif; font-size: 16px; line-height: 1.45">
+  <header style="background: #1D3B27; color: #F6F1E4; padding: 0 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 32px; min-height: 68px">
+    <p style="margin: 0; font-family: 'Zilla Slab', serif; font-weight: 700; font-size: 26px">Julia machine</p>
+    <nav aria-label="Dashboard" style="display: flex; gap: 4px; flex-wrap: wrap">
+      <a href="#models" style="color: #F6F1E4; text-decoration: none; padding: 10px 16px; border-radius: 8px; min-height: 44px; box-sizing: border-box">Models</a>
+      <a href="#run" aria-current="page" style="color: #1D3B27; background: #F6F1E4; text-decoration: none; padding: 10px 16px; border-radius: 8px; font-weight: 700; min-height: 44px; box-sizing: border-box">Run</a>
+    </nav>
+    <p style="margin: 0 0 0 auto; font-size: 14px; color: #D5E3CC">Sample data</p>
+  </header>
+
+  <main style="max-width: 1200px; margin: 0 auto; padding: 28px 32px 44px; display: flex; flex-direction: column; gap: 24px">
+    <section aria-label="Alerts" style="display: flex; flex-wrap: wrap; gap: 12px">
+      <p style="margin: 0; flex: 1 1 360px; display: flex; gap: 12px; align-items: center; background: #FFF1DC; border: 3px dashed #B4540A; border-radius: 14px; padding: 14px 18px; color: #5E2904; font-size: 17px"><strong style="font-size: 19px">Stuck</strong> Warnings to Linear has been on “Write the tests” for 22 min.</p>
+      <p style="margin: 0; flex: 1 1 360px; display: flex; gap: 12px; align-items: center; background: #FBE6E7; border: 3px solid #A3212D; border-radius: 14px; padding: 14px 18px; color: #66101A; font-size: 17px"><strong style="font-size: 19px">Quota low</strong> Claude: 9% of this 5-hour window left.</p>
+    </section>
+
+    <section aria-label="Where the run is" style="background: #1D3B27; color: #F6F1E4; border-radius: 20px; padding: 28px 32px; display: flex; flex-direction: column; gap: 22px">
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 24px">
+        <h1 style="margin: 0; font-family: 'Zilla Slab', serif; font-size: 48px; line-height: 1.05">Mechanical layer</h1>
+        <p style="margin: 0; display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; color: #CDE6B4"><span aria-hidden="true" style="width: 14px; height: 14px; border-radius: 50%; background: #9FD06E; box-shadow: 0 0 0 5px #3D6B2C"></span>Running · 1 h 12 min</p>
+        <p style="margin: 0 0 0 auto; font-size: 17px; color: #D5E3CC">Card so far <strong style="color: #F6F1E4; font-size: 26px; font-family: 'Zilla Slab', serif">1.84 M tokens</strong> · about $2.40, estimate</p>
+      </div>
+      <ol aria-label="Stages" style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 2.2fr 1fr 1fr 1fr 1fr; gap: 10px; align-items: stretch">
+        <li style="padding: 14px 16px; border-radius: 12px; background: #3D6B2C; color: #F6F1E4"><span style="display: block; font-size: 14px">✓ Done</span><strong style="font-size: 20px; font-family: 'Zilla Slab', serif">Plan</strong></li>
+        <li style="padding: 14px 18px; border-radius: 12px; background: #F6F1E4; color: #1D3B27; box-shadow: 0 0 0 4px #9FD06E"><span style="display: block; font-size: 14px; font-weight: 700">Now · step 1 of 4</span><strong style="font-size: 30px; font-family: 'Zilla Slab', serif; line-height: 1.1">Build</strong><span style="display: block; font-size: 15px">First wave: 5 helpers at once</span></li>
+        <li style="padding: 14px 16px; border-radius: 12px; border: 2px solid #5E8A4C; color: #D5E3CC"><span style="display: block; font-size: 14px">Next</span><strong style="font-size: 20px; font-family: 'Zilla Slab', serif">Review</strong></li>
+        <li style="padding: 14px 16px; border-radius: 12px; border: 2px solid #5E8A4C; color: #D5E3CC"><span style="display: block; font-size: 14px">Later</span><strong style="font-size: 20px; font-family: 'Zilla Slab', serif">Shipping</strong></li>
+        <li style="padding: 14px 16px; border-radius: 12px; border: 2px solid #5E8A4C; color: #D5E3CC"><span style="display: block; font-size: 14px">Later</span><strong style="font-size: 20px; font-family: 'Zilla Slab', serif">Try it</strong></li>
+        <li style="padding: 14px 16px; border-radius: 12px; border: 2px solid #5E8A4C; color: #D5E3CC"><span style="display: block; font-size: 14px">Later</span><strong style="font-size: 20px; font-family: 'Zilla Slab', serif">Merge</strong></li>
+      </ol>
+    </section>
+
+    <section aria-label="Helpers" style="display: flex; flex-direction: column; gap: 14px">
+      <h2 style="margin: 0; font-family: 'Zilla Slab', serif; font-size: 28px">Helpers and their steps</h2>
+      <ul style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px">
+        <li style="background: #F6F1E4; border: 3px solid #3D6B2C; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <div><strong style="font-family: 'Zilla Slab', serif; font-size: 20px; line-height: 1.15; display: block">Budget hooks</strong><span style="font-size: 14px; color: #4A4A3E">Working · 412 k tokens</span></div>
+          <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+            <li style="color: #3D5A31">✓ Read the plan</li>
+            <li style="color: #3D5A31">✓ Write the tests</li>
+            <li style="font-weight: 700; background: #DCEBCB; border-radius: 6px; padding: 2px 8px; margin: 0 -8px">▶ Write the code</li>
+            <li style="color: #5B5A50">○ Run the checks</li>
+            <li style="color: #5B5A50">○ Take screenshots</li>
+            <li style="color: #5B5A50">○ Hand over</li>
+          </ol>
+        </li>
+        <li style="background: #F6F1E4; border: 3px solid #3D6B2C; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <div><strong style="font-family: 'Zilla Slab', serif; font-size: 20px; line-height: 1.15; display: block">Usage counter</strong><span style="font-size: 14px; color: #4A4A3E">Working · 380 k tokens</span></div>
+          <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+            <li style="color: #3D5A31">✓ Read the plan</li>
+            <li style="color: #3D5A31">✓ Write the tests</li>
+            <li style="color: #3D5A31">✓ Write the code</li>
+            <li style="color: #3D5A31">✓ Run the checks</li>
+            <li style="font-weight: 700; background: #DCEBCB; border-radius: 6px; padding: 2px 8px; margin: 0 -8px">▶ Take screenshots</li>
+            <li style="color: #5B5A50">○ Hand over</li>
+          </ol>
+        </li>
+        <li style="background: #F6F1E4; border: 3px solid #3D6B2C; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <div><strong style="font-family: 'Zilla Slab', serif; font-size: 20px; line-height: 1.15; display: block">Model picker</strong><span style="font-size: 14px; color: #4A4A3E">Working · 466 k tokens</span></div>
+          <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+            <li style="color: #3D5A31">✓ Read the plan</li>
+            <li style="color: #3D5A31">✓ Write the tests</li>
+            <li style="color: #3D5A31">✓ Write the code</li>
+            <li style="color: #3D5A31">✓ Run the checks</li>
+            <li style="color: #3D5A31">✓ Take screenshots</li>
+            <li style="font-weight: 700; background: #DCEBCB; border-radius: 6px; padding: 2px 8px; margin: 0 -8px">▶ Hand over to you</li>
+          </ol>
+        </li>
+        <li style="background: #FFF1DC; border: 3px dashed #B4540A; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <div><strong style="font-family: 'Zilla Slab', serif; font-size: 20px; line-height: 1.15; display: block; color: #5E2904">Warnings to Linear</strong><span style="font-size: 14px; color: #5E2904; font-weight: 700">Stuck 22 min · 298 k tokens</span></div>
+          <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+            <li style="color: #5E4A2E">✓ Read the plan</li>
+            <li style="font-weight: 700; color: #5E2904; background: #F7D9B0; border-radius: 6px; padding: 2px 8px; margin: 0 -8px">⏸ Write the tests</li>
+            <li style="color: #6B5A45">○ Write the code</li>
+            <li style="color: #6B5A45">○ Run the checks</li>
+            <li style="color: #6B5A45">○ Hand over</li>
+          </ol>
+        </li>
+        <li style="background: #F6F1E4; border: 3px solid #3D6B2C; border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+          <div><strong style="font-family: 'Zilla Slab', serif; font-size: 20px; line-height: 1.15; display: block">Hourly audit</strong><span style="font-size: 14px; color: #4A4A3E">Working · 284 k tokens</span></div>
+          <ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 15px">
+            <li style="font-weight: 700; background: #DCEBCB; border-radius: 6px; padding: 2px 8px; margin: 0 -8px">▶ Read the plan</li>
+            <li style="color: #5B5A50">○ Check each slice</li>
+            <li style="color: #5B5A50">○ Post the audit</li>
+          </ol>
+        </li>
+      </ul>
+      <p style="margin: 0; font-size: 14px; color: #3A4A36">✓ done · ▶ now · ○ to do · ⏸ stuck. Solid edge: working. Dashed: stuck. Struck through: stopped.</p>
+    </section>
+
+    <section aria-label="Quota" style="background: #F6F1E4; border-radius: 20px; padding: 24px 28px; display: flex; flex-direction: column; gap: 16px">
+      <h2 style="margin: 0; font-family: 'Zilla Slab', serif; font-size: 28px">Left in each subscription</h2>
+      <div style="display: grid; grid-template-columns: 150px minmax(0, 1fr) 200px; gap: 14px 18px; align-items: center">
+        <strong style="font-size: 18px">CommandCode</strong><div role="img" aria-label="62 percent left" style="height: 24px; border-radius: 12px; background: #DAD4C4; overflow: hidden"><div style="width: 62%; height: 100%; background: #3D6B2C"></div></div><span style="font-size: 15px; color: #4A4A3E"><strong style="color: #1A2A1E">62%</strong> · refills 22 Nov</span>
+        <strong style="font-size: 18px">ChatGPT</strong><div role="img" aria-label="29 percent left" style="height: 24px; border-radius: 12px; background: #DAD4C4; overflow: hidden"><div style="width: 29%; height: 100%; background: #C2610C"></div></div><span style="font-size: 15px; color: #4A4A3E"><strong style="color: #1A2A1E">29%</strong> · resets Thu</span>
+        <strong style="font-size: 18px">Claude</strong><div role="img" aria-label="9 percent left" style="height: 24px; border-radius: 12px; background: #DAD4C4; overflow: hidden; outline: 3px dashed #A3212D; outline-offset: 3px"><div style="width: 9%; height: 100%; background: #A3212D"></div></div><span style="font-size: 15px; color: #66101A; font-weight: 700">9% · new window 4:40 pm</span>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>
