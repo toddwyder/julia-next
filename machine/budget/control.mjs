@@ -2,7 +2,14 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, u
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const defaultPrices = JSON.parse(readFileSync(new URL('./prices.json', import.meta.url), 'utf8'));
+function loadDefaultPrices() {
+  const local = new URL('./prices.json', import.meta.url);
+  if (existsSync(local)) return JSON.parse(readFileSync(local, 'utf8'));
+  const bundled = new URL('../../machine/budget/prices.json', import.meta.url);
+  if (existsSync(bundled)) return JSON.parse(readFileSync(bundled, 'utf8'));
+  return {};
+}
+const defaultPrices = loadDefaultPrices();
 const validNumber = value => Number.isSafeInteger(value) && value >= 0;
 
 export function priceUsage(usage, price) {
@@ -42,9 +49,7 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
   const owner = randomUUID();
   let abortController = new AbortController();
   let ownsLock = false;
-  let timer;
-  let settle;
-  let accounting = Promise.resolve();
+  const timers = new Map();
   let record = existsSync(recordPath) ? JSON.parse(readFileSync(recordPath, 'utf8')) : {
     phase: 'idle', calls: [], totals: { dollars: 0, tokens: 0 }, events: [], slices: [],
   };
@@ -82,7 +87,7 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
   function release() {
     if (ownsLock) { unlinkSync(lockPath); syncDirectory(); ownsLock = false; }
   }
-  function wake() { clearTimeout(timer); settle?.(); settle = undefined; }
+  function wake() { for (const timer of timers.values()) clearTimeout(timer); timers.clear(); }
   function stop(reason, numbers = {}) {
     if (!ownsLock && existsSync(recordPath)) record = JSON.parse(readFileSync(recordPath, 'utf8'));
     if (existsSync(stopPath)) {
@@ -135,7 +140,7 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
       if (existsSync(clearPath)) { release(); throw new Error('slice_clear_in_progress'); }
       if (existsSync(stopPath)) { release(); throw new Error('slice_stopped'); }
       record = existsSync(recordPath) ? JSON.parse(readFileSync(recordPath, 'utf8')) : record;
-      if (record.phase === 'calling') refuse('unresolved_previous_call', { pending: record.pending });
+      if (record.phase === 'calling') refuse('unresolved_previous_call', { pending: record.reservations });
       if (record.phase === 'finished') {
         record.slices.push({ calls: record.calls, totals: record.totals, dollarCap: record.dollarCap, tokenCap: record.tokenCap });
         record.calls = []; record.totals = { dollars: 0, tokens: 0 };
@@ -152,59 +157,47 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
     if (atCap()) refuse('cap_reached', { ...record.totals });
     return snapshot();
   }
-  function begin({
-    model,
-    role,
-    modelId = model,
-    provider,
-    inputTokens = 0,
-    outputTokens = 0,
-    maxTokens = outputTokens,
-    maxOutputTokens = maxTokens,
-  } = {}) {
+  function reserved() {
+    const list = record.reservations ?? [];
+    return { tokens: list.reduce((n, r) => n + r.worstTokens, 0), dollars: list.reduce((n, r) => n + r.worstDollars, 0) };
+  }
+  function begin({ model, role, modelId = model, provider, inputTokens = 0, maxOutputTokens } = {}) {
     assertStart();
-    if (record.phase === 'calling') refuse('unrecorded_call_cost', { pending: record.pending });
     if (!Object.hasOwn(prices, model ?? '')) refuse('no_price', { model: model ?? null, role: role ?? null });
     try { priceUsage({ inputTokens: 0, outputTokens: 0 }, prices[model]); }
     catch (error) { refuse(error.message, { model, role }); }
     if (!role || !modelId) refuse('missing_call_identity', { model, role: role ?? null });
+    if (!validNumber(inputTokens)) refuse('invalid_input_estimate', { model, role, inputTokens: inputTokens ?? null });
 
-    // Todd, 9 Nov 2026: caps stay hard. Admit only if spent-so-far + worst-case fits under both caps.
-    // Provider setting bounding output: max_completion_tokens (AI SDK maxTokens / maxOutputTokens).
-    // OpenAI doc: "An upper bound for the number of tokens that can be generated for a completion, including visible output tokens and reasoning tokens."
+    // Todd, 9 Nov 2026: caps stay hard. Admit only if spent + already reserved + this call's worst case fits under both caps.
+    // The limit sent to the provider is the largest output that fits (OpenAI max_completion_tokens bounds visible and reasoning tokens).
     const price = prices[model];
-    const knownInput = Number.isSafeInteger(inputTokens) && inputTokens >= 0 ? inputTokens : 0;
-    const maxOutput = Number.isSafeInteger(maxOutputTokens) && maxOutputTokens >= 0
-      ? maxOutputTokens
-      : (Number.isSafeInteger(maxTokens) && maxTokens >= 0 ? maxTokens : 0);
-
-    const longInput = price.longInputThreshold !== undefined && knownInput > price.longInputThreshold;
+    const held = reserved();
+    const longInput = price.longInputThreshold !== undefined && inputTokens > price.longInputThreshold;
     const inputMultiplier = longInput ? price.longInputMultiplier : 1;
     const outputMultiplier = longInput ? price.longOutputMultiplier : 1;
-    const worstCaseDollars = (knownInput * price.input * inputMultiplier + maxOutput * price.output * outputMultiplier) / 1e6;
-    const worstCaseTokens = knownInput + maxOutput;
-
-    const projectedDollars = record.totals.dollars + worstCaseDollars;
-    const projectedTokens = record.totals.tokens + worstCaseTokens;
-    const rounding = Number.EPSILON * Math.max(projectedDollars, dollarCap) * Math.max(1, record.calls.length + 1);
-
-    if (
-      (tokenCap !== undefined && projectedTokens > tokenCap) ||
-      (dollarCap !== undefined && projectedDollars - dollarCap > rounding)
-    ) {
-      refuse('cap_reached', {
-        ...record.totals,
-        projectedDollars,
-        projectedTokens,
-        worstCase: { dollars: worstCaseDollars, tokens: worstCaseTokens, inputTokens: knownInput, outputTokens: maxOutput },
-      });
+    const inputRate = Math.max(price.input, price.cachedInput, price.cacheWrite) * inputMultiplier;
+    const inputDollars = inputTokens * inputRate / 1e6;
+    const roomTokens = tokenCap - record.totals.tokens - held.tokens - inputTokens;
+    const roomDollars = dollarCap - record.totals.dollars - held.dollars - inputDollars;
+    const outputRate = price.output * outputMultiplier;
+    const byDollars = outputRate > 0 ? Math.floor(roomDollars * 1e6 / outputRate + 1e-6) : Infinity;
+    const limits = [roomTokens, byDollars];
+    if (price.maxOutputTokens !== undefined) limits.push(price.maxOutputTokens);
+    if (maxOutputTokens !== undefined) limits.push(maxOutputTokens);
+    const limit = Math.min(...limits);
+    if (!Number.isSafeInteger(limit) || limit < 1) {
+      refuse('no_room_under_caps', { ...record.totals, reserved: held, inputTokens, roomTokens, roomDollars });
     }
+    const worstTokens = inputTokens + limit;
+    const worstDollars = inputDollars + limit * outputRate / 1e6;
 
+    const reservation = { id: randomUUID(), model, role, modelId, provider, startedAt: new Date().toISOString(),
+      inputTokens, maxOutputTokens: limit, worstTokens, worstDollars };
+    (record.reservations ??= []).push(reservation);
     record.phase = 'calling';
-    record.pending = { id: randomUUID(), model, role, modelId, provider, startedAt: new Date().toISOString() };
-    accounting = new Promise(resolve => { settle = resolve; });
     save();
-    return { ...record.pending };
+    return { ...reservation };
   }
   function recordSpan(span) {
     if ((span?.type ?? span?.spanType) !== 'model_inference' || !span.endTime) return;
@@ -214,29 +207,40 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
       record.phase = 'stopped'; record.stop = JSON.parse(readFileSync(stopPath, 'utf8'));
     }
     if (spanId && record.calls.some(call => call.spanId === spanId)) return;
-    if (record.phase === 'stopped' && !record.pending) return;
+    const waiting = record.reservations ?? [];
+    if (record.phase === 'stopped' && waiting.length === 0) return;
     const alreadyStopped = record.phase === 'stopped';
-    if (!record.pending || (!alreadyStopped && record.phase !== 'calling')) return stop('unexpected_model_call', { spanId: spanId ?? null });
-    const pending = record.pending;
+    if (waiting.length === 0 || (!alreadyStopped && record.phase !== 'calling')) return stop('unexpected_model_call', { spanId: spanId ?? null });
     const attributes = span.attributes;
-    if (!spanId || !attributes || attributes.model !== pending.modelId
-        || (pending.provider && attributes.provider !== pending.provider)) {
-      return stop('trace_model_mismatch', { expected: pending, spanId: spanId ?? null, model: attributes?.model ?? null, provider: attributes?.provider ?? null });
+    const candidates = waiting.filter(r => attributes && spanId && attributes.model === r.modelId
+      && (!r.provider || attributes.provider === r.provider));
+    if (candidates.length === 0) {
+      return stop('trace_model_mismatch', { expected: waiting[0], spanId: spanId ?? null, model: attributes?.model ?? null, provider: attributes?.provider ?? null });
     }
-    if (!Object.hasOwn(prices, pending.model)) return stop('no_price', { model: pending.model, spanId });
+    // A span only exists once its call returned, so prefer finished calls, then the smallest reservation that covers the usage.
+    let pending;
     let cost;
-    try { cost = priceUsage(attributes.usage, prices[pending.model]); }
-    catch (error) { return stop(error.message, { model: pending.model, spanId, usage: attributes.usage ?? null }); }
+    try { cost = priceUsage(attributes.usage, prices[candidates[0].model]); }
+    catch (error) { return stop(error.message, { model: candidates[0].model, spanId, usage: attributes.usage ?? null }); }
+    const covers = r => cost.tokens <= r.worstTokens && cost.dollars <= r.worstDollars * (1 + 1e-9);
+    const order = [...candidates].sort((x, y) => (Boolean(y.finished) - Boolean(x.finished)) || (x.worstTokens - y.worstTokens));
+    pending = order.find(covers) ?? order[0];
+    if (!Object.hasOwn(prices, pending.model)) return stop('no_price', { model: pending.model, spanId });
     const call = { ...pending, spanId, traceId: span.traceId, completedAt: new Date().toISOString(), ...cost };
+    delete call.finished;
     record.calls.push(call);
     record.totals.tokens += cost.tokens; record.totals.dollars += cost.dollars;
-    delete record.pending; record.phase = alreadyStopped ? 'stopped' : 'idle'; save(); wake();
+    record.reservations = waiting.filter(r => r.id !== pending.id);
+    clearTimeout(timers.get(pending.id)); timers.delete(pending.id);
+    record.phase = record.reservations.length > 0 ? 'calling' : (alreadyStopped ? 'stopped' : 'idle');
+    save();
+    if (!covers(pending)) return stop('usage_exceeded_reservation', { reservation: pending, usage: cost });
     if (atCap()) return stop('cap_reached', { ...record.totals });
     return call;
   }
   function finish() {
     assertStart();
-    if (record.pending) refuse('unrecorded_call_cost', { pending: record.pending });
+    if ((record.reservations ?? []).length > 0) refuse('unrecorded_call_cost', { pending: record.reservations });
     record.phase = 'finished'; event('slice_finish', { totals: { ...record.totals } }); save(); release();
     return snapshot();
   }
@@ -251,13 +255,13 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
         const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
         let live = true;
         try { process.kill(lock.pid, 0); } catch (error) { if (error.code === 'ESRCH') live = false; else throw error; }
-        if (live && lock.owner !== owner && !(record.phase === 'stopped' && !record.pending)) throw new Error('Cannot clear a slice owned by a live process');
+        if (live && lock.owner !== owner && !(record.phase === 'stopped' && !(record.reservations ?? []).length)) throw new Error('Cannot clear a slice owned by a live process');
         if (live && record.phase === 'calling') throw new Error('Stop the active call before clearing');
       }
-      event('clear', { reason, actor, previousStop: record.stop ?? null, previousPending: record.pending ?? null });
-      record.slices.push({ calls: record.calls, totals: record.totals, stop: record.stop, pending: record.pending });
+      event('clear', { reason, actor, previousStop: record.stop ?? null, previousPending: record.reservations ?? null });
+      record.slices.push({ calls: record.calls, totals: record.totals, stop: record.stop, pending: record.reservations });
       record.calls = []; record.totals = { dollars: 0, tokens: 0 }; record.phase = 'idle';
-      delete record.stop; delete record.pending; save();
+      delete record.stop; delete record.reservations; save();
       if (existsSync(lockPath)) unlinkSync(lockPath);
       ownsLock = false;
       if (existsSync(stopPath)) unlinkSync(stopPath);
@@ -267,11 +271,23 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
     } finally { closeSync(fd); unlinkSync(clearPath); syncDirectory(); }
   }
   function snapshot() { return structuredClone({ ...record, exitCode: record.phase === 'stopped' || existsSync(stopPath) ? 1 : 0 }); }
-  function armTraceDeadline() {
-    if (record.phase !== 'calling') return;
-    clearTimeout(timer);
-    timer = setTimeout(() => stop('unrecorded_call_cost', { pending: record.pending, traceTimeoutMs }), traceTimeoutMs);
-
+  function armTraceDeadline(id) {
+    const reservation = (record.reservations ?? []).find(r => r.id === id);
+    if (!reservation) return;
+    reservation.finished = true;
+    const timer = setTimeout(() => {
+      const open = (record.reservations ?? []).find(r => r.id === id);
+      if (open) stop('unrecorded_call_cost', { pending: open, traceTimeoutMs });
+    }, traceTimeoutMs);
+    timer.unref();
+    timers.set(id, timer);
+  }
+  // UTF-8 bytes bound the token count of any byte-level tokenizer, so this never underestimates the prompt.
+  function estimateInputTokens(options) {
+    const { abortSignal, ...request } = options ?? {};
+    const text = JSON.stringify(request, (key, value) => (value instanceof Uint8Array ? Buffer.from(value).toString('base64') : value));
+    const messages = Array.isArray(options?.prompt) ? options.prompt.length : 0;
+    return Buffer.byteLength(text ?? '', 'utf8') + 16 * messages + 64;
   }
   function wrapModel(model, { id, role }) {
     return new Proxy(model, { get(target, property) {
@@ -280,23 +296,14 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
         return typeof value === 'function' ? value.bind(target) : value;
       }
       return async options => {
-        while (record.phase === 'calling') await accounting;
-        const inputTokens = options?.inputTokens ?? options?.promptTokens ?? 0;
-        const maxOutputTokens = options?.maxTokens
-          ?? options?.maxOutputTokens
-          ?? options?.maxCompletionTokens
-          ?? options?.providerOptions?.openai?.maxCompletionTokens
-          ?? options?.providerOptions?.openai?.max_completion_tokens
-          ?? options?.outputTokens
-          ?? 0;
-        begin({
+        const requested = options?.maxOutputTokens;
+        const reservation = begin({
           model: id,
           role,
           modelId: target.modelId,
           provider: target.provider,
-          inputTokens,
-          maxTokens: maxOutputTokens,
-          maxOutputTokens,
+          inputTokens: estimateInputTokens(options),
+          maxOutputTokens: Number.isSafeInteger(requested) && requested >= 0 ? requested : undefined,
         });
         const signal = options?.abortSignal
           ? AbortSignal.any([options.abortSignal, abortController.signal]) : abortController.signal;
@@ -304,16 +311,16 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
         signal.addEventListener('abort', onAbort, { once: true });
         try {
           signal.throwIfAborted();
-          const result = await target[property]({ ...options, abortSignal: signal, maxRetries: 0 });
+          const result = await target[property]({ ...options, abortSignal: signal, maxRetries: 0, maxOutputTokens: reservation.maxOutputTokens });
           if (property === 'doGenerate') {
-            signal.removeEventListener('abort', onAbort); armTraceDeadline(); return result;
+            signal.removeEventListener('abort', onAbort); armTraceDeadline(reservation.id); return result;
           }
           const reader = result.stream.getReader();
           return { ...result, stream: new ReadableStream({
             async pull(controller) {
               try {
                 const chunk = await reader.read();
-                if (chunk.done) { signal.removeEventListener('abort', onAbort); armTraceDeadline(); controller.close(); }
+                if (chunk.done) { signal.removeEventListener('abort', onAbort); armTraceDeadline(reservation.id); controller.close(); }
                 else controller.enqueue(chunk.value);
               } catch (error) { stop('model_stream_failed', { model: id, role, error: error.name }); controller.error(error); }
             },

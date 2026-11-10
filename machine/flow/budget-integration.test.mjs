@@ -53,7 +53,7 @@ async function fixture(t, { dollarCap = 4, tokenCap = 2e6, id = MODEL, fail = fa
   let nativeMemory;
   if (memory) {
     const actor = role => control.wrapModel(createMockModel({ mockText: '<observations>Observed hello.</observations><current-task>Reply hello</current-task><suggested-response>Hello</suggested-response>' }),
-      { id: memory.unpriced === role ? 'unpriced/memory' : 'commandcode/reflection/beam:free', role });
+      { id: memory.unpriced === role ? 'unpriced/memory' : 'openai/gpt-6-luna', role });
     nativeMemory = new Memory({ options: { observationalMemory: {
       observation: { model: actor('observer'), messageTokens: 1, bufferTokens: false, maxRetries: 0 },
       reflection: { model: actor('reflector'), observationTokens: memory.reflect ? 1 : 1e5, maxRetries: 0 },
@@ -109,14 +109,14 @@ test('unpriced identity refuses actual Agent call without provider execution', a
   assert.equal(f.control.snapshot().stop.reason, 'no_price');
 });
 
-test('completed trace overshoot latches stop and prevents the next call', async t => {
+test('a cap with no room for any call stops before the provider is called', async t => {
   const f = await fixture(t, { tokenCap: 1 });
   f.budget.start();
   await f.agent.generate('hello').catch(() => {});
-  assert.equal(f.control.snapshot().stop?.reason, 'cap_reached');
+  assert.equal(f.control.snapshot().stop?.reason, 'no_room_under_caps');
   await f.agent.generate('again').catch(() => {});
   await assert.rejects(f.budget.finish());
-  assert.equal(f.calls(), 1);
+  assert.equal(f.calls(), 0);
   assert.equal(f.control.snapshot().exitCode, 1);
 });
 
@@ -150,8 +150,8 @@ test('native observational memory invokes explicitly priced wrapped Observer', a
   const record = await f.budget.finish();
   assert.ok(record.calls.some(call => call.role === 'observer'));
   for (const call of record.calls.filter(call => call.role === 'observer')) {
-    assert.equal(call.model, 'commandcode/reflection/beam:free');
-    assert.equal(call.dollars, 0);
+    assert.equal(call.model, 'openai/gpt-6-luna');
+    assert.ok(call.dollars > 0);
     assert.ok(call.tokens > 0);
   }
 });
@@ -182,13 +182,13 @@ test('native Observer with no price stops the shared build budget', async t => {
   assert.throws(() => f.budget.start());
 });
 
-test('native card workflow stops on dollar overshoot before Shipping', async t => {
+test('native card workflow stops before Shipping when the dollar cap leaves no room', async t => {
   const f = await fixture(t, { dollarCap: 0.000001, fullWorkflow: true });
   const run = await f.mastra.getWorkflow(f.workflow.id).createRun();
   const result = await run.start({ inputData: { card: 'JUL-360', kind: 'product' } });
   assert.equal(result.status, 'failed');
   assert.equal(f.stageCalls(), 0);
-  assert.equal(f.calls(), 1);
+  assert.equal(f.calls(), 0);
   assert.equal(f.control.snapshot().exitCode, 1);
 });
 
@@ -203,6 +203,17 @@ test('successful build budget finishes before stand-in Shipping and Retro', asyn
   assert.equal(f.budget.active, false);
 });
 
+test('native card workflow with observational memory stops at the budget cap (no_room_under_caps)', async t => {
+  const f = await fixture(t, { tokenCap: 100, dollarCap: 0.0001, fullWorkflow: true, memory: true });
+  const run = await f.mastra.getWorkflow(f.workflow.id).createRun();
+  const result = await run.start({ inputData: { card: 'JUL-360', kind: 'product' } });
+  assert.ok(['failed', 'tripwire'].includes(result.status), `Expected stopped workflow status, got ${result.status}`);
+  assert.equal(f.stageCalls(), 0);
+  assert.equal(f.calls(), 0);
+  assert.equal(f.control.snapshot().exitCode, 1);
+  assert.equal(f.control.snapshot().stop?.reason, 'no_room_under_caps');
+});
+
 test('native Reflector uses its own explicitly priced wrapped model', async t => {
   const f = await fixture(t, { memory: { reflect: true } });
   f.budget.start();
@@ -212,8 +223,8 @@ test('native Reflector uses its own explicitly priced wrapped model', async t =>
   const record = await f.budget.finish();
   assert.ok(record.calls.some(call => call.role === 'reflector'));
   for (const call of record.calls.filter(call => call.role === 'reflector')) {
-    assert.equal(call.model, 'commandcode/reflection/beam:free');
-    assert.equal(call.dollars, 0);
+    assert.equal(call.model, 'openai/gpt-6-luna');
+    assert.ok(call.dollars > 0);
     assert.ok(call.tokens > 0);
   }
 });

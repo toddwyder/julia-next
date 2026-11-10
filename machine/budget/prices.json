@@ -9,6 +9,13 @@
     "longOutputMultiplier": 1.5,
     "source": "JUL-360, Todd's dated price decision, 9 November 2026"
   },
+  "openai/gpt-6-luna": {
+    "input": 0.1,
+    "cachedInput": 0.01,
+    "cacheWrite": 0.125,
+    "output": 0.5,
+    "source": "https://developers.openai.com/api/docs/pricing (dashboard/lib/fixtures/openai-pricing.html, GPT-6-Luna standard tier)"
+  },
   "commandcode/reflection/beam:free": {
     "input": 0,
     "cachedInput": 0,

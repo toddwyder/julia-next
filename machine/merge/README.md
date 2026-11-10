@@ -13,7 +13,7 @@ node scripts/julia-agents.mjs -- node machine/merge/run.mjs --pr 420 --card JUL-
 `--no-post` does everything except write to Linear: the merge still happens, and
 the completion comment is kept at `.artifacts/merge/pr-<n>/card-note.md` instead
 of being posted. `--card-file <path>` reads the card from a JSON file instead of
-Linear. `--model` overrides the retro's model (default is the free Beam model).
+Linear. `--model` overrides the retro's model (default is GPT-6 Luna).
 `--force` ignores a saved record; without it a run that already finished stops
 before touching the forge again.
 

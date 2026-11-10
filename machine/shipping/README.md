@@ -10,8 +10,8 @@ node scripts/julia-agents.mjs -- node machine/shipping/run.mjs --pr 401 --card J
 ```
 
 `--no-post` writes the determination to `.artifacts/shipping/pr-<n>/determination.md`
-instead of commenting. `--model` overrides the model (default is the free Beam
-model below). `--force` reviews and posts again when the saved record already
+instead of commenting. `--model` overrides the model (default is GPT-6
+Luna). `--force` reviews and posts again when the saved record already
 covers that commit; without it a rerun reads `record.json` first and stops, so a
 run that died after commenting cannot comment twice.
 

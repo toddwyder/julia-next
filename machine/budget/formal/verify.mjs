@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { checkModel } from './model-check.mjs';
+import { checkReservationModel } from './reservation-check.mjs';
 import { createSliceControl } from '../control.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -82,7 +83,10 @@ try {
   result.model = checkModel();
   result.mutantModel = checkModel({ removeStopChecks: true });
   assert.equal(result.mutantModel.pass, false, 'Model mutation did not violate the property');
-  result.pass = result.checks.every(check => check.pass) && result.model.pass;
+  result.reservationModel = checkReservationModel();
+  result.mutantReservationModel = checkReservationModel({ removeReservationCheck: true });
+  assert.equal(result.mutantReservationModel.pass, false, 'Reservation model mutation did not violate the property');
+  result.pass = result.checks.every(check => check.pass) && result.model.pass && result.reservationModel.pass;
   console.log(JSON.stringify(result, null, 2));
   if (!result.pass) process.exitCode = 1;
 } finally {
