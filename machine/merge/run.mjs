@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratchDir } from '../../scripts/scratch-dir.mjs';
 import { fileURLToPath } from 'node:url';
+import { stageModels } from '../../dashboard/lib/model-settings.js';
 
 import { getIssue, postComment, setIssueState } from '../../scripts/linear-cli.mjs';
 import { alreadyCompleted, completeCard, deleteRemoteBranch, gh, mainRunsFor, mergePullRequest, prepareMainCheckout, publishDocs, pullRequestComments, readPullRequest, waitForMainCi, waitForMerged, waitForPullChecks } from './land.mjs';
@@ -18,12 +19,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../..');
 
 function parseArgs(argv) {
-  const args = { noPost: false, force: false, model: null, cardFile: null, pr: null, card: null };
+  const args = { noPost: false, force: false, cardFile: null, pr: null, card: null };
   for (let index = 0; index < argv.length; index++) {
     const value = argv[index];
     if (value === '--pr') args.pr = Number(argv[++index]);
     else if (value === '--card') args.card = argv[++index];
-    else if (value === '--model') args.model = argv[++index];
     else if (value === '--card-file') args.cardFile = argv[++index];
     else if (value === '--no-post') args.noPost = true;
     else if (value === '--force') args.force = true;
@@ -159,10 +159,13 @@ async function main() {
     });
   };
 
+  // Every stage reads Todd's saved pick; a missing pick stops here and names the stage.
+  const stages = stageModels(undefined, ['retro']);
+
   const deps = {
     runDir,
     runId: null,
-    modelId: args.model ?? undefined,
+    modelId: stages.retro,
     getIssue: readCard,
     readPull: pr => readPullRequest(pr),
     readComments: pr => pullRequestComments(pr),
@@ -179,7 +182,7 @@ async function main() {
     saveRecord: async record => writeRecord(runDir, { ...record, updatedAt: new Date().toISOString() }),
     retro: async input => {
       process.env.MASTRA_OBSERVABILITY_DB_PATH = traceFileFor(args.pr, 'merge-retro');
-      return runRetro({ ...input, modelId: args.model ?? undefined, root, log: console.log });
+      return runRetro({ ...input, modelId: stages.retro, root, log: console.log });
     },
     sweep: async ({ card, pr, head, checkout, changed }) => {
       const plan = collectLeftovers({ card, pr, head, checkout, changed });

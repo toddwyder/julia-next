@@ -1,0 +1,94 @@
+[
+  {
+    "label": "Change the Lead model",
+    "id": "openai/gpt-6.1-sol"
+  },
+  {
+    "label": "Change the Building group model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the feature, refactoring model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the bug-fix model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the perf-issue model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the hillclimb model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the Judgment group model",
+    "id": "openai/gpt-6.1-sol"
+  },
+  {
+    "label": "Change the judgment and prose model",
+    "id": "openai/gpt-6.1-sol"
+  },
+  {
+    "label": "Change the hardest tasks model",
+    "id": "openai/gpt-6.1-sol"
+  },
+  {
+    "label": "Change the Investigating group model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the how explorer model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the how explainer model",
+    "id": "openai/gpt-6.1-sol"
+  },
+  {
+    "label": "Change the why investigators model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the why synthesizer model",
+    "id": "openai/gpt-6.1-sol"
+  },
+  {
+    "label": "Change the Learning group model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the reflect tooling model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the reflect judgment, divergent, synthesizer model",
+    "id": "openai/gpt-6.1-sol"
+  },
+  {
+    "label": "Change the Workers group model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the swarm workers model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the Machine stages group model",
+    "id": "commandcode/moonshotai/Kimi-K3.1-Pro"
+  },
+  {
+    "label": "Change the Shipping model",
+    "id": "commandcode/moonshotai/Kimi-K3.1-Pro"
+  },
+  {
+    "label": "Change the Remediation model",
+    "id": "commandcode/deepseek/deepseek-v4.1-flash"
+  },
+  {
+    "label": "Change the Retro model",
+    "id": "openai/gpt-6.1-sol"
+  }
+]

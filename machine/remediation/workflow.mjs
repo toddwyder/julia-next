@@ -4,13 +4,11 @@
 // it was given. The limit of two reviews lives in MAX_REVIEWS and nowhere else.
 
 import { loadMastra } from '../shipping/harness.mjs';
-import { FREE_MODEL } from '../shipping/workflow.mjs';
 import { criteriaFromCard } from '../shipping/determination.mjs';
 import { BUG_FIX_PLAYBOOK, INVESTIGATION_PLAYBOOK, rootCauseFrom } from './builder.mjs';
 
 export const WORKFLOW_ID = 'remediation';
 export const MAX_REVIEWS = 2;
-export const BUILDER_MODEL = FREE_MODEL;
 
 export function passed(verdict) {
   return typeof verdict === 'string' && verdict.length > 0 && verdict !== 'FAIL';
@@ -275,6 +273,8 @@ export async function createRemediationWorkflow({ mastra, deps, log = console.lo
           reason: stopReason(record),
           rootCause,
           threadId: findings.threadId ?? null,
+          modelId: findings.modelId ?? null,
+          answeredModel: findings.answeredModel ?? null,
           ping: null,
         },
       });

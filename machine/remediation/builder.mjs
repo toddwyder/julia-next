@@ -8,6 +8,7 @@ import path from 'node:path';
 
 import { bootHarness, loadMastra, stopHarness } from '../shipping/harness.mjs';
 import { repoRoot } from '../shipping/run-parts.mjs';
+import { answerModel, readSpans } from '../shipping/trace-record.mjs';
 
 export const BUG_FIX_PLAYBOOK = '.agents/skills/poteto-mode/playbooks/bug-fix.md';
 export const INVESTIGATION_PLAYBOOK = '.agents/skills/poteto-mode/playbooks/investigation.md';
@@ -182,23 +183,35 @@ async function lastAssistantText(session, threadId) {
   return '';
 }
 
+async function answeredModelFrom(traceFile) {
+  try {
+    return answerModel(await readSpans(traceFile, { attempts: 1 }));
+  } catch {
+    return null;
+  }
+}
+
 async function freshSession({ root = repoRoot, runDir, storeName = 'session', order, modelId, log = console.log }) {
   // A fresh session keeps its own store. The shared store already holds the
   // builder's thread, and a boot against it would claim that thread instead of
   // starting a new one.
   fs.mkdirSync(runDir, { recursive: true });
   const store = path.join(runDir, `${storeName}.db`);
+  const traceFile = path.join(runDir, `${storeName}.duckdb`);
+  process.env.MASTRA_OBSERVABILITY_DB_PATH = traceFile;
   const storage = { backend: 'libsql', url: `file:${store}`, isRemote: false };
   const { session, booted } = await bootHarness({ cwd: root, createInitialThread: true, storage });
+  let result;
   try {
     const threadId = session.thread.getId();
     if (modelId) await session.model.switch(modelId);
     log(`Started a fresh session ${threadId}${modelId ? ` on ${modelId}` : ''}.`);
     await session.sendMessage({ content: order });
-    return { threadId, answer: await lastAssistantText(session, threadId), store };
+    result = { threadId, answer: await lastAssistantText(session, threadId), store };
   } finally {
     await stopHarness(booted);
   }
+  return { ...result, modelId: modelId ?? null, answeredModel: await answeredModelFrom(traceFile) };
 }
 
 // The resumed thread keeps the model it was built on, so no model is chosen here.
@@ -257,7 +270,7 @@ async function bootOnThread(tools, { root, threadId, attempts = 3 }) {
 }
 
 export async function startFreshBuilder({ root = repoRoot, checkout, runDir, card, pr, sha, determination, playbookText, criteria = [], modelId, log = console.log }) {
-  const { threadId, store } = await freshSession({
+  const session = await freshSession({
     root: checkout ?? root,
     runDir,
     storeName: 'fresh-builder',
@@ -265,7 +278,7 @@ export async function startFreshBuilder({ root = repoRoot, checkout, runDir, car
     log,
     order: freshBuilderOrder({ card, pr, sha, checkout, determination, playbookText, criteria }),
   });
-  return { threadId, resumed: false, store };
+  return { ...session, resumed: false };
 }
 
 export async function investigate({ root = repoRoot, checkout, runDir, card, pr, determinations, playbookText, mayPost = true, modelId, log = console.log }) {

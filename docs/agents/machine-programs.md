@@ -17,7 +17,7 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/graphify.mjs` | The Graphify graph tools Lead and its helpers query before reading files. | `c502bc49faa96ef1de469764696d1682347679a61a17629766940de5baf546b6` |
 | `machine/flow/models.mjs` | The Lead model, read from its independent setting and routed through its account provider. | `77d87ea289d75c4c4fb22892d86e269d49fec15241949df0a0ebb13bd590870d` |
 | `machine/flow/role-models.mjs` | The Lead helper models, read from the saved role table and routed to account providers. | `6946ce44710f02f3bfa74f5aacbe91f49fa65db28b4009cd5b1e2ccc78dbfceb` |
-| `machine/flow/schema.mjs` | What the run form asks for and what the run remembers. | `1bb30c353ed7efa0c8526e0833f5ec841e116ba1e21542191cad321e767ebd66` |
+| `machine/flow/schema.mjs` | What the run form asks for and what the run remembers. | `6998e9db45ff2547c146982e2213afc12f9834616de91da16ab80e16134f5c25` |
 | `machine/flow/scratch.mjs` | The run folder: artifacts, verdicts and the report a stop leaves. | `25c177efa06ece2b499e23421bf8454d1098ae02666d994df26c451f6a1e8abb` |
 | `machine/flow/mastra.mjs` | Storage and tracing, so a run is written down and priced. | `d1c80d6b2b399a47c591af8da4ae46aa9b0811f228691a0b37c3fbe9529f4f34` |
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `85abb4a78740dc747a6f1033fdbc1c2c8e176724fe5b8a5f46938ce0793993dc` |

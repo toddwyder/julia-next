@@ -10,7 +10,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { bootHarness, loadMastra, stopHarness } from '../shipping/harness.mjs';
-import { FREE_MODEL, reviewLimitNote, runWithinTimeLimit } from '../shipping/workflow.mjs';
+import { reviewLimitNote, runWithinTimeLimit } from '../shipping/workflow.mjs';
+import { answerModel, readSpans } from '../shipping/trace-record.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const repoRoot = path.resolve(here, '../..');
@@ -95,6 +96,15 @@ export function retroOutcome({ text, isError, file, failed }) {
   return { ok: true, reason: said, answer, file, body };
 }
 
+async function answeredModelFrom(traceFile) {
+  if (!traceFile) return null;
+  try {
+    return answerModel(await readSpans(traceFile, { attempts: 1 }));
+  } catch {
+    return null;
+  }
+}
+
 export async function runRetro({
   card,
   pr,
@@ -106,7 +116,7 @@ export async function runRetro({
   changed = [],
   failed = null,
   metrics = null,
-  modelId = FREE_MODEL,
+  modelId,
   timeLimitMs = RETRO_TIME_LIMIT_MS,
   storageName = `merge-retro-${pr}`,
   root = repoRoot,
@@ -116,6 +126,7 @@ export async function runRetro({
   const file = path.join(checkout, retroPath);
   const storage = new LibSQLStore({ id: storageName, url: `file:${path.join(root, '.artifacts', 'merge', `pr-${pr}`, `${storageName}.db`)}` });
   const { booted, session, mastra, requestContext, subagent } = await bootHarness({ cwd: checkout, storage });
+  let result;
   try {
     const task = retroTask({ card, pr, title, mergeCommit, checkout, retroPath, determinations, changed, failed, metrics });
     log(`Starting a fresh Execute subagent on ${modelId} for the retro on ${card}.`);
@@ -124,11 +135,12 @@ export async function runRetro({
       { limitMs: timeLimitMs, log, onLimit: () => stopHarness(booted) }
     );
     if (answer.timedOut) {
-      return { ok: false, reason: `the retro ran ${reviewLimitNote(timeLimitMs)} and was ended`, answer: null, file: null };
+      result = { ok: false, reason: `the retro ran ${reviewLimitNote(timeLimitMs)} and was ended`, answer: null, file: null, modelId };
+    } else {
+      const outcome = retroOutcome({ ...answer.value, file, failed });
+      log(outcome.ok ? `The retro doc is at ${file}.` : `The retro did not finish: ${outcome.reason}`);
+      result = { ...outcome, threadId: null, modelId };
     }
-    const outcome = retroOutcome({ ...answer.value, file, failed });
-    log(outcome.ok ? `The retro doc is at ${file}.` : `The retro did not finish: ${outcome.reason}`);
-    return { ...outcome, threadId: null, modelId };
   } finally {
     try {
       await stopHarness(booted);
@@ -136,6 +148,7 @@ export async function runRetro({
       // The harness is already down after a timeout; there is nothing to stop.
     }
   }
+  return { ...result, answeredModel: await answeredModelFrom(process.env.MASTRA_OBSERVABILITY_DB_PATH) };
 }
 
 export function listChangedFiles({ git, from, to }) {

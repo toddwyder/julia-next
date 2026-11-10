@@ -9,7 +9,6 @@ import { bootHarness, loadMastra, stopHarness } from './harness.mjs';
 import { criteriaFromCard, parseVerdict } from './determination.mjs';
 
 export const WORKFLOW_ID = 'shipping';
-export const FREE_MODEL = 'commandcode/reflection/beam:free';
 export const PLAYBOOK = '.agents/skills/poteto-mode/playbooks/shipping.md';
 
 const TRANSIENT = /(429|rate[ -]?limit|too many requests|temporarily unavailable|overloaded|ECONNRESET|socket hang up)/i;
