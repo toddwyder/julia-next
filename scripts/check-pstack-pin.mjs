@@ -13,6 +13,7 @@ export const JULIA_SKILLS = new Set([
   'tighten',
   'verify-julia',
   'verify-recipes-formally',
+  'verify-slice-latch',
 ]);
 const ALLOWED_TOP_LEVEL_FILES = new Set(['PSTACK-SOURCE.md', 'PSTACK-LICENSE.txt']);
 

@@ -2,7 +2,7 @@
 
 Date: 2026-10-25
 
-Status: Superseded by [0024](0024-run-scorecard-and-stop-ping.md) for spend recording, and in part by Todd's 25 October 2026 decision. Card spend is recorded and reported per card; money never stops a card. The $10 cap, the per-card `cardCeilings` override and the priced-accounting block are retired. The history below is kept as the record of how the cap was reached before it was removed.
+Status: Superseded by [0024](0024-run-scorecard-and-stop-ping.md) for spend recording, and superseded by Todd's 9 November 2026 decision (JUL-360): a build slice stops at its caps and exploration gates per [proof.md](../agents/jul-360/proof.md); caps are enforced as hard ceilings on real calls. Card spend is recorded and reported per card. The history below is kept as the record of how the cap was reached before it was removed.
 
 ## 25 October decision
 

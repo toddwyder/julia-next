@@ -9,17 +9,18 @@ of any size, not only a change to the sentence beside it.
 
 | Program | What it does | sha256 |
 | --- | --- | --- |
-| `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `44c59dd59eedf992b77e9d76b740a38210bfb6510b520563f9f0fe68ad2e074b` |
+| `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `e4b48edce8b83675a9ec339e8e0bb05853da2954d29ad9512b781ed4c48bf413` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `7501664a0b3774a5ac48b0628c40f9b1157703d1b2c2b94eb589fdde1f0b5e49` |
-| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `e4a38ba53e9a0180be91361923745ffc7dec12c4c471a5f450eb2eaf3fa3354d` |
-| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `9e2ab963f35a7014b681c3b44929fe99ebbf670b9bf4dbea24f58b0eb4aaba3a` |
+| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `7df92fa59e01e03b926b37d3efa507edf48d07203102fbcebad67ef38e4cb92a` |
+| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `c5eeccd31110fb97871c8c702d76a2960f7b08ae75b14925bb34b924bb1d75ee` |
+| `machine/flow/exploration.mjs` | The gate routing raw grep and glob workspace and shell commands to Graphify. | `8308d2ba679aa9f3dcf006b0a2b5b8e735235bcc4eb77ee3765648b7efabe596` |
 | `machine/flow/graphify.mjs` | The Graphify graph tools Lead and its helpers query before reading files. | `c502bc49faa96ef1de469764696d1682347679a61a17629766940de5baf546b6` |
 | `machine/flow/models.mjs` | The Lead model, read from its independent setting and routed through its account provider. | `77d87ea289d75c4c4fb22892d86e269d49fec15241949df0a0ebb13bd590870d` |
 | `machine/flow/role-models.mjs` | The Lead helper models, read from the saved role table and routed to account providers. | `6946ce44710f02f3bfa74f5aacbe91f49fa65db28b4009cd5b1e2ccc78dbfceb` |
 | `machine/flow/schema.mjs` | What the run form asks for and what the run remembers. | `6998e9db45ff2547c146982e2213afc12f9834616de91da16ab80e16134f5c25` |
 | `machine/flow/scratch.mjs` | The run folder: artifacts, verdicts and the report a stop leaves. | `25c177efa06ece2b499e23421bf8454d1098ae02666d994df26c451f6a1e8abb` |
-| `machine/flow/mastra.mjs` | Storage and tracing, so a run is written down and priced. | `2283953358a234f1ad35c029b8851f347c0303c9ac3e3fa4edcaf2ed842892a1` |
+| `machine/flow/mastra.mjs` | Storage and tracing, so a run is written down and priced. | `d1c80d6b2b399a47c591af8da4ae46aa9b0811f228691a0b37c3fbe9529f4f34` |
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `85abb4a78740dc747a6f1033fdbc1c2c8e176724fe5b8a5f46938ce0793993dc` |
 | `machine/flow/run.mjs` | Answers a waiting card, reads a run, writes its cost. No way to start one. | `6a76edaa92fdbadfbb55dd581e77c2556b33f9ccb4744c89e5fded579ab36e44` |
 | `machine/flow/trace.mjs` | Turns the trace file into the run cost record. | `38e5e5c9c3497e0f1ea05f0a6eb89910262ca487b5dfdce03adfc23f9679ba1b` |
-| `scripts/julia-agents.mjs` | Runs a machine command with the Julia keys it needs. | `20eab0f08a59b8ba2651d9feac811bcf0d57fd86b9a079ceebf471c417abc3e5` |
+| `scripts/julia-agents.mjs` | Runs a machine command with the Julia keys it needs. | `7cfa91c10782d01d9e4130d395727ebaa195a956da65091f3acb2da9557a939a` |

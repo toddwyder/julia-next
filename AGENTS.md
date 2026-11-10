@@ -7,7 +7,7 @@ Julia uses pstack (adopted 22 October 2026). pstack builds and proves. This file
 - Before planning a card, read [docs/plans/path-forward.md](docs/plans/path-forward.md) for Todd's delivery flow and decisions.
 - When pstack slices a card, each slice is a Linear sub-issue of that card, in order, carrying that slice's done-means from the plan. The parent completes only when its last sub-issue does.
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
-- Money never stops a card. Cost and which model answered come from Studio's own run trace, not a per-card scorecard.
+- A build slice stops at its caps and exploration gates per JUL-360 ([docs/agents/jul-360/proof.md](docs/agents/jul-360/proof.md)).
 - Framework facts come from the installed packages and their version-matched official docs.
 - A rule or an acceptance criterion names a kind of model, a free model or a paid model. A specific model lives in the pstack models file and in the dated decision that chose it; Triage runs `node scripts/check-agent-brief.mjs`, which flags a criterion that names one.
 - A card begins in Mastra Studio's run form and nowhere else; no script starts one. [docs/agents/machine-programs.md](docs/agents/machine-programs.md) names every program that begins a card or carries a stage.

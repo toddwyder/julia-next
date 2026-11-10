@@ -32,7 +32,7 @@ test('agent instructions use the trial rulebook and the runbook marks Factory re
   assert.doesNotMatch(runbook, /Tick as you go|Finish the card/);
   const trial = read('AGENTS.md');
   assert.match(trial, /poteto-mode skill/);
-  assert.match(trial, /Money never stops a card/);
+  assert.match(trial, /A build slice stops at its caps and exploration gates per JUL-360/);
   assert.doesNotMatch(trial, /scripts\/scorecard\.mjs|stop-ping/);
   assert.doesNotMatch(trial, /15 minutes with no activity|pauses on a runaway/);
   assert.doesNotMatch(trial, /one \$10 total model budget|Spending is \$0|cost readback above \$0 stops/);

@@ -9,9 +9,13 @@ export const agentsTokenPath='/home/ubuntu/.config/julia-agents/service-account-
 const referencesPath=fileURLToPath(new URL('./julia-agents.env',import.meta.url))
 const tokenScript=fileURLToPath(new URL('./linear-token.mjs',import.meta.url))
 const fields=new Set(['CMD_API_KEY','COMMANDCODE_API_KEY','LINEAR_API_KEY','LINEAR_CLIENT_ID','LINEAR_CLIENT_SECRET','LINEAR_OAUTH_SCOPE','SENTRY_AUTH_TOKEN','NEXT_PUBLIC_SENTRY_DSN','SENTRY_ORG','SENTRY_PROJECT','AXIOM_TOKEN','AXIOM_DATASET','STITCH_API_KEY'])
-export function runAgentsCommand(argv,{tokenPath=agentsTokenPath,environment=process.env}={}){
+export function runAgentsCommand(argv,{tokenPath=agentsTokenPath,environment=process.env,spawn=spawnSync}={}){
  try{
-  if(!Array.isArray(argv)||!argv.length||argv.some(s=>typeof s!=='string'||!s))throw Error()
+  if(!Array.isArray(argv))throw Error()
+  const linearOnly=argv[0]==='--linear'
+  if(linearOnly)argv=argv.slice(1)
+  if(argv[0]==='--')argv=argv.slice(1)
+  if(!argv.length||argv.some(s=>typeof s!=='string'||!s))throw Error()
   const file=statSync(tokenPath),directory=statSync(dirname(tokenPath))
   if(file.uid!==process.getuid()||(file.mode&0o777)!==0o600||directory.uid!==process.getuid()||(directory.mode&0o777)!==0o700)throw Error()
   const token=readFileSync(tokenPath,'utf8').trim()
@@ -19,9 +23,15 @@ export function runAgentsCommand(argv,{tokenPath=agentsTokenPath,environment=pro
   const env=Object.fromEntries(Object.entries(environment).filter(([key,value])=>!key.startsWith('OP_')&&!fields.has(key)&&!value.startsWith('op://')))
   mkdirSync(scratchDir,{recursive:true})
   Object.assign(env,{TMPDIR:scratchDir,OP_SERVICE_ACCOUNT_TOKEN:token,OP_BIOMETRIC_UNLOCK_ENABLED:'false',OP_CACHE:'false'})
-  const auth=spawnSync('op',['user','get','--me','--format=json'],{env,encoding:'utf8',timeout:30000})
-  if(auth.status!==0||auth.error||JSON.parse(auth.stdout).type!=='SERVICE_ACCOUNT')throw Error()
-  const child=spawnSync('op',['run','--env-file',referencesPath,'--',process.execPath,tokenScript,'--',...argv],{env,stdio:'inherit',timeout:undefined})
+  if(linearOnly){
+   const lines=readFileSync(referencesPath,'utf8').split('\n')
+   for(const key of ['LINEAR_CLIENT_ID','LINEAR_CLIENT_SECRET','LINEAR_OAUTH_SCOPE']){
+    const line=lines.find(line=>line.startsWith(`${key}=`))
+    if(!line||!line.slice(key.length+1).trim())throw Error()
+    env[key]=line.slice(key.length+1).trim()
+   }
+  }
+  const child=spawn('op',['run',...(linearOnly?[]:['--env-file',referencesPath]),'--',process.execPath,tokenScript,'--',...argv],{env,stdio:'inherit',timeout:undefined})
   if(child.error)throw Error()
   return child.status??1
  }catch{

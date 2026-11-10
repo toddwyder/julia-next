@@ -2,6 +2,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Agent } from '@mastra/core/agent';
+import { ModelRouterLanguageModel } from '@mastra/core/llm';
+import { Memory } from '@mastra/memory';
+import { createExplorationGate } from './exploration.mjs';
 import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace';
 
 import { buildModelReader, leadModelId } from './models.mjs';
@@ -20,7 +23,22 @@ export function repoRoot() {
   return process.env.FLOW_REPO ?? repositoryContaining(resolve(process.env.MASTRA_PROJECT_ROOT ?? process.cwd()));
 }
 
-export function createAgents({ model, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {} } = {}) {
+export function createAgents({ model, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {}, budget } = {}) {
+  budget = budget ? createBuildBudget({ control: budget, repo }) : undefined;
+  const wrapped = (id, role) => {
+    const selected = agentModel(id);
+    return budget.control.wrapModel(typeof selected === 'string' ? new ModelRouterLanguageModel(selected) : selected, { id, role });
+  };
+  const memoryFor = role => {
+    if (!budget) return {};
+    const memory = new Memory({ options: { observationalMemory: {
+      observation: { model: wrapped('openai/gpt-6-luna', `${role}:observer`), maxRetries: 0, failurePolicy: 'abort' },
+      reflection: { model: wrapped('openai/gpt-6-luna', `${role}:reflector`), maxRetries: 0, failurePolicy: 'abort' },
+    } } });
+    budget.addMemory(memory);
+    return { memory };
+  };
+  const budgetOptions = budget ? { maxRetries: 0, abortSignal: budget.signal, hooks: budget.hooks } : {};
   const workspace = new Workspace({
     id: 'machine-repo',
     filesystem: new LocalFilesystem({ basePath: repo }),
@@ -42,25 +60,28 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
       name: role.name,
       description: `${role.name} pstack role on ${modelId}${choice}. ${role.explanation} Use this helper when delegating ${role.name} work.`,
       instructions: `You are the ${role.name} pstack helper. ${role.explanation} Complete the task delegated by Lead yourself. Do not delegate it again. For questions about code structure or where something lives, call the graphify tools before reading files. Report the result and evidence.`,
-      model: agentModel(modelId),
+      model: budget ? wrapped(modelId, role.name) : agentModel(modelId),
+      ...memoryFor(role.name),
       workspace: helperWorkspace,
       tools,
-      defaultOptions: { maxSteps: 100 },
+      defaultOptions: { maxSteps: 100, ...budgetOptions },
     })];
   })));
   const build = new Agent({
     id: 'flow-build',
     name: 'Lead',
     instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
-    model: buildModelReader(leadModelFile),
+    model: budget ? () => wrapped(leadModelId(leadModelFile), 'lead') : buildModelReader(leadModelFile),
+    ...memoryFor('lead'),
     workspace,
     agents: helpers,
     tools,
-    defaultOptions: { maxSteps: 400 },
+    defaultOptions: { maxSteps: 400, ...budgetOptions },
   });
   // The reader runs later, so check the setting now: a missing Lead model stops Studio at boot
   // and names the installer, as it did when the model was resolved here.
   leadModelId(leadModelFile);
+
 
   // An explicit model is a caller's override, as in a test. Otherwise each stage takes the
   // model Todd saved for it; a missing line stops here and names that stage.
@@ -73,6 +94,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     instructions:
       'You glance at one short file and say in one sentence whether it reads as a recipe title. You do not decide pass or fail; a fixed rule does that. No tools.',
     model: stageModel('shipping'),
+    ...(budget ? { defaultOptions: { maxRetries: 0 } } : {}),
   });
 
   const remediation = new Agent({
@@ -80,6 +102,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     name: 'Flow remediation stand-in',
     instructions: 'You rewrite one short line so it reads better. Reply with the new line only. No tools.',
     model: stageModel('remediation'),
+    ...(budget ? { defaultOptions: { maxRetries: 0 } } : {}),
   });
 
   const retro = new Agent({
@@ -87,7 +110,67 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     name: 'Flow retro stand-in',
     instructions: 'You write one sentence about what this throwaway run did. No tools.',
     model: stageModel('retro'),
+    ...(budget ? { defaultOptions: { maxRetries: 0 } } : {}),
   });
 
-  return { build, shipping, remediation, retro };
+  return { build, shipping, remediation, retro, ...(budget ? { budget } : {}) };
+}
+
+// The controller owns durable accounting. This adapter scopes it to build only.
+export function createBuildBudget({ control, repo, onStop = () => { process.exitCode = 1; } }) {
+  let active = false;
+  let exploration;
+  const memories = new Set();
+  control.signal.addEventListener('abort', onStop, { once: true });
+  const fail = (reason, numbers = {}) => {
+    control.stop(reason, numbers);
+    onStop();
+    throw new Error(reason);
+  };
+  return {
+    control,
+    get active() { return active; },
+    get signal() { return control.signal; },
+    addMemory(memory) { memories.add(memory); },
+    hooks: {
+      beforeToolCall(call) {
+        if (!active || control.signal.aborted) return fail('build_not_active');
+        return exploration.hooks.beforeToolCall(call);
+      },
+      afterToolCall(call) { return exploration?.hooks.afterToolCall(call); },
+    },
+    start() {
+      try {
+        control.assertStart();
+        exploration = createExplorationGate({ root: repo });
+        active = true;
+      } catch (error) { onStop(); throw error; }
+    },
+    processor: {
+      name: 'build-budget',
+      process(span) {
+        if (!active) return span;
+        try {
+          control.recordSpan(span);
+          if (control.signal.aborted) onStop();
+        } catch (error) { control.stop('trace_accounting_failed', { error: error.name }); onStop(); }
+        return span;
+      },
+    },
+    async finish() {
+      try {
+        // @mastra/memory/dist/index.d.ts:72-88: drain work, including work it enqueues.
+        await Promise.all([...memories].map(memory => memory.settled()));
+        const graph = exploration.snapshot();
+        if (graph.awaitingAnswer) fail('incomplete_graph_answer', graph);
+        const record = control.finish();
+        active = false;
+        return { ...record, exploration: graph };
+      } catch (error) {
+        if (!control.signal.aborted) control.stop('build_finish_failed', { error: error.name });
+        onStop();
+        throw error;
+      }
+    },
+  };
 }
