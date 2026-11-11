@@ -1,6 +1,7 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync, fsyncSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { mastraPrice } from './mastra-prices.mjs';
 
 function loadDefaultPrices() {
   const local = new URL('./prices.json', import.meta.url);
@@ -47,6 +48,8 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
   const clearPath = join(directory, 'clear.lock');
   const latchLockPath = join(directory, 'latch.lock');
   const owner = randomUUID();
+  // Todd's dated entries in prices.json win. Any other model is priced from Mastra's built-in table. A model in neither is refused.
+  const priceFor = model => (Object.hasOwn(prices, model ?? '') ? prices[model] : mastraPrice(model ?? ''));
   let abortController = new AbortController();
   let ownsLock = false;
   const timers = new Map();
@@ -163,15 +166,15 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
   }
   function begin({ model, role, modelId = model, provider, inputTokens = 0, maxOutputTokens } = {}) {
     assertStart();
-    if (!Object.hasOwn(prices, model ?? '')) refuse('no_price', { model: model ?? null, role: role ?? null });
-    try { priceUsage({ inputTokens: 0, outputTokens: 0 }, prices[model]); }
+    const price = priceFor(model);
+    if (!price) refuse('no_price', { model: model ?? null, role: role ?? null });
+    try { priceUsage({ inputTokens: 0, outputTokens: 0 }, price); }
     catch (error) { refuse(error.message, { model, role }); }
     if (!role || !modelId) refuse('missing_call_identity', { model, role: role ?? null });
     if (!validNumber(inputTokens)) refuse('invalid_input_estimate', { model, role, inputTokens: inputTokens ?? null });
 
     // Todd, 9 Nov 2026: caps stay hard. Admit only if spent + already reserved + this call's worst case fits under both caps.
     // The limit sent to the provider is the largest output that fits (OpenAI max_completion_tokens bounds visible and reasoning tokens).
-    const price = prices[model];
     const held = reserved();
     const longInput = price.longInputThreshold !== undefined && inputTokens > price.longInputThreshold;
     const inputMultiplier = longInput ? price.longInputMultiplier : 1;
@@ -220,12 +223,12 @@ export function createSliceControl({ directory, dollarCap, tokenCap, prices = de
     // A span only exists once its call returned, so prefer finished calls, then the smallest reservation that covers the usage.
     let pending;
     let cost;
-    try { cost = priceUsage(attributes.usage, prices[candidates[0].model]); }
+    try { cost = priceUsage(attributes.usage, priceFor(candidates[0].model)); }
     catch (error) { return stop(error.message, { model: candidates[0].model, spanId, usage: attributes.usage ?? null }); }
     const covers = r => cost.tokens <= r.worstTokens && cost.dollars <= r.worstDollars * (1 + 1e-9);
     const order = [...candidates].sort((x, y) => (Boolean(y.finished) - Boolean(x.finished)) || (x.worstTokens - y.worstTokens));
     pending = order.find(covers) ?? order[0];
-    if (!Object.hasOwn(prices, pending.model)) return stop('no_price', { model: pending.model, spanId });
+    if (!priceFor(pending.model)) return stop('no_price', { model: pending.model, spanId });
     const call = { ...pending, spanId, traceId: span.traceId, completedAt: new Date().toISOString(), ...cost };
     delete call.finished;
     record.calls.push(call);

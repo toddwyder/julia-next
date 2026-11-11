@@ -1,0 +1,160 @@
+[
+  {
+    "requested": "anthropic/claude-sonnet-5-5",
+    "at": "2026-11-11T00:25:28.575Z",
+    "provider": "anthropic.messages",
+    "requestedModelId": "claude-sonnet-5-5",
+    "answeredModelId": "claude-sonnet-5-5",
+    "text": "ok",
+    "usage": {
+      "inputTokens": {
+        "total": 42,
+        "noCache": 42,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "outputTokens": {
+        "total": 4,
+        "text": 4,
+        "reasoning": 0
+      },
+      "raw": {
+        "input_tokens": 42,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 4,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      }
+    },
+    "finishReason": {
+      "unified": "stop",
+      "raw": "end_turn"
+    }
+  },
+  {
+    "requested": "anthropic/claude-haiku-5-5",
+    "at": "2026-11-11T00:25:29.370Z",
+    "provider": "anthropic.messages",
+    "requestedModelId": "claude-haiku-5-5",
+    "answeredModelId": "claude-haiku-5-5",
+    "text": "ok",
+    "usage": {
+      "inputTokens": {
+        "total": 42,
+        "noCache": 42,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "outputTokens": {
+        "total": 4,
+        "text": 4,
+        "reasoning": 0
+      },
+      "raw": {
+        "input_tokens": 42,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 4,
+        "service_tier": "standard",
+        "inference_geo": "global",
+        "speed": "standard",
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        }
+      }
+    },
+    "finishReason": {
+      "unified": "stop",
+      "raw": "end_turn"
+    }
+  },
+  {
+    "requested": "openai/gpt-6.1-sol",
+    "at": "2026-11-11T00:25:30.160Z",
+    "provider": "openai.responses",
+    "requestedModelId": "gpt-6.1-sol",
+    "answeredModelId": "gpt-6.1-sol",
+    "text": "ok",
+    "usage": {
+      "inputTokens": {
+        "total": 66,
+        "noCache": 66,
+        "cacheRead": 0,
+        "cacheWrite": 0
+      },
+      "outputTokens": {
+        "total": 5,
+        "text": 5,
+        "reasoning": 0
+      },
+      "raw": {
+        "input_tokens": 66,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 5,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 71,
+        "attribution": {
+          "items": {
+            "msg_08ff5ccaedc0e8e7016af3b5fa91a087d09ea1c81e027a20ab": {
+              "input_tokens": 11,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "output_tokens": 0,
+              "content": [
+                {
+                  "input_tokens": 11,
+                  "cached_tokens": 0,
+                  "cache_write_tokens": 0,
+                  "output_tokens": 0
+                }
+              ]
+            },
+            "msg_08ff5ccaedc0e8e7016af3b5fb90bc87d09418d5715c07f439": {
+              "input_tokens": 2,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "output_tokens": 5,
+              "content": [
+                {
+                  "input_tokens": 2,
+                  "cached_tokens": 0,
+                  "cache_write_tokens": 0,
+                  "output_tokens": 5
+                }
+              ]
+            }
+          },
+          "request_fields": {
+            "instructions": {
+              "input_tokens": 53,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0,
+              "output_tokens": 0
+            }
+          }
+        }
+      }
+    },
+    "finishReason": {
+      "unified": "stop"
+    }
+  }
+]

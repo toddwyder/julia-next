@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createSliceControl, priceUsage } from './control.mjs';
+import { mastraPrice } from './mastra-prices.mjs';
 
 const sol = 'openai/gpt-6.1-sol';
 const beam = 'commandcode/reflection/beam:free';
@@ -323,4 +324,23 @@ test('planted: a provider that reports more than the limit it was sent stops the
     attributes: { model: 'sol', provider: 'openai', usage: { inputTokens: reservation.inputTokens, outputTokens: 51 } } });
   assert.equal(control.snapshot().stop.reason, 'usage_exceeded_reservation');
   assert.equal(control.snapshot().exitCode, 1);
+});
+
+for (const id of ['anthropic/claude-sonnet-5-5', 'anthropic/claude-haiku-5-5']) test(`${id} is priced from Mastra's table and admitted at $4 and 2,000,000 tokens`, t => {
+  const { control } = fixture(t);
+  const reservation = control.begin({ model: id, role: 'lead', inputTokens: 1000 });
+  assert.ok(reservation.maxOutputTokens > 0 && reservation.worstDollars <= 4);
+});
+test('Haiku keeps Mastra long-context tier from 100,000 input tokens', () => {
+  const price = mastraPrice('anthropic/claude-haiku-5-5');
+  const short = priceUsage({ inputTokens: 99999, outputTokens: 1000 }, price).dollars;
+  const long = priceUsage({ inputTokens: 100000, outputTokens: 1000 }, price).dollars;
+  assert.ok(Math.abs(short - (99999 * 0.1 + 1000 * 0.5) / 1e6) < 1e-12);
+  assert.ok(Math.abs(long - (100000 * 0.5 + 1000 * 2.5) / 1e6) < 1e-12);
+});
+test('a dated entry in prices.json wins over Mastra and a model in neither is refused', t => {
+  const override = { ...price, input: 99, output: 99, longInputThreshold: undefined };
+  const { control } = fixture(t, { prices: { 'anthropic/claude-sonnet-5-5': override } });
+  assert.ok(Math.abs(control.begin({ model: 'anthropic/claude-sonnet-5-5', role: 'lead', inputTokens: 1000, maxOutputTokens: 10 }).worstDollars - (1000 * 99 + 10 * 99) / 1e6) < 1e-12);
+  assert.throws(() => control.begin({ model: 'anthropic/not-a-model', role: 'lead' }), /no_price/);
 });
