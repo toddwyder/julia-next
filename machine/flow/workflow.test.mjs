@@ -25,7 +25,12 @@ const CARD = 'JUL-336-STANDIN';
 const buildOn = model =>
   new Agent({ id: 'flow-build', name: 'Flow build', instructions: 'Reply with one line.', model });
 
-const stub = text => ({ generate: async () => ({ text }) });
+// The Codex route answers only a streamed request, so a stage agent that is asked to generate fails the way
+// it does there: HTTP 400 "Stream must be set to true".
+const stub = text => ({
+  generate: async () => { throw new Error('Bad Request: Stream must be set to true'); },
+  stream: async () => ({ text: Promise.resolve(text) }),
+});
 const agents = {
   build: buildOn(createMockModel({ mockText: 'built line' })),
   shipping: stub('looked'),
