@@ -56,8 +56,8 @@ const buildPrompt = (card, kind) =>
   ].join('\n');
 
 export function createStages({ agents, dir }) {
-  const budget = agents.budget;
-  const modelStep = (id, execute) => budget ? step(id, execute, { retries: 0 }) : agentStep(id, execute);
+  const buildGate = agents.gate;
+  const modelStep = (id, execute) => buildGate ? step(id, execute, { retries: 0 }) : agentStep(id, execute);
   const cardDir = (card) => join(dir, card);
 
   // The first stage of a run. It takes the two things the run form asks for
@@ -78,7 +78,7 @@ export function createStages({ agents, dir }) {
   // agent's own input and output, so the card data goes through a mapper either
   // side of it instead of through the stage's shared schema.
   const startBuild = step('start-build', async ({ inputData, state, setState, requestContext }) => {
-    budget?.start();
+    buildGate?.start();
     const card = state.card || inputData.card;
     const buildRounds = state.buildRounds + 1;
     const requestId = `${card}/build-${buildRounds}`;
@@ -88,7 +88,7 @@ export function createStages({ agents, dir }) {
     return { ...inputData, card, detail: `build round ${buildRounds} started`, prompt: buildPrompt(card, state.kind) };
   });
 
-  const buildAgent = createStep(agents.build, { retries: budget ? 0 : BUILD_RETRIES });
+  const buildAgent = createStep(agents.build, { retries: buildGate ? 0 : BUILD_RETRIES });
 
   const finishBuild = createStep({
     id: 'finish-build',
@@ -96,10 +96,10 @@ export function createStages({ agents, dir }) {
     outputSchema: flowData,
     execute: async ({ inputData, state }) => {
       const card = state.card;
-      const accounting = await budget?.finish();
+      buildGate?.finish();
       const text = inputData.text ?? '';
       writeArtifact(cardDir(card), card, text);
-      return { card, kind: state.kind, detail: text, failCount: state.failCount, ...(accounting ? { budget: accounting } : {}) };
+      return { card, kind: state.kind, detail: text, failCount: state.failCount };
     },
   });
 

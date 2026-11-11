@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { createAgents, repoRoot } from './agents.mjs';
+import { AGENT_MAX_OUTPUT_TOKENS, MEMORY_MAX_OUTPUT_TOKENS, createAgents, repoRoot } from './agents.mjs';
 import { helperKey, readRoleModels } from './role-models.mjs';
 import { buildModel, leadModelId } from './models.mjs';
 import { installLeadModel } from '../../scripts/install-lead-model.mjs';
@@ -264,4 +264,33 @@ test('a missing stage pick stops before the stage starts and names the stage', t
     .join('\n');
   writeFileSync(roleModelsFile, withoutShipping);
   assert.throws(() => createAgents({ repo, leadModelFile, roleModelsFile }), /Missing Shipping pick/);
+});
+
+test('no agent can answer without an output limit, and every agent carries the cost guard', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  const agents = createAgents({ repo, leadModelFile, roleModelsFile, machine: true });
+  const helpers = Object.values(await agents.build.listAgents());
+  const all = [agents.build, agents.shipping, agents.remediation, agents.retro, ...helpers];
+  assert.ok(all.length >= 25);
+  for (const agent of all) {
+    const options = await agent.getDefaultOptions();
+    assert.equal(options.modelSettings?.maxOutputTokens, AGENT_MAX_OUTPUT_TOKENS, `${agent.name} has no output limit`);
+    const processors = await agent.listConfiguredInputProcessors();
+    assert.ok(processors.some(processor => processor.id === 'token-cost-control'), `${agent.name} has no cost guard`);
+  }
+});
+
+test('the memory note-takers answer under 100,000 output tokens, as Mastra does', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  const { build } = createAgents({ repo, leadModelFile, roleModelsFile, machine: true });
+  const observational = (await build.getMemory()).getMergedThreadConfig({}).observationalMemory;
+  assert.equal(MEMORY_MAX_OUTPUT_TOKENS, 100_000);
+  assert.equal(observational.observation.modelSettings.maxOutputTokens, 100_000);
+  assert.equal(observational.reflection.modelSettings.maxOutputTokens, 100_000);
 });
