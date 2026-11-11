@@ -105,11 +105,12 @@ export function createStages({ agents, dir }) {
 
   const shipping = modelStep('shipping', async ({ inputData, state, tracingContext }) => {
     const artifact = readArtifact(cardDir(state.card), state.card);
-    const result = await agents.shipping.generate(
+    const result = await agents.shipping.stream(
       `File follows. Is it a plausible recipe title?\n\n${artifact}`,
       { tracingContext },
     );
-    return { ...inputData, detail: result.text ?? '' };
+    const text = await result.text;
+    return { ...inputData, detail: text ?? '' };
   });
 
   const verdict = step('verdict', async ({ inputData, state, setState }) => {
@@ -127,12 +128,13 @@ export function createStages({ agents, dir }) {
 
   const remediation = modelStep('remediation', async ({ inputData, state, tracingContext }) => {
     const artifact = readArtifact(cardDir(state.card), state.card);
-    const result = await agents.remediation.generate(
+    const result = await agents.remediation.stream(
       `Rewrite this line so it reads better.\n\n${artifact}`,
       { tracingContext },
     );
-    writeArtifact(cardDir(state.card), state.card, result.text ?? artifact);
-    return { ...inputData, detail: result.text ?? '' };
+    const text = await result.text;
+    writeArtifact(cardDir(state.card), state.card, text ?? artifact);
+    return { ...inputData, detail: text ?? '' };
   });
 
   const passNote = step('pass-note', async ({ inputData }) => ({
@@ -216,12 +218,13 @@ export function createStages({ agents, dir }) {
   });
 
   const retro = modelStep('retro', async ({ inputData, state, tracingContext }) => {
-    const result = await agents.retro.generate(
+    const result = await agents.retro.stream(
       `Card ${state.card} landed after ${state.reviewRound} shipping rounds and ${state.buildRounds} build rounds. Say in one sentence what this run did.`,
       { tracingContext },
     );
-    writeRetro(cardDir(state.card), state.card, result.text ?? '');
-    return { ...inputData, detail: result.text ?? '' };
+    const text = await result.text;
+    writeRetro(cardDir(state.card), state.card, text ?? '');
+    return { ...inputData, detail: text ?? '' };
   });
 
   const cleanup = step('cleanup', async ({ inputData, state }) => {

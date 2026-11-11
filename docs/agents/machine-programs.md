@@ -11,7 +11,7 @@ of any size, not only a change to the sentence beside it.
 | --- | --- | --- |
 | `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `f6d57016aa45d1553dd8e1e8394806ec8a93c2cfc86312086771ce0691893ad9` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `7501664a0b3774a5ac48b0628c40f9b1157703d1b2c2b94eb589fdde1f0b5e49` |
-| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `4152359f2388d305d907ab7f898a17a446bc08d3283971bdc9e4a5bab5e5569f` |
+| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `e4fca327260781d813b43a3e32d8fe8399bc1ab738780f5c620e7b80db637d5b` |
 | `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `86087f88908e82a726299088a3f75ca933030f6c426471b6cd9384fec6b48b8a` |
 | `machine/flow/exploration.mjs` | The gate routing raw grep and glob workspace and shell commands to Graphify. | `8308d2ba679aa9f3dcf006b0a2b5b8e735235bcc4eb77ee3765648b7efabe596` |
 | `machine/flow/graphify.mjs` | The Graphify graph tools Lead and its helpers query before reading files. | `c502bc49faa96ef1de469764696d1682347679a61a17629766940de5baf546b6` |

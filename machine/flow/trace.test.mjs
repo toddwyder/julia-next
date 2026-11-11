@@ -95,7 +95,12 @@ test('the run record on disk answers the same way for a real trace file', async 
   writeFileSync(join(dir, CARD, 'verdicts.json'), JSON.stringify({ review: ['PASS'], smoke: ['PASS'] }));
   writeFileSync(join(dir, CARD, 'cursors.json'), '{}');
 
-  const stub = text => ({ generate: async () => ({ text }) });
+  // The Codex route answers only a streamed request, so a stage agent that is asked to generate fails the way
+  // it does there: HTTP 400 "Stream must be set to true".
+  const stub = text => ({
+    generate: async () => { throw new Error('Bad Request: Stream must be set to true'); },
+    stream: async () => ({ text: Promise.resolve(text) }),
+  });
   const workflow = buildCardPath({
     agents: {
       build: new Agent({
