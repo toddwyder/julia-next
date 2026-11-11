@@ -10,6 +10,11 @@ import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace
 import { buildModelReader, leadModelId } from './models.mjs';
 import { agentModel, helperKey, readRoleModels, readStageModels } from './role-models.mjs';
 
+// Mastra caps the observer and reflector at 100,000 output tokens, but only when it picks their model.
+// An explicit model gets no cap, so the controller reserved all of the remaining token cap for one memory
+// call and the Lead's next call found no room (JUL-362, 11 Nov). This is Mastra's own value, set explicitly.
+export const MEMORY_MAX_OUTPUT_TOKENS = 100_000;
+
 const POTETO_SKILL = '.agents/skills/poteto-mode/SKILL.md';
 
 function repositoryContaining(directory) {
@@ -32,8 +37,8 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
   const memoryFor = role => {
     if (!budget) return {};
     const memory = new Memory({ options: { observationalMemory: {
-      observation: { model: wrapped('openai/gpt-6-luna', `${role}:observer`), maxRetries: 0, failurePolicy: 'abort' },
-      reflection: { model: wrapped('openai/gpt-6-luna', `${role}:reflector`), maxRetries: 0, failurePolicy: 'abort' },
+      observation: { model: wrapped('openai/gpt-6-luna', `${role}:observer`), maxRetries: 0, failurePolicy: 'abort', modelSettings: { maxOutputTokens: MEMORY_MAX_OUTPUT_TOKENS } },
+      reflection: { model: wrapped('openai/gpt-6-luna', `${role}:reflector`), maxRetries: 0, failurePolicy: 'abort', modelSettings: { maxOutputTokens: MEMORY_MAX_OUTPUT_TOKENS } },
     } } });
     budget.addMemory(memory);
     return { memory };
