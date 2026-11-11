@@ -1,6 +1,38 @@
 /* Tokens from docs/design/vintage/DESIGN-LANGUAGE.md. vintage.spec.mjs reads that
    document and fails if a rendered colour or font stops matching it. */
 
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('./fonts/playfair-display-latin-wght-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('./fonts/playfair-display-latin-wght-italic.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/inter-latin-wght-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('./fonts/roboto-mono-latin-wght-normal.woff2') format('woff2');
+}
+
 :root {
   --vintage-paper: #fdfcf7;
   --vintage-ink: #333333;
@@ -12,9 +44,9 @@
   --vintage-terracotta-hover: #a33e20;
   --vintage-divider: rgba(51, 51, 51, 0.15);
   --vintage-divider-soft: rgba(51, 51, 51, 0.3);
-  --vintage-serif: var(--font-serif), Georgia, serif;
-  --vintage-sans: var(--font-sans), Helvetica, sans-serif;
-  --vintage-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --vintage-serif: 'Playfair Display', Georgia, serif;
+  --vintage-sans: 'Inter', Helvetica, sans-serif;
+  --vintage-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 html {
