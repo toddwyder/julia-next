@@ -126,7 +126,7 @@ export function createStages({ agents, dir, repo, review = realReview }) {
         { tracingContext, requestContext, abortSignal: clock },
       );
       const text = await result.text;
-      return { ...inputData, pr: found.pr, sha, answer: text ?? '', detail: text ?? '' };
+      return { ...inputData, pr: found.pr, sha, answer: text ?? '', criteriaCount: criteria.length, detail: text ?? '' };
     } catch (error) {
       if (clock.aborted) return unreviewed(`the review ran longer than ${REVIEW_TIME_LIMIT_MS / 60_000} minutes and was ended`);
       throw error;
@@ -150,8 +150,8 @@ export function createStages({ agents, dir, repo, review = realReview }) {
       return { ...inputData, verdict: null, unreviewed: true, detail: `shipping round ${reviewRound} gave no verdict: ${reason}` };
     };
     if (inputData.unreviewed) return unreviewed(inputData.detail);
-    const { verdict: answer } = parseVerdict(inputData.answer);
-    if (!answer) return unreviewed('the reviewer ended without a verdict line');
+    const { verdict: answer, reason } = parseVerdict(inputData.answer, inputData.criteriaCount);
+    if (!answer) return unreviewed(`the reviewer gave no verdict: ${reason}`);
     try {
       review.postPrComment(repo, inputData.pr, verdictComment({ verdict: answer, answer: inputData.answer, sha: inputData.sha }));
     } catch (error) {

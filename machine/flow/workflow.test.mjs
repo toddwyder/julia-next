@@ -201,7 +201,13 @@ test('PASS+NOTES moves the card forward like PASS and its notes are on the pull 
 });
 
 for (const [name, options, why] of [
-  ['an answer with no verdict line', { review: ['text:I looked around and it seemed fine.'] }, /ended without a verdict line/],
+  ['an answer with no verdict line', { review: ['text:I looked around and it seemed fine.'] }, /first line is not a verdict line/],
+  ['a verdict line with two verdict words', { review: ['text:VERDICT: PASS | FAIL\nCRITERION 1: PASS — ok'] }, /exactly one of PASS/],
+  ['a PASS with a FAIL criterion line', { review: ['text:VERDICT: PASS\nCRITERION 1: FAIL — broke'] }, /PASS with a FAIL criterion line/],
+  ['a PASS+NOTES with a FAIL criterion line', { review: ['text:VERDICT: PASS+NOTES\nCRITERION 1: FAIL — broke'] }, /PASS\+NOTES with a FAIL criterion line/],
+  ['an answer missing a criterion line', { review: ['text:VERDICT: PASS\nNOTES: none'] }, /criterion 1 does not have exactly one/],
+  ['an answer with a criterion line twice', { review: ['text:VERDICT: PASS\nCRITERION 1: PASS — a\nCRITERION 1: PASS — b'] }, /criterion 1 does not have exactly one/],
+  ['a verdict line that is not first', { review: ['text:I checked.\nVERDICT: PASS\nCRITERION 1: PASS — ok'] }, /first line is not a verdict line/],
   ['no pull request for the card', { reviewOptions: { pulls: { reason: 'no open pull request names the card' } } }, /no open pull request names the card/],
   ['a verdict that could not be posted', { reviewOptions: { postFails: true } }, /could not be posted to pull request #498/],
 ]) {
@@ -221,6 +227,15 @@ for (const [name, options, why] of [
     rmSync(dir, { recursive: true, force: true });
   });
 }
+
+test('parseVerdict reads a well-formed answer and refuses each malformed one', async () => {
+  const { parseVerdict } = await import('./review.mjs');
+  assert.equal(parseVerdict('\n\nVERDICT: PASS\nCRITERION 1: PASS — ok\nCRITERION 2: PASS — ok', 2).verdict, 'PASS');
+  assert.equal(parseVerdict('VERDICT: FAIL\nCRITERION 1: PASS — ok\nCRITERION 2: FAIL — no', 2).verdict, 'FAIL');
+  assert.equal(parseVerdict('VERDICT: PASS\nCRITERION 1: PASS — ok', 2).verdict, null);
+  assert.equal(parseVerdict('VERDICT: PASS\nCRITERION 1: PASS — ok\nCRITERION 2: PASS — ok', 1).verdict, null);
+  assert.equal(parseVerdict('VERDICT: PASS FAIL\nCRITERION 1: PASS — ok', 1).verdict, null);
+});
 
 test('a second Shipping FAIL stops the card with a report and asks nobody', async () => {
   const { result, trail, dir, report } = await openCase({ review: ['FAIL', 'FAIL'] });

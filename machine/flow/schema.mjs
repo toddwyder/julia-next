@@ -29,6 +29,7 @@ export const flowData = z
     pr: z.number().int().nullable().default(null),
     sha: z.string().default(''),
     answer: z.string().default(''),
+    criteriaCount: z.number().default(0),
     smoke: z.enum(['PASS', 'FAIL']).nullable().default(null),
     failCount: z.number().int().min(0).default(0),
     accepted: z.boolean().default(false),
