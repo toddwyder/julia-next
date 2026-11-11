@@ -65,7 +65,7 @@ async function main(argv) {
 
   // The harness reads MASTRACODE_PROGRAM_DIR and the two database paths once, at
   // module load, so the environment is set before the import, the way
-  // machine/shipping/run.mjs does it. The paths point into a fresh temp
+  // machine/shipping/harness.mjs does it. The paths point into a fresh temp
   // directory so a check never writes the store a live run is reading.
   mkdirSync(scratchDir, { recursive: true });
   const tempDir = mkdtempSync(join(scratchDir, 'check-machine-builder-'));

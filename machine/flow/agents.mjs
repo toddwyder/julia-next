@@ -7,6 +7,7 @@ import { Memory } from '@mastra/memory';
 import { createExplorationGate } from './exploration.mjs';
 import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace';
 
+import { SHIPPING_MAX_STEPS } from './review.mjs';
 import { buildModelReader, leadModelId } from './models.mjs';
 import { agentModel, helperKey, readRoleModels, readStageModels } from './role-models.mjs';
 
@@ -99,14 +100,25 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
   const stages = model ? { shipping: model, remediation: model, retro: model } : readStageModels(roleModelsFile);
   const stageModel = id => (model ? model : agentModel(stages[id]));
 
+  // Shipping reviews a pull request's code, so its workspace is the checkout the stage made for
+  // this card; the stage hands the path over in the request context.
   const shipping = new Agent({
     id: 'flow-shipping',
-    name: 'Flow shipping stand-in',
+    name: 'Shipping',
     instructions:
-      'You glance at one short file and say in one sentence whether it reads as a recipe title. You do not decide pass or fail; a fixed rule does that. No tools.',
+      'You are the Shipping reviewer. You did not write the code. You run what the card asks you to run inside the checkout you are given, judge each criterion from what the commands printed, and answer in the shape the task gives.',
     model: stageModel('shipping'),
     inputProcessors: [costGuard()],
-    defaultOptions: { ...limits, ...(gate ? { maxRetries: 0 } : {}) },
+    workspace: ({ requestContext }) => {
+      const checkout = requestContext.get('shippingCheckout');
+      if (!checkout) throw new Error('Shipping has no checkout to review.');
+      return new Workspace({
+        id: 'shipping-checkout',
+        filesystem: new LocalFilesystem({ basePath: checkout }),
+        sandbox: new LocalSandbox({ workingDirectory: checkout, env: { HOME: homedir() } }),
+      });
+    },
+    defaultOptions: { maxSteps: SHIPPING_MAX_STEPS, ...limits, ...(gate ? { maxRetries: 0 } : {}) },
   });
 
   const remediation = new Agent({

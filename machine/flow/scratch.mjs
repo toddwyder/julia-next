@@ -7,10 +7,9 @@ import { join } from 'node:path';
 
 const FOLDERS = ['build', 'landing', 'retro', 'reports'];
 
-// A machine card's Shipping stand-in reads no queue, but a product card's does,
-// and a run started from Studio brings no file of its own. One answer each is
-// enough for a stand-in to keep the path moving.
-export const DEFAULT_VERDICTS = { review: ['PASS'], smoke: ['PASS'] };
+// The live smoke test is still a stand-in, and a run started from Studio brings no file of its
+// own. One answer is enough for it to keep the path moving.
+export const DEFAULT_VERDICTS = { smoke: ['PASS'] };
 
 export function openScratch(dir) {
   for (const folder of FOLDERS) mkdirSync(join(dir, folder), { recursive: true });

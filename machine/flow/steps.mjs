@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
+import { REVIEW_TIME_LIMIT_MS, criteriaFromCard, parseVerdict, realReview, reviewTask, verdictComment } from './review.mjs';
 import { cardState, flowData, runInput } from './schema.mjs';
 import {
   nextVerdict,
@@ -36,7 +37,9 @@ const reportText = (state, detail) =>
     `Build rounds: ${state.buildRounds}`,
     `Last detail: ${detail || 'none'}`,
     '',
-    'A second failure stops the card; the next step is an Investigation.',
+    state.unreviewed
+      ? 'The card is unreviewed. No failure was counted; it needs a Shipping review before it can go on.'
+      : 'A second failure stops the card; the next step is an Investigation.',
   ].join('\n');
 
 const step = (id, execute, extra = {}) =>
@@ -55,7 +58,7 @@ const buildPrompt = (card, kind) =>
     "Only a product decision or one approval in Todd's own account may reach him. Decide the rest and log it in the decision log.",
   ].join('\n');
 
-export function createStages({ agents, dir }) {
+export function createStages({ agents, dir, repo, review = realReview }) {
   const buildGate = agents.gate;
   const modelStep = (id, execute) => buildGate ? step(id, execute, { retries: 0 }) : agentStep(id, execute);
   const cardDir = (card) => join(dir, card);
@@ -103,26 +106,64 @@ export function createStages({ agents, dir }) {
     },
   });
 
-  const shipping = modelStep('shipping', async ({ inputData, state, tracingContext }) => {
-    const artifact = readArtifact(cardDir(state.card), state.card);
-    const result = await agents.shipping.stream(
-      `File follows. Is it a plausible recipe title?\n\n${artifact}`,
-      { tracingContext },
-    );
-    const text = await result.text;
-    return { ...inputData, detail: text ?? '' };
+  // Shipping is a fresh agent that gets the card and the card's pull request, nothing the builder
+  // said. A review that ends without an answer is not a failed review: it is reported as unreviewed.
+  const shipping = modelStep('shipping', async ({ inputData, state, tracingContext, requestContext }) => {
+    const unreviewed = reason => ({ ...inputData, unreviewed: true, pr: null, answer: '', detail: reason });
+    const found = review.findPr(repo, state.card);
+    if (!found.pr) return unreviewed(found.reason);
+    const card = await review.readCard(state.card);
+    const criteria = criteriaFromCard(card?.description);
+    if (criteria.length === 0) return unreviewed(`${state.card} lists no acceptance criteria to judge`);
+
+    const checkout = join(cardDir(state.card), 'review');
+    const sha = review.prepareCheckout(repo, found.pr, checkout);
+    const clock = AbortSignal.timeout(REVIEW_TIME_LIMIT_MS);
+    try {
+      requestContext?.set?.('shippingCheckout', checkout);
+      const result = await agents.shipping.stream(
+        reviewTask({ pr: found.pr, sha, checkout, card, criteria }),
+        { tracingContext, requestContext, abortSignal: clock },
+      );
+      const text = await result.text;
+      return { ...inputData, pr: found.pr, sha, answer: text ?? '', detail: text ?? '' };
+    } catch (error) {
+      if (clock.aborted) return unreviewed(`the review ran longer than ${REVIEW_TIME_LIMIT_MS / 60_000} minutes and was ended`);
+      throw error;
+    } finally {
+      review.removeCheckout(repo, checkout);
+    }
   });
 
+  // The verdict is a fixed rule: read the reviewer's verdict line and put it on the pull request.
+  // No line, or a comment that did not post, leaves no verdict on the record, so the round is unreviewed.
   const verdict = step('verdict', async ({ inputData, state, setState }) => {
-    const answer = nextVerdict(cardDir(state.card), 'review');
-    const failCount = answer === 'FAIL' ? state.failCount + 1 : state.failCount;
     const reviewRound = state.reviewRound + 1;
+    const unreviewed = async reason => {
+      await setState({
+        ...state,
+        reviewRound,
+        unreviewed: true,
+        stopPart: 'Shipping',
+        stopWhy: `The card is unreviewed: ${reason}. No failure was counted.`,
+      });
+      return { ...inputData, verdict: null, unreviewed: true, detail: `shipping round ${reviewRound} gave no verdict: ${reason}` };
+    };
+    if (inputData.unreviewed) return unreviewed(inputData.detail);
+    const { verdict: answer } = parseVerdict(inputData.answer);
+    if (!answer) return unreviewed('the reviewer ended without a verdict line');
+    try {
+      review.postPrComment(repo, inputData.pr, verdictComment({ verdict: answer, answer: inputData.answer, sha: inputData.sha }));
+    } catch (error) {
+      return unreviewed(`the verdict could not be posted to pull request #${inputData.pr} (${String(error?.message ?? error).split('\n')[0]})`);
+    }
+    const failCount = answer === 'FAIL' ? state.failCount + 1 : state.failCount;
     await setState({ ...state, failCount, reviewRound });
     return {
       ...inputData,
       verdict: answer,
       failCount,
-      detail: `shipping round ${reviewRound} returned ${answer}`,
+      detail: `shipping round ${reviewRound} returned ${answer} on pull request #${inputData.pr}`,
     };
   });
 
@@ -143,8 +184,11 @@ export function createStages({ agents, dir }) {
   }));
 
   const gate = step('gate', async ({ inputData, state, setState }) => {
-    if (inputData.verdict === 'PASS') {
+    if (inputData.verdict === 'PASS' || inputData.verdict === 'PASS+NOTES') {
       return { ...inputData, stopped: false };
+    }
+    if (inputData.unreviewed) {
+      return { ...inputData, stopped: true };
     }
     await setState({
       ...state,

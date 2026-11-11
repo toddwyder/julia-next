@@ -7,7 +7,7 @@ process.env.CMD_API_KEY ??= process.env.COMMANDCODE_API_KEY;
 
 import { resolve } from 'node:path';
 
-import { createAgents } from '../../machine/flow/agents.mjs';
+import { createAgents, repoRoot } from '../../machine/flow/agents.mjs';
 import { graphifyTools } from '../../machine/flow/graphify.mjs';
 import { openMastra } from '../../machine/flow/mastra.mjs';
 import { CARD_PATH } from '../../machine/flow/schema.mjs';
@@ -18,7 +18,7 @@ const dir = resolve(process.env.FLOW_DIR ?? '.artifacts/flow/studio');
 
 openScratch(dir);
 const agents = createAgents({ tools: await graphifyTools(), machine: true });
-const workflow = buildCardPath({ agents, dir });
+const workflow = buildCardPath({ agents, dir, repo: repoRoot() });
 
 // Storage and observability come from the same place a resumed run uses, so the
 // model calls a Studio run makes are written to this run folder's trace file.

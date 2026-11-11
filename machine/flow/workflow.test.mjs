@@ -33,14 +33,41 @@ const stub = text => ({
 });
 const agents = {
   build: buildOn(createMockModel({ mockText: 'built line' })),
-  shipping: stub('looked'),
   remediation: stub('fixed line'),
   retro: stub('retro line'),
 };
 
+const answerFor = verdict => (verdict.startsWith('text:') ? verdict.slice(5) : `VERDICT: ${verdict}\nCRITERION 1: ${verdict} — ran the command\nNOTES: none`);
+
+// The Shipping stage's outside world, scripted: which pull request the card has, the card's text, the
+// checkout, the comment post. The agent answers from the queue and the verdict comes from its text.
+function fakeReview(queue, { pulls = { pr: 498 }, postFails = false } = {}) {
+  const posted = [];
+  const asked = [];
+  const shipping = {
+    stream: async (task, options) => {
+      asked.push({ task, checkout: options.requestContext?.get?.('shippingCheckout') });
+      const next = queue.shift() ?? 'PASS';
+      return { text: Promise.resolve(answerFor(next)) };
+    },
+  };
+  const review = {
+    findPr: () => pulls,
+    readCard: async identifier => ({ identifier, title: 'A card', description: '## Acceptance criteria\n- it works' }),
+    prepareCheckout: () => 'abc123',
+    removeCheckout: () => {},
+    postPrComment: (repo, pr, body) => {
+      if (postFails) throw new Error('gh: not signed in');
+      posted.push({ pr, body });
+    },
+  };
+  return { shipping, review, posted, asked };
+}
+
 async function openCase({
   kind = 'product',
-  review = ['PASS'],
+  review: queue = ['PASS'],
+  reviewOptions,
   smoke = ['PASS'],
   answers = ['yes'],
   build,
@@ -51,10 +78,16 @@ async function openCase({
   openScratch(dir);
   const caseDir = join(dir, CARD);
   mkdirSync(caseDir, { recursive: true });
-  writeFileSync(join(caseDir, 'verdicts.json'), JSON.stringify({ review, smoke }));
+  writeFileSync(join(caseDir, 'verdicts.json'), JSON.stringify({ smoke }));
   writeFileSync(join(caseDir, 'cursors.json'), '{}');
 
-  const workflow = buildCardPath({ agents: build ? { ...agents, build } : agents, dir });
+  const fake = fakeReview([...queue], reviewOptions);
+  const workflow = buildCardPath({
+    agents: { ...agents, ...(build ? { build } : {}), shipping: fake.shipping },
+    dir,
+    repo: '/repo',
+    review: fake.review,
+  });
   const mastra = await openMastra({
     card: CARD,
     stateDb: join(dir, 'state.db'),
@@ -80,7 +113,7 @@ async function openCase({
   }
 
   const report = join(caseDir, 'reports', `${CARD}.md`);
-  return { result, trail, dir, caseDir, report, workflow };
+  return { result, trail, dir, caseDir, report, workflow, fake };
 }
 
 test('a passing card waits for Todd two levels deep, then lands, retros and cleans up', async () => {
@@ -140,6 +173,54 @@ test('a Shipping FAIL goes to remediation and a fresh Shipping pass lands the ca
   assert.equal(existsSync(report), false);
   rmSync(dir, { recursive: true, force: true });
 });
+
+test('Shipping gets the card and its pull request, and the verdict is posted on that pull request by the stage', async () => {
+  const { result, dir, fake } = await openCase({ kind: 'machine' });
+
+  assert.equal(result.status, 'success');
+  assert.equal(fake.asked.length, 1);
+  assert.match(fake.asked[0].task, /pull request #498/);
+  assert.match(fake.asked[0].task, /it works/);
+  assert.doesNotMatch(fake.asked[0].task, /built line/, 'the builder\'s words never reach Shipping');
+  assert.match(fake.asked[0].checkout, /review$/);
+  assert.equal(fake.posted.length, 1);
+  assert.equal(fake.posted[0].pr, 498);
+  assert.match(fake.posted[0].body, /^Shipping agent: PASS\n/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('PASS+NOTES moves the card forward like PASS and its notes are on the pull request', async () => {
+  const { result, dir, fake } = await openCase({ kind: 'machine', review: ['PASS+NOTES'] });
+
+  assert.equal(result.status, 'success');
+  assert.equal(result.result.verdict, 'PASS+NOTES');
+  assert.equal(result.result.failCount, 0);
+  assert.equal(result.result.landed, true);
+  assert.match(fake.posted[0].body, /^Shipping agent: PASS\+NOTES\n/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+for (const [name, options, why] of [
+  ['an answer with no verdict line', { review: ['text:I looked around and it seemed fine.'] }, /ended without a verdict line/],
+  ['no pull request for the card', { reviewOptions: { pulls: { reason: 'no open pull request names the card' } } }, /no open pull request names the card/],
+  ['a verdict that could not be posted', { reviewOptions: { postFails: true } }, /could not be posted to pull request #498/],
+]) {
+  test(`${name} leaves the failure count alone and reports the card as unreviewed`, async () => {
+    const { result, trail, dir, report } = await openCase({ kind: 'machine', ...options });
+
+    assert.equal(trail.length, 0);
+    assert.equal(result.status, 'success');
+    assert.equal(result.result.stopped, true);
+    assert.equal(result.result.landed, false);
+    assert.equal(result.result.failCount, 0);
+    const text = readFileSync(report, 'utf8');
+    assert.match(text, /Part: Shipping/);
+    assert.match(text, why);
+    assert.match(text, /unreviewed/);
+    assert.match(text, /Failures counted: 0/);
+    rmSync(dir, { recursive: true, force: true });
+  });
+}
 
 test('a second Shipping FAIL stops the card with a report and asks nobody', async () => {
   const { result, trail, dir, report } = await openCase({ review: ['FAIL', 'FAIL'] });
@@ -206,9 +287,10 @@ test('an answer for another request is refused and the same run still takes the 
   openScratch(dirCase);
   const caseDir = join(dirCase, CARD);
   mkdirSync(caseDir, { recursive: true });
-  writeFileSync(join(caseDir, 'verdicts.json'), JSON.stringify({ review: ['PASS'], smoke: ['PASS'] }));
+  writeFileSync(join(caseDir, 'verdicts.json'), JSON.stringify({ smoke: ['PASS'] }));
   writeFileSync(join(caseDir, 'cursors.json'), '{}');
-  const caseWorkflow = buildCardPath({ agents, dir: dirCase });
+  const fake = fakeReview(['PASS']);
+  const caseWorkflow = buildCardPath({ agents: { ...agents, shipping: fake.shipping }, dir: dirCase, repo: '/repo', review: fake.review });
   const mastra = await openMastra({
     card: CARD,
     stateDb: join(dirCase, 'state.db'),

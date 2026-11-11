@@ -92,7 +92,7 @@ test('the run record on disk answers the same way for a real trace file', async 
   const dir = mkdtempSync(join(tmpdir(), 'flow-cost-'));
   openScratch(dir);
   mkdirSync(join(dir, CARD), { recursive: true });
-  writeFileSync(join(dir, CARD, 'verdicts.json'), JSON.stringify({ review: ['PASS'], smoke: ['PASS'] }));
+  writeFileSync(join(dir, CARD, 'verdicts.json'), JSON.stringify({ smoke: ['PASS'] }));
   writeFileSync(join(dir, CARD, 'cursors.json'), '{}');
 
   // The Codex route answers only a streamed request, so a stage agent that is asked to generate fails the way
@@ -109,11 +109,19 @@ test('the run record on disk answers the same way for a real trace file', async 
         instructions: 'Reply with one line.',
         model: createMockModel({ mockText: 'built line' }),
       }),
-      shipping: stub('b'),
+      shipping: { stream: async () => ({ text: Promise.resolve('VERDICT: PASS\nCRITERION 1: PASS — ok\nNOTES: none') }) },
       remediation: stub('c'),
       retro: stub('d'),
     },
     dir,
+    repo: '/repo',
+    review: {
+      findPr: () => ({ pr: 1 }),
+      readCard: async identifier => ({ identifier, title: 't', description: '## Acceptance criteria\n- ok' }),
+      prepareCheckout: () => 'abc',
+      removeCheckout: () => {},
+      postPrComment: () => {},
+    },
   });
   const mastra = await openMastra({
     card: CARD,

@@ -45,20 +45,21 @@ const unfold = async ({ inputData }) => {
   return ran;
 };
 
-const passed = async ({ inputData }) => inputData.verdict === 'PASS' || inputData.failCount >= 2;
+const passed = async ({ inputData }) =>
+  inputData.verdict === 'PASS' || inputData.verdict === 'PASS+NOTES' || inputData.unreviewed === true || inputData.failCount >= 2;
 const smokeDone = async ({ inputData }) => inputData.smoke === 'PASS' || inputData.stopped === true;
 const answered = async ({ inputData }) => inputData.accepted === true || inputData.stopped === true;
 
-export function buildCardPath({ agents, dir }) {
-  const stage = createStages({ agents, dir });
+export function buildCardPath({ agents, dir, repo, review }) {
+  const stage = createStages({ agents, dir, repo, review });
 
   const reviewRound = createWorkflow({ ...schema, id: REVIEW_ROUND })
     .then(stage.shipping)
     .then(stage.verdict)
     .branch([
       [async ({ inputData }) => inputData.verdict === 'FAIL' && inputData.failCount < 2, stage.remediation],
-      [async ({ inputData }) => inputData.verdict === 'PASS', stage.passNote],
-      [async ({ inputData }) => inputData.verdict === 'FAIL' && inputData.failCount >= 2, stage.hold],
+      [async ({ inputData }) => inputData.verdict === 'PASS' || inputData.verdict === 'PASS+NOTES', stage.passNote],
+      [async ({ inputData }) => inputData.unreviewed === true || (inputData.verdict === 'FAIL' && inputData.failCount >= 2), stage.hold],
     ])
     .map(unfold)
     .commit();

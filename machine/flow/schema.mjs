@@ -24,7 +24,11 @@ export const flowData = z
     kind: z.enum(['product', 'machine']),
     prompt: z.string().default(''),
     detail: z.string().default(''),
-    verdict: z.enum(['PASS', 'FAIL']).nullable().default(null),
+    verdict: z.enum(['PASS', 'PASS+NOTES', 'FAIL']).nullable().default(null),
+    unreviewed: z.boolean().default(false),
+    pr: z.number().int().nullable().default(null),
+    sha: z.string().default(''),
+    answer: z.string().default(''),
     smoke: z.enum(['PASS', 'FAIL']).nullable().default(null),
     failCount: z.number().int().min(0).default(0),
     accepted: z.boolean().default(false),
@@ -48,4 +52,5 @@ export const cardState = z.object({
   answer: z.string().default(''),
   stopPart: z.string().default(''),
   stopWhy: z.string().default(''),
+  unreviewed: z.boolean().default(false),
 });
