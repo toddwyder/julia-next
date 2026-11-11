@@ -12,7 +12,7 @@ import { createTool } from '@mastra/core/tools';
 import { buildCardPath } from './workflow.mjs';
 import { openScratch } from './scratch.mjs';
 import { createSliceControl } from '../budget/control.mjs';
-import { createBuildBudget } from './agents.mjs';
+import { createBuildBudget, MEMORY_MAX_OUTPUT_TOKENS } from './agents.mjs';
 import { openMastra } from './mastra.mjs';
 
 const scratch = join(homedir(), '.local/state/julia-scratch');
@@ -55,8 +55,8 @@ async function fixture(t, { dollarCap = 4, tokenCap = 2e6, id = MODEL, fail = fa
     const actor = role => control.wrapModel(createMockModel({ mockText: '<observations>Observed hello.</observations><current-task>Reply hello</current-task><suggested-response>Hello</suggested-response>' }),
       { id: memory.unpriced === role ? 'unpriced/memory' : 'openai/gpt-6-luna', role });
     nativeMemory = new Memory({ options: { observationalMemory: {
-      observation: { model: actor('observer'), messageTokens: 1, bufferTokens: false, maxRetries: 0 },
-      reflection: { model: actor('reflector'), observationTokens: memory.reflect ? 1 : 1e5, maxRetries: 0 },
+      observation: { model: actor('observer'), messageTokens: 1, bufferTokens: false, maxRetries: 0, modelSettings: { maxOutputTokens: MEMORY_MAX_OUTPUT_TOKENS } },
+      reflection: { model: actor('reflector'), observationTokens: memory.reflect ? 1 : 1e5, maxRetries: 0, modelSettings: { maxOutputTokens: MEMORY_MAX_OUTPUT_TOKENS } },
     } } });
     budget.addMemory(nativeMemory);
   }
@@ -151,6 +151,7 @@ test('native observational memory invokes explicitly priced wrapped Observer', a
   assert.ok(record.calls.some(call => call.role === 'observer'));
   for (const call of record.calls.filter(call => call.role === 'observer')) {
     assert.equal(call.model, 'openai/gpt-6-luna');
+    assert.equal(call.maxOutputTokens, MEMORY_MAX_OUTPUT_TOKENS);
     assert.ok(call.dollars > 0);
     assert.ok(call.tokens > 0);
   }
