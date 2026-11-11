@@ -1,14 +1,21 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Inter, Playfair_Display, Roboto_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 
 import SiteNav from './site-nav';
 import styles from './layout.module.css';
 import './vintage.css';
 
-const serif = Playfair_Display({ subsets: ['latin'], weight: ['400', '500', '600', '700'], style: ['normal', 'italic'], variable: '--font-serif' });
-const sans = Inter({ subsets: ['latin'], variable: '--font-sans' });
-const mono = Roboto_Mono({ subsets: ['latin'], variable: '--font-mono' });
+const serif = localFont({
+  src: [
+    { path: './fonts/playfair-display-latin-wght-normal.woff2', weight: '400 900', style: 'normal' },
+    { path: './fonts/playfair-display-latin-wght-italic.woff2', weight: '400 900', style: 'italic' },
+  ],
+  variable: '--font-serif',
+  display: 'swap',
+});
+const sans = localFont({ src: './fonts/inter-latin-wght-normal.woff2', weight: '100 900', variable: '--font-sans', display: 'swap' });
+const mono = localFont({ src: './fonts/roboto-mono-latin-wght-normal.woff2', weight: '100 700', variable: '--font-mono', display: 'swap' });
 
 export const metadata = {
   title: 'Julia',

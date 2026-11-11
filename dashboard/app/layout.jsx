@@ -1,7 +1,7 @@
-import { Public_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
-const publicSans = Public_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-public-sans' });
+const publicSans = localFont({ src: './fonts/public-sans-latin-wght-normal.woff2', weight: '100 900', display: 'swap', variable: '--font-public-sans' });
 export const metadata = { title: 'Julia dashboard', description: 'Ready cards in Julia-next' };
 
 export default function Layout({ children }) {
