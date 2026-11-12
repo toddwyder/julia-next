@@ -1,0 +1,458 @@
+[
+  {
+    "key": "solo",
+    "runId": "3745b1f8-e1d8-4471-a6a5-a8b49b60998b",
+    "traceId": "59341e507ac5e702716e8a04dcf1915e",
+    "outcome": "limit",
+    "stopReason": "max_steps",
+    "agents": [
+      {
+        "entityId": "solo",
+        "runId": "3745b1f8-e1d8-4471-a6a5-a8b49b60998b",
+        "outcome": "limit",
+        "stopReason": "max_steps"
+      }
+    ],
+    "calls": [
+      {
+        "spanId": "36202d5b23e9e998",
+        "runId": "3745b1f8-e1d8-4471-a6a5-a8b49b60998b",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "e34047825d5cbf86",
+        "runId": "3745b1f8-e1d8-4471-a6a5-a8b49b60998b",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "8eed4808a7b39a4a",
+        "runId": "3745b1f8-e1d8-4471-a6a5-a8b49b60998b",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      }
+    ],
+    "tools": [
+      {
+        "name": "tool: 'again'",
+        "outcome": "success",
+        "runId": "3745b1f8-e1d8-4471-a6a5-a8b49b60998b"
+      },
+      {
+        "name": "tool: 'again'",
+        "outcome": "success",
+        "runId": "3745b1f8-e1d8-4471-a6a5-a8b49b60998b"
+      },
+      {
+        "name": "tool: 'again'",
+        "outcome": "success",
+        "runId": "3745b1f8-e1d8-4471-a6a5-a8b49b60998b"
+      }
+    ],
+    "tripwire": null,
+    "rows": [
+      {
+        "metricId": "2e53c6fc-038d-4e8f-9359-b3b317bbeb49",
+        "spanId": "8df708a548ea869c",
+        "runId": "3745b1f8-e1d8-4471-a6a5-a8b49b60998b",
+        "entityId": "solo",
+        "name": "mastra_model_total_output_tokens",
+        "value": 42,
+        "estimatedCost": 0.000021,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      },
+      {
+        "metricId": "5d644c09-22ba-4c49-b4bb-7866b12abd74",
+        "spanId": "8df708a548ea869c",
+        "runId": "3745b1f8-e1d8-4471-a6a5-a8b49b60998b",
+        "entityId": "solo",
+        "name": "mastra_model_total_input_tokens",
+        "value": 780,
+        "estimatedCost": 0.000078,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      }
+    ],
+    "total": 0.000099
+  },
+  {
+    "key": "helpers",
+    "runId": "b24da9be-5ddb-4f4f-8aa3-dcacfe86b2cb",
+    "traceId": "4f37bbc06ed2c6d5dd5980e1b3f8e58a",
+    "outcome": "limit",
+    "stopReason": "max_steps",
+    "agents": [
+      {
+        "entityId": "helpers",
+        "runId": "b24da9be-5ddb-4f4f-8aa3-dcacfe86b2cb",
+        "outcome": "limit",
+        "stopReason": "max_steps"
+      },
+      {
+        "entityId": "helper",
+        "runId": "f45b4ee6-bef5-4b30-b2ea-b1841499e016",
+        "outcome": "limit",
+        "stopReason": "max_steps"
+      },
+      {
+        "entityId": "helper",
+        "runId": "16fcca8f-447b-4cea-bdbc-8c9081d1effc",
+        "outcome": "limit",
+        "stopReason": "max_steps"
+      },
+      {
+        "entityId": "helper",
+        "runId": "d8983c11-731b-44ee-a90d-018f81774b4b",
+        "outcome": "limit",
+        "stopReason": "max_steps"
+      }
+    ],
+    "calls": [
+      {
+        "spanId": "7470437067e9ff50",
+        "runId": "b24da9be-5ddb-4f4f-8aa3-dcacfe86b2cb",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "7c8ea810f16bbbb4",
+        "runId": "f45b4ee6-bef5-4b30-b2ea-b1841499e016",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "e51a72b9bd50b0b5",
+        "runId": "f45b4ee6-bef5-4b30-b2ea-b1841499e016",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "7c6dccb418ba5943",
+        "runId": "b24da9be-5ddb-4f4f-8aa3-dcacfe86b2cb",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "41947612f6da5a0a",
+        "runId": "16fcca8f-447b-4cea-bdbc-8c9081d1effc",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "38e829b76a625a72",
+        "runId": "16fcca8f-447b-4cea-bdbc-8c9081d1effc",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "cf8d50ecfbcbc257",
+        "runId": "b24da9be-5ddb-4f4f-8aa3-dcacfe86b2cb",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "be7cfcd611ebf2cc",
+        "runId": "d8983c11-731b-44ee-a90d-018f81774b4b",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "681eb8480a15a8ba",
+        "runId": "d8983c11-731b-44ee-a90d-018f81774b4b",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      }
+    ],
+    "tools": [
+      {
+        "name": "tool: 'agent-helper'",
+        "outcome": "success",
+        "runId": "b24da9be-5ddb-4f4f-8aa3-dcacfe86b2cb"
+      },
+      {
+        "name": "tool: 'again'",
+        "outcome": "success",
+        "runId": "f45b4ee6-bef5-4b30-b2ea-b1841499e016"
+      },
+      {
+        "name": "tool: 'again'",
+        "outcome": "success",
+        "runId": "f45b4ee6-bef5-4b30-b2ea-b1841499e016"
+      },
+      {
+        "name": "tool: 'agent-helper'",
+        "outcome": "success",
+        "runId": "b24da9be-5ddb-4f4f-8aa3-dcacfe86b2cb"
+      },
+      {
+        "name": "tool: 'again'",
+        "outcome": "success",
+        "runId": "16fcca8f-447b-4cea-bdbc-8c9081d1effc"
+      },
+      {
+        "name": "tool: 'again'",
+        "outcome": "success",
+        "runId": "16fcca8f-447b-4cea-bdbc-8c9081d1effc"
+      },
+      {
+        "name": "tool: 'agent-helper'",
+        "outcome": "success",
+        "runId": "b24da9be-5ddb-4f4f-8aa3-dcacfe86b2cb"
+      },
+      {
+        "name": "tool: 'again'",
+        "outcome": "success",
+        "runId": "d8983c11-731b-44ee-a90d-018f81774b4b"
+      },
+      {
+        "name": "tool: 'again'",
+        "outcome": "success",
+        "runId": "d8983c11-731b-44ee-a90d-018f81774b4b"
+      }
+    ],
+    "tripwire": null,
+    "rows": [
+      {
+        "metricId": "7297bc18-3d7e-4f3f-bfc4-7f1ee0c5aec0",
+        "spanId": "f4565526f58fda09",
+        "runId": "f45b4ee6-bef5-4b30-b2ea-b1841499e016",
+        "entityId": "helper",
+        "name": "mastra_model_total_output_tokens",
+        "value": 28,
+        "estimatedCost": 0.000014,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      },
+      {
+        "metricId": "0d636243-9ad8-40cd-82a3-a2be6aba1e03",
+        "spanId": "f4565526f58fda09",
+        "runId": "f45b4ee6-bef5-4b30-b2ea-b1841499e016",
+        "entityId": "helper",
+        "name": "mastra_model_total_input_tokens",
+        "value": 664,
+        "estimatedCost": 0.0000664,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      },
+      {
+        "metricId": "fd874b50-b9f1-433a-8f2d-96c62bf48817",
+        "spanId": "d0ea444c275bb580",
+        "runId": "16fcca8f-447b-4cea-bdbc-8c9081d1effc",
+        "entityId": "helper",
+        "name": "mastra_model_total_input_tokens",
+        "value": 664,
+        "estimatedCost": 0.0000664,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      },
+      {
+        "metricId": "c1ece4f3-90fb-42a9-b547-023f40d89208",
+        "spanId": "d0ea444c275bb580",
+        "runId": "16fcca8f-447b-4cea-bdbc-8c9081d1effc",
+        "entityId": "helper",
+        "name": "mastra_model_total_output_tokens",
+        "value": 46,
+        "estimatedCost": 0.000023,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      },
+      {
+        "metricId": "c7823f88-ccbe-4916-a460-31014f64ff47",
+        "spanId": "7908028becdceaec",
+        "runId": "d8983c11-731b-44ee-a90d-018f81774b4b",
+        "entityId": "helper",
+        "name": "mastra_model_total_input_tokens",
+        "value": 664,
+        "estimatedCost": 0.0000664,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      },
+      {
+        "metricId": "77976ca5-7a58-45e8-8104-691ff597ae45",
+        "spanId": "7908028becdceaec",
+        "runId": "d8983c11-731b-44ee-a90d-018f81774b4b",
+        "entityId": "helper",
+        "name": "mastra_model_total_output_tokens",
+        "value": 28,
+        "estimatedCost": 0.000014,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      },
+      {
+        "metricId": "cc1a40a8-0d25-4ccd-a596-5ea73325a7a7",
+        "spanId": "f8f81e6021704527",
+        "runId": "b24da9be-5ddb-4f4f-8aa3-dcacfe86b2cb",
+        "entityId": "helpers",
+        "name": "mastra_model_total_output_tokens",
+        "value": 288,
+        "estimatedCost": 0.000144,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      },
+      {
+        "metricId": "6cba23a3-33b5-417d-bfb3-8ecc889db0c2",
+        "spanId": "f8f81e6021704527",
+        "runId": "b24da9be-5ddb-4f4f-8aa3-dcacfe86b2cb",
+        "entityId": "helpers",
+        "name": "mastra_model_total_input_tokens",
+        "value": 1608,
+        "estimatedCost": 0.0001608,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      }
+    ],
+    "total": 0.000555
+  },
+  {
+    "key": "guard",
+    "runId": "5fdd4665-8640-4b85-a153-804c20ea832f",
+    "traceId": "a61aeefc1d5bb051b02b0f4c81c8155d",
+    "outcome": "blocked",
+    "stopReason": "guardrail",
+    "agents": [
+      {
+        "entityId": "guard",
+        "runId": "5fdd4665-8640-4b85-a153-804c20ea832f",
+        "outcome": "blocked",
+        "stopReason": "guardrail"
+      },
+      {
+        "entityId": "helper",
+        "runId": "b5b752c6-c40c-428b-b9ad-79310db8dd17",
+        "outcome": "limit",
+        "stopReason": "max_steps"
+      }
+    ],
+    "calls": [
+      {
+        "spanId": "a35cf78df1c239df",
+        "runId": "5fdd4665-8640-4b85-a153-804c20ea832f",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "7263a302e717388f",
+        "runId": "b5b752c6-c40c-428b-b9ad-79310db8dd17",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      },
+      {
+        "spanId": "642e7a8fee175abf",
+        "runId": "b5b752c6-c40c-428b-b9ad-79310db8dd17",
+        "model": "gpt-6-luna",
+        "provider": "openai.responses",
+        "outcome": "success"
+      }
+    ],
+    "tools": [
+      {
+        "name": "tool: 'agent-helper'",
+        "outcome": "success",
+        "runId": "5fdd4665-8640-4b85-a153-804c20ea832f"
+      },
+      {
+        "name": "tool: 'again'",
+        "outcome": "success",
+        "runId": "b5b752c6-c40c-428b-b9ad-79310db8dd17"
+      },
+      {
+        "name": "tool: 'again'",
+        "outcome": "success",
+        "runId": "b5b752c6-c40c-428b-b9ad-79310db8dd17"
+      }
+    ],
+    "tripwire": {
+      "reason": "Cost control: estimated cost limit exceeded (0.000083/0)",
+      "retry": false,
+      "metadata": {
+        "processorId": "token-cost-control",
+        "usage": {
+          "estimatedCost": 0.0000828,
+          "costUnit": "USD",
+          "incomplete": false
+        },
+        "maxCost": 1e-8,
+        "scope": "run",
+        "threshold": "hard"
+      },
+      "processorId": "token-cost-control"
+    },
+    "rows": [
+      {
+        "metricId": "86ac5436-6d1e-4e3c-880c-5532cd52346e",
+        "spanId": "8d32ee79fcbe5db3",
+        "runId": "b5b752c6-c40c-428b-b9ad-79310db8dd17",
+        "entityId": "helper",
+        "name": "mastra_model_total_output_tokens",
+        "value": 28,
+        "estimatedCost": 0.000014,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      },
+      {
+        "metricId": "2352da24-8da5-4fe7-8f9a-2d4bb6274968",
+        "spanId": "8d32ee79fcbe5db3",
+        "runId": "b5b752c6-c40c-428b-b9ad-79310db8dd17",
+        "entityId": "helper",
+        "name": "mastra_model_total_input_tokens",
+        "value": 688,
+        "estimatedCost": 0.00006879999999999999,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      },
+      {
+        "metricId": "5864514a-a351-4ed4-9963-3be3b68cf928",
+        "spanId": "4cf3c2afd27f77d1",
+        "runId": "5fdd4665-8640-4b85-a153-804c20ea832f",
+        "entityId": "guard",
+        "name": "mastra_model_total_output_tokens",
+        "value": 108,
+        "estimatedCost": 0.000054,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      },
+      {
+        "metricId": "14e6ccc7-170a-4d0c-bdb2-58b087f14974",
+        "spanId": "4cf3c2afd27f77d1",
+        "runId": "5fdd4665-8640-4b85-a153-804c20ea832f",
+        "entityId": "guard",
+        "name": "mastra_model_total_input_tokens",
+        "value": 429,
+        "estimatedCost": 0.0000429,
+        "costUnit": "USD",
+        "provider": "openai",
+        "model": "gpt-6-luna"
+      }
+    ],
+    "total": 0.00017969999999999998
+  }
+]
