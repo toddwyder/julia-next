@@ -69,12 +69,28 @@ function reportFailures(report, root, cwd) {
   }
 }
 
-function execute(command, args, cwd, { report, root = cwd, environment = {} } = {}) {
+function execute(command, args, cwd, { report, root = cwd, environment = {}, timeout } = {}) {
   const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'NODE_TEST_CONTEXT' && !key.startsWith('GIT_'))), ...environment };
-  const result = spawnSync(command, args, { cwd, env, stdio: 'inherit' });
+  const result = spawnSync(command, args, { cwd, env, stdio: 'inherit', timeout });
   if (report && existsSync(report)) reportFailures(readFileSync(report, 'utf8'), root, cwd);
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${command} exited ${result.status ?? result.signal}`);
+}
+
+const INSTALL_ATTEMPTS = 3;
+const INSTALL_TIMEOUT_MS = 3 * 60 * 1000;
+
+// apt inside "--with-deps" can sit for minutes on a mirror DNS failure, so each try is bounded.
+// The system libraries Chromium needs ship on the runner image; only fallback fonts come from apt,
+// so after the tries run out the browser alone is installed rather than failing the run.
+function installChromium(cwd) {
+  const install = ['--no-install', 'playwright', 'install'];
+  for (let attempt = 1; attempt <= INSTALL_ATTEMPTS; attempt++) {
+    try { return execute('npx', [...install, '--with-deps', 'chromium'], cwd, { timeout: INSTALL_TIMEOUT_MS }); }
+    catch (error) { console.error(`::warning::Chromium install with system packages failed (try ${attempt} of ${INSTALL_ATTEMPTS}) in ${cwd}: ${error.message}`); }
+  }
+  console.error(`::warning::Installing Chromium without system packages in ${cwd}; apt was unreachable`);
+  execute('npx', [...install, 'chromium'], cwd);
 }
 
 export function runOwnedTests(environment, { root = process.cwd(), plan = testOwners(root) } = {}) {
@@ -109,7 +125,7 @@ export function main(args = process.argv.slice(2)) {
       const manifest = JSON.parse(readFileSync(join(owner.directory, 'package.json'), 'utf8'));
       const dependencies = { ...manifest.dependencies, ...manifest.devDependencies };
       if (!owner.tests.browser.length && !dependencies.playwright && !dependencies['@playwright/test']) continue;
-      execute('npx', ['--no-install', 'playwright', 'install', '--with-deps', 'chromium'], resolve(owner.directory));
+      installChromium(resolve(owner.directory));
     }
   } else if (args[0] === '--install') {
     const environment = args[1];
