@@ -1,0 +1,21 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+const dir = process.argv[2];
+if (!dir) throw Error('Supply an artifact directory');
+const read = file => JSON.parse(readFileSync(join(dir, file), 'utf8'));
+const best = new Map();
+for (const s of read('span_events.json')) if (!best.has(s.spanId) || s.eventType === 'end') best.set(s.spanId, s);
+const spans = [...best.values()], metrics = read('metric_events.json');
+const evidence = read('runs.json').map(run => {
+ const root = spans.find(s => s.spanType === 'agent_run' && !s.parentSpanId && s.runId === run.runId);
+ if (!root) return {...run, error:'no saved root span'};
+ const inside = spans.filter(s => s.traceId === root.traceId);
+ const agents = inside.filter(s => s.spanType === 'agent_run').map(s => ({id:s.entityId,spanId:s.spanId,parentSpanId:s.parentSpanId,outcome:s.outcome,stopReason:s.stopReason}));
+ const generations = inside.filter(s => s.spanType === 'model_generation').map(s => ({spanId:s.spanId,parentSpanId:s.parentSpanId,model:s.model,provider:s.provider, rows:metrics.filter(m => m.spanId === s.spanId && ['mastra_model_total_input_tokens','mastra_model_total_output_tokens'].includes(m.name)).map(m=>({name:m.name,value:m.value,estimatedCost:m.estimatedCost,costUnit:m.costUnit}))}));
+ const tools = inside.filter(s=>s.spanType==='tool_call').map(s=>({spanId:s.spanId,parentSpanId:s.parentSpanId,name:s.name}));
+ return {...run,traceId:root.traceId,outcome:root.outcome,stopReason:root.stopReason,agents,generations,tools};
+});
+const conditionPath = join(dir, 'conditions.jsonl');
+const conditions = existsSync(conditionPath) ? readFileSync(conditionPath, 'utf8').trim().split('\n').filter(Boolean).map(line => { const {owner,total,limit,stop,usage} = JSON.parse(line); return {owner,total,limit,stop,usage:usage.map(({inputTokens,outputTokens,cachedInputTokens,cacheCreationInputTokens})=>({inputTokens,outputTokens,cachedInputTokens,cacheCreationInputTokens}))}; }) : [];
+const text = JSON.stringify({runs:evidence,conditions},null,2)+'\n';
+if (process.argv[3]) writeFileSync(process.argv[3],text); else process.stdout.write(text);
