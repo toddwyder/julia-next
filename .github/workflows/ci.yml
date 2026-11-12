@@ -78,8 +78,18 @@ jobs:
         run: node scripts/test-owners.mjs --install-browsers browser
       - name: Guard the workflow folder
         run: npm run guard:flow
+      - name: Block the outside font hosts
+        run: |
+          echo "0.0.0.0 fonts.googleapis.com fonts.gstatic.com" | sudo tee -a /etc/hosts
+          if curl -sS --max-time 10 -o /dev/null https://fonts.gstatic.com/; then
+            echo "fonts.gstatic.com is still reachable"; exit 1
+          fi
       - name: Build application
         run: npm run build
+      - name: Install the dashboard's locked dependencies
+        run: npm ci --prefix dashboard
+      - name: Build dashboard
+        run: npm run build --prefix dashboard
       - name: Check the build holds no outside font address
         run: node scripts/check-font-hosts.mjs
 
