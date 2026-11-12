@@ -1,0 +1,486 @@
+{
+  "runs": [
+    {
+      "key": "solo",
+      "runId": "80c54b7c-78b9-435d-8af2-3adf2645cae2",
+      "status": 200,
+      "traceId": "2ec1aac2546b123883e1d0c22cf2db39",
+      "outcome": "success",
+      "stopReason": "stop_condition",
+      "agents": [
+        {
+          "id": "solo",
+          "spanId": "c86a0504a134ab5d",
+          "parentSpanId": null,
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        }
+      ],
+      "generations": [
+        {
+          "spanId": "9792343496e8a623",
+          "parentSpanId": "c86a0504a134ab5d",
+          "model": "claude-haiku-5-5",
+          "provider": "anthropic.messages",
+          "rows": [
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 6215,
+              "estimatedCost": 0.0012426,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 24,
+              "estimatedCost": 0.000012,
+              "costUnit": "USD"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "4a265282b19c790e",
+          "parentSpanId": "23d0e506b9d9feb6",
+          "name": "tool: 'again'"
+        }
+      ]
+    },
+    {
+      "key": "helper",
+      "runId": "e5dce14d-cffb-422c-bafa-cb032e925fde",
+      "status": 200,
+      "traceId": "297663b4fd1c5934d33d4f204f610b33",
+      "outcome": "success",
+      "stopReason": "stop_condition",
+      "agents": [
+        {
+          "id": "helper",
+          "spanId": "30cdd666ea38720c",
+          "parentSpanId": null,
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        },
+        {
+          "id": "helper1",
+          "spanId": "f55a48d11231c76c",
+          "parentSpanId": "6b624582bd147d39",
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        }
+      ],
+      "generations": [
+        {
+          "spanId": "4f1090699ec6cd0a",
+          "parentSpanId": "30cdd666ea38720c",
+          "model": "claude-haiku-5-5",
+          "provider": "anthropic.messages",
+          "rows": [
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 7674,
+              "estimatedCost": 0.0015344,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 175,
+              "estimatedCost": 0.0000875,
+              "costUnit": "USD"
+            }
+          ]
+        },
+        {
+          "spanId": "d42e640fb1b50ca7",
+          "parentSpanId": "f55a48d11231c76c",
+          "model": "claude-haiku-5-5",
+          "provider": "anthropic.messages",
+          "rows": [
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 135,
+              "estimatedCost": 0.00006749999999999999,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 697,
+              "estimatedCost": 0.000139,
+              "costUnit": "USD"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "6b624582bd147d39",
+          "parentSpanId": "cf238ad4130277f3",
+          "name": "tool: 'agent-helper1'"
+        },
+        {
+          "spanId": "dc542e0d3b2a25fb",
+          "parentSpanId": "04ec204990df6867",
+          "name": "tool: 'again'"
+        }
+      ]
+    },
+    {
+      "key": "parallel",
+      "runId": "bfad4e9e-9160-414c-ab75-7230e00482fe",
+      "status": 200,
+      "traceId": "e078c590f3244dec256bef76eb5827d4",
+      "outcome": "success",
+      "stopReason": "stop_condition",
+      "agents": [
+        {
+          "id": "parallel",
+          "spanId": "5db577863d95a910",
+          "parentSpanId": null,
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        },
+        {
+          "id": "helper1",
+          "spanId": "369284aaecf41cc5",
+          "parentSpanId": "2e1cddb2b9b9e211",
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        },
+        {
+          "id": "helper2",
+          "spanId": "758347a1bdd35372",
+          "parentSpanId": "b846f895b1e81792",
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        },
+        {
+          "id": "helper3",
+          "spanId": "2af5c4e49b7a6940",
+          "parentSpanId": "39960e58b44c8922",
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        }
+      ],
+      "generations": [
+        {
+          "spanId": "01973b25ca5f7a5f",
+          "parentSpanId": "5db577863d95a910",
+          "model": "claude-haiku-5-5",
+          "provider": "anthropic.messages",
+          "rows": [
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 822,
+              "estimatedCost": 0.000411,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 7692,
+              "estimatedCost": 0.001538,
+              "costUnit": "USD"
+            }
+          ]
+        },
+        {
+          "spanId": "53a5dd0cbaab6103",
+          "parentSpanId": "369284aaecf41cc5",
+          "model": "claude-haiku-5-5",
+          "provider": "anthropic.messages",
+          "rows": [
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 290,
+              "estimatedCost": 0.000145,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 810,
+              "estimatedCost": 0.0001616,
+              "costUnit": "USD"
+            }
+          ]
+        },
+        {
+          "spanId": "54a998d25f2a0ba1",
+          "parentSpanId": "758347a1bdd35372",
+          "model": "claude-haiku-5-5",
+          "provider": "anthropic.messages",
+          "rows": [
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 288,
+              "estimatedCost": 0.000144,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 822,
+              "estimatedCost": 0.000164,
+              "costUnit": "USD"
+            }
+          ]
+        },
+        {
+          "spanId": "da570f72e80d71da",
+          "parentSpanId": "2af5c4e49b7a6940",
+          "model": "claude-haiku-5-5",
+          "provider": "anthropic.messages",
+          "rows": [
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 766,
+              "estimatedCost": 0.0000445,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 422,
+              "estimatedCost": 0.000211,
+              "costUnit": "USD"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "b846f895b1e81792",
+          "parentSpanId": "6947166880ea4501",
+          "name": "tool: 'agent-helper2'"
+        },
+        {
+          "spanId": "2e1cddb2b9b9e211",
+          "parentSpanId": "6947166880ea4501",
+          "name": "tool: 'agent-helper1'"
+        },
+        {
+          "spanId": "39960e58b44c8922",
+          "parentSpanId": "6947166880ea4501",
+          "name": "tool: 'agent-helper3'"
+        },
+        {
+          "spanId": "dd46c5e27b84c318",
+          "parentSpanId": "1e419aa922016742",
+          "name": "tool: 'again'"
+        },
+        {
+          "spanId": "8c36b3f361ee8a97",
+          "parentSpanId": "0ae116d7c92a2252",
+          "name": "tool: 'again'"
+        },
+        {
+          "spanId": "4e63551f91b8e874",
+          "parentSpanId": "ba91dffb6261b382",
+          "name": "tool: 'again'"
+        }
+      ]
+    },
+    {
+      "key": "guard",
+      "runId": "612fe576-f892-4572-9f27-9e51a343498a",
+      "status": 200,
+      "traceId": "05745a8fc83abfb9a55d78f38a400fc1",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "agents": [
+        {
+          "id": "guard",
+          "spanId": "eba426dd7e17a954",
+          "parentSpanId": null,
+          "outcome": "blocked",
+          "stopReason": "guardrail"
+        },
+        {
+          "id": "helper1",
+          "spanId": "b61bc9ce2ca1e334",
+          "parentSpanId": "7e3831f009c30d87",
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        }
+      ],
+      "generations": [
+        {
+          "spanId": "5b8e28ebadfa65d8",
+          "parentSpanId": "eba426dd7e17a954",
+          "model": "claude-haiku-5-5",
+          "provider": "anthropic.messages",
+          "rows": [
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 7674,
+              "estimatedCost": 0.0000771,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 210,
+              "estimatedCost": 0.000105,
+              "costUnit": "USD"
+            }
+          ]
+        },
+        {
+          "spanId": "1dba7e5298071a4f",
+          "parentSpanId": "b61bc9ce2ca1e334",
+          "model": "claude-haiku-5-5",
+          "provider": "anthropic.messages",
+          "rows": [
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 117,
+              "estimatedCost": 0.0000585,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 700,
+              "estimatedCost": 0.000033010000000000004,
+              "costUnit": "USD"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "7e3831f009c30d87",
+          "parentSpanId": "752e455da68fc558",
+          "name": "tool: 'agent-helper1'"
+        },
+        {
+          "spanId": "e58a84014660481d",
+          "parentSpanId": "7780218b37449a30",
+          "name": "tool: 'again'"
+        }
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "owner": "lead",
+      "total": 0.0012546,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 6215,
+          "outputTokens": 24,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 6211
+        }
+      ]
+    },
+    {
+      "owner": "helper1",
+      "total": 0.0002065,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 697,
+          "outputTokens": 135,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 693
+        }
+      ]
+    },
+    {
+      "owner": "lead",
+      "total": 0.0016219000000000001,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 7674,
+          "outputTokens": 175,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 7670
+        }
+      ]
+    },
+    {
+      "owner": "helper1",
+      "total": 0.0003066,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 810,
+          "outputTokens": 290,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 806
+        }
+      ]
+    },
+    {
+      "owner": "helper2",
+      "total": 0.000308,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 822,
+          "outputTokens": 288,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 818
+        }
+      ]
+    },
+    {
+      "owner": "helper3",
+      "total": 0.0002555,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 766,
+          "outputTokens": 422,
+          "cachedInputTokens": 570,
+          "cacheCreationInputTokens": 192
+        }
+      ]
+    },
+    {
+      "owner": "lead",
+      "total": 0.0019490000000000002,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 7692,
+          "outputTokens": 822,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 7688
+        }
+      ]
+    },
+    {
+      "owner": "helper1",
+      "total": 0.00009151,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 700,
+          "outputTokens": 117,
+          "cachedInputTokens": 561,
+          "cacheCreationInputTokens": 135
+        }
+      ]
+    },
+    {
+      "owner": "lead",
+      "total": 0.00018210000000000004,
+      "limit": 10,
+      "stop": false,
+      "usage": [
+        {
+          "inputTokens": 7674,
+          "outputTokens": 210,
+          "cachedInputTokens": 7670,
+          "cacheCreationInputTokens": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,496 @@
+{
+  "runs": [
+    {
+      "key": "solo",
+      "runId": "8f455288-9104-4dc4-99d1-e28fb16c22db",
+      "status": 200,
+      "traceId": "8f8157a15c6a5df1c1dc139f84c080d4",
+      "outcome": "success",
+      "stopReason": "stop_condition",
+      "agents": [
+        {
+          "id": "solo",
+          "spanId": "8493a8deffa1605d",
+          "parentSpanId": null,
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        }
+      ],
+      "generations": [
+        {
+          "spanId": "d42f634d5e3ec716",
+          "parentSpanId": "8493a8deffa1605d",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "rows": [
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 14,
+              "estimatedCost": 0.000007,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 3605,
+              "estimatedCost": 0.0003605,
+              "costUnit": "USD"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "da038d55f9929cf2",
+          "parentSpanId": "23430158b32e21c5",
+          "name": "tool: 'again'"
+        }
+      ]
+    },
+    {
+      "key": "helper",
+      "runId": "88d7e7d6-cae0-4144-982a-211398472b0d",
+      "status": 200,
+      "traceId": "248c863034d39a1c385e36e78edb68b7",
+      "outcome": "success",
+      "stopReason": "stop_condition",
+      "agents": [
+        {
+          "id": "helper",
+          "spanId": "e707b0af48f93068",
+          "parentSpanId": null,
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        },
+        {
+          "id": "helper1",
+          "spanId": "02360a80a4e82d13",
+          "parentSpanId": "7c31a1357847d734",
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        }
+      ],
+      "generations": [
+        {
+          "spanId": "abd40d9595135cc8",
+          "parentSpanId": "e707b0af48f93068",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "rows": [
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 4157,
+              "estimatedCost": 0.0004157,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 92,
+              "estimatedCost": 0.000046,
+              "costUnit": "USD"
+            }
+          ]
+        },
+        {
+          "spanId": "20a800a2c5ccc165",
+          "parentSpanId": "02360a80a4e82d13",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "rows": [
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 270,
+              "estimatedCost": 0.000027,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 14,
+              "estimatedCost": 0.000007,
+              "costUnit": "USD"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "7c31a1357847d734",
+          "parentSpanId": "24f0b7b7ef48e2c6",
+          "name": "tool: 'agent-helper1'"
+        },
+        {
+          "spanId": "24a044c153faacf7",
+          "parentSpanId": "b8f79dc8d592a458",
+          "name": "tool: 'again'"
+        }
+      ]
+    },
+    {
+      "key": "parallel",
+      "runId": "721b1432-315e-406c-a848-6605f41e2b9c",
+      "status": 200,
+      "traceId": "757c63788a0abdd8a52b440ec8ca532f",
+      "outcome": "success",
+      "stopReason": "stop_condition",
+      "agents": [
+        {
+          "id": "parallel",
+          "spanId": "f80cabf5b7c8d64b",
+          "parentSpanId": null,
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        },
+        {
+          "id": "helper1",
+          "spanId": "b946db9a517d1f8c",
+          "parentSpanId": "0be55daecd4e6409",
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        },
+        {
+          "id": "helper2",
+          "spanId": "ffafab0da2efd643",
+          "parentSpanId": "33031639f60673db",
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        },
+        {
+          "id": "helper3",
+          "spanId": "00d627b0b8b8ef4a",
+          "parentSpanId": "a0202693e327d0c5",
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        }
+      ],
+      "generations": [
+        {
+          "spanId": "c3c440362795081b",
+          "parentSpanId": "f80cabf5b7c8d64b",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "rows": [
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 4175,
+              "estimatedCost": 0.0004175,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 263,
+              "estimatedCost": 0.0001315,
+              "costUnit": "USD"
+            }
+          ]
+        },
+        {
+          "spanId": "ddd35fbc62948d6e",
+          "parentSpanId": "b946db9a517d1f8c",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "rows": [
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 283,
+              "estimatedCost": 0.0000283,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 14,
+              "estimatedCost": 0.000007,
+              "costUnit": "USD"
+            }
+          ]
+        },
+        {
+          "spanId": "1d2a198cad1341be",
+          "parentSpanId": "ffafab0da2efd643",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "rows": [
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 283,
+              "estimatedCost": 0.0000283,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 54,
+              "estimatedCost": 0.000027,
+              "costUnit": "USD"
+            }
+          ]
+        },
+        {
+          "spanId": "23c70d74a72a4b2f",
+          "parentSpanId": "00d627b0b8b8ef4a",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "rows": [
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 51,
+              "estimatedCost": 0.000025499999999999996,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 283,
+              "estimatedCost": 0.0000283,
+              "costUnit": "USD"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "0be55daecd4e6409",
+          "parentSpanId": "b384939c430dfce5",
+          "name": "tool: 'agent-helper1'"
+        },
+        {
+          "spanId": "33031639f60673db",
+          "parentSpanId": "b384939c430dfce5",
+          "name": "tool: 'agent-helper2'"
+        },
+        {
+          "spanId": "a0202693e327d0c5",
+          "parentSpanId": "b384939c430dfce5",
+          "name": "tool: 'agent-helper3'"
+        },
+        {
+          "spanId": "81645cff0ade0159",
+          "parentSpanId": "431c3e94a727e860",
+          "name": "tool: 'again'"
+        },
+        {
+          "spanId": "728badea27942ec8",
+          "parentSpanId": "a8c7b2ff36bded67",
+          "name": "tool: 'again'"
+        },
+        {
+          "spanId": "4af95223df4e5f01",
+          "parentSpanId": "47f5b9504ae14caf",
+          "name": "tool: 'again'"
+        },
+        {
+          "spanId": "da721ed7b9004fdc",
+          "parentSpanId": "47f5b9504ae14caf",
+          "name": "tool: 'again'"
+        },
+        {
+          "spanId": "2433852f3f76b177",
+          "parentSpanId": "47f5b9504ae14caf",
+          "name": "tool: 'again'"
+        }
+      ]
+    },
+    {
+      "key": "guard",
+      "runId": "ce9e09b6-a7fc-453e-a85a-5ea370443050",
+      "status": 200,
+      "traceId": "9eb2e91a9afbae1d17c3dd7b90d02f47",
+      "outcome": "success",
+      "stopReason": "stop_condition",
+      "agents": [
+        {
+          "id": "guard",
+          "spanId": "f514a9f99f5b4ed8",
+          "parentSpanId": null,
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        },
+        {
+          "id": "helper1",
+          "spanId": "118afe0fbacd750d",
+          "parentSpanId": "784ec4fa764904a0",
+          "outcome": "success",
+          "stopReason": "stop_condition"
+        }
+      ],
+      "generations": [
+        {
+          "spanId": "a366106c37d30011",
+          "parentSpanId": "f514a9f99f5b4ed8",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "rows": [
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 84,
+              "estimatedCost": 0.000042,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 4157,
+              "estimatedCost": 0.0004157,
+              "costUnit": "USD"
+            }
+          ]
+        },
+        {
+          "spanId": "a7806d477ffc7c0f",
+          "parentSpanId": "118afe0fbacd750d",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "rows": [
+            {
+              "name": "mastra_model_total_input_tokens",
+              "value": 262,
+              "estimatedCost": 0.0000262,
+              "costUnit": "USD"
+            },
+            {
+              "name": "mastra_model_total_output_tokens",
+              "value": 14,
+              "estimatedCost": 0.000007,
+              "costUnit": "USD"
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "784ec4fa764904a0",
+          "parentSpanId": "6c31ddcf4443c211",
+          "name": "tool: 'agent-helper1'"
+        },
+        {
+          "spanId": "8f0d65628bb1842d",
+          "parentSpanId": "8b6ea767f2ded9e7",
+          "name": "tool: 'again'"
+        }
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "owner": "lead",
+      "total": 0.0003675,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 3605,
+          "outputTokens": 14,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        }
+      ]
+    },
+    {
+      "owner": "helper1",
+      "total": 0.000034,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 270,
+          "outputTokens": 14,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        }
+      ]
+    },
+    {
+      "owner": "lead",
+      "total": 0.00046170000000000006,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 4157,
+          "outputTokens": 92,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        }
+      ]
+    },
+    {
+      "owner": "helper1",
+      "total": 0.0000353,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 283,
+          "outputTokens": 14,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        }
+      ]
+    },
+    {
+      "owner": "helper3",
+      "total": 0.0000538,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 283,
+          "outputTokens": 51,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        }
+      ]
+    },
+    {
+      "owner": "helper2",
+      "total": 0.000055299999999999996,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 283,
+          "outputTokens": 54,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        }
+      ]
+    },
+    {
+      "owner": "lead",
+      "total": 0.000549,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 4175,
+          "outputTokens": 263,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        }
+      ]
+    },
+    {
+      "owner": "helper1",
+      "total": 0.0000332,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 262,
+          "outputTokens": 14,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        }
+      ]
+    },
+    {
+      "owner": "lead",
+      "total": 0.00045770000000000007,
+      "limit": 1e-8,
+      "stop": true,
+      "usage": [
+        {
+          "inputTokens": 4157,
+          "outputTokens": 84,
+          "cachedInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        }
+      ]
+    }
+  ]
+}
