@@ -1,0 +1,2285 @@
+{
+  "environmentVerifiedAtExport": {
+    "coreVersion": "1.82.0",
+    "method": "Read installed @mastra/core/package.json after the Studio server stopped. No dependencies changed during the experiment."
+  },
+  "setup": {
+    "baseCommit": "be39210",
+    "sourceSha256": "86087f88908e82a726299088a3f75ca933030f6c426471b6cd9384fec6b48b8a",
+    "model": "openai/gpt-6-luna",
+    "limit": 1e-8,
+    "prompt": "This is a disposable cost measurement, not a card or a code change. Delegate exactly once to the how explorer helper using agent-howExplorer. Ask it to reverse the string cobalt739 and return only the reversed string. Do not ask it about code. After the helper returns, repeat its answer and finish. Do not use any other tool, edit files, run commands, or start another helper.",
+    "cases": [
+      {
+        "key": "current-normal",
+        "factory": "current",
+        "test": "normal"
+      },
+      {
+        "key": "current-stop",
+        "factory": "current",
+        "test": "stop"
+      },
+      {
+        "key": "current-memory",
+        "factory": "current",
+        "test": "memory"
+      },
+      {
+        "key": "coding-normal",
+        "factory": "coding",
+        "test": "normal"
+      },
+      {
+        "key": "coding-stop",
+        "factory": "coding",
+        "test": "stop"
+      },
+      {
+        "key": "coding-memory",
+        "factory": "coding",
+        "test": "memory"
+      }
+    ],
+    "changes": [
+      "All model selections point to local Luna-only files.",
+      "Stop cases replace only COST_LIMIT_DOLLARS.",
+      "Coding cases replace every new Agent(config) with createCodingAgent(config).",
+      "Memory cases lower observation and reflection thresholds to 200 and 100 tokens, disabling async buffering. No other memory setting changes.",
+      "Only agent-howExplorer is active on the Lead. Helpers retain workspace tools. The Graphify gate is started."
+    ]
+  },
+  "pricing": {
+    "source": "https://developers.openai.com/api/docs/models/gpt-6-luna",
+    "perMillionUsd": {
+      "input": 0.1,
+      "cacheRead": 0.01,
+      "cacheWrite": 0.125,
+      "output": 0.5
+    },
+    "contextLimit": 272000
+  },
+  "runs": [
+    {
+      "key": "current-normal",
+      "factory": "current",
+      "test": "normal",
+      "runId": "a36cc4f5-df0d-4672-b2a5-63299cf6df68",
+      "traceId": "c3c6ebbb38a3c92343e865e02f474218",
+      "persistedRoot": {
+        "spanId": "4c8087bedd05675a",
+        "eventType": "end",
+        "endedAt": "2026-11-12T16:12:15.765Z",
+        "outcome": "success",
+        "stopReason": null,
+        "stopReasonContext": null
+      },
+      "tripwire": null,
+      "inferenceCount": 3,
+      "totalUsd": 0.0032057400000000003,
+      "generations": [
+        {
+          "spanId": "c8518be4e5aa278e",
+          "parentSpanId": "4c8087bedd05675a",
+          "runId": "a36cc4f5-df0d-4672-b2a5-63299cf6df68",
+          "entityId": "flow-build",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 26829,
+            "outputTokens": 85,
+            "inputDetails": {
+              "cacheRead": 13184,
+              "cacheWrite": 0,
+              "text": 13645
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 85
+            }
+          },
+          "recordedCostUsd": 0.00153884,
+          "tokensTimesPriceUsd": 0.0015388399999999999,
+          "metricRows": [
+            {
+              "metricId": "19cb80e8-ae80-4461-8a4f-1ee0deff07ac",
+              "timestamp": "2026-11-12T16:12:15.763Z",
+              "traceId": "c3c6ebbb38a3c92343e865e02f474218",
+              "spanId": "c8518be4e5aa278e",
+              "runId": "a36cc4f5-df0d-4672-b2a5-63299cf6df68",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 26829,
+              "estimatedCost": 0.00149634,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "08284f6a-61b8-4452-bb1b-422a4336456f",
+              "timestamp": "2026-11-12T16:12:15.763Z",
+              "traceId": "c3c6ebbb38a3c92343e865e02f474218",
+              "spanId": "c8518be4e5aa278e",
+              "runId": "a36cc4f5-df0d-4672-b2a5-63299cf6df68",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 85,
+              "estimatedCost": 0.0000425,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "30ae1da1bba2e469",
+              "parentSpanId": "288fac8d0db9bb66",
+              "runId": "a36cc4f5-df0d-4672-b2a5-63299cf6df68",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 13368,
+                "outputTokens": 77,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 13368
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 77
+                }
+              },
+              "tokensTimesPriceUsd": 0.0013753
+            },
+            {
+              "spanId": "72b8ce839647af7c",
+              "parentSpanId": "1cf3d7b2ad7ef473",
+              "runId": "a36cc4f5-df0d-4672-b2a5-63299cf6df68",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 13461,
+                "outputTokens": 8,
+                "inputDetails": {
+                  "cacheRead": 13184,
+                  "cacheWrite": 0,
+                  "text": 277
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 8
+                }
+              },
+              "tokensTimesPriceUsd": 0.00016354000000000002
+            }
+          ]
+        },
+        {
+          "spanId": "a89c60d5ad584dba",
+          "parentSpanId": "8bf6bb8adc52a2e8",
+          "runId": "3cd24965-724f-483f-a0bd-aeb2641754c4",
+          "entityId": "pstack-how-explorer-1",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 16629,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16629
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          },
+          "recordedCostUsd": 0.0016669,
+          "tokensTimesPriceUsd": 0.0016669,
+          "metricRows": [
+            {
+              "metricId": "d84853d6-7546-49f3-bfee-8994db273ed7",
+              "timestamp": "2026-11-12T16:12:14.221Z",
+              "traceId": "c3c6ebbb38a3c92343e865e02f474218",
+              "spanId": "a89c60d5ad584dba",
+              "runId": "3cd24965-724f-483f-a0bd-aeb2641754c4",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 16629,
+              "estimatedCost": 0.0016629,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "c6c22e49-7cf5-49f3-a23e-1ec75068aa2e",
+              "timestamp": "2026-11-12T16:12:14.222Z",
+              "traceId": "c3c6ebbb38a3c92343e865e02f474218",
+              "spanId": "a89c60d5ad584dba",
+              "runId": "3cd24965-724f-483f-a0bd-aeb2641754c4",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 8,
+              "estimatedCost": 0.000004,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "0892e4f1c30602d4",
+              "parentSpanId": "524bfca0291bc62a",
+              "runId": "3cd24965-724f-483f-a0bd-aeb2641754c4",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 16629,
+                "outputTokens": 8,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 16629
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 8
+                }
+              },
+              "tokensTimesPriceUsd": 0.0016669
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "fa91b1d7ca7c8c67",
+          "name": "tool: 'agent-howExplorer'",
+          "outcome": "success"
+        }
+      ]
+    },
+    {
+      "key": "current-stop",
+      "factory": "current",
+      "test": "stop",
+      "runId": "5a7e3948-0e85-4deb-aa77-48b4d53c6ad8",
+      "traceId": "9eef7ac57fb63d7a4c2ffd4151881c20",
+      "persistedRoot": {
+        "spanId": "0c45d34ac8dd6a03",
+        "eventType": "end",
+        "endedAt": "2026-11-12T16:12:23.205Z",
+        "outcome": "blocked",
+        "stopReason": "guardrail",
+        "stopReasonContext": "{\"processorId\":\"token-cost-control\"}"
+      },
+      "tripwire": {
+        "reason": "Cost control: estimated cost limit exceeded (0.001666/0)",
+        "retry": false,
+        "metadata": {
+          "processorId": "token-cost-control",
+          "usage": {
+            "estimatedCost": 0.0016661,
+            "costUnit": "USD",
+            "incomplete": false
+          },
+          "maxCost": 1e-8,
+          "scope": "run",
+          "threshold": "hard"
+        },
+        "processorId": "token-cost-control"
+      },
+      "inferenceCount": 2,
+      "totalUsd": 0.0030374,
+      "generations": [
+        {
+          "spanId": "1a715c81e3b971b0",
+          "parentSpanId": "0c45d34ac8dd6a03",
+          "runId": "5a7e3948-0e85-4deb-aa77-48b4d53c6ad8",
+          "entityId": "flow-build",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 13368,
+            "outputTokens": 69,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 13368
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 69
+            }
+          },
+          "recordedCostUsd": 0.0013713,
+          "tokensTimesPriceUsd": 0.0013713000000000002,
+          "metricRows": [
+            {
+              "metricId": "f4265fe9-26ed-47a2-9e7a-05accfc7d4c6",
+              "timestamp": "2026-11-12T16:12:23.205Z",
+              "traceId": "9eef7ac57fb63d7a4c2ffd4151881c20",
+              "spanId": "1a715c81e3b971b0",
+              "runId": "5a7e3948-0e85-4deb-aa77-48b4d53c6ad8",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 69,
+              "estimatedCost": 0.0000345,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "52242f37-6d60-47b1-b322-5c6a9a508a75",
+              "timestamp": "2026-11-12T16:12:23.204Z",
+              "traceId": "9eef7ac57fb63d7a4c2ffd4151881c20",
+              "spanId": "1a715c81e3b971b0",
+              "runId": "5a7e3948-0e85-4deb-aa77-48b4d53c6ad8",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 13368,
+              "estimatedCost": 0.0013368,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "7f16806e893b86b4",
+              "parentSpanId": "8dda32835c866821",
+              "runId": "5a7e3948-0e85-4deb-aa77-48b4d53c6ad8",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 13368,
+                "outputTokens": 69,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 13368
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 69
+                }
+              },
+              "tokensTimesPriceUsd": 0.0013713000000000002
+            }
+          ]
+        },
+        {
+          "spanId": "0afec8b7a2d7c430",
+          "parentSpanId": "be52aa51abdc7636",
+          "runId": "3760c794-f3cc-4473-bf93-e85e509280ae",
+          "entityId": "pstack-how-explorer-1",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 16621,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 16621
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          },
+          "recordedCostUsd": 0.0016661,
+          "tokensTimesPriceUsd": 0.0016661000000000002,
+          "metricRows": [
+            {
+              "metricId": "d659af13-be57-4c16-9441-00df3f437334",
+              "timestamp": "2026-11-12T16:12:22.925Z",
+              "traceId": "9eef7ac57fb63d7a4c2ffd4151881c20",
+              "spanId": "0afec8b7a2d7c430",
+              "runId": "3760c794-f3cc-4473-bf93-e85e509280ae",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 16621,
+              "estimatedCost": 0.0016621,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "2fb01131-258d-403c-bf21-3ed04478bddb",
+              "timestamp": "2026-11-12T16:12:22.925Z",
+              "traceId": "9eef7ac57fb63d7a4c2ffd4151881c20",
+              "spanId": "0afec8b7a2d7c430",
+              "runId": "3760c794-f3cc-4473-bf93-e85e509280ae",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 8,
+              "estimatedCost": 0.000004,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "48723bbe05dee501",
+              "parentSpanId": "fa4447085dfbdf46",
+              "runId": "3760c794-f3cc-4473-bf93-e85e509280ae",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 16621,
+                "outputTokens": 8,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 16621
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 8
+                }
+              },
+              "tokensTimesPriceUsd": 0.0016661000000000002
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "5cc77e00d138ba32",
+          "name": "tool: 'agent-howExplorer'",
+          "outcome": "success"
+        }
+      ]
+    },
+    {
+      "key": "current-memory",
+      "factory": "current",
+      "test": "memory",
+      "runId": "009213a7-d4b0-40cd-8044-6d6bca9916d2",
+      "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+      "persistedRoot": {
+        "spanId": "d4fa051690c82ca8",
+        "eventType": "end",
+        "endedAt": "2026-11-12T16:13:03.637Z",
+        "outcome": "success",
+        "stopReason": null,
+        "stopReasonContext": null
+      },
+      "tripwire": null,
+      "inferenceCount": 9,
+      "totalUsd": 0.00742436,
+      "generations": [
+        {
+          "spanId": "5a7fe7c5c7549b3b",
+          "parentSpanId": "d4fa051690c82ca8",
+          "runId": "009213a7-d4b0-40cd-8044-6d6bca9916d2",
+          "entityId": "flow-build",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 30161,
+            "outputTokens": 87,
+            "inputDetails": {
+              "cacheRead": 14848,
+              "cacheWrite": 0,
+              "text": 15313
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 87
+            }
+          },
+          "recordedCostUsd": 0.00172328,
+          "tokensTimesPriceUsd": 0.0017232800000000002,
+          "metricRows": [
+            {
+              "metricId": "3b8d9054-83fe-4ce9-bb67-d68a09e406ea",
+              "timestamp": "2026-11-12T16:13:03.632Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "5a7fe7c5c7549b3b",
+              "runId": "009213a7-d4b0-40cd-8044-6d6bca9916d2",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 30161,
+              "estimatedCost": 0.00167978,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "a4f125e3-75b2-4c90-bbdf-0f6f032a98a2",
+              "timestamp": "2026-11-12T16:13:03.633Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "5a7fe7c5c7549b3b",
+              "runId": "009213a7-d4b0-40cd-8044-6d6bca9916d2",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 87,
+              "estimatedCost": 0.0000435,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "1523b0ea9fa3c574",
+              "parentSpanId": "7bb6f560de2d4ec8",
+              "runId": "009213a7-d4b0-40cd-8044-6d6bca9916d2",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 15033,
+                "outputTokens": 79,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 15033
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 79
+                }
+              },
+              "tokensTimesPriceUsd": 0.0015428000000000002
+            },
+            {
+              "spanId": "cf148845e620da8d",
+              "parentSpanId": "e39da9bbb3946875",
+              "runId": "009213a7-d4b0-40cd-8044-6d6bca9916d2",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 15128,
+                "outputTokens": 8,
+                "inputDetails": {
+                  "cacheRead": 14848,
+                  "cacheWrite": 0,
+                  "text": 280
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 8
+                }
+              },
+              "tokensTimesPriceUsd": 0.00018047999999999998
+            }
+          ]
+        },
+        {
+          "spanId": "1035067d7464c474",
+          "parentSpanId": "0e746015ef7c66f3",
+          "runId": "6a85e8a1-1d10-4042-8c31-35f7dae136c4",
+          "entityId": "observational-memory-observer",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 5293,
+            "outputTokens": 343,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 5293
+            },
+            "outputDetails": {
+              "reasoning": 131,
+              "text": 212
+            }
+          },
+          "recordedCostUsd": 0.0007008,
+          "tokensTimesPriceUsd": 0.0007008000000000001,
+          "metricRows": [
+            {
+              "metricId": "13a05123-7b31-42bf-a5ce-94a1d9e53a8f",
+              "timestamp": "2026-11-12T16:12:33.939Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "1035067d7464c474",
+              "runId": "6a85e8a1-1d10-4042-8c31-35f7dae136c4",
+              "entityType": "agent",
+              "entityId": "observational-memory-observer",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-observer",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 5293,
+              "estimatedCost": 0.0005293,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "4fcd426f-0535-481e-9a43-494e0743070f",
+              "timestamp": "2026-11-12T16:12:33.939Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "1035067d7464c474",
+              "runId": "6a85e8a1-1d10-4042-8c31-35f7dae136c4",
+              "entityType": "agent",
+              "entityId": "observational-memory-observer",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-observer",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 343,
+              "estimatedCost": 0.0001715,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "8dfd378cd0f8cd1e",
+              "parentSpanId": "54de0f8175cdff59",
+              "runId": "6a85e8a1-1d10-4042-8c31-35f7dae136c4",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 5293,
+                "outputTokens": 343,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 5293
+                },
+                "outputDetails": {
+                  "reasoning": 131,
+                  "text": 212
+                }
+              },
+              "tokensTimesPriceUsd": 0.0007008000000000001
+            }
+          ]
+        },
+        {
+          "spanId": "ca996ac9978b4e04",
+          "parentSpanId": "b87850c74f6a471b",
+          "runId": "d833cde1-e90f-43e9-9c10-37d96f4bd4a8",
+          "entityId": "observational-memory-reflector",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 6188,
+            "outputTokens": 223,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 6188
+            },
+            "outputDetails": {
+              "reasoning": 38,
+              "text": 185
+            }
+          },
+          "recordedCostUsd": 0.0007302999999999999,
+          "tokensTimesPriceUsd": 0.0007303,
+          "metricRows": [
+            {
+              "metricId": "e22fcdd3-3e75-4e6b-8cf5-f7764e0df453",
+              "timestamp": "2026-11-12T16:12:38.956Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "ca996ac9978b4e04",
+              "runId": "d833cde1-e90f-43e9-9c10-37d96f4bd4a8",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 6188,
+              "estimatedCost": 0.0006188,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "e6d7936a-2bb5-4d68-9048-481866c7f90e",
+              "timestamp": "2026-11-12T16:12:38.956Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "ca996ac9978b4e04",
+              "runId": "d833cde1-e90f-43e9-9c10-37d96f4bd4a8",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 223,
+              "estimatedCost": 0.0001115,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "b99a2203cd10db4c",
+              "parentSpanId": "5b6d87e39c4cf25c",
+              "runId": "d833cde1-e90f-43e9-9c10-37d96f4bd4a8",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 6188,
+                "outputTokens": 223,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 6188
+                },
+                "outputDetails": {
+                  "reasoning": 38,
+                  "text": 185
+                }
+              },
+              "tokensTimesPriceUsd": 0.0007303
+            }
+          ]
+        },
+        {
+          "spanId": "cbbdce5055026f91",
+          "parentSpanId": "4062dd29e174af1d",
+          "runId": "dda3ecb8-595b-4456-888e-cd951276fc46",
+          "entityId": "observational-memory-reflector",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 6220,
+            "outputTokens": 213,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 6220
+            },
+            "outputDetails": {
+              "reasoning": 35,
+              "text": 178
+            }
+          },
+          "recordedCostUsd": 0.0007285,
+          "tokensTimesPriceUsd": 0.0007285,
+          "metricRows": [
+            {
+              "metricId": "ff932361-5320-4030-88c5-1ac4bbd139c5",
+              "timestamp": "2026-11-12T16:12:44.061Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "cbbdce5055026f91",
+              "runId": "dda3ecb8-595b-4456-888e-cd951276fc46",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 6220,
+              "estimatedCost": 0.0006219999999999999,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "76994a4a-5915-422d-9313-44184ef89d47",
+              "timestamp": "2026-11-12T16:12:44.062Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "cbbdce5055026f91",
+              "runId": "dda3ecb8-595b-4456-888e-cd951276fc46",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 213,
+              "estimatedCost": 0.0001065,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "c02506bd959433c4",
+              "parentSpanId": "58d7964fb3498ce1",
+              "runId": "dda3ecb8-595b-4456-888e-cd951276fc46",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 6220,
+                "outputTokens": 213,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 6220
+                },
+                "outputDetails": {
+                  "reasoning": 35,
+                  "text": 178
+                }
+              },
+              "tokensTimesPriceUsd": 0.0007285
+            }
+          ]
+        },
+        {
+          "spanId": "3df18a848726ee46",
+          "parentSpanId": "5b4997220d526890",
+          "runId": "5b75e96e-6d03-4082-87cd-e3d24c17f313",
+          "entityId": "observational-memory-reflector",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 6239,
+            "outputTokens": 211,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 6239
+            },
+            "outputDetails": {
+              "reasoning": 51,
+              "text": 160
+            }
+          },
+          "recordedCostUsd": 0.0007294,
+          "tokensTimesPriceUsd": 0.0007294000000000001,
+          "metricRows": [
+            {
+              "metricId": "da2dbedc-427a-4ccb-982f-fd4ca9c806ab",
+              "timestamp": "2026-11-12T16:12:48.885Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "3df18a848726ee46",
+              "runId": "5b75e96e-6d03-4082-87cd-e3d24c17f313",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 211,
+              "estimatedCost": 0.0001055,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "9b9ebbf4-906e-4fc8-89e2-7182c941d27e",
+              "timestamp": "2026-11-12T16:12:48.885Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "3df18a848726ee46",
+              "runId": "5b75e96e-6d03-4082-87cd-e3d24c17f313",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 6239,
+              "estimatedCost": 0.0006238999999999999,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "5bbd1456570f91a2",
+              "parentSpanId": "9f154a2dce6e8fe2",
+              "runId": "5b75e96e-6d03-4082-87cd-e3d24c17f313",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 6239,
+                "outputTokens": 211,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 6239
+                },
+                "outputDetails": {
+                  "reasoning": 51,
+                  "text": 160
+                }
+              },
+              "tokensTimesPriceUsd": 0.0007294000000000001
+            }
+          ]
+        },
+        {
+          "spanId": "bb6a36e87277f39e",
+          "parentSpanId": "f0b545653e7b4ce0",
+          "runId": "86dcfb7a-a9a2-4d9a-bd7f-e30cceed618c",
+          "entityId": "observational-memory-reflector",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 6292,
+            "outputTokens": 208,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 6292
+            },
+            "outputDetails": {
+              "reasoning": 47,
+              "text": 161
+            }
+          },
+          "recordedCostUsd": 0.0007332,
+          "tokensTimesPriceUsd": 0.0007332,
+          "metricRows": [
+            {
+              "metricId": "0e57e4f8-1f2d-4eb6-bc51-7d799c87f715",
+              "timestamp": "2026-11-12T16:12:53.791Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "bb6a36e87277f39e",
+              "runId": "86dcfb7a-a9a2-4d9a-bd7f-e30cceed618c",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 6292,
+              "estimatedCost": 0.0006292,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "3988953e-c46c-46bd-b792-dda0ef8d9134",
+              "timestamp": "2026-11-12T16:12:53.791Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "bb6a36e87277f39e",
+              "runId": "86dcfb7a-a9a2-4d9a-bd7f-e30cceed618c",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 208,
+              "estimatedCost": 0.000104,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "d5ee8cd890ea87ae",
+              "parentSpanId": "5220019ccb54699e",
+              "runId": "86dcfb7a-a9a2-4d9a-bd7f-e30cceed618c",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 6292,
+                "outputTokens": 208,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 6292
+                },
+                "outputDetails": {
+                  "reasoning": 47,
+                  "text": 161
+                }
+              },
+              "tokensTimesPriceUsd": 0.0007332
+            }
+          ]
+        },
+        {
+          "spanId": "6c4f99c1878859ef",
+          "parentSpanId": "e9ae8dab9f97a355",
+          "runId": "65cdef0c-d099-48d3-b292-f4b86d21178f",
+          "entityId": "pstack-how-explorer-1",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 36487,
+            "outputTokens": 109,
+            "inputDetails": {
+              "cacheRead": 18048,
+              "cacheWrite": 0,
+              "text": 18439
+            },
+            "outputDetails": {
+              "reasoning": 40,
+              "text": 69
+            }
+          },
+          "recordedCostUsd": 0.00207888,
+          "tokensTimesPriceUsd": 0.00207888,
+          "metricRows": [
+            {
+              "metricId": "f2e89574-e312-434f-8f3c-1faa961a6ea1",
+              "timestamp": "2026-11-12T16:13:02.208Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "6c4f99c1878859ef",
+              "runId": "65cdef0c-d099-48d3-b292-f4b86d21178f",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 109,
+              "estimatedCost": 0.0000545,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "12ea078d-b071-4e6b-a5ed-a2f0cded652c",
+              "timestamp": "2026-11-12T16:13:02.208Z",
+              "traceId": "01accf867d830dbdb64ec8ebc6dc82e1",
+              "spanId": "6c4f99c1878859ef",
+              "runId": "65cdef0c-d099-48d3-b292-f4b86d21178f",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 36487,
+              "estimatedCost": 0.00202438,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "f29b04b4a7530a4f",
+              "parentSpanId": "ee5e3bb92a9ce0a8",
+              "runId": "65cdef0c-d099-48d3-b292-f4b86d21178f",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 18205,
+                "outputTokens": 59,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 18205
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 59
+                }
+              },
+              "tokensTimesPriceUsd": 0.00185
+            },
+            {
+              "spanId": "92377a9539bff8c8",
+              "parentSpanId": "a2cb197c85d66b20",
+              "runId": "65cdef0c-d099-48d3-b292-f4b86d21178f",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 18282,
+                "outputTokens": 50,
+                "inputDetails": {
+                  "cacheRead": 18048,
+                  "cacheWrite": 0,
+                  "text": 234
+                },
+                "outputDetails": {
+                  "reasoning": 40,
+                  "text": 10
+                }
+              },
+              "tokensTimesPriceUsd": 0.00022888
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "c72500a0c457916c",
+          "name": "tool: 'agent-howExplorer'",
+          "outcome": "success"
+        },
+        {
+          "spanId": "8f3893ec7f1cb356",
+          "name": "tool: 'mastra_workspace_execute_command'",
+          "outcome": "success"
+        }
+      ]
+    },
+    {
+      "key": "coding-normal",
+      "factory": "coding",
+      "test": "normal",
+      "runId": "b856bf63-2f78-4e62-b54b-5706b8a5b5ad",
+      "traceId": "837ba7e94931e9722f79fd38413089fa",
+      "persistedRoot": {
+        "spanId": "18e7db182d50c3da",
+        "eventType": "end",
+        "endedAt": "2026-11-12T16:13:14.711Z",
+        "outcome": "success",
+        "stopReason": null,
+        "stopReasonContext": null
+      },
+      "tripwire": null,
+      "inferenceCount": 3,
+      "totalUsd": 0.00337012,
+      "generations": [
+        {
+          "spanId": "1aa79f62c129955d",
+          "parentSpanId": "18e7db182d50c3da",
+          "runId": "b856bf63-2f78-4e62-b54b-5706b8a5b5ad",
+          "entityId": "flow-build",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 27015,
+            "outputTokens": 77,
+            "inputDetails": {
+              "cacheRead": 13312,
+              "cacheWrite": 0,
+              "text": 13703
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 77
+            }
+          },
+          "recordedCostUsd": 0.00154192,
+          "tokensTimesPriceUsd": 0.00154192,
+          "metricRows": [
+            {
+              "metricId": "f677e4ce-6d23-4487-b568-c6b2ccc15f4d",
+              "timestamp": "2026-11-12T16:13:14.709Z",
+              "traceId": "837ba7e94931e9722f79fd38413089fa",
+              "spanId": "1aa79f62c129955d",
+              "runId": "b856bf63-2f78-4e62-b54b-5706b8a5b5ad",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 27015,
+              "estimatedCost": 0.00150342,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "73eb3a4a-690c-4718-911d-9866686ddab0",
+              "timestamp": "2026-11-12T16:13:14.709Z",
+              "traceId": "837ba7e94931e9722f79fd38413089fa",
+              "spanId": "1aa79f62c129955d",
+              "runId": "b856bf63-2f78-4e62-b54b-5706b8a5b5ad",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 77,
+              "estimatedCost": 0.0000385,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "5abb174b3b48b5ac",
+              "parentSpanId": "6be122fb9bd07fae",
+              "runId": "b856bf63-2f78-4e62-b54b-5706b8a5b5ad",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 13465,
+                "outputTokens": 69,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 13465
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 69
+                }
+              },
+              "tokensTimesPriceUsd": 0.001381
+            },
+            {
+              "spanId": "2e6f1008a6daf887",
+              "parentSpanId": "5a6624135bc59f55",
+              "runId": "b856bf63-2f78-4e62-b54b-5706b8a5b5ad",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 13550,
+                "outputTokens": 8,
+                "inputDetails": {
+                  "cacheRead": 13312,
+                  "cacheWrite": 0,
+                  "text": 238
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 8
+                }
+              },
+              "tokensTimesPriceUsd": 0.00016092000000000002
+            }
+          ]
+        },
+        {
+          "spanId": "418e133cd68584eb",
+          "parentSpanId": "333a3fd12b93d7f6",
+          "runId": "f2f74089-ff62-49a4-a2b4-cbf4d858e47c",
+          "entityId": "pstack-how-explorer-1",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 17692,
+            "outputTokens": 118,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 17692
+            },
+            "outputDetails": {
+              "reasoning": 108,
+              "text": 10
+            }
+          },
+          "recordedCostUsd": 0.0018282,
+          "tokensTimesPriceUsd": 0.0018282,
+          "metricRows": [
+            {
+              "metricId": "3c07601d-0742-4082-b35a-f16dafb3b1bc",
+              "timestamp": "2026-11-12T16:13:13.087Z",
+              "traceId": "837ba7e94931e9722f79fd38413089fa",
+              "spanId": "418e133cd68584eb",
+              "runId": "f2f74089-ff62-49a4-a2b4-cbf4d858e47c",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 118,
+              "estimatedCost": 0.000059,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "6cb27a66-1213-4d8e-b8a4-82372de8d793",
+              "timestamp": "2026-11-12T16:13:13.087Z",
+              "traceId": "837ba7e94931e9722f79fd38413089fa",
+              "spanId": "418e133cd68584eb",
+              "runId": "f2f74089-ff62-49a4-a2b4-cbf4d858e47c",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 17692,
+              "estimatedCost": 0.0017692,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "28974eabb91428a5",
+              "parentSpanId": "b5f3b46560169aad",
+              "runId": "f2f74089-ff62-49a4-a2b4-cbf4d858e47c",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 17692,
+                "outputTokens": 118,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 17692
+                },
+                "outputDetails": {
+                  "reasoning": 108,
+                  "text": 10
+                }
+              },
+              "tokensTimesPriceUsd": 0.0018282
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "d80a9df89e849264",
+          "name": "tool: 'agent-howExplorer'",
+          "outcome": "success"
+        }
+      ]
+    },
+    {
+      "key": "coding-stop",
+      "factory": "coding",
+      "test": "stop",
+      "runId": "6033e456-cf1d-4d61-bcc1-8314e702b072",
+      "traceId": "26c5a3b4d500a227f8af305a85f4cdc6",
+      "persistedRoot": {
+        "spanId": "ea0b82f471538d2c",
+        "eventType": "end",
+        "endedAt": "2026-11-12T16:13:25.119Z",
+        "outcome": "blocked",
+        "stopReason": "guardrail",
+        "stopReasonContext": "{\"processorId\":\"token-cost-control\"}"
+      },
+      "tripwire": {
+        "reason": "Cost control: estimated cost limit exceeded (0.001827/0)",
+        "retry": false,
+        "metadata": {
+          "processorId": "token-cost-control",
+          "usage": {
+            "estimatedCost": 0.0018273999999999999,
+            "costUnit": "USD",
+            "incomplete": false
+          },
+          "maxCost": 1e-8,
+          "scope": "run",
+          "threshold": "hard"
+        },
+        "processorId": "token-cost-control"
+      },
+      "inferenceCount": 2,
+      "totalUsd": 0.0032309,
+      "generations": [
+        {
+          "spanId": "cbfb8c9c8ae15afa",
+          "parentSpanId": "ea0b82f471538d2c",
+          "runId": "6033e456-cf1d-4d61-bcc1-8314e702b072",
+          "entityId": "flow-build",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 13465,
+            "outputTokens": 114,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 13465
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 114
+            }
+          },
+          "recordedCostUsd": 0.0014035,
+          "tokensTimesPriceUsd": 0.0014035,
+          "metricRows": [
+            {
+              "metricId": "0df52c35-03be-4d58-8dec-90c27fbcec16",
+              "timestamp": "2026-11-12T16:13:25.119Z",
+              "traceId": "26c5a3b4d500a227f8af305a85f4cdc6",
+              "spanId": "cbfb8c9c8ae15afa",
+              "runId": "6033e456-cf1d-4d61-bcc1-8314e702b072",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 13465,
+              "estimatedCost": 0.0013465,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "ff7384ea-3c01-4572-871e-485ecf7fc180",
+              "timestamp": "2026-11-12T16:13:25.119Z",
+              "traceId": "26c5a3b4d500a227f8af305a85f4cdc6",
+              "spanId": "cbfb8c9c8ae15afa",
+              "runId": "6033e456-cf1d-4d61-bcc1-8314e702b072",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 114,
+              "estimatedCost": 0.000057,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "1a01ce0ac6bc1551",
+              "parentSpanId": "17a38a73f3b43487",
+              "runId": "6033e456-cf1d-4d61-bcc1-8314e702b072",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 13465,
+                "outputTokens": 114,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 13465
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 114
+                }
+              },
+              "tokensTimesPriceUsd": 0.0014035
+            }
+          ]
+        },
+        {
+          "spanId": "fba36a1cb8f43ed4",
+          "parentSpanId": "8f634e85d362b5f5",
+          "runId": "20773e21-5798-4375-94dd-34a177934022",
+          "entityId": "pstack-how-explorer-1",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 17699,
+            "outputTokens": 115,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 17699
+            },
+            "outputDetails": {
+              "reasoning": 105,
+              "text": 10
+            }
+          },
+          "recordedCostUsd": 0.0018273999999999999,
+          "tokensTimesPriceUsd": 0.0018274,
+          "metricRows": [
+            {
+              "metricId": "e7e9535f-747a-4453-b61f-2657c285aba6",
+              "timestamp": "2026-11-12T16:13:24.803Z",
+              "traceId": "26c5a3b4d500a227f8af305a85f4cdc6",
+              "spanId": "fba36a1cb8f43ed4",
+              "runId": "20773e21-5798-4375-94dd-34a177934022",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 17699,
+              "estimatedCost": 0.0017698999999999998,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "1b0ab58e-8364-473d-8abc-bc27e3232aa4",
+              "timestamp": "2026-11-12T16:13:24.803Z",
+              "traceId": "26c5a3b4d500a227f8af305a85f4cdc6",
+              "spanId": "fba36a1cb8f43ed4",
+              "runId": "20773e21-5798-4375-94dd-34a177934022",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 115,
+              "estimatedCost": 0.000057499999999999995,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "d489fd586b719895",
+              "parentSpanId": "0cb3531b440b88a8",
+              "runId": "20773e21-5798-4375-94dd-34a177934022",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 17699,
+                "outputTokens": 115,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 17699
+                },
+                "outputDetails": {
+                  "reasoning": 105,
+                  "text": 10
+                }
+              },
+              "tokensTimesPriceUsd": 0.0018274
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "0d7abc01e0e6b1fb",
+          "name": "tool: 'agent-howExplorer'",
+          "outcome": "success"
+        }
+      ]
+    },
+    {
+      "key": "coding-memory",
+      "factory": "coding",
+      "test": "memory",
+      "runId": "06dbfece-1e05-42a4-96af-8f42628d49c8",
+      "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+      "persistedRoot": {
+        "spanId": "4e4338c6250d0ff9",
+        "eventType": "end",
+        "endedAt": "2026-11-12T16:14:04.898Z",
+        "outcome": "success",
+        "stopReason": null,
+        "stopReasonContext": null
+      },
+      "tripwire": null,
+      "inferenceCount": 8,
+      "totalUsd": 0.00602174,
+      "generations": [
+        {
+          "spanId": "4b058feaa378d877",
+          "parentSpanId": "4e4338c6250d0ff9",
+          "runId": "06dbfece-1e05-42a4-96af-8f42628d49c8",
+          "entityId": "flow-build",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 30389,
+            "outputTokens": 87,
+            "inputDetails": {
+              "cacheRead": 14976,
+              "cacheWrite": 0,
+              "text": 15413
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 87
+            }
+          },
+          "recordedCostUsd": 0.00173456,
+          "tokensTimesPriceUsd": 0.0017345600000000002,
+          "metricRows": [
+            {
+              "metricId": "33a881de-78ac-4b9f-8b1a-668e8950347a",
+              "timestamp": "2026-11-12T16:14:04.896Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "4b058feaa378d877",
+              "runId": "06dbfece-1e05-42a4-96af-8f42628d49c8",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 30389,
+              "estimatedCost": 0.00169106,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "5dfca289-def3-4a12-a0a2-0163552e6567",
+              "timestamp": "2026-11-12T16:14:04.896Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "4b058feaa378d877",
+              "runId": "06dbfece-1e05-42a4-96af-8f42628d49c8",
+              "entityType": "agent",
+              "entityId": "flow-build",
+              "parentEntityType": "agent",
+              "parentEntityId": "flow-build",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 87,
+              "estimatedCost": 0.0000435,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "29404e10ea94b407",
+              "parentSpanId": "ba5f9413055b6993",
+              "runId": "06dbfece-1e05-42a4-96af-8f42628d49c8",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 15147,
+                "outputTokens": 79,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 15147
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 79
+                }
+              },
+              "tokensTimesPriceUsd": 0.0015542
+            },
+            {
+              "spanId": "5d7108c521e8edbe",
+              "parentSpanId": "fb6f458ff9c476e3",
+              "runId": "06dbfece-1e05-42a4-96af-8f42628d49c8",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 15242,
+                "outputTokens": 8,
+                "inputDetails": {
+                  "cacheRead": 14976,
+                  "cacheWrite": 0,
+                  "text": 266
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 8
+                }
+              },
+              "tokensTimesPriceUsd": 0.00018036
+            }
+          ]
+        },
+        {
+          "spanId": "9ca991264b668e29",
+          "parentSpanId": "bb765023a536538b",
+          "runId": "a81db134-9d91-425a-9839-17c4dbdd6b21",
+          "entityId": "observational-memory-observer",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 5293,
+            "outputTokens": 302,
+            "inputDetails": {
+              "cacheRead": 4096,
+              "cacheWrite": 0,
+              "text": 1197
+            },
+            "outputDetails": {
+              "reasoning": 70,
+              "text": 232
+            }
+          },
+          "recordedCostUsd": 0.00031165999999999995,
+          "tokensTimesPriceUsd": 0.00031165999999999995,
+          "metricRows": [
+            {
+              "metricId": "cb9160d5-b17a-4acf-a1d6-73732eda4f3d",
+              "timestamp": "2026-11-12T16:13:34.835Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "9ca991264b668e29",
+              "runId": "a81db134-9d91-425a-9839-17c4dbdd6b21",
+              "entityType": "agent",
+              "entityId": "observational-memory-observer",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-observer",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 302,
+              "estimatedCost": 0.00015099999999999998,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "fb589b4b-de04-404f-86f1-f27982ef7b5d",
+              "timestamp": "2026-11-12T16:13:34.835Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "9ca991264b668e29",
+              "runId": "a81db134-9d91-425a-9839-17c4dbdd6b21",
+              "entityType": "agent",
+              "entityId": "observational-memory-observer",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-observer",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 5293,
+              "estimatedCost": 0.00016066,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "8f7f58c17d1841f5",
+              "parentSpanId": "849bdbcac7a1a7fe",
+              "runId": "a81db134-9d91-425a-9839-17c4dbdd6b21",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 5293,
+                "outputTokens": 302,
+                "inputDetails": {
+                  "cacheRead": 4096,
+                  "cacheWrite": 0,
+                  "text": 1197
+                },
+                "outputDetails": {
+                  "reasoning": 70,
+                  "text": 232
+                }
+              },
+              "tokensTimesPriceUsd": 0.00031165999999999995
+            }
+          ]
+        },
+        {
+          "spanId": "921112eec9ce0e9b",
+          "parentSpanId": "66203e64fcf50636",
+          "runId": "80179051-3ab2-4af4-ab3b-78d43e1a5d78",
+          "entityId": "observational-memory-reflector",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 6208,
+            "outputTokens": 242,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 6208
+            },
+            "outputDetails": {
+              "reasoning": 33,
+              "text": 209
+            }
+          },
+          "recordedCostUsd": 0.0007418,
+          "tokensTimesPriceUsd": 0.0007418,
+          "metricRows": [
+            {
+              "metricId": "4cbecc14-658f-406b-9fea-1c57538d17be",
+              "timestamp": "2026-11-12T16:13:40.317Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "921112eec9ce0e9b",
+              "runId": "80179051-3ab2-4af4-ab3b-78d43e1a5d78",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 242,
+              "estimatedCost": 0.000121,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "4ab00173-a7c4-4333-8711-076db9f95aa2",
+              "timestamp": "2026-11-12T16:13:40.317Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "921112eec9ce0e9b",
+              "runId": "80179051-3ab2-4af4-ab3b-78d43e1a5d78",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 6208,
+              "estimatedCost": 0.0006208,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "17cd0a7dc30eaadc",
+              "parentSpanId": "238b816adac6c0a4",
+              "runId": "80179051-3ab2-4af4-ab3b-78d43e1a5d78",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 6208,
+                "outputTokens": 242,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 6208
+                },
+                "outputDetails": {
+                  "reasoning": 33,
+                  "text": 209
+                }
+              },
+              "tokensTimesPriceUsd": 0.0007418
+            }
+          ]
+        },
+        {
+          "spanId": "949ba22c85b1e171",
+          "parentSpanId": "ce98a424c2e7a7e3",
+          "runId": "64c03f33-1947-4803-8980-c7efb570c413",
+          "entityId": "observational-memory-reflector",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 6240,
+            "outputTokens": 261,
+            "inputDetails": {
+              "cacheRead": 5376,
+              "cacheWrite": 0,
+              "text": 864
+            },
+            "outputDetails": {
+              "reasoning": 84,
+              "text": 177
+            }
+          },
+          "recordedCostUsd": 0.00027066000000000004,
+          "tokensTimesPriceUsd": 0.00027066,
+          "metricRows": [
+            {
+              "metricId": "bf24bb06-c609-4075-b82e-03ada797e280",
+              "timestamp": "2026-11-12T16:13:46.109Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "949ba22c85b1e171",
+              "runId": "64c03f33-1947-4803-8980-c7efb570c413",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 261,
+              "estimatedCost": 0.0001305,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "68f355e9-547a-41ee-8534-2d602fe40c34",
+              "timestamp": "2026-11-12T16:13:46.109Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "949ba22c85b1e171",
+              "runId": "64c03f33-1947-4803-8980-c7efb570c413",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 6240,
+              "estimatedCost": 0.00014016,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "104e6b65d8d2b5ed",
+              "parentSpanId": "4d5742fea94e36da",
+              "runId": "64c03f33-1947-4803-8980-c7efb570c413",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 6240,
+                "outputTokens": 261,
+                "inputDetails": {
+                  "cacheRead": 5376,
+                  "cacheWrite": 0,
+                  "text": 864
+                },
+                "outputDetails": {
+                  "reasoning": 84,
+                  "text": 177
+                }
+              },
+              "tokensTimesPriceUsd": 0.00027066
+            }
+          ]
+        },
+        {
+          "spanId": "dcf0dcf4deed1416",
+          "parentSpanId": "b74e1410613ad61f",
+          "runId": "de2502c1-bc98-4542-a074-d5244812f590",
+          "entityId": "observational-memory-reflector",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 6259,
+            "outputTokens": 334,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 6259
+            },
+            "outputDetails": {
+              "reasoning": 135,
+              "text": 199
+            }
+          },
+          "recordedCostUsd": 0.0007929,
+          "tokensTimesPriceUsd": 0.0007929000000000001,
+          "metricRows": [
+            {
+              "metricId": "ca0ce8a2-3923-4b93-9d6e-4c2c90ab52ab",
+              "timestamp": "2026-11-12T16:13:53.631Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "dcf0dcf4deed1416",
+              "runId": "de2502c1-bc98-4542-a074-d5244812f590",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 6259,
+              "estimatedCost": 0.0006259,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "3430f4e9-42c5-4899-8fdc-40e4a8fd428a",
+              "timestamp": "2026-11-12T16:13:53.631Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "dcf0dcf4deed1416",
+              "runId": "de2502c1-bc98-4542-a074-d5244812f590",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 334,
+              "estimatedCost": 0.000167,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "8243a79db30734fc",
+              "parentSpanId": "fa0ddcd457afa4a2",
+              "runId": "de2502c1-bc98-4542-a074-d5244812f590",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 6259,
+                "outputTokens": 334,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 6259
+                },
+                "outputDetails": {
+                  "reasoning": 135,
+                  "text": 199
+                }
+              },
+              "tokensTimesPriceUsd": 0.0007929000000000001
+            }
+          ]
+        },
+        {
+          "spanId": "4a646c15f1f005d2",
+          "parentSpanId": "96836f06013c191f",
+          "runId": "f8bf8b17-91db-4955-aaad-a2e89cf3392d",
+          "entityId": "observational-memory-reflector",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 6312,
+            "outputTokens": 179,
+            "inputDetails": {
+              "cacheRead": 5376,
+              "cacheWrite": 0,
+              "text": 936
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 179
+            }
+          },
+          "recordedCostUsd": 0.00023685999999999998,
+          "tokensTimesPriceUsd": 0.00023686,
+          "metricRows": [
+            {
+              "metricId": "c606819e-bd20-4dbc-9ead-37a033f98c16",
+              "timestamp": "2026-11-12T16:13:58.025Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "4a646c15f1f005d2",
+              "runId": "f8bf8b17-91db-4955-aaad-a2e89cf3392d",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 6312,
+              "estimatedCost": 0.00014736,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "14430832-024a-4689-bbf3-8fc681bc8239",
+              "timestamp": "2026-11-12T16:13:58.025Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "4a646c15f1f005d2",
+              "runId": "f8bf8b17-91db-4955-aaad-a2e89cf3392d",
+              "entityType": "agent",
+              "entityId": "observational-memory-reflector",
+              "parentEntityType": "agent",
+              "parentEntityId": "observational-memory-reflector",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 179,
+              "estimatedCost": 0.0000895,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "81e78a73f679d254",
+              "parentSpanId": "cf433c347ddc3118",
+              "runId": "f8bf8b17-91db-4955-aaad-a2e89cf3392d",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 6312,
+                "outputTokens": 179,
+                "inputDetails": {
+                  "cacheRead": 5376,
+                  "cacheWrite": 0,
+                  "text": 936
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 179
+                }
+              },
+              "tokensTimesPriceUsd": 0.00023686
+            }
+          ]
+        },
+        {
+          "spanId": "b7fd608022fb1d5e",
+          "parentSpanId": "bf9bbec06e724671",
+          "runId": "d65b4388-5968-4d86-8028-fa23c35867b2",
+          "entityId": "pstack-how-explorer-1",
+          "model": "gpt-6-luna",
+          "provider": "openai.responses",
+          "usage": {
+            "inputTokens": 19293,
+            "outputTokens": 8,
+            "inputDetails": {
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "text": 19293
+            },
+            "outputDetails": {
+              "reasoning": 0,
+              "text": 8
+            }
+          },
+          "recordedCostUsd": 0.0019333,
+          "tokensTimesPriceUsd": 0.0019333000000000002,
+          "metricRows": [
+            {
+              "metricId": "f2adeb5d-1950-4ea9-bb3d-307dd1a43d3c",
+              "timestamp": "2026-11-12T16:14:03.060Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "b7fd608022fb1d5e",
+              "runId": "d65b4388-5968-4d86-8028-fa23c35867b2",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_input_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 19293,
+              "estimatedCost": 0.0019293,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            },
+            {
+              "metricId": "4453fb42-f8b3-4e58-8269-2078272f8a00",
+              "timestamp": "2026-11-12T16:14:03.060Z",
+              "traceId": "6e6444cf7b07619844b5f472e90b6a31",
+              "spanId": "b7fd608022fb1d5e",
+              "runId": "d65b4388-5968-4d86-8028-fa23c35867b2",
+              "entityType": "agent",
+              "entityId": "pstack-how-explorer-1",
+              "parentEntityType": "agent",
+              "parentEntityId": "pstack-how-explorer-1",
+              "rootEntityId": "flow-build",
+              "name": "mastra_model_total_output_tokens",
+              "provider": "openai",
+              "model": "gpt-6-luna",
+              "value": 8,
+              "estimatedCost": 0.000004,
+              "costUnit": "USD",
+              "costMetadata": "{\"pricing_id\":\"openai/gpt-6-luna\",\"tier_index\":0}"
+            }
+          ],
+          "calls": [
+            {
+              "spanId": "4d7ec6e2a74d0461",
+              "parentSpanId": "addcc4acc82d54b7",
+              "runId": "d65b4388-5968-4d86-8028-fa23c35867b2",
+              "model": "gpt-6-luna",
+              "provider": "openai.responses",
+              "outcome": "success",
+              "usage": {
+                "inputTokens": 19293,
+                "outputTokens": 8,
+                "inputDetails": {
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "text": 19293
+                },
+                "outputDetails": {
+                  "reasoning": 0,
+                  "text": 8
+                }
+              },
+              "tokensTimesPriceUsd": 0.0019333000000000002
+            }
+          ]
+        }
+      ],
+      "tools": [
+        {
+          "spanId": "8133c2ed5edfb331",
+          "name": "tool: 'agent-howExplorer'",
+          "outcome": "success"
+        }
+      ]
+    }
+  ]
+}
