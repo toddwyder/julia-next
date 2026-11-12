@@ -140,6 +140,51 @@ require('node:fs').writeFileSync('runtime-installed.json',JSON.stringify(process
   assert.deepEqual(JSON.parse(readFileSync(join(f.root, 'packages/node-browser/runtime-installed.json'), 'utf8')), ['install', '--with-deps', 'chromium']);
 });
 
+function failingInstaller(f, failsUntilCall, { depsOnly = false } = {}) {
+  f.owner('packages/node-browser');
+  f.write('.gitignore', 'node_modules/\n');
+  f.write('packages/node-browser/package.json', JSON.stringify({ name: 'node-browser', type: 'module', devDependencies: { playwright: '1.63.0' } }));
+  f.write('packages/node-browser/test/surface.test.mjs', '');
+  f.write('packages/node-browser/node_modules/.bin/playwright', `#!/usr/bin/env node
+const fs = require('node:fs');
+const calls = fs.existsSync('calls.json') ? JSON.parse(fs.readFileSync('calls.json', 'utf8')) : [];
+calls.push(process.argv.slice(2));
+fs.writeFileSync('calls.json', JSON.stringify(calls));
+const withDeps = process.argv.includes('--with-deps');
+if (${depsOnly} ? withDeps : calls.length < ${failsUntilCall}) { console.error("Temporary failure resolving 'azure.archive.ubuntu.com'"); process.exit(100); }
+`);
+  chmodSync(join(f.root, 'packages/node-browser/node_modules/.bin/playwright'), 0o755);
+  return () => JSON.parse(readFileSync(join(f.root, 'packages/node-browser/calls.json'), 'utf8'));
+}
+
+test('one failed system-package install is retried and the run goes on', t => {
+  const f = fixture(t);
+  const calls = failingInstaller(f, 2);
+  const result = f.run('--install-browsers', 'local');
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.deepEqual(calls(), [['install', '--with-deps', 'chromium'], ['install', '--with-deps', 'chromium']]);
+  assert.match(result.stderr, /try 1 of 3/);
+});
+
+test('when apt stays unreachable, Chromium alone is installed and the run goes on', t => {
+  const f = fixture(t);
+  const calls = failingInstaller(f, 0, { depsOnly: true });
+  const result = f.run('--install-browsers', 'local');
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.deepEqual(calls(), [
+    ['install', '--with-deps', 'chromium'], ['install', '--with-deps', 'chromium'], ['install', '--with-deps', 'chromium'],
+    ['install', 'chromium'],
+  ]);
+  assert.match(result.stderr, /without system packages/);
+});
+
+test('a Chromium download that fails even without apt still fails the run', t => {
+  const f = fixture(t);
+  failingInstaller(f, 99);
+  const result = f.run('--install-browsers', 'local');
+  assert.notEqual(result.status, 0);
+});
+
 test('failing Node tests emit one readable annotation each, without suite duplicates or passing tests', t => {
   const f = fixture(t);
   f.write('test/failure.test.mjs', `import { test, describe } from 'node:test';
