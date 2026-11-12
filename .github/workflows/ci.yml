@@ -13,6 +13,29 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      docs_only: ${{ steps.diff.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Find out whether only documents changed
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          docs_only=false
+          if [[ "$EVENT" == pull_request ]]; then
+            files=$(git diff --name-only "$BASE" "$HEAD")
+            if [[ -n "$files" ]] && ! grep -qv '\.md$' <<< "$files"; then docs_only=true; fi
+          fi
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+
   repository-hygiene:
     runs-on: ubuntu-22.04
     permissions:
@@ -36,6 +59,8 @@ jobs:
         run: node scripts/check-branch-pr.mjs
 
   package-tests:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +71,11 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
+      - name: Cache the Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/bun.lock', '**/bun.lockb') }}
       - name: Plan the test owners
         run: node scripts/test-owners.mjs --plan
       - name: Install locked dependencies
@@ -62,6 +92,8 @@ jobs:
         run: node scripts/test-owners.mjs --run browser
 
   web:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -80,10 +112,12 @@ jobs:
         run: npm run build
 
   checks:
-    needs: [repository-hygiene, package-tests, web]
+    needs: [changes, repository-hygiene, package-tests, web]
     if: always()
     runs-on: ubuntu-22.04
     env:
+      CHANGES: ${{ needs.changes.result }}
+      DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
       REPOSITORY_HYGIENE: ${{ needs.repository-hygiene.result }}
       PACKAGE_TESTS: ${{ needs.package-tests.result }}
       WEB: ${{ needs.web.result }}
@@ -91,6 +125,12 @@ jobs:
       - name: Require every job to pass
         run: |
           set -euo pipefail
+          [[ "$CHANGES" == success ]]
           [[ "$REPOSITORY_HYGIENE" == success ]]
-          [[ "$PACKAGE_TESTS" == success ]]
-          [[ "$WEB" == success ]]
+          if [[ "$DOCS_ONLY" == true ]]; then
+            [[ "$PACKAGE_TESTS" == skipped ]]
+            [[ "$WEB" == skipped ]]
+          else
+            [[ "$PACKAGE_TESTS" == success ]]
+            [[ "$WEB" == success ]]
+          fi
