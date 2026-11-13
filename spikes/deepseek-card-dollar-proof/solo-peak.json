@@ -1,0 +1,411 @@
+{
+  "run": {
+    "account": "commandcode",
+    "test": "solo",
+    "limit": 0.02,
+    "runId": "58a38e88-a9ed-466c-ab45-3ed6c873d3c3",
+    "status": 200
+  },
+  "ledger": [
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.0013194,
+      "cost": 0.0013194,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 4310,
+        "outputTokens": 22,
+        "cachedInputTokens": 0
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.0013194,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.010086143999999998,
+      "cost": 0.008766743999999998,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 33174,
+        "outputTokens": 47,
+        "cachedInputTokens": 4224
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.010086143999999998,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.018992256,
+      "cost": 0.008906112,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 62024,
+        "outputTokens": 38,
+        "cachedInputTokens": 33152
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.018992256,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.028071167999999997,
+      "cost": 0.009078911999999998,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 90876,
+        "outputTokens": 25,
+        "cachedInputTokens": 61952
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.028071167999999997,
+      "priced": true
+    }
+  ],
+  "spans": [
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "165656d91ec543b9",
+      "parentSpanId": "a08d10f324a9ac81",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'deepseek/deepseek-v4.1-flash'",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "provider": "commandcode",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:07.536Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "43f116ac4e4b8500",
+      "parentSpanId": "f0f7592f60549194",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T01:00:13.005Z",
+      "endedAt": "2026-11-13T01:00:13.005Z"
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "1e13d03cf4fb1242",
+      "parentSpanId": "15c1da807b7d4d18",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:15.210Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "1e13d03cf4fb1242",
+      "parentSpanId": "15c1da807b7d4d18",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:15.210Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "165656d91ec543b9",
+      "parentSpanId": "a08d10f324a9ac81",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'deepseek/deepseek-v4.1-flash'",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "provider": "commandcode",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "end",
+      "timestamp": "2026-11-13T01:00:15.278Z",
+      "endedAt": "2026-11-13T01:00:15.278Z"
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "a08d10f324a9ac81",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "provider": "commandcode",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:07.451Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "b5398a2207a2b39c",
+      "parentSpanId": "2b18039d3de34a24",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:08.907Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "9f9bb3626ac0544d",
+      "parentSpanId": "737651a2690547dd",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:10.885Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "9f9bb3626ac0544d",
+      "parentSpanId": "737651a2690547dd",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T01:00:10.890Z",
+      "endedAt": "2026-11-13T01:00:10.890Z"
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "43f116ac4e4b8500",
+      "parentSpanId": "f0f7592f60549194",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:13.004Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "1e13d03cf4fb1242",
+      "parentSpanId": "15c1da807b7d4d18",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T01:00:15.218Z",
+      "endedAt": "2026-11-13T01:00:15.218Z"
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "a08d10f324a9ac81",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "provider": "commandcode",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:07.451Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "b5398a2207a2b39c",
+      "parentSpanId": "2b18039d3de34a24",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T01:00:08.915Z",
+      "endedAt": "2026-11-13T01:00:08.915Z"
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "43f116ac4e4b8500",
+      "parentSpanId": "f0f7592f60549194",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:13.004Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "b5398a2207a2b39c",
+      "parentSpanId": "2b18039d3de34a24",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:08.907Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "9f9bb3626ac0544d",
+      "parentSpanId": "737651a2690547dd",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:10.885Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "a08d10f324a9ac81",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "provider": "commandcode",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "end",
+      "timestamp": "2026-11-13T01:00:15.437Z",
+      "endedAt": "2026-11-13T01:00:15.437Z"
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "165656d91ec543b9",
+      "parentSpanId": "a08d10f324a9ac81",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'deepseek/deepseek-v4.1-flash'",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "provider": "commandcode",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "start",
+      "timestamp": "2026-11-13T01:00:07.536Z",
+      "endedAt": null
+    }
+  ],
+  "metrics": [
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "165656d91ec543b9",
+      "name": "mastra_model_input_text_tokens",
+      "value": 91056,
+      "estimatedCost": 0.0136584,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "165656d91ec543b9",
+      "name": "mastra_model_total_output_tokens",
+      "value": 132,
+      "estimatedCost": 0.0000792,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "165656d91ec543b9",
+      "name": "mastra_model_total_input_tokens",
+      "value": 190384,
+      "estimatedCost": 0.013956384,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "165656d91ec543b9",
+      "name": "mastra_model_output_text_tokens",
+      "value": 88,
+      "estimatedCost": 0.0000528,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "165656d91ec543b9",
+      "name": "mastra_model_input_cache_read_tokens",
+      "value": 99328,
+      "estimatedCost": 0.000297984,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "cca608728686aac8841f99f88d5bc3c5",
+      "spanId": "165656d91ec543b9",
+      "name": "mastra_model_output_reasoning_tokens",
+      "value": 44,
+      "estimatedCost": 0.0000264,
+      "costUnit": "USD"
+    }
+  ]
+}
