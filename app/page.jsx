@@ -1,3 +1,4 @@
+import '../machine/flow/run.mjs';
 import { version } from '../package.json';
 import styles from './page.module.css';
 
