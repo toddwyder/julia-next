@@ -15,6 +15,7 @@ export function readLedger(file) {
       total: Number(data.total) || 0,
       calls: Array.isArray(data.calls) ? data.calls : [],
       stop: data.stop && typeof data.stop === 'object' ? data.stop : null,
+      memoryModel: typeof data.memoryModel === 'string' ? data.memoryModel : null,
     };
   } catch {
     return null;

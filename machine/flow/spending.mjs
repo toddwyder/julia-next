@@ -80,11 +80,22 @@ export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, correct
     ledger = readLedger(file) ?? { card, limit, total: 0, calls: [], stop: null };
     ledger.card = card;
     ledger.limit = limit;
+    const memoryModel = getMemoryModel();
+    if (memoryModel && ledger.memoryModel !== memoryModel) {
+      ledger.memoryModel = memoryModel;
+      persist();
+    }
     return ledger;
   };
 
   const priceOf = ({ provider, model, at = null }) =>
     priceFor({ ...priceList(), provider, model, at });
+
+  // The memory note-takers run on a free model the price list offers, so their calls add $0 to the
+  // card. The pick is made when the card starts and saved in its ledger, so a Studio restart keeps
+  // the same model even if the price list later offers another free one.
+  const freeModels = () => (priceList().corrections?.freeModels ?? []).filter(id => priceOf(splitModelId(id))?.free);
+  const getMemoryModel = () => ledger?.memoryModel ?? freeModels()[0] ?? null;
 
   const stop = reason => {
     if (!ledger) return reason;
@@ -111,7 +122,7 @@ export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, correct
   // Every call that finished is counted, including the ones that finish after the cap was crossed,
   // because the provider bills them all. Only the first crossing call reports a stop, so the calls
   // already in flight are not turned into errors; the stage in front of the next agent refuses.
-  const record = ({ provider, model, usage, at = now() } = {}) => {
+  const record = ({ provider, model, usage, agent = null, at = now() } = {}) => {
     const missing = !usage || (!(Number(usage.inputTokens) > 0) && !(Number(usage.outputTokens) > 0));
     if (missing) return { usd: 0, stop: stop(STOP_REASONS.usage) };
     const price = priceOf({ provider, model, at });
@@ -124,6 +135,7 @@ export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, correct
       at: at.toISOString(),
       provider,
       model,
+      agent,
       usd,
       peak,
       inputTokens: tokens.totalInput,
@@ -148,6 +160,7 @@ export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, correct
     get limit() { return limit; },
     get total() { return ledger?.total ?? 0; },
     get calls() { return ledger?.calls ?? []; },
+    get memoryModel() { return getMemoryModel(); },
     get file() { return file; },
   };
 }
@@ -184,15 +197,15 @@ export function spendingProcessor(spending, ids = null, { refuseAfterStop = fals
   let called = null;
   return {
     id: 'card-spending',
-    processInputStep: async ({ model, abort }) => {
-      called = model ?? null;
+    processInputStep: async ({ model, agent, abort }) => {
+      called = { model: model ?? null, agent: agent?.id ?? agent?.name ?? null };
       const reason = refuseAfterStop ? spending.stopReason() : null;
       if (reason) abort(reason, { metadata: { reason } });
     },
     processOutputStep: async ({ usage, abort }) => {
       if (!spending.started) return;
-      const { provider, model } = idsOf(ids, called);
-      const result = spending.record({ provider, model, usage });
+      const { provider, model } = idsOf(ids, called?.model);
+      const result = spending.record({ provider, model, usage, agent: called?.agent });
       if (result.stop) abort(result.stop, { metadata: { reason: result.stop } });
     },
   };
@@ -200,10 +213,10 @@ export function spendingProcessor(spending, ids = null, { refuseAfterStop = fals
 
 // Memory note-takers call their own model outside the agent's processors, so that model is
 // wrapped instead. The wrapper records each call's usage and leaves the answer untouched.
-export function meteredModel(model, { spending, provider, model: name }) {
+export function meteredModel(model, { spending, provider, model: name, agent = null }) {
   const record = usage => {
     if (!spending.started) return;
-    spending.record({ provider, model: name, usage });
+    spending.record({ provider, model: name, usage, agent });
   };
   const wrapStream = async (...args) => {
     const result = await model.doStream(...args);
