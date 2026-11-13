@@ -323,6 +323,34 @@ test('the memory note-takers run on the free model the card picked, with the ret
   assert.equal(observational.reflection.modelSettings?.maxOutputTokens, undefined);
 });
 
+test("every helper reads poteto-mode's one line and can load the skills, and the Lead holds Mastra's task list", async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  const agents = createAgents({ repo, leadModelFile, roleModelsFile, dir });
+  agents.spending.begin('JUL-375-STOCK');
+
+  const skillFile = '.agents/skills/poteto-mode/SKILL.md';
+  const quoted = /"Read <this file's absolute path> in full, including its Principles section, before any work\."/
+    .exec(readFileSync(join(repo, skillFile), 'utf8'));
+  assert.ok(quoted, 'poteto-mode still gives helpers their one-line instruction');
+  const expected = quoted[0].slice(1, -1).replace("<this file's absolute path>", join(repo, skillFile));
+
+  const helpers = Object.values(await agents.build.listAgents());
+  assert.ok(helpers.length > 0);
+  for (const helper of helpers) {
+    assert.equal(await helper.getInstructions(), expected, `${helper.name} does not read poteto-mode as written`);
+    const skills = await (await helper.getWorkspace()).skills.list();
+    assert.ok(skills.some(skill => skill.name === 'poteto-mode'), `${helper.name} cannot load the project skills`);
+  }
+
+  const tools = await agents.build.listTools();
+  for (const name of ['task_write', 'task_update', 'task_complete', 'task_check']) {
+    assert.ok(tools[name], `the Lead does not hold Mastra's ${name}`);
+  }
+});
+
 test('the Lead runs a fixed number of helpers at once, and a stopped card starts no new helper', async t => {
   const dir = temporary(t);
   const leadModelFile = join(dir, 'lead-model');

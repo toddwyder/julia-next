@@ -16,6 +16,7 @@ process.env.CMD_API_KEY ??= 'unused-in-tests';
 const { Agent } = await import('@mastra/core/agent');
 const { createMockModel } = await import('@mastra/core/test-utils/llm-mock');
 const { buildCardPath } = await import('./workflow.mjs');
+const { taskFromCard } = await import('./task.mjs');
 const { openMastra } = await import('./mastra.mjs');
 const { openScratch } = await import('./scratch.mjs');
 const { copiesRoot } = await import('./copy.mjs');
@@ -56,9 +57,10 @@ const agents = {
 
 const answerFor = verdict => (verdict.startsWith('text:') ? verdict.slice(5) : `VERDICT: ${verdict}\nCRITERION 1: ${verdict} — ran the command\nNOTES: none`);
 
-function fakeReview(queue, { pulls = { pr: 498 }, postFails = false } = {}) {
+function fakeReview(queue, { pulls = { pr: 498 }, postFails = false, cardMissing = false } = {}) {
   const posted = [];
   const asked = [];
+  const moved = [];
   const shipping = {
     stream: async (task, options) => {
       asked.push({ task, checkout: options.requestContext?.get?.('cardCheckout') });
@@ -68,14 +70,15 @@ function fakeReview(queue, { pulls = { pr: 498 }, postFails = false } = {}) {
   };
   const review = {
     findPr: () => pulls,
-    readCard: async identifier => ({ identifier, title: 'A card', description: '## Acceptance criteria\n- it works' }),
+    readCard: async identifier => (cardMissing ? null : { identifier, title: 'A card', description: '## Acceptance criteria\n- it works' }),
+    moveCard: async (identifier, state) => { moved.push({ identifier, state }); },
     headCommit: () => 'abc123',
     postPrComment: (repo, pr, body) => {
       if (postFails) throw new Error('gh: not signed in');
       posted.push({ pr, body });
     },
   };
-  return { shipping, review, posted, asked };
+  return { shipping, review, posted, asked, moved };
 }
 
 async function openCase({
@@ -152,6 +155,56 @@ test('a passing card waits for Todd two levels deep, then lands, retros and clea
   rmSync(dir, { recursive: true, force: true });
 });
 
+test('the Lead is given the card\'s own words and nothing about how to work', () => {
+  const card = {
+    identifier: 'JUL-900',
+    title: 'Builds run stock pstack',
+    description: [
+      '## Goal',
+      'A card runs on stock pstack.',
+      '',
+      '### Why',
+      'The hand-built agent drifts from the skill.',
+      '',
+      '## Acceptance criteria',
+      '- the Lead holds a task list',
+      '- every helper reads the skill',
+      '',
+      '## Proof',
+      'A CI test reads the built agents.',
+      '',
+      '## What we know',
+      'The Lead is hand built today.',
+      '',
+      '## Constraints',
+      'No new dependency.',
+      '',
+      '## Pull request',
+      'Not part of the task.',
+    ].join('\n'),
+  };
+
+  assert.equal(taskFromCard(card), [
+    'Linear card JUL-900: Builds run stock pstack',
+    '## Goal\nA card runs on stock pstack.\n\n### Why\nThe hand-built agent drifts from the skill.',
+    '## Done check\n- the Lead holds a task list\n- every helper reads the skill',
+    '## Proof\nA CI test reads the built agents.',
+    '## What is already known\nThe Lead is hand built today.',
+    '## Constraints\nNo new dependency.',
+  ].join('\n\n'));
+});
+
+test('a card missing some headings keeps the parts it has, and an unheaded card is passed through', () => {
+  assert.equal(
+    taskFromCard({ identifier: 'JUL-901', title: 'One part', description: '## Outcome\nIt works.\n\n## Outside check\nSomeone else looks.' }),
+    'Linear card JUL-901: One part\n\n## Goal\nIt works.',
+  );
+  assert.equal(
+    taskFromCard({ identifier: 'JUL-902', title: 'Plain', description: 'A card with no headings.' }),
+    'Linear card JUL-902: Plain\n\nA card with no headings.',
+  );
+});
+
 test('the build stage runs a real agent step and keeps what the agent wrote', async () => {
   const asked = [];
   const build = buildOn(
@@ -163,6 +216,21 @@ test('the build stage runs a real agent step and keeps what the agent wrote', as
   assert.equal(asked.length, 1, 'the build stage makes one model call');
   assert.match(JSON.stringify(asked[0]), new RegExp(CARD), 'the model is asked about this card');
   assert.match(readFileSync(join(caseDir, 'build', `${CARD}.md`), 'utf8'), /built line/);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('the runner moves the card to Implementation once, before the build starts', async () => {
+  const { fake, dir } = await openCase({ untilFirstWait: true });
+
+  assert.deepEqual(fake.moved, [{ identifier: CARD, state: 'Implementation' }]);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('a card Linear cannot return fails the run and names the card', async () => {
+  const { result, dir } = await openCase({ reviewOptions: { cardMissing: true } });
+
+  assert.equal(result.status, 'failed');
+  assert.match(JSON.stringify(result.error ?? result), new RegExp(`Linear card ${CARD} could not be read`));
   rmSync(dir, { recursive: true, force: true });
 });
 
