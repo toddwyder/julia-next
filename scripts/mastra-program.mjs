@@ -6,7 +6,7 @@
 // `MASTRACODE_PROGRAM_DIR` or `MASTRACODE_PROGRAM` still win, for a checkout that is not the
 // global one.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -44,15 +44,6 @@ export function programDir(env = process.env) {
   const found = programCandidates(env).find(isProgram);
   if (!found) {
     throw new Error(`No installed mastracode program was found in ${programCandidates(env).join(' or ')}. Run npm install -g mastracode, or set MASTRACODE_PROGRAM_DIR to the directory that holds its node_modules.`);
-  }
-  return found;
-}
-
-export function codeSdkPath(env = process.env) {
-  const relative = join('node_modules', '@mastra', 'code-sdk', 'dist', 'index.js');
-  const found = programCandidates(env).map(dir => join(dir, relative)).find(existsSync);
-  if (!found) {
-    throw new Error(`The Mastra Code SDK was not found in ${programCandidates(env).join(' or ')}. Run npm install -g mastracode, or set MASTRACODE_PROGRAM_DIR to the directory that holds its node_modules.`);
   }
   return found;
 }

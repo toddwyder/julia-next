@@ -112,6 +112,26 @@ User lingering is enabled, so user timers continue without a login. Inspect them
 The disk check alerts Todd on JUL-185 below 10 GB free through the Julia controller account.
 Inspect its result with `journalctl --user -u julia-disk-check.service`.
 
+### `/tmp/mc` belongs to Mastra Code and is never deleted
+
+Mastra Code keeps its cross-process signal sockets under `/tmp/mc`, one of them the lease socket
+that says which process owns a thread, and it keeps the socket of a run that is still going
+(`@mastra/code-sdk/dist/utils/signals-pubsub.js:5`). The stock `/tmp` rule removes anything there
+older than 30 days and the boot pass clears the directory, so on 13 November a cleanup that deleted
+`/tmp/mc` aborted every run in progress: the lease lookup failed, and the memory step reported it as
+`Processor "observational-memory" stopped the run: Agent execution was aborted`, which is not what
+it looked like. `/etc/tmpfiles.d/mastracode.conf` excludes the folder from every cleanup rule; the
+repository holds that file as `scripts/server/mastracode-tmpfiles.conf` and installing it is the one
+step needed on a new server:
+
+```sh
+sudo install -D -m 0644 scripts/server/mastracode-tmpfiles.conf /etc/tmpfiles.d/mastracode.conf
+```
+
+`systemd-tmpfiles --cat-config | grep tmp/mc` shows the exclusion is in force. No cleanup script of
+ours may remove `/tmp/mc` either: an idle folder is safe, a running session's folder is not, and
+telling them apart means finding its sockets in use.
+
 ## Mastra Code's trace store
 
 Mastra Code opens its trace store once, at startup, and DuckDB lets one process write a file. The

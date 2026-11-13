@@ -1,7 +1,0 @@
-{
-  "githubLogin": "toddwyder",
-  "repository": "toddwyder/julia-next",
-  "pushAccess": true,
-  "gitPushDryRun": "PASS",
-  "source": "existing ubuntu GitHub sign-in and Git credential helper"
-}

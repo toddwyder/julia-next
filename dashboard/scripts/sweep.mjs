@@ -2,7 +2,6 @@ import { appendFileSync, mkdirSync, readFileSync, realpathSync, renameSync, writ
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { codeSdkPath } from '../../scripts/mastra-program.mjs';
 import { listAccountModels } from '../lib/account-model-catalog.js';
 
 import { accountProviders, mergeSweep, parsePrices, stateDir } from '../lib/models.js';
@@ -14,15 +13,10 @@ export function readConfig(name) {
   return JSON.parse(readFileSync(join(dashboardRoot, 'config', name), 'utf8'));
 }
 
-// The sweep reads the models from the installed program, so it asks the same resolver every
-// other script asks: the global npm install, unless an override names another one.
-export function findSdkPath(env = process.env) {
-  return env.MASTRACODE_SDK_PATH || codeSdkPath(env);
-}
-
-export async function availableModels(env = process.env) {
-  const sdkPath = findSdkPath(env);
-  const { createMastraCodeAgentController } = await import(sdkPath);
+// The sweep reads the models by asking the dashboard's own dependency, so it loads whatever
+// version this checkout installed rather than whatever `mastracode` happens to be on PATH.
+export async function availableModels() {
+  const { createMastraCodeAgentController } = await import('@mastra/code-sdk');
   return listAccountModels(createMastraCodeAgentController, dashboardRoot);
 }
 
