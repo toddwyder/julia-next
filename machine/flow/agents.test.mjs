@@ -138,8 +138,21 @@ test('Lead exposes one stock helper per role and one per saved panel model', asy
   assert.equal((await helpers.arenaRunners2.getModel()).modelId, 'deepseek/deepseek-v4.1-flash');
 });
 
-test('the role file the Start screen writes reads back with every saved model', async t => {
+test('the Lead and every helper keep Mastra’s refusal handler beside the spending guard', async t => {
   const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = join(dir, 'lead-role-models.md');
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  completeRoleFile(roleModelsFile);
+  const build = createAgents({ repo, leadModelFile, roleModelsFile }).build;
+  const processorsOf = async agent => (await agent.listConfiguredOutputProcessors()).map(processor => processor.id);
+  assert.deepEqual(await processorsOf(build), ['cyber-refusal-handler', 'card-spending']);
+  for (const helper of Object.values(await build.listAgents())) {
+    assert.deepEqual(await processorsOf(helper), ['cyber-refusal-handler', 'card-spending'], `${helper.name} lost a processor.`);
+  }
+});
+
+test('the role file the Start screen writes reads back with every saved model', async t => {  const dir = temporary(t);
   const roleModelsFile = join(dir, 'lead-role-models.md');
   const modelIds = [...MODEL_IDS];
   const models = modelIds.map(id => ({ id, provider: id.split('/')[0] }));

@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Agent } from '@mastra/core/agent';
 import { createCodingAgent } from '@mastra/core/coding-agent';
-import { TokenCostControl } from '@mastra/core/processors';
+import { CyberRefusalHandler, TokenCostControl } from '@mastra/core/processors';
 import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace';
 
 import { cardMemory } from './memory.mjs';
@@ -44,6 +44,12 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     const guard = spendingProcessor(spending, ids, options);
     return { inputProcessors: [costGuard(), guard], outputProcessors: [guard] };
   };
+  // `createCodingAgent` uses any output list it is given verbatim, so a coding agent must name
+  // Mastra's default CyberRefusalHandler itself or lose it. A plain Agent never had that default.
+  const codingProcessors = (ids, options) => {
+    const processors = cardProcessors(ids, options);
+    return { ...processors, outputProcessors: [new CyberRefusalHandler(), ...processors.outputProcessors] };
+  };
   // A run names the copy of the repository its card works in. A call outside a card, such as a
   // settings read, works in the repository Studio runs from.
   const cardWorkspace = (id, extra = {}) => ({ requestContext } = {}) => {
@@ -67,7 +73,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
       description: `${role.name} pstack role on ${modelId}${choice}. ${role.explanation} Use this helper when delegating ${role.name} work.`,
       instructions: skillInstruction,
       model: agentModel(modelId),
-      ...cardProcessors(() => splitModelId(modelId)),
+      ...codingProcessors(() => splitModelId(modelId)),
       ...cardMemory(spending),
       workspace: cardWorkspace('machine-repo-helper', { skills: ['.agents/skills'] }),
       tools,
@@ -79,7 +85,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     name: 'Lead',
     instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
     model: buildModelReader(leadModelFile),
-    ...cardProcessors(() => splitModelId(leadModelId(leadModelFile)), { refuseAfterStop: true }),
+    ...codingProcessors(() => splitModelId(leadModelId(leadModelFile)), { refuseAfterStop: true }),
     ...cardMemory(spending),
     workspace: cardWorkspace('machine-repo', { skills: ['.agents/skills'] }),
     agents: helpers,

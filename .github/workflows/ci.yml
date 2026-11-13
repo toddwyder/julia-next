@@ -113,8 +113,27 @@ jobs:
       - name: Build application
         run: npm run build
 
+  machine-mutation:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - name: Install the application's locked dependencies
+        run: npm ci
+      - name: Mutate the machine lines this change touches
+        run: node scripts/mutation-changed.mjs --base "${BASE:-origin/main}"
+
   checks:
-    needs: [changes, repository-hygiene, package-tests, web]
+    needs: [changes, repository-hygiene, package-tests, web, machine-mutation]
     if: always()
     runs-on: ubuntu-22.04
     env:
@@ -123,6 +142,7 @@ jobs:
       REPOSITORY_HYGIENE: ${{ needs.repository-hygiene.result }}
       PACKAGE_TESTS: ${{ needs.package-tests.result }}
       WEB: ${{ needs.web.result }}
+      MACHINE_MUTATION: ${{ needs.machine-mutation.result }}
     steps:
       - name: Require every job to pass
         run: |
@@ -132,7 +152,9 @@ jobs:
           if [[ "$DOCS_ONLY" == true ]]; then
             [[ "$PACKAGE_TESTS" == skipped ]]
             [[ "$WEB" == skipped ]]
+            [[ "$MACHINE_MUTATION" == skipped ]]
           else
             [[ "$PACKAGE_TESTS" == success ]]
             [[ "$WEB" == success ]]
+            [[ "$MACHINE_MUTATION" == success ]]
           fi

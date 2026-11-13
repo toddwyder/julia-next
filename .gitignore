@@ -46,3 +46,8 @@ graphify-out/mastra/*
 .firebase-proof-keys/
 .firebase-vault-*.json
 .proof/
+
+# Stryker mutation testing
+.stryker-tmp/
+reports/mutation/
+stryker-output-*.json
