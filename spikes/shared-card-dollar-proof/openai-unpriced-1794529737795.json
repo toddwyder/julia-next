@@ -1,0 +1,109 @@
+{
+  "run": {
+    "account": "openai",
+    "test": "unpriced",
+    "runId": "1076b984-8d22-49fc-9d79-f4fce674f248",
+    "status": 200
+  },
+  "ledger": [
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0,
+      "priced": false
+    }
+  ],
+  "spans": [
+    {
+      "traceId": "e631baa92f5d3d6ccb0e398c3fb4a4cc",
+      "spanId": "04fb612f2ebbd2e3",
+      "parentSpanId": "f28834e135c50281",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'gpt-6-luna'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:29:29.148Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "e631baa92f5d3d6ccb0e398c3fb4a4cc",
+      "spanId": "f28834e135c50281",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:29:29.064Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "e631baa92f5d3d6ccb0e398c3fb4a4cc",
+      "spanId": "f28834e135c50281",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:29:29.064Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "e631baa92f5d3d6ccb0e398c3fb4a4cc",
+      "spanId": "f28834e135c50281",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:29:29.387Z",
+      "endedAt": "2026-11-13T00:29:29.387Z"
+    },
+    {
+      "traceId": "e631baa92f5d3d6ccb0e398c3fb4a4cc",
+      "spanId": "04fb612f2ebbd2e3",
+      "parentSpanId": "f28834e135c50281",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'gpt-6-luna'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:29:29.148Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "e631baa92f5d3d6ccb0e398c3fb4a4cc",
+      "spanId": "04fb612f2ebbd2e3",
+      "parentSpanId": "f28834e135c50281",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'gpt-6-luna'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:29:29.249Z",
+      "endedAt": "2026-11-13T00:29:29.249Z"
+    }
+  ],
+  "metrics": []
+}
