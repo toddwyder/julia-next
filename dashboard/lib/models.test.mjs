@@ -1,54 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import {
-  parseAnthropicPrices, parseCommandCodePrices, parseOpenAIPrices, parsePrices,
-  mergeSweep, onePerName, readModels, startModels, priceLabel, stateDir,
-} from './models.js';
+import { mergeSweep, onePerName, readModels, startModels, priceLabel, stateDir } from './models.js';
+import { priceFor } from './model-prices.js';
 
-const fixture = name => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 const priced = (inputPerMillion, outputPerMillion) => ({ inputPerMillion, outputPerMillion });
 const model = (id, provider, modelName) => ({ id, provider, modelName });
-const find = (rows, name) => rows.find(row => row.name === name);
 
-test('the saved Anthropic page parses to its real prices', () => {
-  const rows = parseAnthropicPrices(fixture('anthropic-pricing.html'));
-  assert.deepEqual(find(rows, 'Opus 5.5'), { name: 'Opus 5.5', ...priced(4, 20) });
-  assert.deepEqual(find(rows, 'Haiku 5.5'), { name: 'Haiku 5.5', ...priced(0.1, 0.5) });
-});
-
-test('the saved OpenAI page parses to its real prices', () => {
-  const rows = parseOpenAIPrices(fixture('openai-pricing.html'));
-  assert.deepEqual(find(rows, 'gpt-6-astra'), { name: 'gpt-6-astra', ...priced(10, 50) });
-  assert.deepEqual(find(rows, 'gpt-6.1-sol'), { name: 'gpt-6.1-sol', ...priced(2, 10) });
-});
-
-test('the saved CommandCode page parses to its real prices', () => {
-  const rows = parseCommandCodePrices(fixture('commandcode-pricing.html'));
-  assert.deepEqual(find(rows, 'DeepSeek V4.1 Flash'), { name: 'DeepSeek V4.1 Flash', ...priced(0.15, 0.6) });
-  assert.deepEqual(find(rows, 'Kimi K3.1 Pro'), { name: 'Kimi K3.1 Pro', ...priced(2, 10) });
-});
-
-test('a pricing page that changes shape fails loudly instead of returning nothing', () => {
-  const pages = [
-    ['anthropic', fixture('anthropic-pricing.html').replaceAll('modelName', 'modelLabel')],
-    ['openai', fixture('openai-pricing.html').replaceAll('&quot;tier&quot;', '&quot;rate&quot;')],
-    ['commandcode', fixture('commandcode-pricing.html').replaceAll('role="row"', 'role="line"')],
-  ];
-  for (const [parser, body] of pages) {
-    assert.throws(() => parsePrices(parser, body, parser), /page changed shape/);
-  }
-});
-
-const anthropicPrices = () => ({ anthropic: parseAnthropicPrices(fixture('anthropic-pricing.html')) });
+const catalog = {
+  source: 'test-list',
+  costs: {
+    anthropic: { models: {
+      'claude-opus-5-5': { cost: { input: 4, output: 20 } },
+      'claude-sonnet-5-5': { cost: { input: 3, output: 15 } },
+    } },
+  },
+};
+const corrections = { peakWindows: [], freeModels: [], excludeDates: [] };
+const at = new Date('2026-10-29T00:00:00.000Z');
+const price = item => priceFor({ catalog, corrections, provider: item.provider, model: item.modelName, at });
 
 test('a model that appears is added and a model that disappeared is retired', () => {
   const first = mergeSweep({
     previousModels: [],
     available: [model('anthropic/claude-opus-5-5', 'anthropic', 'claude-opus-5-5')],
-    pricesByProvider: anthropicPrices(),
+    priceFor: price,
     readAt: '2026-10-29T00:00:00.000Z',
   });
   assert.deepEqual(first.added, ['anthropic/claude-opus-5-5']);
@@ -58,7 +36,7 @@ test('a model that appears is added and a model that disappeared is retired', ()
   const second = mergeSweep({
     previousModels: first.models,
     available: [model('anthropic/claude-sonnet-5-5', 'anthropic', 'claude-sonnet-5-5')],
-    pricesByProvider: anthropicPrices(),
+    priceFor: price,
     readAt: '2026-11-05T00:00:00.000Z',
   });
   assert.deepEqual(second.retired, ['anthropic/claude-opus-5-5']);
@@ -73,7 +51,7 @@ test('a model with no saved price is never written and is reported', () => {
       model('anthropic/claude-opus-5-5', 'anthropic', 'claude-opus-5-5'),
       model('anthropic/claude-brand-new', 'anthropic', 'claude-brand-new'),
     ],
-    pricesByProvider: anthropicPrices(),
+    priceFor: price,
     readAt: '2026-10-29T00:00:00.000Z',
   });
   assert.deepEqual(merged.models.map(row => row.id), ['anthropic/claude-opus-5-5']);

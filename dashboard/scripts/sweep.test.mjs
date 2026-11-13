@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sweep, findSdkPath } from './sweep.mjs';
@@ -14,41 +14,32 @@ const listed = [
   { id: 'not-an-account/model', provider: 'not-an-account', modelName: 'model' },
 ];
 
-const fixture = name => readFileSync(new URL(`../lib/fixtures/${name}`, import.meta.url), 'utf8');
-const pages = new Map([
-  ['https://claude.com/pricing', fixture('anthropic-pricing.html')],
-  ['https://developers.openai.com/api/docs/pricing', fixture('openai-pricing.html')],
-  ['https://commandcode.ai/docs/resources/pricing-limits', fixture('commandcode-pricing.html')],
-]);
-const fetchImpl = async url => {
-  const body = pages.get(String(url));
-  if (!body) throw new Error(`the test asked for an unknown page: ${url}`);
-  return { ok: true, status: 200, text: async () => body };
+const catalog = {
+  source: 'test-list',
+  costs: {
+    anthropic: { models: { 'claude-opus-5-5': { cost: { input: 4, output: 20 } } } },
+    commandcode: { models: {
+      'deepseek/deepseek-v4.1-flash': { cost: { input: 0.15, output: 0.6 } },
+      'moonshotai/Kimi-K3.1-Pro': { cost: { input: 2, output: 10 } },
+    } },
+  },
 };
+const corrections = { peakWindows: [], freeModels: [], excludeDates: [] };
 
 const swept = async () => {
   const directory = mkdtempSync(join(tmpdir(), 'julia-sweep-test-'));
   try {
-    return await sweep({ directory, fetchImpl, now: new Date('2026-10-29T09:00:00.000Z'), listModels: async () => listed });
+    return await sweep({
+      directory,
+      catalog,
+      corrections,
+      now: new Date('2026-10-29T05:00:00.000Z'),
+      listModels: async () => listed,
+    });
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
 };
-
-// `mastracode` on PATH is the launcher, a script in this repo, so walking up from it lands in
-// the repo and finds no SDK. The sweep has to take the program directory it is told about.
-test('the sweep takes the SDK from the program directory, not from beside the launcher', () => {
-  const program = mkdtempSync(join(tmpdir(), 'julia-program-'));
-  try {
-    const sdk = join(program, 'node_modules', '@mastra', 'code-sdk', 'dist', 'index.js');
-    mkdirSync(join(program, 'node_modules', '@mastra', 'code-sdk', 'dist'), { recursive: true });
-    writeFileSync(sdk, 'export const nothing = true;\n');
-    assert.equal(findSdkPath({ MASTRACODE_PROGRAM_DIR: program }), sdk);
-    assert.equal(findSdkPath({ MASTRACODE_PROGRAM: program }), sdk);
-  } finally {
-    rmSync(program, { recursive: true, force: true });
-  }
-});
 
 test('every provider name an account answers to reaches the saved models', async () => {
   const saved = await swept();

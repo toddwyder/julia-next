@@ -22,5 +22,5 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/mastra.mjs` | Storage and tracing, so a run is written down and priced. | `30ef73ccfa6302ecdfdad10c06aff8283261f2ba82509580c383d809ee02f7e7` |
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `85abb4a78740dc747a6f1033fdbc1c2c8e176724fe5b8a5f46938ce0793993dc` |
 | `machine/flow/run.mjs` | Answers a waiting card, reads a run, writes its cost. No way to start one. | `6a76edaa92fdbadfbb55dd581e77c2556b33f9ccb4744c89e5fded579ab36e44` |
-| `machine/flow/trace.mjs` | Turns the trace file into the run cost record. | `38e5e5c9c3497e0f1ea05f0a6eb89910262ca487b5dfdce03adfc23f9679ba1b` |
+| `machine/flow/trace.mjs` | Turns the trace file into the run cost record. | `1e98e9b8ac813c5b6002128751b86bd88ede2935e8cf3687632c39d3464d463b` |
 | `scripts/julia-agents.mjs` | Runs a machine command with the Julia keys it needs. | `7cfa91c10782d01d9e4130d395727ebaa195a956da65091f3acb2da9557a939a` |

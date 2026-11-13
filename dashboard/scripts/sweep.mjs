@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 import { listAccountModels } from '../lib/account-model-catalog.js';
 
-import { accountProviders, mergeSweep, parsePrices, stateDir } from '../lib/models.js';
+import { accountProviders, mergeSweep, stateDir } from '../lib/models.js';
+import { loadCatalog, priceFor as findPrice, readCorrections } from '../lib/model-prices.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dashboardRoot = dirname(here);
@@ -34,23 +35,6 @@ export async function availableModels(env = process.env) {
   return listAccountModels(createMastraCodeAgentController, dashboardRoot);
 }
 
-export async function fetchPrices(source, { fetchImpl = fetch, now = new Date() } = {}) {
-  const response = await fetchImpl(source.url, {
-    headers: { 'user-agent': 'julia-dashboard-sweep' },
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) {
-    throw new Error(`${source.label} price page answered ${response.status}.`);
-  }
-  const body = await response.text();
-  const rows = parsePrices(source.parser, body, source.label).map(row => ({
-    ...row,
-    source: source.url,
-    readAt: now.toISOString(),
-  }));
-  return rows;
-}
-
 function writeAtomically(path, contents) {
   const temporary = `${path}.${process.pid}.tmp`;
   writeFileSync(temporary, contents);
@@ -62,15 +46,17 @@ export function appendLog(directory, entry) {
   appendFileSync(join(directory, 'sweep-log.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`);
 }
 
+// The sweep keeps only the check of which models each account offers. Prices come from
+// Mastra's models.dev list plus the corrections file, the same list the spending total uses.
 export async function sweep({
   env = process.env,
   directory = stateDir(env),
-  fetchImpl = fetch,
   now = new Date(),
   listModels = availableModels,
+  catalog = loadCatalog({ env }),
+  corrections = readCorrections({ env }),
 } = {}) {
   const accounts = readConfig('accounts.json').accounts;
-  const sources = readConfig('price-sources.json');
   const defaults = readConfig('defaults.json');
 
   const all = await listModels(env);
@@ -87,15 +73,6 @@ export async function sweep({
     throw new Error('No account reported any model. The sweep wrote nothing.');
   }
 
-  // One pricing page serves every provider name its account answers to.
-  const prices = {};
-  for (const account of perAccount) {
-    const source = sources[account.id];
-    if (!source) continue;
-    const rows = await fetchPrices(source, { fetchImpl, now });
-    for (const provider of account.providers) prices[provider] = rows;
-  }
-
   const available = perAccount.flatMap(account => account.models);
   const previous = (() => {
     try {
@@ -108,7 +85,7 @@ export async function sweep({
   const merged = mergeSweep({
     previousModels: previous,
     available,
-    pricesByProvider: prices,
+    priceFor: model => findPrice({ catalog, corrections, provider: model.provider, model: model.modelName }),
     readAt: now.toISOString(),
     defaultIds: { mainSession: defaults.mainSession, shipping: defaults.shipping },
   });
