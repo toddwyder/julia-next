@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const SERVER_HOSTNAME = 'vps-ce27cb55';
+export const OPERATOR_CHECKOUT = '/home/ubuntu/julia-mastra';
 export const DEFAULT_CHECKOUT = '/home/ubuntu/julia-dashboard';
 export const STATE_DIR = '/var/lib/julia-dashboard';
 export const ENV_FILE = '/etc/julia-dashboard.env';
@@ -32,16 +33,19 @@ export const TIMERS = Object.freeze([
 const here = dirname(fileURLToPath(import.meta.url));
 const opsDir = join(here, '..', 'ops');
 
-export function serverIdentityProblem({ hostname = osHostname(), checkout = DEFAULT_CHECKOUT, read = readFileSync } = {}) {
+export function serverIdentityProblem({ hostname = osHostname(), operatorCheckout = OPERATOR_CHECKOUT, checkout = DEFAULT_CHECKOUT, exists = existsSync, read = readFileSync } = {}) {
   if (hostname !== SERVER_HOSTNAME) return `this is ${hostname}, not the Julia server ${SERVER_HOSTNAME}`;
-  let config;
+  if (!exists(join(operatorCheckout, '.git'))) return `the operator checkout ${operatorCheckout} is not a git checkout`;
+  let worktree;
   try {
-    config = read(join(checkout, '.git', 'config'), 'utf8');
+    worktree = read(join(checkout, '.git'), 'utf8');
   } catch {
-    return `${checkout} is not its own git checkout`;
+    return `${checkout} is not a git worktree`;
   }
-  const origin = /\[remote "origin"\][^\[]*?url = (\S+)/.exec(config)?.[1] ?? '';
-  if (!/julia-next(\.git)?$/.test(origin)) return `${checkout} does not clone julia-next`;
+  const gitdir = worktree.match(/^gitdir:\s*(.+)$/m)?.[1]?.trim() ?? '';
+  if (!gitdir.startsWith(join(operatorCheckout, '.git', 'worktrees') + '/')) {
+    return `${checkout} is not a worktree of ${operatorCheckout}`;
+  }
   return '';
 }
 

@@ -18,7 +18,7 @@ const ROOT = new URL('..', import.meta.url).pathname;
 const LANES = join(homedir(), '.local', 'state', 'julia-scratch', 'jul-284-lanes');
 // A --url run proves someone else's build, so its screenshots must not overwrite the ones this
 // branch ships for its own build.
-const SHOTS = process.argv.includes('--url') ? join(LANES, 'live') : join(LANES, 'shots');
+const SHOTS = process.argv.includes('--url') ? join(LANES, 'live') : join(ROOT, 'docs/scorecards/jul-276/pr-4');
 const MODELS = '/var/lib/julia-dashboard/state/models.json';
 const PORT_BASE = 3114;
 const CARD = 'JUL-280';
