@@ -1,0 +1,110 @@
+{
+  "run": {
+    "account": "claude",
+    "test": "unpriced",
+    "limit": 0.002,
+    "runId": "22a1fd34-53e2-4da7-a924-594cd8d5b4a6",
+    "status": 200
+  },
+  "ledger": [
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0,
+      "priced": false
+    }
+  ],
+  "spans": [
+    {
+      "traceId": "9b9549ff9e7335ba1bcd0d26db75cb5b",
+      "spanId": "60d6764fd22643f6",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:38:54.510Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "9b9549ff9e7335ba1bcd0d26db75cb5b",
+      "spanId": "2f1a962351c0a8af",
+      "parentSpanId": "60d6764fd22643f6",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'claude-haiku-5-5'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:38:54.618Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "9b9549ff9e7335ba1bcd0d26db75cb5b",
+      "spanId": "2f1a962351c0a8af",
+      "parentSpanId": "60d6764fd22643f6",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'claude-haiku-5-5'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:38:54.717Z",
+      "endedAt": "2026-11-13T00:38:54.717Z"
+    },
+    {
+      "traceId": "9b9549ff9e7335ba1bcd0d26db75cb5b",
+      "spanId": "60d6764fd22643f6",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:38:54.881Z",
+      "endedAt": "2026-11-13T00:38:54.881Z"
+    },
+    {
+      "traceId": "9b9549ff9e7335ba1bcd0d26db75cb5b",
+      "spanId": "2f1a962351c0a8af",
+      "parentSpanId": "60d6764fd22643f6",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'claude-haiku-5-5'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:38:54.618Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "9b9549ff9e7335ba1bcd0d26db75cb5b",
+      "spanId": "60d6764fd22643f6",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:38:54.510Z",
+      "endedAt": null
+    }
+  ],
+  "metrics": []
+}
