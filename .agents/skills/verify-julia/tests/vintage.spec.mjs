@@ -51,6 +51,7 @@ test.beforeEach(async () => {
 test('the design fonts are loaded, not only named', async ({ page }) => {
   await signIn(page, TODD);
   await page.goto('/recipes/new');
+  await expect(page.getByRole('heading', { level: 1, name: 'Enter a Recipe' })).toBeVisible();
   const loaded = await page.evaluate(async () => {
     await document.fonts.ready;
     return [...document.fonts].filter(face => face.status === 'loaded').map(face => face.family.replaceAll(/["']/g, ''));
@@ -58,16 +59,15 @@ test('the design fonts are loaded, not only named', async ({ page }) => {
   for (const family of [SERIF, SANS, MONO]) expect(loaded, family).toContain(family);
 });
 
-test('Library uses the vintage paper, ink, greens and fonts', async ({ page }) => {
+test('Library uses the locked Apothecary paper, shell, search and title fonts', async ({ page }) => {
   await signIn(page, TODD);
-
-  expect(await style(page.locator('body'))).toEqual({ color: INK, background: PAPER, font: SERIF });
-  expect(await style(page.getByRole('heading', { level: 1, name: 'Library' }))).toMatchObject({ color: HEADING, font: SERIF });
+  expect(await style(page.locator('header'))).toMatchObject({ background: 'rgb(111, 124, 90)' });
+  expect(await style(page.locator('main'))).toMatchObject({ color: 'rgb(46, 33, 25)', font: 'Libre Caslon Text' });
+  expect(await style(page.getByRole('heading', { level: 1, name: 'Library' }))).toMatchObject({ font: 'Libre Caslon Text' });
   expect(await style(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Library' })))
-    .toEqual({ color: BUTTON, background: ACTIVE_TAB, font: SANS });
-  expect(await style(page.getByRole('link', { name: 'Manual Entry' }))).toMatchObject({ background: PAPER, font: SANS });
-  expect(await style(page.getByLabel('Search your collection'))).toMatchObject({ color: INK, background: PAPER, font: SANS });
-  expect(await style(page.getByText('Your library is empty.'))).toMatchObject({ color: TERRACOTTA, font: SERIF });
+    .toMatchObject({ color: 'rgb(246, 241, 230)', font: 'IM Fell English' });
+  expect(await style(page.getByLabel('Search your collection'))).toMatchObject({ color: 'rgb(46, 33, 25)', font: 'Libre Caslon Text' });
+  await expect(page.getByRole('link', { name: 'Manual Entry' })).toBeVisible();
 });
 
 test('Enter a Recipe uses the vintage buttons, inputs and fonts', async ({ page }) => {
@@ -83,7 +83,7 @@ test('Enter a Recipe uses the vintage buttons, inputs and fonts', async ({ page 
   expect(await style(page.getByRole('link', { name: 'Cancel' }))).toMatchObject({ background: PAPER, font: SANS });
 });
 
-test('a Recipe uses the vintage title, sections and fonts', async ({ page }) => {
+test('a written Recipe uses Apothecary type and preserves its reading text', async ({ page }) => {
   await signIn(page, TODD);
   await page.goto('/recipes/new');
   await page.getByLabel('Recipe Title').fill('Coq au Vin');
@@ -92,9 +92,9 @@ test('a Recipe uses the vintage title, sections and fonts', async ({ page }) => 
   await page.getByRole('button', { name: 'Save Recipe' }).click();
   await page.waitForURL(/\/recipes\/(?!new$)[^/]+$/);
 
-  expect(await style(page.getByTestId('recipe-title'))).toMatchObject({ color: HEADING, font: SERIF });
-  expect(await style(page.getByRole('heading', { name: 'The Ingredients' }))).toMatchObject({ color: HEADING, font: SERIF });
-  expect(await style(page.getByText('12 shallots'))).toMatchObject({ color: INK, font: SERIF });
-  expect(await style(page.getByText('Brown the bird.'))).toMatchObject({ color: INK, font: SERIF });
-  expect(await style(page.getByRole('link', { name: '← Library' }))).toMatchObject({ color: INK, font: MONO });
+  expect(await style(page.getByTestId('recipe-title'))).toMatchObject({ color: 'rgb(46, 33, 25)', font: 'IM Fell English' });
+  expect(await style(page.getByRole('heading', { name: 'The Ingredients' }))).toMatchObject({ color: 'rgb(111, 124, 90)', font: 'IM Fell English' });
+  expect(await style(page.getByText('12 shallots'))).toMatchObject({ color: 'rgb(46, 33, 25)', font: 'Libre Caslon Text' });
+  expect(await style(page.getByText('Brown the bird.'))).toMatchObject({ color: 'rgb(46, 33, 25)', font: 'Libre Caslon Text' });
+  expect(await style(page.getByRole('link', { name: '← Library' }))).toMatchObject({ color: 'rgb(90, 62, 46)', font: 'IM Fell English' });
 });

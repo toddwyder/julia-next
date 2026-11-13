@@ -1,0 +1,12 @@
+ts	phase	decision	why	evidence	result
+2026-11-07T15:31:57Z	start	Build the locked pages and stop before Shipping	The requested handoff is an up-to-date pull request, not a merge	docs/agents/jul-341/build.md	open
+2026-11-07T15:31:57Z	scope	Use the card basket override and preserve both locked directions	Todd settled the design on 6 and 7 November; the card replaces per-ingredient pictures	.impeccable/surfaces/app-recipes-id-page-jsx.md	open
+2026-11-07T15:31:57Z	tooling	Run local Codex design workers after routed helpers returned no result	The exposed helper calls returned no report or artifact; available CLI models can perform the work	.artifacts/jul-341/design-a.log	open
+2026-11-07T15:38:53Z	architecture	Use a shared display model with an exclusive server-selected demo provider	The preview must exercise the product pages without mounting migration or inventing real metadata	docs/agents/jul-341/architecture.md	chosen
+2026-11-07T15:38:53Z	assets	Fetch the original basket from the frozen public deployment and resize it	The original repository path returns 404; the recorded old Julia deployment serves the exact supplied basket	public/apothecary/SOURCES.md	verified image
+2026-11-07T15:38:53Z	scope	Keep unbuilt navigation and import commands explicitly unavailable	The settled card places these controls but does not build their separate workflows	docs/agents/jul-341/architecture.md	chosen
+2026-11-07T15:46:59Z	review	Choose design A and graft design B browser coverage	The independent DeepSeek judge preferred shared base quantities and stricter demo isolation	docs/agents/jul-341/design-review.md	agreed
+2026-11-07T16:05:00Z	start	Resume the existing implementation and pull request without repeating design work	The branch already contains the approved design exploration and delegated build	docs/agents/jul-341/build.md	verification pending
+2026-11-07T16:06:00Z	access	Request one Vercel CLI authorization and continue local work	The preview redirects to Vercel sign-in and no configured token or bypass is available	.artifacts/jul-341/vercel-login-private.log	approval pending
+2026-11-07T16:06:00Z	verification	Retain the inherited request-time layout fix for verification	Next connection prevents build-time rendering from fixing the runtime preview provider selection	app/recipes/layout.jsx	verification pending
+2026-11-07T16:06:00Z	tooling	Use a local Codex reviewer after the routed verification helper returned empty	An empty tool result is not independent verification	.artifacts/jul-341/verification-review.log	in progress
