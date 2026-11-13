@@ -222,17 +222,13 @@ test('helpers keep spending until the card total reaches the limit, then every a
   assert.equal(calls, 3, 'the call that crosses the limit is the last one made');
   assert.ok(spending.total <= 0.04 + 0.015, 'the total stays under the limit plus one call');
 
-  // The lead shares the same ledger, so the next thing it does is also blocked.
-  let leadCalls = 0;
-  const lead = new Agent({
-    id: 'flow-build',
-    name: 'Lead',
-    instructions: 'Reply with one line.',
-    model: fakeModel({ called: () => { leadCalls += 1; } }),
-    ...guarded(spending, () => ({ provider: 'commandcode', model: DEEPSEEK })),
-  });
-  await lead.generate('start one more helper');
-  assert.equal(leadCalls, 0, 'the lead makes no call once the card has spent its limit');
+  // The stage around the lead asks the same ledger before the lead runs, so the lead is turned
+  // away and the card never pays for the next call it would have started.
+  assert.equal(
+    spending.blockingReason({ provider: 'commandcode', model: DEEPSEEK }),
+    STOP_REASONS.limit,
+    'a stage that finds the limit spent turns the next agent away',
+  );
   assert.equal(calls, 3);
   rmSync(dir, { recursive: true, force: true });
 });
@@ -268,7 +264,7 @@ test('the card total survives a rerun and a Studio restart because it lives in t
 // Criteria 2 and 7: an unpriceable model, and a call with no usage.
 // ---------------------------------------------------------------------------
 
-test('a model the price list cannot price stops the card before its first call', async () => {
+test('a model the price list cannot price stops the card at its first call', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'flow-spending-unpriced-'));
   const spending = openSpending({ dir, catalog: CATALOG, corrections: CORRECTIONS, now: OFF_PEAK });
   spending.begin(CARD);
@@ -284,9 +280,9 @@ test('a model the price list cannot price stops the card before its first call',
 
   await agent.generate('build the card');
 
-  assert.equal(calls, 0, 'the card never pays for a model it cannot price');
+  assert.equal(calls, 1, 'the call happens, and it is the last one the card makes');
   assert.equal(spending.stopReason(), STOP_REASONS.unpriced);
-  assert.equal(spending.total, 0);
+  assert.equal(spending.total, 0, 'a call the list cannot price adds no dollars it cannot count');
   rmSync(dir, { recursive: true, force: true });
 });
 

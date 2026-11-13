@@ -63,9 +63,11 @@ export function createStages({ agents, dir }) {
 
   // Once the card has spent its limit, or a call came back with no usage to count, no later stage
   // calls a model or changes where the card is going. The card keeps the reason it stopped for,
-  // and the path ends at the stop report.
-  const halt = async ({ inputData, state, setState }) => {
-    const reason = spending?.stopReason() ?? null;
+  // and the path ends at the stop report. A stage also asks about its own model first, so a card
+  // that cannot pay for the next call stops with a reason instead of a failed model call.
+  const halt = async ({ inputData, state, setState }, stage) => {
+    const ids = stage ? agents.spendingIds?.[stage]?.() : null;
+    const reason = spending?.stopReason() ?? spending?.blockingReason(ids ?? null) ?? null;
     if (!reason) return null;
     if (state.stopPart !== 'Spending' || state.stopWhy !== reason) {
       await setState({ ...state, stopPart: 'Spending', stopWhy: reason });
@@ -94,7 +96,7 @@ export function createStages({ agents, dir }) {
   // agent's own input and output, so the card data goes through a mapper either
   // side of it instead of through the stage's shared schema.
   const startBuild = step('start-build', async (context) => {
-    const stopped = await halt(context);
+    const stopped = await halt(context, 'build');
     if (stopped) return stopped;
     const { inputData, state, setState, requestContext } = context;
     buildGate?.start();
@@ -107,14 +109,29 @@ export function createStages({ agents, dir }) {
     return { ...inputData, card, detail: `build round ${buildRounds} started`, prompt: buildPrompt(card, state.kind) };
   });
 
-  const buildAgent = createStep(agents.build, { retries: buildGate ? 0 : BUILD_RETRIES });
+  // The build is a real agent step, but it is called here rather than handed to createStep so a
+  // card that spent its limit in the stage before cannot make the call. Mastra's agent step has
+  // no way to skip its agent, and refusing at the model would fail the whole workflow instead of
+  // ending the card with a reason.
+  const buildAgent = createStep({
+    id: 'flow-build',
+    inputSchema: z.object({ prompt: z.string() }),
+    outputSchema: z.object({ text: z.string() }),
+    retries: buildGate ? 0 : BUILD_RETRIES,
+    execute: async ({ inputData, requestContext, tracingContext, metrics }) => {
+      const reason = spending?.stopReason() ?? spending?.blockingReason(agents.spendingIds?.build?.() ?? null) ?? null;
+      if (reason) return { text: '' };
+      const response = await agents.build.stream(inputData.prompt, { requestContext, tracingContext, metrics });
+      return { text: (await response.text) ?? '' };
+    },
+  });
 
   const finishBuild = createStep({
     id: 'finish-build',
     inputSchema: z.object({ text: z.string().optional() }),
     outputSchema: flowData,
     execute: async (context) => {
-      const stopped = await halt(context);
+      const stopped = await halt(context, 'build');
       if (stopped) return stopped;
       const { inputData, state } = context;
       const card = state.card;
@@ -126,7 +143,7 @@ export function createStages({ agents, dir }) {
   });
 
   const shipping = modelStep('shipping', async (context) => {
-    const stopped = await halt(context);
+    const stopped = await halt(context, 'shipping');
     if (stopped) return stopped;
     const { inputData, state, tracingContext } = context;
     const artifact = readArtifact(cardDir(state.card), state.card);
@@ -155,7 +172,7 @@ export function createStages({ agents, dir }) {
   });
 
   const remediation = modelStep('remediation', async (context) => {
-    const stopped = await halt(context);
+    const stopped = await halt(context, 'remediation');
     if (stopped) return stopped;
     const { inputData, state, tracingContext } = context;
     const artifact = readArtifact(cardDir(state.card), state.card);
@@ -235,7 +252,7 @@ export function createStages({ agents, dir }) {
   });
 
   const smoke = step('smoke', async (context) => {
-    const stopped = await halt(context);
+    const stopped = await halt(context, 'shipping');
     if (stopped) return stopped;
     const { inputData, state, setState } = context;
     const answer = nextVerdict(cardDir(state.card), 'smoke');
@@ -264,7 +281,7 @@ export function createStages({ agents, dir }) {
   });
 
   const retro = modelStep('retro', async (context) => {
-    const stopped = await halt(context);
+    const stopped = await halt(context, 'retro');
     if (stopped) return stopped;
     const { inputData, state, tracingContext } = context;
     const result = await agents.retro.stream(

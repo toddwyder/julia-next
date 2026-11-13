@@ -151,16 +151,17 @@ function idsOf(ids, model) {
   return { provider: model?.provider ?? '', model: model?.modelId ?? '' };
 }
 
-// A Mastra input/output processor. The input step stops the card before a call it cannot afford,
-// and the output step adds the call's dollars to the ledger.
+// A Mastra input/output processor. The input step remembers which model the call will use, and
+// the output step adds the call's dollars to the ledger and stops the card when that call spent
+// the last of its limit or came back without usage. The input step does not refuse the call: a
+// refusal at that point leaves the agent as a TripWire, which fails the whole workflow with no
+// stop report. A card that is already out of money is turned away by the stage before the agent.
 export function spendingProcessor(spending, ids = null) {
   let called = null;
   return {
     id: 'card-spending',
-    processInputStep: async ({ model, abort }) => {
+    processInputStep: async ({ model }) => {
       called = model ?? null;
-      const reason = spending.started ? spending.blockingReason(idsOf(ids, called)) : null;
-      if (reason) abort(reason, { metadata: { reason } });
     },
     processOutputStep: async ({ usage, abort }) => {
       if (!spending.started) return;

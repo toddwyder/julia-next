@@ -140,7 +140,16 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     defaultOptions: { ...limits, ...(gate ? { maxRetries: 0 } : {}) },
   });
 
-  return { build, shipping, remediation, retro, spending, ...(gate ? { gate } : {}) };
+  // A stage asks these before it calls its agent, so a card that has spent its limit or picked a
+  // model the price list cannot price ends with a stop report instead of a failed model call.
+  const spendingIds = {
+    build: () => splitModelId(leadModelId(leadModelFile)),
+    shipping: () => (model ? null : splitModelId(stages.shipping)),
+    remediation: () => (model ? null : splitModelId(stages.remediation)),
+    retro: () => (model ? null : splitModelId(stages.retro)),
+  };
+
+  return { build, shipping, remediation, retro, spending, spendingIds, ...(gate ? { gate } : {}) };
 }
 
 // The Graphify exploration gate, scoped to the build. Spending is Mastra's cost guard's job.
