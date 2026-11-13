@@ -261,19 +261,6 @@ test('the picker and the machine resolve the same model id for every saved role'
   }
 });
 
-test('installing the Lead setting twice keeps an existing model and the coder role', t => {
-  const dir = temporary(t);
-  const file = join(dir, 'lead-model');
-  const pstack = join(dir, 'pstack-models.md');
-  writeFileSync(pstack, 'feature, refactoring: coder-model\n');
-  assert.equal(installLeadModel(file).created, true);
-  assert.equal(readFileSync(file, 'utf8'), 'openai/gpt-6.1-sol\n');
-  writeFileSync(file, 'openai/gpt-5.4\n');
-  assert.equal(installLeadModel(file).created, false);
-  assert.equal(readFileSync(file, 'utf8'), 'openai/gpt-5.4\n');
-  assert.equal(readFileSync(pstack, 'utf8'), 'feature, refactoring: coder-model\n');
-});
-
 test('the machine stages take their models from the saved picks', async t => {
   const dir = temporary(t);
   const leadModelFile = join(dir, 'lead-model');

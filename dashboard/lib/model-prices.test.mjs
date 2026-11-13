@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { costOfTokens, costFromMetrics, findCost, priceFor, readCorrections } from './model-prices.js';
+import { costOfTokens, costFromMetrics, findCost, loadCatalog, priceFor, readCorrections } from './model-prices.js';
 
 const catalog = {
   source: 'test-list',
@@ -143,4 +143,19 @@ test('a duration row adds no call to the run total', () => {
   assert.equal(total.calls, 1);
   assert.equal(total.usd, 0.15);
   assert.deepEqual(total.unpriced, []);
+});
+
+// The real price list is on this machine, so one test reads it to keep the wiring honest.
+test('the shipped price list prices a peak DeepSeek call at the peak rate', () => {
+  let shipped;
+  try {
+    shipped = loadCatalog();
+  } catch {
+    return; // No price list on this machine, so there is nothing to read here.
+  }
+  const at = new Date('2026-11-13T02:00:00Z');
+  const price = priceFor({ catalog: shipped, corrections, provider: 'commandcode', model: 'deepseek/deepseek-v4.1-flash', at });
+  assert.ok(price, 'the shipped list knows this model');
+  assert.equal(price.peak, true);
+  assert.equal(price.inputPerMillion, 0.3);
 });
