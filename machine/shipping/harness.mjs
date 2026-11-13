@@ -11,11 +11,12 @@
 // some versions.
 
 import { existsSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const programDir = process.env.MASTRACODE_PROGRAM_DIR || path.join(os.homedir(), '.local', 'lib', 'mastracode-program');
+import { programDir as installedProgramDir } from '../../scripts/mastra-program.mjs';
+
+const programDir = process.env.MASTRACODE_PROGRAM_DIR || installedProgramDir();
 const modules = path.join(programDir, 'node_modules');
 const NEEDED = ['@mastra/code-sdk', '@mastra/core', '@mastra/libsql', '@libsql/client', 'zod'];
 

@@ -11,7 +11,6 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..', '..');
-process.env.MASTRACODE_PROGRAM_DIR ||= path.join(process.env.HOME ?? '', '.local', 'lib', 'mastracode-program');
 
 const stateFile = process.argv[2];
 const workflowId = process.argv[3] ?? 'stock-workflow-proof';

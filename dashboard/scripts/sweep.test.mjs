@@ -35,9 +35,9 @@ const swept = async () => {
   }
 };
 
-// `mastracode` on PATH is the launcher, a script in this repo, so walking up from it lands in
-// the repo and finds no SDK. The sweep has to take the program directory it is told about.
-test('the sweep takes the SDK from the program directory, not from beside the launcher', () => {
+// The sweep loads the SDK from the installed program, so it needs the directory that holds
+// the program's node_modules rather than whatever `mastracode` happens to resolve to on PATH.
+test('the sweep takes the SDK from the program directory it is told about', () => {
   const program = mkdtempSync(join(tmpdir(), 'julia-program-'));
   try {
     const sdk = join(program, 'node_modules', '@mastra', 'code-sdk', 'dist', 'index.js');

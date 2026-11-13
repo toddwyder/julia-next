@@ -1,8 +1,8 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
+import { codeSdkPath } from '../../scripts/mastra-program.mjs';
 import { listAccountModels } from '../lib/account-model-catalog.js';
 
 import { accountProviders, mergeSweep, parsePrices, stateDir } from '../lib/models.js';
@@ -14,18 +14,10 @@ export function readConfig(name) {
   return JSON.parse(readFileSync(join(dashboardRoot, 'config', name), 'utf8'));
 }
 
-// `mastracode` on PATH is the launcher, a plain script in this repo, so the program is not
-// beside it. MASTRACODE_PROGRAM names the program directory, and this server's installer puts
-// it at ~/.local/lib/mastracode-program.
+// The sweep reads the models from the installed program, so it asks the same resolver every
+// other script asks: the global npm install, unless an override names another one.
 export function findSdkPath(env = process.env) {
-  if (env.MASTRACODE_SDK_PATH) return env.MASTRACODE_SDK_PATH;
-  const relative = join('node_modules', '@mastra', 'code-sdk', 'dist', 'index.js');
-  const programs = [env.MASTRACODE_PROGRAM, env.MASTRACODE_PROGRAM_DIR, join(homedir(), '.local', 'lib', 'mastracode-program')].filter(Boolean);
-  for (const program of programs) {
-    const candidate = join(program, relative);
-    if (existsSync(candidate)) return candidate;
-  }
-  throw new Error(`The Mastra Code SDK was not found in ${programs.join(' or ')}. Set MASTRACODE_PROGRAM to the directory that holds its node_modules.`);
+  return env.MASTRACODE_SDK_PATH || codeSdkPath(env);
 }
 
 export async function availableModels(env = process.env) {

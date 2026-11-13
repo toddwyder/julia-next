@@ -114,25 +114,22 @@ Inspect its result with `journalctl --user -u julia-disk-check.service`.
 
 ## Mastra Code's trace store
 
-Mastra Code opens its trace store once, at startup, and DuckDB lets one process write a file. A
-session that starts while another holds `observability.duckdb` gets no tracing at all, silently, for
-its whole life (`@mastra/code-sdk/dist/index.js:323`), so its tokens and cost are never recorded and
-the card priced from it reads unknown. Pstack runs sessions in parallel, so this happened on the
-first slice of 30 October and nothing said so.
+Mastra Code opens its trace store once, at startup, and DuckDB lets one process write a file. The
+stock install keeps one store, `~/.local/share/mastracode/observability.duckdb`, and a session that
+starts while another holds it gets no tracing at all, silently, for its whole life
+(`@mastra/code-sdk/dist/index.js:323`), so its tokens and cost are never recorded and the card priced
+from it reads unknown. Run one traced session at a time; a session started while another is open is
+the one that loses its rows. `MASTRA_APP_DATA_DIR` moves the store with the rest of the data.
 
-The launcher at `~/.local/bin/mastracode` (`scripts/mastracode`, installed by
-`node scripts/install-launcher.mjs`) is the one place every session starts from. It gives the launch
-its own file under `~/.local/share/mastracode/traces/<utc stamp>-<pid>.duckdb` through
-`MASTRA_OBSERVABILITY_DB_PATH`, so parallel sessions never share a lock. The daily
-`julia-trace-fold.timer` folds finished traces. `JULIA_TRACES_DIR` moves the directory; `MASTRA_APP_DATA_DIR`
-moves it with the rest of the data. `mastracode` on PATH is now the launcher rather than the
-program, so a script that needs the program's own packages reads `MASTRACODE_PROGRAM_DIR` or
-`~/.local/lib/mastracode-program`, never the command's neighbours.
+The daily `julia-trace-fold.timer` runs `node scripts/trace-store.mjs fold`, which copies the store's
+cost rows into `~/.local/share/mastracode/traces/archive.duckdb` and deletes the store, so the next
+session recreates an empty one. A script that needs the program's own packages asks
+`scripts/mastra-program.mjs`, which resolves the global npm install from `npm root -g` unless
+`MASTRACODE_PROGRAM_DIR` or `MASTRACODE_PROGRAM` names another copy; `npm install -g mastracode` is
+how the program gets there and how it updates itself.
 
-A session started any other way, by a Mastra Code update that replaces the launcher or by a command
-that skips it, records nothing and leaves no file of its own. Nothing on the machine notices that, so
-the card says it. The launcher's install time is the cutover, so a run from before it is history and
-not a loss.
+A session started outside the stock CLI, or one that runs while another session holds the store,
+records nothing. Nothing on the machine notices that, so the card says it.
 
 ```sh
 node scripts/trace-store.mjs status
@@ -150,9 +147,8 @@ left as `<name>.folding` is picked up by the next fold. One file that cannot be 
 trace stopped every fold behind it for two days, so the traces of 31 October to 2 November all waited
 on the one that had failed. `status` lists what is still left behind and why.
 
-The single store the launcher replaced,
-`~/.local/share/mastracode/observability.duckdb`, is folded and deleted the same way; that happened
-on 30 October, 5,955,137,536 B into a 3,158,016 B archive holding 44,408 cost rows.
+The store is folded and deleted the same way; on 30 October
+5,955,137,536 B became a 3,158,016 B archive holding 44,408 cost rows.
 
 Deleting a file is what returns the disk. A delete inside a file gives nothing back even after a
 `CHECKPOINT`: on 30 October 52,443 rows were deleted and checkpointed and the file was 5,955,137,536

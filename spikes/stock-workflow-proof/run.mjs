@@ -36,7 +36,6 @@ fs.rmSync(path.join(SCRATCH, 'proof.txt'), { force: true });
 
 process.env.MASTRA_OBSERVABILITY_DB_PATH = traceFile;
 process.env.MASTRA_DB_PATH = stateFile;
-process.env.MASTRACODE_PROGRAM_DIR ||= path.join(process.env.HOME ?? '', '.local', 'lib', 'mastracode-program');
 
 const log = message => console.log(`[${new Date().toISOString()}] ${message}`);
 
