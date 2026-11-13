@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+import { readLedger } from './card-ledger.mjs';
 import test from 'node:test';
 
-import { AGENT_MAX_OUTPUT_TOKENS, MEMORY_MAX_OUTPUT_TOKENS, createAgents, repoRoot } from './agents.mjs';
+import { createAgents, repoRoot } from './agents.mjs';
 import { HELPER_CONCURRENCY, STOP_REASONS } from './spending.mjs';
 import { helperKey, readRoleModels } from './role-models.mjs';
 import { buildModel, leadModelId } from './models.mjs';
@@ -267,33 +269,38 @@ test('a missing stage pick stops before the stage starts and names the stage', t
   assert.throws(() => createAgents({ repo, leadModelFile, roleModelsFile }), /Missing Shipping pick/);
 });
 
-test('no agent can answer without an output limit, and every agent carries the cost guard', async t => {
+test('every agent carries the cost guard and sets no output limit of its own', async t => {
   const dir = temporary(t);
   const leadModelFile = join(dir, 'lead-model');
   const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
   writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
-  const agents = createAgents({ repo, leadModelFile, roleModelsFile, machine: true });
+  const agents = createAgents({ repo, leadModelFile, roleModelsFile, dir });
   const helpers = Object.values(await agents.build.listAgents());
   const all = [agents.build, agents.shipping, agents.remediation, agents.retro, ...helpers];
   assert.ok(all.length >= 25);
   for (const agent of all) {
     const options = await agent.getDefaultOptions();
-    assert.equal(options.modelSettings?.maxOutputTokens, AGENT_MAX_OUTPUT_TOKENS, `${agent.name} has no output limit`);
+    assert.equal(options.modelSettings?.maxOutputTokens, undefined, `${agent.name} has an output limit of the machine's own`);
+    assert.equal(options.maxRetries, undefined, `${agent.name} retries the way Mastra retries`);
     const processors = await agent.listConfiguredInputProcessors();
     assert.ok(processors.some(processor => processor.id === 'token-cost-control'), `${agent.name} has no cost guard`);
   }
 });
 
-test('the memory note-takers answer under 100,000 output tokens, as Mastra does', async t => {
+test('the memory note-takers run on the free model the card picked, with the retries and answer limit Mastra gives them', async t => {
   const dir = temporary(t);
   const leadModelFile = join(dir, 'lead-model');
   const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
   writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
-  const { build } = createAgents({ repo, leadModelFile, roleModelsFile, machine: true });
+  const { build, spending } = createAgents({ repo, leadModelFile, roleModelsFile, dir });
+  spending.begin('JUL-375-MEMORY');
+  assert.equal(spending.memoryModel, 'commandcode/inclusionai/ling-3.1-flash:free');
+  assert.equal(readLedger(join(dir, 'JUL-375-MEMORY', 'spending.json')).memoryModel, 'commandcode/inclusionai/ling-3.1-flash:free', 'the pick is saved with the card');
   const observational = (await build.getMemory()).getMergedThreadConfig({}).observationalMemory;
-  assert.equal(MEMORY_MAX_OUTPUT_TOKENS, 100_000);
-  assert.equal(observational.observation.modelSettings.maxOutputTokens, 100_000);
-  assert.equal(observational.reflection.modelSettings.maxOutputTokens, 100_000);
+  assert.equal(observational.observation.maxRetries, undefined);
+  assert.equal(observational.reflection.maxRetries, undefined);
+  assert.equal(observational.observation.modelSettings?.maxOutputTokens, undefined);
+  assert.equal(observational.reflection.modelSettings?.maxOutputTokens, undefined);
 });
 
 test('the Lead runs a fixed number of helpers at once, and a stopped card starts no new helper', async t => {

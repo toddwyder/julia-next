@@ -28,8 +28,8 @@ export const PROGRAMS = [
   ['machine/flow/workflow.mjs', 'The order of the stages, the loops and the one place a card waits.'],
   ['machine/flow/steps.mjs', 'What each stage does, including the build being a real agent step.'],
   ['machine/flow/agents.mjs', 'The agents the stages run, and what the build agent may touch.'],
-  ['machine/flow/exploration.mjs', 'The gate routing raw grep and glob workspace and shell commands to Graphify.'],
-  ['machine/flow/graphify.mjs', 'The Graphify graph tools Lead and its helpers query before reading files.'],
+  ['machine/flow/graphify.mjs', 'The Graphify graph tools offered to Lead and its helpers.'],
+  ['machine/flow/memory.mjs', 'The memory note-takers, run on the free model the card picked.'],
   ['machine/flow/models.mjs', 'The Lead model, read from its independent setting and routed through its account provider.'],
   ['machine/flow/role-models.mjs', 'The Lead helper models, read from the saved role table and routed to account providers.'],
   ['machine/flow/schema.mjs', 'What the run form asks for and what the run remembers.'],
@@ -40,6 +40,7 @@ export const PROGRAMS = [
   ['machine/flow/start.mjs', 'Assembles a run to read it back and to resume a card.'],
   ['machine/flow/run.mjs', 'Answers a waiting card, reads a run, writes its cost. No way to start one.'],
   ['machine/flow/trace.mjs', 'Turns the trace file into the run cost record.'],
+  ['machine/flow/report.mjs', 'The token table every card report carries, grouped by agent and model.'],
   ['scripts/julia-agents.mjs', 'Runs a machine command with the Julia keys it needs.'],
 ].map(([path, what]) => ({ path, what }));
 

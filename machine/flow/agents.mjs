@@ -3,26 +3,17 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Agent } from '@mastra/core/agent';
 import { TokenCostControl } from '@mastra/core/processors';
-import { Memory } from '@mastra/memory';
-import { createExplorationGate } from './exploration.mjs';
 import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace';
 
+import { cardMemory } from './memory.mjs';
 import { buildModelReader, leadModelId } from './models.mjs';
 import { agentModel, helperKey, readRoleModels, readStageModels } from './role-models.mjs';
-import { HELPER_CONCURRENCY, helperStartHook, meteredModel, openSpending, spendingProcessor, splitModelId } from './spending.mjs';
-
-// Mastra caps the observer and reflector at 100,000 output tokens, but only when it picks their model.
-// An explicit model gets no cap, so the controller reserved all of the remaining token cap for one memory
-// call and the Lead's next call found no room (JUL-362, 11 Nov). This is Mastra's own value, set explicitly.
-export const MEMORY_MAX_OUTPUT_TOKENS = 100_000;
+import { HELPER_CONCURRENCY, helperStartHook, openSpending, spendingProcessor, splitModelId } from './spending.mjs';
 
 // Mastra's own cost guard stops a run once its estimated cost passes this many dollars. The scope is the
 // run's trace, so the Lead, its helpers and the stage agents share one total.
 export const COST_LIMIT_DOLLARS = 4;
-// Every agent answers under an output limit, so one call cannot run away.
-export const AGENT_MAX_OUTPUT_TOKENS = 32_000;
 
-const limits = { modelSettings: { maxOutputTokens: AGENT_MAX_OUTPUT_TOKENS } };
 export const costGuard = () => new TokenCostControl({ maxCost: COST_LIMIT_DOLLARS, scope: 'run' });
 
 const POTETO_SKILL = '.agents/skills/poteto-mode/SKILL.md';
@@ -40,30 +31,10 @@ export function repoRoot() {
 
 // The card's spending total is read from its own folder, so every agent in the run adds to the
 // same ledger and a rerun carries the total it already spent.
-export function createAgents({ model, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {}, machine = false, dir = process.env.FLOW_DIR ?? '.artifacts/flow/studio', spending = openSpending({ dir }) } = {}) {
-  const gate = machine ? createBuildGate({ repo }) : undefined;
-  // Memory note-takers call the model themselves, outside an agent's processors, so their calls
-  // are metered on the model instead.
-  const memoryModel = () => meteredModel(agentModel('openai/gpt-6-luna'), { spending, ...splitModelId('openai/gpt-6-luna') });
-  const memoryFor = role => {
-    if (!gate) return {};
-    const memory = new Memory({ options: { observationalMemory: {
-      observation: { model: memoryModel(), maxRetries: 0, failurePolicy: 'abort', modelSettings: { maxOutputTokens: MEMORY_MAX_OUTPUT_TOKENS } },
-      reflection: { model: memoryModel(), maxRetries: 0, failurePolicy: 'abort', modelSettings: { maxOutputTokens: MEMORY_MAX_OUTPUT_TOKENS } },
-    } } });
-    return { memory };
-  };
-  const gateOptions = gate ? { maxRetries: 0, hooks: gate.hooks } : {};
-  const startHook = helperStartHook(spending);
-  const buildHooks = {
-    beforeToolCall(call) {
-      startHook.beforeToolCall(call);
-      return gate?.hooks.beforeToolCall(call);
-    },
-    afterToolCall(call) {
-      return gate?.hooks.afterToolCall(call);
-    },
-  };
+export function createAgents({ model, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {}, dir = process.env.FLOW_DIR ?? '.artifacts/flow/studio', spending = openSpending({ dir }) } = {}) {
+  // A stopped card starts no new helper. The hook runs before the helper does, and what it throws
+  // comes back to the Lead as a failed tool call.
+  const buildHooks = helperStartHook(spending);
   // The input side stops a call the card cannot afford, and the output side adds the call's
   // dollars. Mastra runs `processOutputStep` only for output processors, so the same processor
   // goes into both lists and remembers the model the input step saw.
@@ -91,13 +62,13 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
       id: `pstack-${role.id}-${index + 1}`,
       name: role.name,
       description: `${role.name} pstack role on ${modelId}${choice}. ${role.explanation} Use this helper when delegating ${role.name} work.`,
-      instructions: `You are the ${role.name} pstack helper. ${role.explanation} Complete the task delegated by Lead yourself. Do not delegate it again. For questions about code structure or where something lives, call the graphify tools before reading files. Report the result and evidence.`,
+      instructions: `You are the ${role.name} pstack helper. ${role.explanation} Complete the task delegated by Lead yourself. Do not delegate it again. Report the result and evidence.`,
       model: agentModel(modelId),
       ...cardProcessors(() => splitModelId(modelId)),
-      ...memoryFor(role.name),
+      ...cardMemory(spending),
       workspace: helperWorkspace,
       tools,
-      defaultOptions: { maxSteps: 100, ...limits, ...gateOptions },
+      defaultOptions: { maxSteps: 100 },
     })];
   })));
   const build = new Agent({
@@ -106,7 +77,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
     model: buildModelReader(leadModelFile),
     ...cardProcessors(() => splitModelId(leadModelId(leadModelFile)), { refuseAfterStop: true }),
-    ...memoryFor('lead'),
+    ...cardMemory(spending),
     workspace,
     agents: helpers,
     tools,
@@ -114,14 +85,11 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
       maxSteps: 400,
       toolCallConcurrency: HELPER_CONCURRENCY,
       hooks: buildHooks,
-      ...limits,
-      ...(gate ? { maxRetries: 0 } : {}),
     },
   });
   // The reader runs later, so check the setting now: a missing Lead model stops Studio at boot
   // and names the installer, as it did when the model was resolved here.
   leadModelId(leadModelFile);
-
 
   // An explicit model is a caller's override, as in a test. Otherwise each stage takes the
   // model Todd saved for it; a missing line stops here and names that stage.
@@ -135,7 +103,6 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
       'You glance at one short file and say in one sentence whether it reads as a recipe title. You do not decide pass or fail; a fixed rule does that. No tools.',
     model: stageModel('shipping'),
     ...cardProcessors(() => (model ? null : splitModelId(stages.shipping))),
-    defaultOptions: { ...limits, ...(gate ? { maxRetries: 0 } : {}) },
   });
 
   const remediation = new Agent({
@@ -144,7 +111,6 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     instructions: 'You rewrite one short line so it reads better. Reply with the new line only. No tools.',
     model: stageModel('remediation'),
     ...cardProcessors(() => (model ? null : splitModelId(stages.remediation))),
-    defaultOptions: { ...limits, ...(gate ? { maxRetries: 0 } : {}) },
   });
 
   const retro = new Agent({
@@ -153,7 +119,6 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     instructions: 'You write one sentence about what this throwaway run did. No tools.',
     model: stageModel('retro'),
     ...cardProcessors(() => (model ? null : splitModelId(stages.retro))),
-    defaultOptions: { ...limits, ...(gate ? { maxRetries: 0 } : {}) },
   });
 
   // A stage asks these before it calls its agent, so a card that has spent its limit or picked a
@@ -165,31 +130,5 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     retro: () => (model ? null : splitModelId(stages.retro)),
   };
 
-  return { build, shipping, remediation, retro, spending, spendingIds, ...(gate ? { gate } : {}) };
-}
-
-// The Graphify exploration gate, scoped to the build. Spending is Mastra's cost guard's job.
-export function createBuildGate({ repo }) {
-  let active = false;
-  let exploration;
-  return {
-    get active() { return active; },
-    hooks: {
-      beforeToolCall(call) {
-        if (!active) throw new Error('build_not_active');
-        return exploration.hooks.beforeToolCall(call);
-      },
-      afterToolCall(call) { return exploration?.hooks.afterToolCall(call); },
-    },
-    start() {
-      exploration = createExplorationGate({ root: repo });
-      active = true;
-    },
-    finish() {
-      const graph = exploration.snapshot();
-      if (graph.awaitingAnswer) throw new Error('incomplete_graph_answer');
-      active = false;
-      return { exploration: graph };
-    },
-  };
+  return { build, shipping, remediation, retro, spending, spendingIds };
 }

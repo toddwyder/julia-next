@@ -3,12 +3,14 @@
 // folder and returns a value. Landing, Todd's answer and the stop report are
 // plain stages, so no model decides them.
 
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
 import { cardState, flowData, runInput } from './schema.mjs';
+import { tokenReport } from './report.mjs';
 import { HELPER_CONCURRENCY } from './spending.mjs';
 import {
   nextVerdict,
@@ -20,10 +22,6 @@ import {
   writeReport,
   writeRetro,
 } from './scratch.mjs';
-
-// What the build step does with a failed model call is Mastra's own step
-// setting. The tests count attempts from this number instead of naming one.
-export const BUILD_RETRIES = 2;
 
 // The words a stop leaves behind are the same wherever the card stops. A stop on spending also
 // states the most the card can overshoot: the helpers running when the cap was crossed, each worth
@@ -44,16 +42,14 @@ const reportText = (state, detail, spending) => {
     `Last detail: ${detail || 'none'}`,
     ...overshoot,
     '',
+    ...tokenReport(spending?.calls ?? []),
+    '',
     'A second failure stops the card; the next step is an Investigation.',
   ].join('\n');
 };
 
 const step = (id, execute, extra = {}) =>
   createStep({ id, inputSchema: flowData, outputSchema: flowData, ...extra, execute });
-
-// A model call is the part of a stage that meets the network, so that stage is
-// the one that retries. `retries: 2` is Mastra's own step setting.
-const agentStep = (id, execute) => step(id, execute, { retries: BUILD_RETRIES });
 
 const buildPrompt = (card, kind) =>
   [
@@ -65,9 +61,7 @@ const buildPrompt = (card, kind) =>
   ].join('\n');
 
 export function createStages({ agents, dir }) {
-  const buildGate = agents.gate;
   const spending = agents.spending;
-  const modelStep = (id, execute) => buildGate ? step(id, execute, { retries: 0 }) : agentStep(id, execute);
   const cardDir = (card) => join(dir, card);
 
   // Once the card has spent its limit, or a call came back with no usage to count, no later stage
@@ -108,7 +102,6 @@ export function createStages({ agents, dir }) {
     const stopped = await halt(context, 'build');
     if (stopped) return stopped;
     const { inputData, state, setState, requestContext } = context;
-    buildGate?.start();
     const card = state.card || inputData.card;
     const buildRounds = state.buildRounds + 1;
     const requestId = `${card}/build-${buildRounds}`;
@@ -127,7 +120,6 @@ export function createStages({ agents, dir }) {
     id: 'flow-build',
     inputSchema: z.object({ prompt: z.string() }),
     outputSchema: z.object({ text: z.string() }),
-    retries: buildGate ? 0 : BUILD_RETRIES,
     execute: async ({ inputData, requestContext, tracingContext, metrics }) => {
       const reason = spending?.stopReason() ?? spending?.blockingReason(agents.spendingIds?.build?.() ?? null) ?? null;
       if (reason) return { text: '' };
@@ -150,14 +142,13 @@ export function createStages({ agents, dir }) {
       if (stopped) return stopped;
       const { inputData, state } = context;
       const card = state.card;
-      buildGate?.finish();
       const text = inputData.text ?? '';
       writeArtifact(cardDir(card), card, text);
       return { card, kind: state.kind, detail: text, failCount: state.failCount };
     },
   });
 
-  const shipping = modelStep('shipping', async (context) => {
+  const shipping = step('shipping', async (context) => {
     const stopped = await halt(context, 'shipping');
     if (stopped) return stopped;
     const { inputData, state, tracingContext } = context;
@@ -186,7 +177,7 @@ export function createStages({ agents, dir }) {
     };
   });
 
-  const remediation = modelStep('remediation', async (context) => {
+  const remediation = step('remediation', async (context) => {
     const stopped = await halt(context, 'remediation');
     if (stopped) return stopped;
     const { inputData, state, tracingContext } = context;
@@ -295,7 +286,7 @@ export function createStages({ agents, dir }) {
     return { ...inputData, stopped: true, finished: true, detail: `stop report at ${path}` };
   });
 
-  const retro = modelStep('retro', async (context) => {
+  const retro = step('retro', async (context) => {
     const stopped = await halt(context, 'retro');
     if (stopped) return stopped;
     const { inputData, state, tracingContext } = context;
@@ -308,7 +299,11 @@ export function createStages({ agents, dir }) {
     return { ...inputData, detail: text ?? '' };
   });
 
+  // A card that ran to the end gets the same report, so every card leaves the token table behind.
+  // A stopped card already wrote its own at the stop report, and that one stays.
   const cleanup = step('cleanup', async ({ inputData, state }) => {
+    const report = join(cardDir(state.card), 'reports', `${state.card}.md`);
+    if (!existsSync(report)) writeReport(cardDir(state.card), state.card, reportText(state, inputData.detail, spending));
     sweepBuild(cardDir(state.card));
     return { ...inputData, finished: true, detail: `${state.card} cleaned up` };
   });

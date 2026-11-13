@@ -25,7 +25,7 @@ export function leadModelId(file = leadModelPath()) {
     throw error;
   }
   if (!ACCOUNT_MODEL.test(value)) {
-    throw new Error(`Lead model setting ${file} must contain one account model id, such as openai/gpt-6.1-sol or commandcode/moonshotai/Kimi-K3.1-Pro.`);
+    throw new Error(`Lead model setting ${file} must contain one account model id, such as provider/model.`);
   }
   return value;
 }
