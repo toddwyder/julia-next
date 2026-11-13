@@ -2,26 +2,24 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ENV_FILE, OPERATOR_CHECKOUT, SERVER_HOSTNAME, UNITS, envFileContent, installService, installSyncEnv, readEnvFile, serverIdentityProblem } from './install-service.mjs';
+import { ENV_FILE, SERVER_HOSTNAME, UNITS, envFileContent, installService, installSyncEnv, readEnvFile, serverIdentityProblem } from './install-service.mjs';
 
-const WORKTREE_GITDIR = `gitdir: ${join(OPERATOR_CHECKOUT, '.git', 'worktrees', 'julia-dashboard')}\n`;
+const CLONE_CONFIG = `[remote "origin"]\n\turl = https://github.com/toddwyder/julia-next.git\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n`;
 const thisServer = (overrides = {}) => serverIdentityProblem({
   hostname: SERVER_HOSTNAME,
-  exists: path => path === join(OPERATOR_CHECKOUT, '.git'),
-  read: () => WORKTREE_GITDIR,
+  read: () => CLONE_CONFIG,
   ...overrides,
 });
 
-test('it runs on this server, from a worktree of the operator checkout', () => {
+test('it runs on this server, from the deploy checkout its own clone of julia-next', () => {
   assert.equal(thisServer(), '');
 });
 
-test('it refuses any other machine, checkout or worktree', () => {
+test('it refuses any other machine, checkout or repository', () => {
   assert.match(thisServer({ hostname: 'someone-laptop' }), /not the Julia server/);
-  assert.match(thisServer({ exists: () => false }), /operator checkout .* is not a git checkout/);
-  assert.match(thisServer({ read: () => { throw Object.assign(new Error('missing'), { code: 'ENOENT' }); } }), /is not a git worktree/);
-  assert.match(thisServer({ read: () => '/home/ubuntu/verifications/jul-276/owners/pr-2/.git\n' }), /is not a worktree of/);
-  assert.match(thisServer({ read: () => `gitdir: /tmp/elsewhere/.git/worktrees/x\n` }), /is not a worktree of/);
+  assert.match(thisServer({ read: () => { throw Object.assign(new Error('missing'), { code: 'ENOENT' }); } }), /is not its own git checkout/);
+  assert.match(thisServer({ read: () => '[remote "origin"]\n\turl = https://github.com/someone/other.git\n' }), /does not clone julia-next/);
+  assert.match(thisServer({ read: () => 'gitdir: /home/ubuntu/another-clone/.git/worktrees/julia-dashboard\n' }), /does not clone julia-next/);
 });
 
 test('it refuses to write anything at all unless it is root on this server', () => {
@@ -72,7 +70,7 @@ test('every unit the installer writes exists in dashboard/ops and obeys the deci
       assert.match(text, /^RestartSec=2$/m);
       assert.match(text, /^WantedBy=multi-user\.target$/m);
       assert.match(text, /^EnvironmentFile=\/etc\/julia-dashboard\.env$/m);
-      assert.match(text, /ExecStart=\/usr\/local\/bin\/node \/home\/ubuntu\/julia-mastra\/scripts\/julia-agents\.mjs -- \/usr\/local\/bin\/node \/home\/ubuntu\/julia-dashboard\/dashboard\/server\.js/);
+      assert.match(text, /ExecStart=\/usr\/local\/bin\/node \/home\/ubuntu\/julia-dashboard\/scripts\/julia-agents\.mjs -- \/usr\/local\/bin\/node \/home\/ubuntu\/julia-dashboard\/dashboard\/server\.js/);
     }
     if (unit.endsWith('.timer')) assert.match(text, /^WantedBy=timers\.target$/m);
   }

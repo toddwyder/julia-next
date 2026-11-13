@@ -190,11 +190,11 @@ small table per file, so a 5.6 GB file folds in seconds.
 prints the directory, every file with its size, which files a fold would take, the total, the free
 space, and whether that total is over the 15 GB alarm.
 
-Reading a trace file by hand takes the client out of the repo, because it is a dev dependency here
-and the installed program also carries one:
+Reading a trace file by hand needs a DuckDB client from somewhere that has one installed, because the
+repo root does not. The dashboard's dependencies carry one, and so does the installed program:
 
 ```sh
-node -e "const {createRequire}=require('node:module');const r=createRequire('/home/ubuntu/julia-mastra/package.json');const {DuckDBInstance}=r('@duckdb/node-api');..."
+node -e "const {createRequire}=require('node:module');const r=createRequire('/home/ubuntu/julia-dashboard/dashboard/package.json');const {DuckDBInstance}=r('@duckdb/node-api');..."
 ```
 
 Four facts that cost failed runs on 30 October: `connection.runAndReadAll(sql).getRowsJS()` returns rows as arrays, not objects (`getRowObjectsJson` does not exist on the reader); values come back as `BigInt`, so `Number()` them before arithmetic; `duckdb_tables().estimated_size` is a row count, not bytes, so measure payloads with `sum(length(cast(column as varchar)))`; and `octet_length` is not implemented for `VARCHAR` here, so cast first. A connection holds a file's lock until it is closed, so close the connection and then the instance.

@@ -16,7 +16,7 @@ EnvironmentFile=/etc/julia-dashboard.env
 Environment=NODE_ENV=production
 Environment=HOME=/home/ubuntu
 # LINEAR_API_KEY comes from 1Password through the vault wrapper; nothing secret is on disk.
-ExecStart=/usr/local/bin/node /home/ubuntu/julia-mastra/scripts/julia-agents.mjs -- /usr/local/bin/node /home/ubuntu/julia-dashboard/dashboard/server.js
+ExecStart=/usr/local/bin/node /home/ubuntu/julia-dashboard/scripts/julia-agents.mjs -- /usr/local/bin/node /home/ubuntu/julia-dashboard/dashboard/server.js
 Restart=always
 RestartSec=2
 TimeoutStopSec=20
