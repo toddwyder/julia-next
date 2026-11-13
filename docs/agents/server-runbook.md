@@ -24,6 +24,12 @@ Studio's agent list includes **Lead**, the existing Flow build Agent. Its instru
 
 Lead reads its model from `~/.config/julia/lead-model`, independently of the coder's pstack role. Run `node scripts/install-lead-model.mjs` once to create the initial setting. It preserves an existing file. The setting holds one `openai/<model>` value and uses Mastra Code's ChatGPT login. The Lead reads the file at each model call, so an edit reaches the next call with Studio left running. A missing setting prevents Lead from starting and names the installer command. See [the Lead build record](jul-339/build.md) for the dated model choice and acceptance checks.
 
+Mastra prices a run from its own copy of models.dev. `julia-studio.service` turns the daily refresh on
+with a drop-in (`~/.config/systemd/user/julia-studio.service.d/pricing.conf` sets
+`MASTRA_AUTO_REFRESH_PRICING=true`); without it Mastra reads only the price table installed with the
+program. The run record and the model picker read the same refreshed copy, so a price corrected at
+models.dev reaches both at once.
+
 The `card-path` workflow begins in Mastra Studio's run form. No script starts a card.
 
 ```sh

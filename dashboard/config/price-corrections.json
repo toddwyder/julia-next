@@ -1,0 +1,45 @@
+{
+  "peakWindows": [
+    {
+      "provider": "commandcode",
+      "modelPrefix": "deepseek/",
+      "days": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+      ],
+      "from": "01:00",
+      "to": "04:00",
+      "timezone": "UTC",
+      "multiplier": 2
+    },
+    {
+      "provider": "commandcode",
+      "modelPrefix": "deepseek/",
+      "days": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri"
+      ],
+      "from": "06:00",
+      "to": "10:00",
+      "timezone": "UTC",
+      "multiplier": 2
+    }
+  ],
+  "freeModels": [
+    "commandcode/inclusionai/ling-3.1-flash:free"
+  ],
+  "excludeDates": [],
+  "overrides": {
+    "commandcode/moonshotai/Kimi-K3.1-Pro": {
+      "input": 2,
+      "output": 10,
+      "cache_read": 0.2
+    }
+  }
+}

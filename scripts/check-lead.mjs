@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { costFromMetrics, loadCatalog, readCorrections } from '../dashboard/lib/model-prices.js';
 import { leadModelId, leadModelPath } from '../machine/flow/models.mjs';
 import { checkStudioStart } from './check-studio-start.mjs';
 
@@ -76,8 +77,12 @@ async function inspect(port, root, configuredModel) {
   assert(calls.length > 0, 'The Studio trace must contain a model inference.');
   assert(calls.some(span => hasExactText(span, model)), 'The Studio trace must name the selected Lead model.');
   const metrics = await json(port, '/observability/metrics').catch(() => ({ metrics: [] }));
-  const totals = (metrics.metrics ?? []).filter(row => row.name === 'mastra_model_total_input_tokens' || row.name === 'mastra_model_total_output_tokens');
-  const priced = totals.filter(row => row.estimatedCost != null && row.costUnit === 'USD');
+  const rows = metrics.metrics ?? [];
+  const totals = rows.filter(row => row.name === 'mastra_model_total_input_tokens' || row.name === 'mastra_model_total_output_tokens');
+  const cost = costFromMetrics(rows, {
+    catalog: (() => { try { return loadCatalog(); } catch { return null; } })(),
+    corrections: (() => { try { return readCorrections(); } catch { return {}; } })(),
+  });
   return {
     agent: agent.name,
     configuredModel,
@@ -87,7 +92,12 @@ async function inspect(port, root, configuredModel) {
     traceId: trace.spans[0].traceId,
     modelCalls: calls.length,
     usage: calls.map(span => span.attributes?.usage ?? null),
-    usd: priced.length ? priced.reduce((sum, row) => sum + Number(row.estimatedCost), 0) : null,
+    usd: cost.usd,
+    costNote: cost.usd === null
+      ? cost.unpriced.length
+        ? `Unknown: the price list has no price for ${cost.unpriced.join(', ')}.`
+        : 'Unknown: Studio returned no priced metric for this run.'
+      : 'Priced from the same list the model picker uses.',
     metrics: totals.map(({ name, value, estimatedCost, costUnit, model }) => ({ name, value, estimatedCost, costUnit, model })),
     checks: { agentList: 'PASS', fullInstructions: 'PASS', subscriptionModelAndTrace: 'PASS' },
     shippingRerun: 'pending separate Shipping step',

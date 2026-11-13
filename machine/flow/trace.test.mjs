@@ -71,13 +71,39 @@ test('every model call is counted once, even when its start row arrives twice', 
   );
 });
 
+const catalog = {
+  source: 'test-list',
+  costs: { commandcode: { models: {
+    'deepseek/deepseek-v4.1-flash': { cost: { input: 0.15, output: 0.6, cache_read: 0.003 } },
+  } } },
+};
+const corrections = { peakWindows: [{
+  provider: 'commandcode',
+  modelPrefix: 'deepseek/',
+  days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+  from: '01:00',
+  to: '04:00',
+  timezone: 'UTC',
+  multiplier: 2,
+}], freeModels: [], excludeDates: [] };
+const metric = (fields) => ({ spanId: 'call-1', name: '', value: 0, timestamp: '2026-11-13T02:00:00Z', ...fields });
+
 test('a model with no published price is reported as unknown, with the reason', () => {
   const record = summarise([stepSpan('step-build', 'build'), inference('call-1', 'step-build', { inputTokens: 5, outputTokens: 1 })], [
-    { name: 'mastra_model_total_input_tokens', estimatedCost: null, costUnit: null, costMetadata: '{"error":"no_matching_model"}' },
-  ]);
+    metric({ provider: 'commandcode', model: 'nobody/no-such-model', name: 'mastra_model_input_text_tokens', value: 5 }),
+  ], { catalog, corrections });
 
   assert.equal(record.usd, null);
-  assert.match(record.costNote, /no_matching_model/);
+  assert.match(record.costNote, /nobody\/no-such-model/);
+});
+
+test('a peak-hour DeepSeek call is priced at the peak rate, not the installed table rate', () => {
+  const record = summarise([stepSpan('step-build', 'build'), inference('call-1', 'step-build', { inputTokens: 1000000, outputTokens: 0 })], [
+    metric({ provider: 'commandcode', model: 'deepseek/deepseek-v4.1-flash', name: 'mastra_model_input_text_tokens', value: 1000000 }),
+  ], { catalog, corrections });
+
+  assert.equal(record.usd, 0.3);
+  assert.match(record.costNote, /same list the model picker uses/);
 });
 
 test('a trace with no model calls says so instead of inventing a price', () => {
