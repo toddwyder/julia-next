@@ -4,6 +4,8 @@
 
 const FLOW = '^machine/flow/';
 const ENTRY = '^machine/flow/run\\.mjs$';
+const JULIA = '^(?:app|lib)/';
+const MACHINE = '^(?:machine|src/mastra)/';
 
 const allowedPackages = [
   '@mastra/core',
@@ -64,6 +66,22 @@ export default {
         pathNot: '\\.test\\.mjs$',
         reachable: false,
       },
+    },
+    {
+      name: 'julia-imports-no-machine',
+      severity: 'error',
+      comment:
+        'Julia serves households and the machine builds cards, so Julia code may not import machine code.',
+      from: { path: JULIA },
+      to: { path: MACHINE },
+    },
+    {
+      name: 'machine-imports-no-julia',
+      severity: 'error',
+      comment:
+        'Julia serves households and the machine builds cards, so machine code may not import Julia code.',
+      from: { path: MACHINE },
+      to: { path: JULIA },
     },
   ],
   options: {

@@ -108,6 +108,8 @@ jobs:
         run: node scripts/test-owners.mjs --install-browsers browser
       - name: Guard the workflow folder
         run: npm run guard:flow
+      - name: Guard the Julia and machine boundary
+        run: npm run guard:boundaries
       - name: Build application
         run: npm run build
 
