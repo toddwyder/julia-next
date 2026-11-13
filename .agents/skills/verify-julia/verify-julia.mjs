@@ -102,6 +102,7 @@ async function launch(args) {
       env: {
         ...process.env,
         JULIA_VERIFY_DIST_DIR: distDir,
+        NODE_PATH: join(root, 'node_modules'),
         NEXT_TELEMETRY_DISABLED: '1',
         NEXT_PUBLIC_FIREBASE_EMULATOR: '1',
         FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099',
@@ -164,7 +165,10 @@ async function doctor() {
 function test(specs) {
   const run = loadRun();
   if (!specs.length) throw new Error('Name at least one spec, for example .agents/skills/verify-julia/tests/home.spec.mjs');
-  const result = spawnSync(process.execPath, [playwright, 'test', ...specs, '--reporter=line'], {
+  // A local run shares one emulator household library, so specs that save a
+  // recipe must not run beside specs that count recipes.
+  const workers = run.mode === 'local' ? ['--workers=1'] : [];
+  const result = spawnSync(process.execPath, [playwright, 'test', ...specs, ...workers, '--reporter=line'], {
     cwd: root, encoding: 'utf8', env: { ...process.env, JULIA_VERIFY_URL: run.url },
   });
   const output = `$ test ${specs.join(' ')}\n${result.stdout}${result.stderr}\nexitCode=${result.status}\n\n`;
