@@ -8,7 +8,7 @@ import { dirname, resolve } from 'node:path';
 const args = process.argv.slice(2);
 const baseIndex = args.indexOf('--base');
 const base = baseIndex === -1 ? 'origin/main' : args[baseIndex + 1];
-const reportFile = 'reports/mutation/changed.json';
+const reportFile = 'reports/mutation/machine.json';
 const root = process.cwd();
 
 const diff = spawnSync('git', ['diff', '--unified=0', '--no-color', base, 'HEAD', '--', 'machine'], { cwd: root, encoding: 'utf8' });
@@ -38,14 +38,14 @@ if (ranges.length === 0) {
   process.exit(0);
 }
 
-const mutate = ranges.map(range => (range.start === range.end ? `${range.file}:${range.start}` : `${range.file}:${range.start}-${range.end}`));
+const mutate = ranges.map(range => `${range.file}:${range.start}-${range.end}`);
 console.log(`Mutating ${mutate.length} changed range(s) against ${base}:`);
 for (const range of mutate) console.log(`  ${range}`);
 
 mkdirSync(dirname(resolve(root, reportFile)), { recursive: true });
 rmSync(resolve(root, reportFile), { force: true });
 const stryker = resolve(root, 'node_modules/@stryker-mutator/core/bin/stryker.js');
-const run = spawnSync(process.execPath, [stryker, 'run', 'stryker.config.mjs', '--mutate', ...mutate, '--jsonReporter.fileName', reportFile], {
+const run = spawnSync(process.execPath, [stryker, 'run', 'stryker.config.mjs', '--mutate', mutate.join(',')], {
   cwd: root,
   stdio: 'inherit',
 });

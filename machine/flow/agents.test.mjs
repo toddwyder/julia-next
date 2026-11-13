@@ -7,7 +7,7 @@ import { readLedger } from './card-ledger.mjs';
 import test from 'node:test';
 
 import { createAgents, repoRoot } from './agents.mjs';
-import { HELPER_CONCURRENCY, STOP_REASONS } from './spending.mjs';
+import { HELPER_CONCURRENCY, openSpending, STOP_REASONS } from './spending.mjs';
 import { helperKey, readRoleModels } from './role-models.mjs';
 import { buildModel, leadModelId } from './models.mjs';
 import { installLeadModel } from '../../scripts/install-lead-model.mjs';
@@ -151,6 +151,59 @@ test('the Lead and every helper keep Mastra’s refusal handler beside the spend
     assert.deepEqual(await processorsOf(helper), ['cyber-refusal-handler', 'card-spending'], `${helper.name} lost a processor.`);
   }
 });
+
+test('the card ledger names the model each saved pick chose, not the one the framework reports', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = join(dir, 'lead-role-models.md');
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  completeRoleFile(roleModelsFile);
+  const spending = openSpending({ dir: join(dir, 'ledger'), catalog: LEDGER_CATALOG, corrections: {} });
+  const agents = createAgents({ repo, leadModelFile, roleModelsFile, spending });
+  spending.begin('JUL-404-LEDGER');
+  const guardOf = async agent => (await agent.listConfiguredOutputProcessors()).find(processor => processor.id === 'card-spending');
+  const helper = (await agents.build.listAgents()).featureRefactoring;
+  const guards = [['Lead', await guardOf(agents.build)], ['helper', await guardOf(helper)]];
+  const usage = { inputTokens: 1000, outputTokens: 100 };
+  for (const [, guard] of guards) {
+    await guard.processInputStep({ model: { provider: 'openai', modelId: 'gpt-6-luna' }, agent: { id: 'wrong' }, abort() {} });
+    await guard.processOutputStep({ usage });
+  }
+  assert.deepEqual(spending.calls.map(call => [call.provider, call.model]), [
+    ['openai', 'gpt-6.1-sol'],
+    ['commandcode', 'deepseek/deepseek-v4.1-flash'],
+  ]);
+});
+
+test('only the Lead is turned away once the card has spent its limit', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = join(dir, 'lead-role-models.md');
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  completeRoleFile(roleModelsFile);
+  const spending = openSpending({ dir: join(dir, 'ledger'), catalog: LEDGER_CATALOG, corrections: {} });
+  const agents = createAgents({ repo, leadModelFile, roleModelsFile, spending });
+  spending.begin('JUL-405-STOPPED');
+  spending.stop(STOP_REASONS.limit);
+  const guardOf = async agent => (await agent.listConfiguredOutputProcessors()).find(processor => processor.id === 'card-spending');
+  const helper = (await agents.build.listAgents()).featureRefactoring;
+  const turnAway = async agent => {
+    const reasons = [];
+    const guard = await guardOf(agent);
+    await guard.processInputStep({ model: { provider: 'openai', modelId: 'gpt-6.1-sol' }, agent: { id: agent.id }, abort: reason => reasons.push(reason) });
+    return reasons;
+  };
+  assert.deepEqual(await turnAway(agents.build), [STOP_REASONS.limit]);
+  assert.deepEqual(await turnAway(helper), [], 'a helper is turned away by the stage before it starts, not by its own processor');
+});
+
+const LEDGER_CATALOG = {
+  source: 'a fake price list',
+  costs: {
+    openai: { models: { 'gpt-6.1-sol': { cost: { input: 2, output: 10 } } } },
+    commandcode: { models: { 'deepseek/deepseek-v4.1-flash': { cost: { input: 0.15, output: 0.6 } } } },
+  },
+};
 
 test('the role file the Start screen writes reads back with every saved model', async t => {  const dir = temporary(t);
   const roleModelsFile = join(dir, 'lead-role-models.md');
