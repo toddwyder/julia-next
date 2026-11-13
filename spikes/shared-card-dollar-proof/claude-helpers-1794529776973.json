@@ -1,0 +1,375 @@
+{
+  "run": {
+    "account": "claude",
+    "test": "helpers",
+    "runId": "2a68b443-4505-4772-97f5-cf13d33dd25c",
+    "status": 200
+  },
+  "ledger": [
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.0019000000000000002,
+      "cost": 0.0019000000000000002,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 9367,
+        "outputTokens": 56,
+        "cachedInputTokens": 0,
+        "cacheCreationInputTokens": 9353,
+        "cacheCreationInputTokens5m": 0,
+        "cacheCreationInputTokens1h": 9353
+      }
+    },
+    {
+      "event": "input",
+      "owner": "helper1",
+      "total": 0.0019000000000000002,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "helper1",
+      "total": 0.0020350000000000004,
+      "cost": 0.000135,
+      "finishReason": "stop",
+      "usage": {
+        "inputTokens": 300,
+        "outputTokens": 210,
+        "cachedInputTokens": 0,
+        "cacheCreationInputTokens": 0,
+        "cacheCreationInputTokens5m": 0,
+        "cacheCreationInputTokens1h": 0
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.0020350000000000004,
+      "priced": true
+    }
+  ],
+  "spans": [
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "e15d60a4d195ef9d",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:30:07.242Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6a914218927d0312",
+      "parentSpanId": "e15d60a4d195ef9d",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'claude-haiku-5-5'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:30:07.315Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "3c74e4b51223a4ba",
+      "parentSpanId": "3ab4102843d46e37",
+      "spanType": "agent_run",
+      "entityId": "helper1",
+      "name": "agent run: 'helper1'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:30:08.415Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6c3ddca940841051",
+      "parentSpanId": "3c74e4b51223a4ba",
+      "spanType": "model_generation",
+      "entityId": "helper1",
+      "name": "llm: 'claude-haiku-5-5'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:30:09.925Z",
+      "endedAt": "2026-11-13T00:30:09.925Z"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "3c74e4b51223a4ba",
+      "parentSpanId": "3ab4102843d46e37",
+      "spanType": "agent_run",
+      "entityId": "helper1",
+      "name": "agent run: 'helper1'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:30:08.415Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "3c74e4b51223a4ba",
+      "parentSpanId": "3ab4102843d46e37",
+      "spanType": "agent_run",
+      "entityId": "helper1",
+      "name": "agent run: 'helper1'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:30:10.068Z",
+      "endedAt": "2026-11-13T00:30:10.068Z"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "e15d60a4d195ef9d",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:30:10.151Z",
+      "endedAt": "2026-11-13T00:30:10.151Z"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6a914218927d0312",
+      "parentSpanId": "e15d60a4d195ef9d",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'claude-haiku-5-5'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:30:07.315Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6c3ddca940841051",
+      "parentSpanId": "3c74e4b51223a4ba",
+      "spanType": "model_generation",
+      "entityId": "helper1",
+      "name": "llm: 'claude-haiku-5-5'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:30:08.427Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6c3ddca940841051",
+      "parentSpanId": "3c74e4b51223a4ba",
+      "spanType": "model_generation",
+      "entityId": "helper1",
+      "name": "llm: 'claude-haiku-5-5'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:30:08.427Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6a914218927d0312",
+      "parentSpanId": "e15d60a4d195ef9d",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'claude-haiku-5-5'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:30:10.149Z",
+      "endedAt": "2026-11-13T00:30:10.149Z"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "3ab4102843d46e37",
+      "parentSpanId": "9f5bea94181049fe",
+      "spanType": "tool_call",
+      "entityId": "agent-helper1",
+      "name": "tool: 'agent-helper1'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:30:08.403Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "3ab4102843d46e37",
+      "parentSpanId": "9f5bea94181049fe",
+      "spanType": "tool_call",
+      "entityId": "agent-helper1",
+      "name": "tool: 'agent-helper1'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:30:08.403Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "3ab4102843d46e37",
+      "parentSpanId": "9f5bea94181049fe",
+      "spanType": "tool_call",
+      "entityId": "agent-helper1",
+      "name": "tool: 'agent-helper1'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:30:10.082Z",
+      "endedAt": "2026-11-13T00:30:10.082Z"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "e15d60a4d195ef9d",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "claude-haiku-5-5",
+      "provider": "anthropic.messages",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:30:07.242Z",
+      "endedAt": null
+    }
+  ],
+  "metrics": [
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6c3ddca940841051",
+      "name": "mastra_model_input_text_tokens",
+      "value": 300,
+      "estimatedCost": 0.000029999999999999997,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6c3ddca940841051",
+      "name": "mastra_model_output_text_tokens",
+      "value": 32,
+      "estimatedCost": 0.000016,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6c3ddca940841051",
+      "name": "mastra_model_total_output_tokens",
+      "value": 210,
+      "estimatedCost": 0.000105,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6c3ddca940841051",
+      "name": "mastra_model_total_input_tokens",
+      "value": 300,
+      "estimatedCost": 0.000029999999999999997,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6c3ddca940841051",
+      "name": "mastra_model_output_reasoning_tokens",
+      "value": 178,
+      "estimatedCost": 0.000089,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6a914218927d0312",
+      "name": "mastra_model_input_text_tokens",
+      "value": 14,
+      "estimatedCost": 0.0000014,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6a914218927d0312",
+      "name": "mastra_model_total_output_tokens",
+      "value": 56,
+      "estimatedCost": 0.000028,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6a914218927d0312",
+      "name": "mastra_model_input_cache_write_tokens",
+      "value": 9353,
+      "estimatedCost": 0.0018706,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6a914218927d0312",
+      "name": "mastra_model_input_cache_write_1h_tokens",
+      "value": 9353,
+      "estimatedCost": 0.0018706,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6a914218927d0312",
+      "name": "mastra_model_output_text_tokens",
+      "value": 56,
+      "estimatedCost": 0.000028,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "8f8ed290d0e2aaed4e2c03575e27c691",
+      "spanId": "6a914218927d0312",
+      "name": "mastra_model_total_input_tokens",
+      "value": 9367,
+      "estimatedCost": 0.0018719999999999995,
+      "costUnit": "USD"
+    }
+  ]
+}

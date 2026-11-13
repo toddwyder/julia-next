@@ -1,0 +1,662 @@
+{
+  "run": {
+    "account": "openai",
+    "test": "solo",
+    "runId": "a2dad3de-c9b1-454f-91cf-edd7c221685b",
+    "status": 200
+  },
+  "ledger": [
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.00036690000000000003,
+      "cost": 0.00036690000000000003,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 3599,
+        "outputTokens": 14,
+        "cachedInputTokens": 0,
+        "cacheCreationInputTokens": 0
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.00036690000000000003,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.0007364,
+      "cost": 0.0003695,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 3625,
+        "outputTokens": 14,
+        "cachedInputTokens": 0,
+        "cacheCreationInputTokens": 0
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.0007364,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.0011085000000000001,
+      "cost": 0.00037210000000000005,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 3651,
+        "outputTokens": 14,
+        "cachedInputTokens": 0,
+        "cacheCreationInputTokens": 0
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.0011085000000000001,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.0011952000000000002,
+      "cost": 0.0000867,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 3677,
+        "outputTokens": 14,
+        "cachedInputTokens": 3200,
+        "cacheCreationInputTokens": 0
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.0011952000000000002,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.0012845000000000003,
+      "cost": 0.00008930000000000002,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 3703,
+        "outputTokens": 14,
+        "cachedInputTokens": 3200,
+        "cacheCreationInputTokens": 0
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.0012845000000000003,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.0016644000000000003,
+      "cost": 0.0003799,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 3729,
+        "outputTokens": 14,
+        "cachedInputTokens": 0,
+        "cacheCreationInputTokens": 0
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.0016644000000000003,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.0017589000000000003,
+      "cost": 0.0000945,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 3755,
+        "outputTokens": 14,
+        "cachedInputTokens": 3200,
+        "cacheCreationInputTokens": 0
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.0017589000000000003,
+      "priced": true
+    },
+    {
+      "event": "output",
+      "owner": "lead",
+      "total": 0.0021440000000000005,
+      "cost": 0.00038510000000000004,
+      "finishReason": "tool-calls",
+      "usage": {
+        "inputTokens": 3781,
+        "outputTokens": 14,
+        "cachedInputTokens": 0,
+        "cacheCreationInputTokens": 0
+      }
+    },
+    {
+      "event": "input",
+      "owner": "lead",
+      "total": 0.0021440000000000005,
+      "priced": true
+    }
+  ],
+  "spans": [
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "afdad84d9c2af6a7",
+      "parentSpanId": "ffde6afaf3572ccd",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'gpt-6-luna'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:17.465Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "ac5d775f23c3b27d",
+      "parentSpanId": "286d16c3ac98addb",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:18.861Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "dccefe2b96fe19cd",
+      "parentSpanId": "1d6ae104df9544a5",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:20.293Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "e7d5ea5afc6996b8",
+      "parentSpanId": "43d32ed7b51bb026",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:23.350Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "27a35ed8dc41dcb5",
+      "parentSpanId": "4259ab2e5f16e03a",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:27.461Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "0f9b4eff04b13c60",
+      "parentSpanId": "dcff713c05947052",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:34:28.652Z",
+      "endedAt": "2026-11-13T00:34:28.652Z"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "afdad84d9c2af6a7",
+      "parentSpanId": "ffde6afaf3572ccd",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'gpt-6-luna'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:17.465Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "afdad84d9c2af6a7",
+      "parentSpanId": "ffde6afaf3572ccd",
+      "spanType": "model_generation",
+      "entityId": "probe",
+      "name": "llm: 'gpt-6-luna'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:34:28.721Z",
+      "endedAt": "2026-11-13T00:34:28.721Z"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "ffde6afaf3572ccd",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:34:28.922Z",
+      "endedAt": "2026-11-13T00:34:28.922Z"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "ac5d775f23c3b27d",
+      "parentSpanId": "286d16c3ac98addb",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:18.861Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "dccefe2b96fe19cd",
+      "parentSpanId": "1d6ae104df9544a5",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:20.293Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "2f19b3ce727ed810",
+      "parentSpanId": "f6b3f21b4919ecc6",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:21.765Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "2f19b3ce727ed810",
+      "parentSpanId": "f6b3f21b4919ecc6",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:34:21.767Z",
+      "endedAt": "2026-11-13T00:34:21.767Z"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "e7d5ea5afc6996b8",
+      "parentSpanId": "43d32ed7b51bb026",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:23.350Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "6900f2c0ebe7e1b0",
+      "parentSpanId": "9f08fc099eb456f4",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:24.701Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "4a5d6b4cba57f07a",
+      "parentSpanId": "571bed21225c90db",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:26.215Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "27a35ed8dc41dcb5",
+      "parentSpanId": "4259ab2e5f16e03a",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:27.461Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "0f9b4eff04b13c60",
+      "parentSpanId": "dcff713c05947052",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:28.651Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "dccefe2b96fe19cd",
+      "parentSpanId": "1d6ae104df9544a5",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:34:20.294Z",
+      "endedAt": "2026-11-13T00:34:20.294Z"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "0f9b4eff04b13c60",
+      "parentSpanId": "dcff713c05947052",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:28.651Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "ffde6afaf3572ccd",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": null,
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:17.379Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "ac5d775f23c3b27d",
+      "parentSpanId": "286d16c3ac98addb",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:34:18.865Z",
+      "endedAt": "2026-11-13T00:34:18.865Z"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "2f19b3ce727ed810",
+      "parentSpanId": "f6b3f21b4919ecc6",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:21.765Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "e7d5ea5afc6996b8",
+      "parentSpanId": "43d32ed7b51bb026",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:34:23.352Z",
+      "endedAt": "2026-11-13T00:34:23.352Z"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "6900f2c0ebe7e1b0",
+      "parentSpanId": "9f08fc099eb456f4",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:24.701Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "6900f2c0ebe7e1b0",
+      "parentSpanId": "9f08fc099eb456f4",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:34:24.702Z",
+      "endedAt": "2026-11-13T00:34:24.702Z"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "4a5d6b4cba57f07a",
+      "parentSpanId": "571bed21225c90db",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:26.215Z",
+      "endedAt": null
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "4a5d6b4cba57f07a",
+      "parentSpanId": "571bed21225c90db",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:34:26.216Z",
+      "endedAt": "2026-11-13T00:34:26.216Z"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "27a35ed8dc41dcb5",
+      "parentSpanId": "4259ab2e5f16e03a",
+      "spanType": "tool_call",
+      "entityId": "again",
+      "name": "tool: 'again'",
+      "model": null,
+      "provider": null,
+      "outcome": "success",
+      "stopReason": null,
+      "eventType": "end",
+      "timestamp": "2026-11-13T00:34:27.462Z",
+      "endedAt": "2026-11-13T00:34:27.462Z"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "ffde6afaf3572ccd",
+      "parentSpanId": null,
+      "spanType": "agent_run",
+      "entityId": "probe",
+      "name": "agent run: 'probe'",
+      "model": "gpt-6-luna",
+      "provider": "openai.responses",
+      "outcome": "blocked",
+      "stopReason": "guardrail",
+      "eventType": "start",
+      "timestamp": "2026-11-13T00:34:17.379Z",
+      "endedAt": null
+    }
+  ],
+  "metrics": [
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "afdad84d9c2af6a7",
+      "name": "mastra_model_total_output_tokens",
+      "value": 112,
+      "estimatedCost": 0.000056,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "afdad84d9c2af6a7",
+      "name": "mastra_model_total_input_tokens",
+      "value": 29520,
+      "estimatedCost": 0.002088,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "afdad84d9c2af6a7",
+      "name": "mastra_model_input_text_tokens",
+      "value": 19920,
+      "estimatedCost": 0.001992,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "afdad84d9c2af6a7",
+      "name": "mastra_model_input_cache_read_tokens",
+      "value": 9600,
+      "estimatedCost": 0.000096,
+      "costUnit": "USD"
+    },
+    {
+      "traceId": "48f9be2dbfe9cbc24efa4fef1a70acf3",
+      "spanId": "afdad84d9c2af6a7",
+      "name": "mastra_model_output_text_tokens",
+      "value": 112,
+      "estimatedCost": 0.000056,
+      "costUnit": "USD"
+    }
+  ]
+}
