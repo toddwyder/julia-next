@@ -19,6 +19,8 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/role-models.mjs` | The Lead helper models, read from the saved role table and routed to account providers. | `6946ce44710f02f3bfa74f5aacbe91f49fa65db28b4009cd5b1e2ccc78dbfceb` |
 | `machine/flow/schema.mjs` | What the run form asks for and what the run remembers. | `6998e9db45ff2547c146982e2213afc12f9834616de91da16ab80e16134f5c25` |
 | `machine/flow/scratch.mjs` | The run folder: artifacts, verdicts and the report a stop leaves. | `25c177efa06ece2b499e23421bf8454d1098ae02666d994df26c451f6a1e8abb` |
+| `machine/flow/spending.mjs` | The per-card spending ledger, its dollar limit and the processor that counts each model call. | `66b97d0376da23ff96f711851dac5abb352db9dce1dbce08d326ffc0fe5f1d7e` |
+| `machine/flow/card-ledger.mjs` | Reads and writes the spending ledger file for one card. | `ef1d9e920ab4a40b0b8d515be6618935596ba26fb61c91bfb8c942588f35d148` |
 | `machine/flow/mastra.mjs` | Storage and tracing, so a run is written down and priced. | `5d18cc8805c9a255a241fc046350f5c54ed6212b6fe4b319444c6eb2be0134ee` |
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `76ce1eceb8678701fe12266931a65338b9b4edb51bd3835a14b53f8ef7ecb9fc` |
 | `machine/flow/run.mjs` | Answers a waiting card, reads a run, writes its cost. No way to start one. | `6a76edaa92fdbadfbb55dd581e77c2556b33f9ccb4744c89e5fded579ab36e44` |
