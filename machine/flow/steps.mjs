@@ -9,8 +9,10 @@ import { join } from 'node:path';
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
-import { cardState, flowData, runInput } from './schema.mjs';
+import { closeCopy, openCopy } from './copy.mjs';
 import { tokenReport } from './report.mjs';
+import { REVIEW_TIME_LIMIT_MS, criteriaFromCard, parseVerdict, realReview, reviewTask, verdictComment } from './review.mjs';
+import { cardState, flowData, runInput } from './schema.mjs';
 import { HELPER_CONCURRENCY } from './spending.mjs';
 import {
   nextVerdict,
@@ -39,6 +41,7 @@ const reportText = (state, detail, spending) => {
     `Failures counted: ${state.failCount}`,
     `Shipping rounds: ${state.reviewRound}`,
     `Build rounds: ${state.buildRounds}`,
+    ...(state.copy ? [`Copy: ${state.copy}`, `Started from main at: ${state.base}`] : []),
     `Last detail: ${detail || 'none'}`,
     ...overshoot,
     '',
@@ -54,13 +57,14 @@ const step = (id, execute, extra = {}) =>
 const buildPrompt = (card, kind) =>
   [
     `Build Linear card ${card}. It is a ${kind} card.`,
+    'You work in a fresh copy of the repository made from main for this card. No other card works there.',
     "Read the whole card first, including Todd's dated decisions on it, and move it to Implementation when you start.",
     'Open the pull request in the same step as your first push, name only this card in its description, and keep pushing as you go.',
     'When the build is ready and the pull request is up to date, stop. Shipping comes next.',
     "Only a product decision or one approval in Todd's own account may reach him. Decide the rest and log it in the decision log.",
   ].join('\n');
 
-export function createStages({ agents, dir }) {
+export function createStages({ agents, dir, repo, review = realReview }) {
   const spending = agents.spending;
   const cardDir = (card) => join(dir, card);
 
@@ -80,6 +84,14 @@ export function createStages({ agents, dir }) {
     return { card: state.card, kind: state.kind, ...inputData, stopped: true, detail: reason };
   };
 
+  // A stage that spends the card's last dollars in the middle of its call has that call refused by
+  // the ledger's processor. The refusal is the card stopping, not the run failing, so the stage
+  // hands back the same stopped data as a stage that was turned away before it called.
+  const refused = async (context, error) => {
+    if (!/TripWire/.test(String(error?.message ?? error))) return null;
+    return halt(context);
+  };
+
   // The first stage of a run. It takes the two things the run form asks for
   // and puts them into the run's saved state, so every later stage and the
   // finished trace can name the card without asking for it again.
@@ -95,9 +107,6 @@ export function createStages({ agents, dir }) {
     },
   });
 
-  // The build is a real agent step: `createStep(agents.build)` gives it the
-  // agent's own input and output, so the card data goes through a mapper either
-  // side of it instead of through the stage's shared schema.
   const startBuild = step('start-build', async (context) => {
     const stopped = await halt(context, 'build');
     if (stopped) return stopped;
@@ -105,17 +114,17 @@ export function createStages({ agents, dir }) {
     const card = state.card || inputData.card;
     const buildRounds = state.buildRounds + 1;
     const requestId = `${card}/build-${buildRounds}`;
+    const copy = openCopy({ repo, card });
+    requestContext?.set?.('cardCheckout', copy.folder);
     requestContext?.set?.('mastra__threadId', requestId);
     requestContext?.set?.('mastra__resourceId', card);
-    await setState({ ...state, buildRounds, requestId });
-    return { ...inputData, card, detail: `build round ${buildRounds} started`, prompt: buildPrompt(card, state.kind) };
+    await setState({ ...state, buildRounds, requestId, copy: copy.folder, base: copy.base });
+    return { ...inputData, card, detail: `build round ${buildRounds} started in ${copy.folder}`, prompt: buildPrompt(card, state.kind) };
   });
 
-  // The build is a real agent step, but it is called here rather than handed to createStep so a
-  // card that spent its limit in the stage before cannot make the call. Mastra's agent step has
-  // no way to skip its agent, and refusing at the model would fail the whole workflow instead of
-  // ending the card with a reason. A Lead that spends the limit mid-run has its next model call
-  // refused the same way, and that refusal ends the build instead of failing the card.
+  // The build is called here rather than handed to `createStep(agents.build)` so a card that spent
+  // its limit in the stage before cannot make the call. Mastra's agent step has no way to skip its
+  // agent, and refusing at the model would fail the run instead of ending the card with a reason.
   const buildAgent = createStep({
     id: 'flow-build',
     inputSchema: z.object({ prompt: z.string() }),
@@ -148,32 +157,71 @@ export function createStages({ agents, dir }) {
     },
   });
 
+  // Shipping is a fresh agent that gets the card and the card's pull request, nothing the builder
+  // said. A review that ends without an answer is not a failed review: it is reported as unreviewed.
   const shipping = step('shipping', async (context) => {
     const stopped = await halt(context, 'shipping');
     if (stopped) return stopped;
-    const { inputData, state, tracingContext } = context;
-    const artifact = readArtifact(cardDir(state.card), state.card);
-    const result = await agents.shipping.stream(
-      `File follows. Is it a plausible recipe title?\n\n${artifact}`,
-      { tracingContext },
-    );
-    const text = await result.text;
-    return { ...inputData, detail: text ?? '' };
+    const { inputData, state, tracingContext, requestContext } = context;
+    const unreviewed = reason => ({ ...inputData, unreviewed: true, pr: null, answer: '', detail: reason });
+    const found = review.findPr(repo, state.card);
+    if (!found.pr) return unreviewed(found.reason);
+    const card = await review.readCard(state.card);
+    const criteria = criteriaFromCard(card?.description);
+    if (criteria.length === 0) return unreviewed(`${state.card} lists no acceptance criteria to judge`);
+    if (!state.copy) return unreviewed(`${state.card} has no copy of the repository to review`);
+
+    const checkout = state.copy;
+    const sha = review.headCommit(checkout);
+    const clock = AbortSignal.timeout(REVIEW_TIME_LIMIT_MS);
+    try {
+      requestContext?.set?.('cardCheckout', checkout);
+      const result = await agents.shipping.stream(
+        reviewTask({ pr: found.pr, sha, checkout, card, criteria }),
+        { tracingContext, requestContext, abortSignal: clock },
+      );
+      const text = await result.text;
+      return { ...inputData, pr: found.pr, sha, answer: text ?? '', criteriaCount: criteria.length, detail: text ?? '' };
+    } catch (error) {
+      if (clock.aborted) return unreviewed(`the review ran longer than ${REVIEW_TIME_LIMIT_MS / 60_000} minutes and was ended`);
+      const stopped = await refused(context, error);
+      if (stopped) return stopped;
+      throw error;
+    }
   });
 
+  // The verdict is a fixed rule: read the reviewer's verdict line and put it on the pull request.
+  // No line, or a comment that did not post, leaves no verdict on the record, so the round is unreviewed.
   const verdict = step('verdict', async (context) => {
     const stopped = await halt(context);
     if (stopped) return stopped;
     const { inputData, state, setState } = context;
-    const answer = nextVerdict(cardDir(state.card), 'review');
-    const failCount = answer === 'FAIL' ? state.failCount + 1 : state.failCount;
     const reviewRound = state.reviewRound + 1;
+    const unreviewed = async reason => {
+      await setState({
+        ...state,
+        reviewRound,
+        unreviewed: true,
+        stopPart: 'Shipping',
+        stopWhy: `The card is unreviewed: ${reason}. No failure was counted.`,
+      });
+      return { ...inputData, verdict: null, unreviewed: true, detail: `shipping round ${reviewRound} gave no verdict: ${reason}` };
+    };
+    if (inputData.unreviewed) return unreviewed(inputData.detail);
+    const { verdict: answer, reason } = parseVerdict(inputData.answer, inputData.criteriaCount);
+    if (!answer) return unreviewed(`the reviewer gave no verdict: ${reason}`);
+    try {
+      review.postPrComment(repo, inputData.pr, verdictComment({ verdict: answer, answer: inputData.answer, sha: inputData.sha }));
+    } catch (error) {
+      return unreviewed(`the verdict could not be posted to pull request #${inputData.pr} (${String(error?.message ?? error).split('\n')[0]})`);
+    }
+    const failCount = answer === 'FAIL' ? state.failCount + 1 : state.failCount;
     await setState({ ...state, failCount, reviewRound });
     return {
       ...inputData,
       verdict: answer,
       failCount,
-      detail: `shipping round ${reviewRound} returned ${answer}`,
+      detail: `shipping round ${reviewRound} returned ${answer} on pull request #${inputData.pr}`,
     };
   });
 
@@ -182,10 +230,17 @@ export function createStages({ agents, dir }) {
     if (stopped) return stopped;
     const { inputData, state, tracingContext } = context;
     const artifact = readArtifact(cardDir(state.card), state.card);
-    const result = await agents.remediation.stream(
-      `Rewrite this line so it reads better.\n\n${artifact}`,
-      { tracingContext },
-    );
+    let result;
+    try {
+      result = await agents.remediation.stream(
+        `Rewrite this line so it reads better.\n\n${artifact}`,
+        { tracingContext },
+      );
+    } catch (error) {
+      const stopped = await refused(context, error);
+      if (stopped) return stopped;
+      throw error;
+    }
     const text = await result.text;
     writeArtifact(cardDir(state.card), state.card, text ?? artifact);
     return { ...inputData, detail: text ?? '' };
@@ -200,8 +255,11 @@ export function createStages({ agents, dir }) {
     const stopped = await halt(context);
     if (stopped) return stopped;
     const { inputData, state, setState } = context;
-    if (inputData.verdict === 'PASS') {
+    if (inputData.verdict === 'PASS' || inputData.verdict === 'PASS+NOTES') {
       return { ...inputData, stopped: false };
+    }
+    if (inputData.unreviewed) {
+      return { ...inputData, stopped: true };
     }
     await setState({
       ...state,
@@ -290,10 +348,17 @@ export function createStages({ agents, dir }) {
     const stopped = await halt(context, 'retro');
     if (stopped) return stopped;
     const { inputData, state, tracingContext } = context;
-    const result = await agents.retro.stream(
-      `Card ${state.card} landed after ${state.reviewRound} shipping rounds and ${state.buildRounds} build rounds. Say in one sentence what this run did.`,
-      { tracingContext },
-    );
+    let result;
+    try {
+      result = await agents.retro.stream(
+        `Card ${state.card} landed after ${state.reviewRound} shipping rounds and ${state.buildRounds} build rounds. Say in one sentence what this run did.`,
+        { tracingContext },
+      );
+    } catch (error) {
+      const stopped = await refused(context, error);
+      if (stopped) return stopped;
+      throw error;
+    }
     const text = await result.text;
     writeRetro(cardDir(state.card), state.card, text ?? '');
     return { ...inputData, detail: text ?? '' };
@@ -302,6 +367,7 @@ export function createStages({ agents, dir }) {
   // A card that ran to the end gets the same report, so every card leaves the token table behind.
   // A stopped card already wrote its own at the stop report, and that one stays.
   const cleanup = step('cleanup', async ({ inputData, state }) => {
+    closeCopy({ repo, card: state.card });
     const report = join(cardDir(state.card), 'reports', `${state.card}.md`);
     if (!existsSync(report)) writeReport(cardDir(state.card), state.card, reportText(state, inputData.detail, spending));
     sweepBuild(cardDir(state.card));

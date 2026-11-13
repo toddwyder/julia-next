@@ -2,6 +2,7 @@
 // Each test names the acceptance criterion it proves, so a failing line says which promise broke.
 
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -110,6 +111,28 @@ function openCase({ limit = CARD_LIMIT_DOLLARS, catalog = CATALOG, corrections =
   };
   if (memoryModel) agents.memory = memoryModel;
   return { dir, cardDir, spending, agents };
+}
+
+const PASS = 'VERDICT: PASS\nCRITERION 1: PASS';
+
+const fakeReview = () => ({
+  findPr: () => ({ pr: 1 }),
+  readCard: async () => ({ identifier: CARD, title: CARD, description: '## Acceptance criteria\n- the thing works' }),
+  headCommit: () => 'abc1234',
+  postPrComment: () => {},
+});
+
+// A card builds in a copy made from a real repository, so a card-path case needs one.
+function studioRepo(dir) {
+  const repo = join(dir, 'studio');
+  mkdirSync(repo, { recursive: true });
+  writeFileSync(join(repo, 'README.md'), 'studio\n');
+  const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+  git('init', '--quiet', '--initial-branch=main');
+  git('add', '-A');
+  git('-c', 'user.email=flow@test', '-c', 'user.name=flow', 'commit', '--quiet', '-m', 'main');
+  process.env.FLOW_SCRATCH = join(dir, 'scratch');
+  return repo;
 }
 
 // The environment is read once per case, so a fresh price list per case keeps the order safe.
@@ -333,8 +356,9 @@ test('the card path stops a card that crosses its limit and writes the reason in
   writeFileSync(join(cardDir, 'verdicts.json'), JSON.stringify({ review: ['PASS'], smoke: ['PASS'] }));
   writeFileSync(join(cardDir, 'cursors.json'), '{}');
   openScratch(dir);
+  const repo = studioRepo(dir);
 
-  const workflow = buildCardPath({ agents, dir });
+  const workflow = buildCardPath({ agents, dir, repo, review: fakeReview() });
   const mastra = await openMastra({ card: CARD, stateDb: join(dir, 'state.db'), traceDb: join(dir, 'trace.duckdb'), workflow });
   const wf = mastra.getWorkflow(workflow.id);
   const run = await wf.createRun();
@@ -403,9 +427,10 @@ test('the Studio record and the card ledger agree on what the card spent', async
     ...guarded(spending, () => ({ provider: 'commandcode', model: DEEPSEEK })),
   });
   const stub = text => ({ generate: async () => ({ text }), stream: async () => ({ text: Promise.resolve(text) }) });
-  const agents = { build, shipping: stub('looked'), remediation: stub('fixed line'), retro: stub('retro line'), spending };
+  const agents = { build, shipping: stub(PASS), remediation: stub('fixed line'), retro: stub('retro line'), spending };
+  const repo = studioRepo(dir);
 
-  const workflow = buildCardPath({ agents, dir });
+  const workflow = buildCardPath({ agents, dir, repo, review: fakeReview() });
   const mastra = await openMastra({ card: CARD, stateDb: join(dir, 'state.db'), traceDb: join(dir, 'trace.duckdb'), workflow });
   const wf = mastra.getWorkflow(workflow.id);
   const run = await wf.createRun();

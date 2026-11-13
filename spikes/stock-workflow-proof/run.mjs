@@ -9,7 +9,7 @@
 //   node spikes/stock-workflow-proof/run.mjs
 //
 // The trace path and the harness state database are set before any Mastra module
-// is loaded, the way machine/shipping/run.mjs does it.
+// is loaded, the way machine/shipping/harness.mjs does it.
 
 import fs from 'node:fs';
 import path from 'node:path';

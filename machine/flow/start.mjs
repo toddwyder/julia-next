@@ -29,7 +29,7 @@ async function assemble({ dir, card, model, agents: injected }) {
       tools: await graphifyTools(),
       dir,
     });
-  const workflow = buildCardPath({ agents, dir });
+  const workflow = buildCardPath({ agents, dir, repo: (await import('./agents.mjs')).repoRoot() });
   const mastra = await openMastra({
     card,
     agents: injected ? undefined : agents,

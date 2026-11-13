@@ -6,6 +6,7 @@
 // Every call here is a fake AI SDK model, so the dollars in each assertion are exact.
 
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -114,18 +115,44 @@ function meteredAgent({ id, spending, called = () => {}, usage, modelOptions = {
 // A stand-in stage that answers without calling a model, so only the calls under test cost money.
 const stub = text => ({ generate: async () => ({ text }), stream: async () => ({ text: Promise.resolve(text) }) });
 
+// The reviewer's answer for the one criterion the fake card lists.
+const PASS = 'VERDICT: PASS\nCRITERION 1: PASS';
+
+// Shipping reads the card and its pull request through these four calls, so a test answers them
+// from here instead of reaching GitHub.
+const fakeReview = () => ({
+  findPr: () => ({ pr: 1 }),
+  readCard: async () => ({ identifier: CARD, title: CARD, description: '## Acceptance criteria\n- the thing works' }),
+  headCommit: () => 'abc1234',
+  postPrComment: () => {},
+});
+
+// A card builds in a copy made from a real repository, so each case needs one with a main branch.
+function studioRepo(dir) {
+  const repo = join(dir, 'studio');
+  mkdirSync(repo, { recursive: true });
+  writeFileSync(join(repo, 'README.md'), 'studio\n');
+  const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+  git('init', '--quiet', '--initial-branch=main');
+  git('add', '-A');
+  git('-c', 'user.email=flow@test', '-c', 'user.name=flow', 'commit', '--quiet', '-m', 'main');
+  process.env.FLOW_SCRATCH = join(dir, 'scratch');
+  return repo;
+}
+
 function openCase({ limit, verdicts }) {
   const dir = mkdtempSync(join(tmpdir(), 'flow-freedoms-'));
+  const repo = studioRepo(dir);
   const cardDir = join(dir, CARD);
   mkdirSync(cardDir, { recursive: true });
   writeFileSync(join(cardDir, 'verdicts.json'), JSON.stringify(verdicts));
   writeFileSync(join(cardDir, 'cursors.json'), '{}');
   openScratch(dir);
-  return { dir, cardDir };
+  return { dir, repo, cardDir };
 }
 
-async function runCard({ dir, agents }) {
-  const workflow = buildCardPath({ dir, agents });
+async function runCard({ dir, repo, agents }) {
+  const workflow = buildCardPath({ dir, repo, review: fakeReview(), agents });
   const studio = await openMastra({ card: CARD, stateDb: join(dir, 'state.db'), traceDb: join(dir, 'trace.duckdb'), workflow });
   const run = await studio.getWorkflow(workflow.id).createRun();
   const result = await run.start({ inputData: { card: CARD, kind: 'product' } });
@@ -165,7 +192,7 @@ const searching = () => {
 // ---------------------------------------------------------------------------
 
 test('a card reads and searches freely, and Graphify is offered as one tool among the rest', async t => {
-  const { dir } = openCase({ limit: 4, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
+  const { dir, repo } = openCase({ limit: 4, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const spending = openSpending({ dir, limit: 4, catalog: CATALOG, corrections: CORRECTIONS, now: OFF_PEAK });
   const { counts, tools } = searching();
@@ -191,7 +218,8 @@ test('a card reads and searches freely, and Graphify is offered as one tool amon
 
   const result = await runCard({
     dir,
-    agents: { build: lead, shipping: stub('looked'), remediation: stub('fixed line'), retro: stub('retro line'), spending },
+    repo,
+    agents: { build: lead, shipping: stub(PASS), remediation: stub('fixed line'), retro: stub('retro line'), spending },
   });
 
   assert.equal(result.status, 'suspended', 'the card carried on to the wait for Todd');
@@ -215,7 +243,7 @@ test('a card reads and searches freely, and Graphify is offered as one tool amon
 // ---------------------------------------------------------------------------
 
 test('a transient model failure is retried through Mastra default retry, and the card carries on', async t => {
-  const { dir } = openCase({ limit: 4, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
+  const { dir, repo } = openCase({ limit: 4, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const spending = openSpending({ dir, limit: 4, catalog: CATALOG, corrections: CORRECTIONS, now: OFF_PEAK });
 
@@ -232,7 +260,8 @@ test('a transient model failure is retried through Mastra default retry, and the
 
   const result = await runCard({
     dir,
-    agents: { build: lead, shipping: stub('looked'), remediation: stub('fixed line'), retro: stub('retro line'), spending },
+    repo,
+    agents: { build: lead, shipping: stub(PASS), remediation: stub('fixed line'), retro: stub('retro line'), spending },
   });
 
   assert.equal(attempts, 2, 'the failed call was attempted again');
@@ -248,7 +277,7 @@ test('a transient model failure is retried through Mastra default retry, and the
 // ---------------------------------------------------------------------------
 
 test('no output limit reaches the model, a long answer passes, and the card cap still ends a runaway', async t => {
-  const { dir } = openCase({ limit: 4, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
+  const { dir, repo } = openCase({ limit: 4, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const spending = openSpending({ dir, limit: 4, catalog: CATALOG, corrections: CORRECTIONS, now: OFF_PEAK });
 
@@ -264,7 +293,8 @@ test('no output limit reaches the model, a long answer passes, and the card cap 
 
   const result = await runCard({
     dir,
-    agents: { build: lead, shipping: stub('looked'), remediation: stub('fixed line'), retro: stub('retro line'), spending },
+    repo,
+    agents: { build: lead, shipping: stub(PASS), remediation: stub('fixed line'), retro: stub('retro line'), spending },
   });
 
   assert.ok(limits.length >= 1, 'the model was called');
@@ -303,7 +333,8 @@ test('no output limit reaches the model, a long answer passes, and the card cap 
 
   const runawayResult = await runCard({
     dir: runawayDir,
-    agents: { build: runaway, shipping: stub('looked'), remediation: stub('fixed line'), retro: stub('retro line'), spending: runawaySpending },
+    repo: studioRepo(runawayDir),
+    agents: { build: runaway, shipping: stub(PASS), remediation: stub('fixed line'), retro: stub('retro line'), spending: runawaySpending },
   });
 
   assert.equal(runawayResult.result.stopped, true, 'the cap ended the runaway agent');
@@ -385,7 +416,7 @@ test('a memory note-taker retries a failed call the way Mastra retries by defaul
 // ---------------------------------------------------------------------------
 
 test('a card report shows the tokens the lead and each helper read, grouped by model', async t => {
-  const { dir, cardDir } = openCase({ limit: 0.02, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
+  const { dir, repo, cardDir } = openCase({ limit: 0.02, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const spending = openSpending({ dir, limit: 0.02, catalog: CATALOG, corrections: CORRECTIONS, now: OFF_PEAK });
 
@@ -411,7 +442,8 @@ test('a card report shows the tokens the lead and each helper read, grouped by m
 
   const result = await runCard({
     dir,
-    agents: { build: lead, shipping: stub('looked'), remediation: stub('fixed line'), retro: stub('retro line'), spending },
+    repo,
+    agents: { build: lead, shipping: stub(PASS), remediation: stub('fixed line'), retro: stub('retro line'), spending },
   });
   assert.equal(result.result.stopped, true, 'the helper call crossed the cap, so the card stopped');
 

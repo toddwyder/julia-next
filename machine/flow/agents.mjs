@@ -7,6 +7,7 @@ import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace
 
 import { cardMemory } from './memory.mjs';
 import { buildModelReader, leadModelId } from './models.mjs';
+import { SHIPPING_MAX_STEPS } from './review.mjs';
 import { agentModel, helperKey, readRoleModels, readStageModels } from './role-models.mjs';
 import { HELPER_CONCURRENCY, helperStartHook, openSpending, spendingProcessor, splitModelId } from './spending.mjs';
 
@@ -42,17 +43,17 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     const guard = spendingProcessor(spending, ids, options);
     return { inputProcessors: [costGuard(), guard], outputProcessors: [guard] };
   };
-  const workspace = new Workspace({
-    id: 'machine-repo',
-    filesystem: new LocalFilesystem({ basePath: repo }),
-    sandbox: new LocalSandbox({ workingDirectory: repo, env: { HOME: homedir() } }),
-    skills: ['.agents/skills'],
-  });
-  const helperWorkspace = new Workspace({
-    id: 'machine-repo-helper',
-    filesystem: new LocalFilesystem({ basePath: repo }),
-    sandbox: new LocalSandbox({ workingDirectory: repo, env: { HOME: homedir() } }),
-  });
+  // A run names the copy of the repository its card works in. A call outside a card, such as a
+  // settings read, works in the repository Studio runs from.
+  const cardWorkspace = (id, extra = {}) => ({ requestContext } = {}) => {
+    const folder = requestContext?.get?.('cardCheckout') ?? repo;
+    return new Workspace({
+      id,
+      filesystem: new LocalFilesystem({ basePath: folder }),
+      sandbox: new LocalSandbox({ workingDirectory: folder, env: { HOME: homedir() } }),
+      ...extra,
+    });
+  };
   // Mastra resolves `agents` and `model` at each call, so the picker's file and the Lead
   // setting reach the next call without a restart. 7 Nov: the save at 15:18:07 needed the
   // restart at 15:18:10 to take effect.
@@ -66,7 +67,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
       model: agentModel(modelId),
       ...cardProcessors(() => splitModelId(modelId)),
       ...cardMemory(spending),
-      workspace: helperWorkspace,
+      workspace: cardWorkspace('machine-repo-helper'),
       tools,
       defaultOptions: { maxSteps: 100 },
     })];
@@ -78,7 +79,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     model: buildModelReader(leadModelFile),
     ...cardProcessors(() => splitModelId(leadModelId(leadModelFile)), { refuseAfterStop: true }),
     ...cardMemory(spending),
-    workspace,
+    workspace: cardWorkspace('machine-repo', { skills: ['.agents/skills'] }),
     agents: helpers,
     tools,
     defaultOptions: {
@@ -98,11 +99,21 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
 
   const shipping = new Agent({
     id: 'flow-shipping',
-    name: 'Flow shipping stand-in',
+    name: 'Shipping',
     instructions:
-      'You glance at one short file and say in one sentence whether it reads as a recipe title. You do not decide pass or fail; a fixed rule does that. No tools.',
+      'You are the Shipping reviewer. You did not write the code. You run what the card asks you to run inside the checkout you are given, judge each criterion from what the commands printed, and answer in the shape the task gives.',
     model: stageModel('shipping'),
     ...cardProcessors(() => (model ? null : splitModelId(stages.shipping))),
+    workspace: ({ requestContext } = {}) => {
+      const checkout = requestContext?.get?.('cardCheckout');
+      if (!checkout) throw new Error('Shipping has no checkout to review.');
+      return new Workspace({
+        id: 'shipping-checkout',
+        filesystem: new LocalFilesystem({ basePath: checkout }),
+        sandbox: new LocalSandbox({ workingDirectory: checkout, env: { HOME: homedir() } }),
+      });
+    },
+    defaultOptions: { maxSteps: SHIPPING_MAX_STEPS },
   });
 
   const remediation = new Agent({

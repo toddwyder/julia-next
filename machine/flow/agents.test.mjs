@@ -169,6 +169,26 @@ test('the Lead setting accepts a CommandCode model through the helper route', t 
   assert.equal(buildModel(file), 'commandcode/moonshotai/Kimi-K3.1-Pro');
 });
 
+test('the build and its helpers work in the card copy the run names', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  installLeadModel(leadModelFile);
+  const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
+  const cardCopy = join(dir, 'cards', 'JUL-400');
+  mkdirSync(cardCopy, { recursive: true });
+  const requestContext = new Map([['cardCheckout', cardCopy]]);
+  const agents = createAgents({ repo, leadModelFile, roleModelsFile, model: 'openai/gpt-6.1-sol' });
+
+  const lead = (await agents.build.getWorkspace({ requestContext })).getPathContext();
+  assert.equal(lead.filesystem.basePath, cardCopy);
+  assert.equal(lead.sandbox.workingDirectory, cardCopy);
+  const helper = (await (await agents.build.listAgents()).featureRefactoring.getWorkspace({ requestContext })).getPathContext();
+  assert.equal(helper.sandbox.workingDirectory, cardCopy);
+
+  const settings = (await createAgents({ repo, leadModelFile, roleModelsFile, model: 'openai/gpt-6.1-sol' }).build.getWorkspace()).getPathContext();
+  assert.equal(settings.sandbox.workingDirectory, repo, 'a read with no card copy works in Studio’s repository');
+});
+
 // 7 Nov: a pick saved at 15:18:07 only reached the run after Studio restarted at 15:18:10.
 test('a changed models file changes the next call without a new createAgents', async t => {
   const dir = temporary(t);

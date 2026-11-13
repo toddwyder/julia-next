@@ -2,6 +2,7 @@
 // share, and an unknown price left unknown rather than guessed.
 
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -116,10 +117,18 @@ test('a trace with no model calls says so instead of inventing a price', () => {
 
 test('the run record on disk answers the same way for a real trace file', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'flow-cost-'));
+  process.env.FLOW_SCRATCH = join(dir, 'scratch');
   openScratch(dir);
   mkdirSync(join(dir, CARD), { recursive: true });
-  writeFileSync(join(dir, CARD, 'verdicts.json'), JSON.stringify({ review: ['PASS'], smoke: ['PASS'] }));
+  writeFileSync(join(dir, CARD, 'verdicts.json'), JSON.stringify({ smoke: ['PASS'] }));
   writeFileSync(join(dir, CARD, 'cursors.json'), '{}');
+
+  const repo = join(dir, 'studio');
+  mkdirSync(repo);
+  writeFileSync(join(repo, 'README.md'), 'studio\n');
+  execFileSync('git', ['init', '--quiet', '--initial-branch=main'], { cwd: repo });
+  execFileSync('git', ['add', '-A'], { cwd: repo });
+  execFileSync('git', ['-c', 'user.email=flow@test', '-c', 'user.name=flow', 'commit', '--quiet', '-m', 'main'], { cwd: repo });
 
   // The Codex route answers only a streamed request, so a stage agent that is asked to generate fails the way
   // it does there: HTTP 400 "Stream must be set to true".
@@ -135,11 +144,18 @@ test('the run record on disk answers the same way for a real trace file', async 
         instructions: 'Reply with one line.',
         model: createMockModel({ mockText: 'built line' }),
       }),
-      shipping: stub('b'),
+      shipping: { stream: async () => ({ text: Promise.resolve('VERDICT: PASS\nCRITERION 1: PASS — ok\nNOTES: none') }) },
       remediation: stub('c'),
       retro: stub('d'),
     },
     dir,
+    repo,
+    review: {
+      findPr: () => ({ pr: 1 }),
+      readCard: async identifier => ({ identifier, title: 't', description: '## Acceptance criteria\n- ok' }),
+      headCommit: () => 'abc',
+      postPrComment: () => {},
+    },
   });
   const mastra = await openMastra({
     card: CARD,

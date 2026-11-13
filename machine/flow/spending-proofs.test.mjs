@@ -3,6 +3,7 @@
 // is a fake AI SDK model, so the dollars in each assertion are exact.
 
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -88,17 +89,41 @@ function meteredAgent({ id, spending, called = () => {}, usage, modelOptions = {
   });
 }
 
+const PASS = 'VERDICT: PASS\nCRITERION 1: PASS';
+const FAIL = 'VERDICT: FAIL\nCRITERION 1: FAIL';
+
+const fakeReview = () => ({
+  findPr: () => ({ pr: 1 }),
+  readCard: async () => ({ identifier: CARD, title: CARD, description: '## Acceptance criteria\n- the thing works' }),
+  headCommit: () => 'abc1234',
+  postPrComment: () => {},
+});
+
+// A card builds in a copy made from a real repository, so a card-path case needs one.
+function studioRepo(dir) {
+  const repo = join(dir, 'studio');
+  mkdirSync(repo, { recursive: true });
+  writeFileSync(join(repo, 'README.md'), 'studio\n');
+  const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+  git('init', '--quiet', '--initial-branch=main');
+  git('add', '-A');
+  git('-c', 'user.email=flow@test', '-c', 'user.name=flow', 'commit', '--quiet', '-m', 'main');
+  process.env.FLOW_SCRATCH = join(dir, 'scratch');
+  return repo;
+}
+
 // A stand-in stage that answers without calling a model, so only the calls under test cost money.
 const stub = text => ({ generate: async () => ({ text }), stream: async () => ({ text: Promise.resolve(text) }) });
 
 function openCase({ limit, verdicts }) {
   const dir = mkdtempSync(join(tmpdir(), 'flow-proofs-'));
+  const repo = studioRepo(dir);
   const cardDir = join(dir, CARD);
   mkdirSync(cardDir, { recursive: true });
   writeFileSync(join(cardDir, 'verdicts.json'), JSON.stringify(verdicts));
   writeFileSync(join(cardDir, 'cursors.json'), '{}');
   openScratch(dir);
-  return { dir, cardDir };
+  return { dir, repo, cardDir };
 }
 
 function readReport(cardDir) {
@@ -110,7 +135,7 @@ function readReport(cardDir) {
 // ---------------------------------------------------------------------------
 
 test('a card killed while it waits for Todd resumes after the restart with the money already spent and ends at its limit', async () => {
-  const { dir, cardDir } = openCase({ limit: 0.03, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
+  const { dir, repo, cardDir } = openCase({ limit: 0.03, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
   const stateDb = join(dir, 'state.db');
   const traceDb = join(dir, 'trace.duckdb');
 
@@ -119,9 +144,11 @@ test('a card killed while it waits for Todd resumes after the restart with the m
   let firstBuildCalls = 0;
   const firstWorkflow = buildCardPath({
     dir,
+    repo,
+    review: fakeReview(),
     agents: {
       build: meteredAgent({ id: 'flow-build', spending: firstSpending, called: () => { firstBuildCalls += 1; } }),
-      shipping: stub('looked'),
+      shipping: stub(PASS),
       remediation: stub('fixed line'),
       retro: stub('retro line'),
       spending: firstSpending,
@@ -145,9 +172,11 @@ test('a card killed while it waits for Todd resumes after the restart with the m
   let secondBuildCalls = 0;
   const secondWorkflow = buildCardPath({
     dir,
+    repo,
+    review: fakeReview(),
     agents: {
       build: meteredAgent({ id: 'flow-build', spending: secondSpending, called: () => { secondBuildCalls += 1; } }),
-      shipping: stub('looked'),
+      shipping: stub(PASS),
       remediation: stub('fixed line'),
       retro: stub('retro line'),
       spending: secondSpending,
@@ -188,15 +217,22 @@ test('a card killed while it waits for Todd resumes after the restart with the m
 // ---------------------------------------------------------------------------
 
 test('a card whose Shipping fails again and again ends with "card spending limit reached"', async () => {
-  const { dir, cardDir } = openCase({ limit: 0.05, verdicts: { review: ['FAIL', 'FAIL', 'FAIL'], smoke: ['PASS'] } });
+  const { dir, repo, cardDir } = openCase({ limit: 0.05, verdicts: { smoke: ['PASS'] } });
   const spending = openSpending({ dir, limit: 0.05, catalog: CATALOG, corrections: {}, now: OFF_PEAK });
   let shippingCalls = 0;
   let remediationCalls = 0;
   const workflow = buildCardPath({
     dir,
+    repo,
+    review: fakeReview(),
     agents: {
       build: meteredAgent({ id: 'flow-build', spending }),
-      shipping: meteredAgent({ id: 'flow-shipping', spending, called: () => { shippingCalls += 1; } }),
+      shipping: meteredAgent({
+        id: 'flow-shipping',
+        spending,
+        called: () => { shippingCalls += 1; },
+        modelOptions: { text: FAIL },
+      }),
       remediation: meteredAgent({ id: 'flow-remediation', spending, called: () => { remediationCalls += 1; } }),
       retro: stub('retro line'),
       spending,
@@ -209,7 +245,7 @@ test('a card whose Shipping fails again and again ends with "card spending limit
 
   assert.equal(result.status, 'success');
   assert.equal(result.result.stopped, true);
-  assert.equal(shippingCalls, 2, 'Shipping got two rounds, both queued to fail');
+  assert.equal(shippingCalls, 2, 'Shipping reviewed the card twice, and both reviews failed it');
   assert.equal(remediationCalls, 1, 'the first failure was handed to remediation');
   assert.equal(spending.calls.length, 4, 'build, shipping, remediation, shipping');
   assert.equal(spending.stopReason(), STOP_REASONS.limit, 'the cap ended the card, not the second failure');
@@ -221,10 +257,10 @@ test('a card whose Shipping fails again and again ends with "card spending limit
   assert.match(report, /Shipping rounds: 1/);
   assert.doesNotMatch(report, /Shipping failed twice/, 'the card never reached its second counted failure');
 
-  // Only the first FAIL was read. The card ran out of money in the round that would have read the
-  // second one, so the queue Todd set is still waiting.
+  // Only the first FAIL was counted. The card ran out of money in the round that would have read
+  // the second verdict, so the second FAIL never reached the record.
   const cursors = JSON.parse(readFileSync(join(cardDir, 'cursors.json'), 'utf8'));
-  assert.equal(cursors.review, 1);
+  assert.equal(cursors.review, undefined, 'the review round that ran out of money read no verdict');
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -233,7 +269,7 @@ test('a card whose Shipping fails again and again ends with "card spending limit
 // ---------------------------------------------------------------------------
 
 test('a lead that starts 150 helpers at once ends at its limit, and the total equals every call the fake model answered', async () => {
-  const { dir, cardDir } = openCase({ limit: 0.04, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
+  const { dir, repo, cardDir } = openCase({ limit: 0.04, verdicts: { smoke: ['PASS'] } });
   const limit = 0.04;
   const spending = openSpending({ dir, limit, catalog: CATALOG, corrections: {}, now: OFF_PEAK });
 
@@ -280,7 +316,9 @@ test('a lead that starts 150 helpers at once ends at its limit, and the total eq
 
   const workflow = buildCardPath({
     dir,
-    agents: { build: lead, shipping: stub('looked'), remediation: stub('fixed line'), retro: stub('retro line'), spending },
+    repo,
+    review: fakeReview(),
+    agents: { build: lead, shipping: stub(PASS), remediation: stub('fixed line'), retro: stub('retro line'), spending },
   });
   const studio = await openMastra({ card: CARD, stateDb: join(dir, 'state.db'), traceDb: join(dir, 'trace.duckdb'), workflow });
   const run = await studio.getWorkflow(workflow.id).createRun();
