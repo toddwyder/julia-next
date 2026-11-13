@@ -153,6 +153,7 @@ test('the run record on disk answers the same way for a real trace file', async 
     review: {
       findPr: () => ({ pr: 1 }),
       readCard: async identifier => ({ identifier, title: 't', description: '## Acceptance criteria\n- ok' }),
+      moveCard: async () => {},
       headCommit: () => 'abc',
       postPrComment: () => {},
     },

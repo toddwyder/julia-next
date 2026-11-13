@@ -123,6 +123,7 @@ const PASS = 'VERDICT: PASS\nCRITERION 1: PASS';
 const fakeReview = () => ({
   findPr: () => ({ pr: 1 }),
   readCard: async () => ({ identifier: CARD, title: CARD, description: '## Acceptance criteria\n- the thing works' }),
+  moveCard: async () => {},
   headCommit: () => 'abc1234',
   postPrComment: () => {},
 });

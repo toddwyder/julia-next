@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 
-import { getIssue, postComment as postCardComment } from '../../scripts/linear-cli.mjs';
+import { getIssue, postComment as postCardComment, setIssueState } from '../../scripts/linear-cli.mjs';
 
 export const PLAYBOOK = '.agents/skills/poteto-mode/playbooks/shipping.md';
 export const REVIEW_TIME_LIMIT_MS = 20 * 60_000;
@@ -102,6 +102,7 @@ export function postPrComment(repo, pr, body) {
 export const realReview = {
   findPr: findCardPr,
   readCard: identifier => getIssue(identifier),
+  moveCard: setIssueState,
   headCommit,
   postPrComment,
   postCardComment,

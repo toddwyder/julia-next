@@ -14,6 +14,7 @@ import { tokenReport } from './report.mjs';
 import { REVIEW_TIME_LIMIT_MS, criteriaFromCard, parseVerdict, realReview, reviewTask, verdictComment } from './review.mjs';
 import { cardState, flowData, runInput } from './schema.mjs';
 import { HELPER_CONCURRENCY } from './spending.mjs';
+import { taskFromCard } from './task.mjs';
 import {
   nextVerdict,
   openRun,
@@ -53,16 +54,6 @@ const reportText = (state, detail, spending) => {
 
 const step = (id, execute, extra = {}) =>
   createStep({ id, inputSchema: flowData, outputSchema: flowData, ...extra, execute });
-
-const buildPrompt = (card, kind) =>
-  [
-    `Build Linear card ${card}. It is a ${kind} card.`,
-    'You work in a fresh copy of the repository made from main for this card. No other card works there.',
-    "Read the whole card first, including Todd's dated decisions on it, and move it to Implementation when you start.",
-    'Open the pull request in the same step as your first push, name only this card in its description, and keep pushing as you go.',
-    'When the build is ready and the pull request is up to date, stop. Shipping comes next.',
-    "Only a product decision or one approval in Todd's own account may reach him. Decide the rest and log it in the decision log.",
-  ].join('\n');
 
 export function createStages({ agents, dir, repo, review = realReview }) {
   const spending = agents.spending;
@@ -119,7 +110,10 @@ export function createStages({ agents, dir, repo, review = realReview }) {
     requestContext?.set?.('mastra__threadId', requestId);
     requestContext?.set?.('mastra__resourceId', card);
     await setState({ ...state, buildRounds, requestId, copy: copy.folder, base: copy.base });
-    return { ...inputData, card, detail: `build round ${buildRounds} started in ${copy.folder}`, prompt: buildPrompt(card, state.kind) };
+    const issue = await review.readCard(card);
+    if (!issue) throw new Error(`Linear card ${card} could not be read.`);
+    if (buildRounds === 1) await review.moveCard(card, 'Implementation');
+    return { ...inputData, card, detail: `build round ${buildRounds} started in ${copy.folder}`, prompt: taskFromCard(issue) };
   });
 
   // The build is called here rather than handed to `createStep(agents.build)` so a card that spent

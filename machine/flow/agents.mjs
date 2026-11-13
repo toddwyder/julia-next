@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { Agent } from '@mastra/core/agent';
+import { createCodingAgent } from '@mastra/core/coding-agent';
 import { TokenCostControl } from '@mastra/core/processors';
 import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace';
 
@@ -57,22 +58,23 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
   // Mastra resolves `agents` and `model` at each call, so the picker's file and the Lead
   // setting reach the next call without a restart. 7 Nov: the save at 15:18:07 needed the
   // restart at 15:18:10 to take effect.
+  const skillInstruction = `Read ${join(repo, POTETO_SKILL)} in full, including its Principles section, before any work.`;
   const helpers = () => Object.fromEntries(readRoleModels(roleModelsFile).flatMap(role => role.models.map((modelId, index) => {
     const choice = role.models.length > 1 ? `, choice ${index + 1}` : '';
-    return [helperKey(role, index), new Agent({
+    return [helperKey(role, index), createCodingAgent({
       id: `pstack-${role.id}-${index + 1}`,
       name: role.name,
       description: `${role.name} pstack role on ${modelId}${choice}. ${role.explanation} Use this helper when delegating ${role.name} work.`,
-      instructions: `You are the ${role.name} pstack helper. ${role.explanation} Complete the task delegated by Lead yourself. Do not delegate it again. Report the result and evidence.`,
+      instructions: skillInstruction,
       model: agentModel(modelId),
       ...cardProcessors(() => splitModelId(modelId)),
       ...cardMemory(spending),
-      workspace: cardWorkspace('machine-repo-helper'),
+      workspace: cardWorkspace('machine-repo-helper', { skills: ['.agents/skills'] }),
       tools,
       defaultOptions: { maxSteps: 100 },
     })];
   })));
-  const build = new Agent({
+  const build = createCodingAgent({
     id: 'flow-build',
     name: 'Lead',
     instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
