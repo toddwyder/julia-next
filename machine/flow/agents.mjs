@@ -9,6 +9,7 @@ import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace
 
 import { buildModelReader, leadModelId } from './models.mjs';
 import { agentModel, helperKey, readRoleModels, readStageModels } from './role-models.mjs';
+import { meteredModel, openSpending, spendingProcessor, splitModelId } from './spending.mjs';
 
 // Mastra caps the observer and reflector at 100,000 output tokens, but only when it picks their model.
 // An explicit model gets no cap, so the controller reserved all of the remaining token cap for one memory
@@ -37,17 +38,29 @@ export function repoRoot() {
   return process.env.FLOW_REPO ?? repositoryContaining(resolve(process.env.MASTRA_PROJECT_ROOT ?? process.cwd()));
 }
 
-export function createAgents({ model, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {}, machine = false } = {}) {
+// The card's spending total is read from its own folder, so every agent in the run adds to the
+// same ledger and a rerun carries the total it already spent.
+export function createAgents({ model, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {}, machine = false, dir = process.env.FLOW_DIR ?? '.artifacts/flow/studio', spending = openSpending({ dir }) } = {}) {
   const gate = machine ? createBuildGate({ repo }) : undefined;
+  // Memory note-takers call the model themselves, outside an agent's processors, so their calls
+  // are metered on the model instead.
+  const memoryModel = () => meteredModel(agentModel('openai/gpt-6-luna'), { spending, ...splitModelId('openai/gpt-6-luna') });
   const memoryFor = role => {
     if (!gate) return {};
     const memory = new Memory({ options: { observationalMemory: {
-      observation: { model: agentModel('openai/gpt-6-luna'), maxRetries: 0, failurePolicy: 'abort', modelSettings: { maxOutputTokens: MEMORY_MAX_OUTPUT_TOKENS } },
-      reflection: { model: agentModel('openai/gpt-6-luna'), maxRetries: 0, failurePolicy: 'abort', modelSettings: { maxOutputTokens: MEMORY_MAX_OUTPUT_TOKENS } },
+      observation: { model: memoryModel(), maxRetries: 0, failurePolicy: 'abort', modelSettings: { maxOutputTokens: MEMORY_MAX_OUTPUT_TOKENS } },
+      reflection: { model: memoryModel(), maxRetries: 0, failurePolicy: 'abort', modelSettings: { maxOutputTokens: MEMORY_MAX_OUTPUT_TOKENS } },
     } } });
     return { memory };
   };
   const gateOptions = gate ? { maxRetries: 0, hooks: gate.hooks } : {};
+  // The input side stops a call the card cannot afford, and the output side adds the call's
+  // dollars. Mastra runs `processOutputStep` only for output processors, so the same processor
+  // goes into both lists and remembers the model the input step saw.
+  const cardProcessors = ids => {
+    const guard = spendingProcessor(spending, ids);
+    return { inputProcessors: [costGuard(), guard], outputProcessors: [guard] };
+  };
   const workspace = new Workspace({
     id: 'machine-repo',
     filesystem: new LocalFilesystem({ basePath: repo }),
@@ -70,7 +83,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
       description: `${role.name} pstack role on ${modelId}${choice}. ${role.explanation} Use this helper when delegating ${role.name} work.`,
       instructions: `You are the ${role.name} pstack helper. ${role.explanation} Complete the task delegated by Lead yourself. Do not delegate it again. For questions about code structure or where something lives, call the graphify tools before reading files. Report the result and evidence.`,
       model: agentModel(modelId),
-      inputProcessors: [costGuard()],
+      ...cardProcessors(() => splitModelId(modelId)),
       ...memoryFor(role.name),
       workspace: helperWorkspace,
       tools,
@@ -82,7 +95,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     name: 'Lead',
     instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
     model: buildModelReader(leadModelFile),
-    inputProcessors: [costGuard()],
+    ...cardProcessors(() => splitModelId(leadModelId(leadModelFile))),
     ...memoryFor('lead'),
     workspace,
     agents: helpers,
@@ -105,7 +118,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     instructions:
       'You glance at one short file and say in one sentence whether it reads as a recipe title. You do not decide pass or fail; a fixed rule does that. No tools.',
     model: stageModel('shipping'),
-    inputProcessors: [costGuard()],
+    ...cardProcessors(() => (model ? null : splitModelId(stages.shipping))),
     defaultOptions: { ...limits, ...(gate ? { maxRetries: 0 } : {}) },
   });
 
@@ -114,7 +127,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     name: 'Flow remediation stand-in',
     instructions: 'You rewrite one short line so it reads better. Reply with the new line only. No tools.',
     model: stageModel('remediation'),
-    inputProcessors: [costGuard()],
+    ...cardProcessors(() => (model ? null : splitModelId(stages.remediation))),
     defaultOptions: { ...limits, ...(gate ? { maxRetries: 0 } : {}) },
   });
 
@@ -123,11 +136,20 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     name: 'Flow retro stand-in',
     instructions: 'You write one sentence about what this throwaway run did. No tools.',
     model: stageModel('retro'),
-    inputProcessors: [costGuard()],
+    ...cardProcessors(() => (model ? null : splitModelId(stages.retro))),
     defaultOptions: { ...limits, ...(gate ? { maxRetries: 0 } : {}) },
   });
 
-  return { build, shipping, remediation, retro, ...(gate ? { gate } : {}) };
+  // A stage asks these before it calls its agent, so a card that has spent its limit or picked a
+  // model the price list cannot price ends with a stop report instead of a failed model call.
+  const spendingIds = {
+    build: () => splitModelId(leadModelId(leadModelFile)),
+    shipping: () => (model ? null : splitModelId(stages.shipping)),
+    remediation: () => (model ? null : splitModelId(stages.remediation)),
+    retro: () => (model ? null : splitModelId(stages.retro)),
+  };
+
+  return { build, shipping, remediation, retro, spending, spendingIds, ...(gate ? { gate } : {}) };
 }
 
 // The Graphify exploration gate, scoped to the build. Spending is Mastra's cost guard's job.

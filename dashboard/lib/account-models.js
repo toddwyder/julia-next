@@ -25,9 +25,6 @@ function savedCommandCodeModels() {
       id: String(model.id).replace(/^mastracode\//, ''),
       provider: 'commandcode',
       modelName: model.name,
-      inputPerMillion: model.inputPerMillion,
-      outputPerMillion: model.outputPerMillion,
-      free: model.free,
     }));
 }
 

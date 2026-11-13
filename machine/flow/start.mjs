@@ -27,6 +27,7 @@ async function assemble({ dir, card, model, agents: injected }) {
     injected ?? (await import('./agents.mjs')).createAgents({
       ...(model ? { model } : {}),
       tools: await graphifyTools(),
+      dir,
     });
   const workflow = buildCardPath({ agents, dir });
   const mastra = await openMastra({

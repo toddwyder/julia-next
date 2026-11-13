@@ -14,6 +14,7 @@ const catalog = {
       'claude-opus-5-5': { cost: { input: 4, output: 20, cache_read: 0.2, cache_write: 5 } },
     } },
     openai: { models: {
+      'gpt-6-luna': { cost: { input: 0.2, output: 1.2, cache_read: 0.02 } },
       'gpt-6.1-sol': {
         cost: {
           input: 2, output: 10, cache_read: 0.1, cache_write: 2.5,
@@ -111,4 +112,35 @@ test('a run total is unknown when any call has no price', () => {
   const total = costFromMetrics(rows, { catalog, corrections });
   assert.equal(total.usd, null);
   assert.deepEqual(total.unpriced, ['commandcode/nobody/no-such-model']);
+});
+
+test('a memory note-taker rolled up to the agent span keeps its own rate', () => {
+  const rows = [
+    { spanId: 'a', provider: 'commandcode', model: 'deepseek/deepseek-v4.1-flash', timestamp: '2026-11-13T05:00:00Z', name: 'mastra_model_input_text_tokens', value: 1_000_000 },
+    { spanId: 'a', provider: 'openai', model: 'gpt-6-luna', timestamp: '2026-11-13T05:00:00Z', name: 'mastra_model_input_text_tokens', value: 1_000_000 },
+  ];
+  const total = costFromMetrics(rows, { catalog, corrections });
+  assert.equal(total.calls, 2);
+  assert.equal(total.usd, 0.15 + 0.2);
+});
+
+test('a model name Mastra wrote with dashes still finds its price', () => {
+  const rows = [
+    { spanId: 'a', provider: 'commandcode', model: 'deepseek-deepseek-v4-1-flash', timestamp: '2026-11-13T05:00:00Z', name: 'mastra_model_input_text_tokens', value: 1_000_000 },
+  ];
+  const total = costFromMetrics(rows, { catalog, corrections });
+  assert.equal(total.calls, 1);
+  assert.equal(total.usd, 0.15);
+});
+
+test('a duration row adds no call to the run total', () => {
+  const rows = [
+    { spanId: 'a', provider: 'commandcode', model: 'deepseek/deepseek-v4.1-flash', timestamp: '2026-11-13T05:00:00Z', name: 'mastra_model_input_text_tokens', value: 1_000_000 },
+    { spanId: 'a', provider: null, model: null, timestamp: '2026-11-13T05:00:00Z', name: 'mastra_agent_duration_ms', value: 466 },
+    { spanId: 'b', provider: null, model: null, timestamp: '2026-11-13T05:00:00Z', name: 'mastra_workflow_duration_ms', value: 35 },
+  ];
+  const total = costFromMetrics(rows, { catalog, corrections });
+  assert.equal(total.calls, 1);
+  assert.equal(total.usd, 0.15);
+  assert.deepEqual(total.unpriced, []);
 });

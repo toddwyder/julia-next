@@ -34,6 +34,8 @@ export const PROGRAMS = [
   ['machine/flow/role-models.mjs', 'The Lead helper models, read from the saved role table and routed to account providers.'],
   ['machine/flow/schema.mjs', 'What the run form asks for and what the run remembers.'],
   ['machine/flow/scratch.mjs', 'The run folder: artifacts, verdicts and the report a stop leaves.'],
+  ['machine/flow/spending.mjs', 'The per-card spending ledger, its dollar limit and the processor that counts each model call.'],
+  ['machine/flow/card-ledger.mjs', 'Reads and writes the spending ledger file for one card.'],
   ['machine/flow/mastra.mjs', 'Storage and tracing, so a run is written down and priced.'],
   ['machine/flow/start.mjs', 'Assembles a run to read it back and to resume a card.'],
   ['machine/flow/run.mjs', 'Answers a waiting card, reads a run, writes its cost. No way to start one.'],
