@@ -84,6 +84,14 @@ export function createStages({ agents, dir, repo, review = realReview }) {
     return { card: state.card, kind: state.kind, ...inputData, stopped: true, detail: reason };
   };
 
+  // A stage that spends the card's last dollars in the middle of its call has that call refused by
+  // the ledger's processor. The refusal is the card stopping, not the run failing, so the stage
+  // hands back the same stopped data as a stage that was turned away before it called.
+  const refused = async (context, error) => {
+    if (!/TripWire/.test(String(error?.message ?? error))) return null;
+    return halt(context);
+  };
+
   // The first stage of a run. It takes the two things the run form asks for
   // and puts them into the run's saved state, so every later stage and the
   // finished trace can name the card without asking for it again.
@@ -99,9 +107,6 @@ export function createStages({ agents, dir, repo, review = realReview }) {
     },
   });
 
-  // The build is a real agent step: `createStep(agents.build)` gives it the
-  // agent's own input and output, so the card data goes through a mapper either
-  // side of it instead of through the stage's shared schema.
   const startBuild = step('start-build', async (context) => {
     const stopped = await halt(context, 'build');
     if (stopped) return stopped;
@@ -117,11 +122,9 @@ export function createStages({ agents, dir, repo, review = realReview }) {
     return { ...inputData, card, detail: `build round ${buildRounds} started in ${copy.folder}`, prompt: buildPrompt(card, state.kind) };
   });
 
-  // The build is a real agent step, but it is called here rather than handed to createStep so a
-  // card that spent its limit in the stage before cannot make the call. Mastra's agent step has
-  // no way to skip its agent, and refusing at the model would fail the whole workflow instead of
-  // ending the card with a reason. A Lead that spends the limit mid-run has its next model call
-  // refused the same way, and that refusal ends the build instead of failing the card.
+  // The build is called here rather than handed to `createStep(agents.build)` so a card that spent
+  // its limit in the stage before cannot make the call. Mastra's agent step has no way to skip its
+  // agent, and refusing at the model would fail the run instead of ending the card with a reason.
   const buildAgent = createStep({
     id: 'flow-build',
     inputSchema: z.object({ prompt: z.string() }),
@@ -181,6 +184,8 @@ export function createStages({ agents, dir, repo, review = realReview }) {
       return { ...inputData, pr: found.pr, sha, answer: text ?? '', criteriaCount: criteria.length, detail: text ?? '' };
     } catch (error) {
       if (clock.aborted) return unreviewed(`the review ran longer than ${REVIEW_TIME_LIMIT_MS / 60_000} minutes and was ended`);
+      const stopped = await refused(context, error);
+      if (stopped) return stopped;
       throw error;
     }
   });
@@ -225,10 +230,17 @@ export function createStages({ agents, dir, repo, review = realReview }) {
     if (stopped) return stopped;
     const { inputData, state, tracingContext } = context;
     const artifact = readArtifact(cardDir(state.card), state.card);
-    const result = await agents.remediation.stream(
-      `Rewrite this line so it reads better.\n\n${artifact}`,
-      { tracingContext },
-    );
+    let result;
+    try {
+      result = await agents.remediation.stream(
+        `Rewrite this line so it reads better.\n\n${artifact}`,
+        { tracingContext },
+      );
+    } catch (error) {
+      const stopped = await refused(context, error);
+      if (stopped) return stopped;
+      throw error;
+    }
     const text = await result.text;
     writeArtifact(cardDir(state.card), state.card, text ?? artifact);
     return { ...inputData, detail: text ?? '' };
@@ -336,10 +348,17 @@ export function createStages({ agents, dir, repo, review = realReview }) {
     const stopped = await halt(context, 'retro');
     if (stopped) return stopped;
     const { inputData, state, tracingContext } = context;
-    const result = await agents.retro.stream(
-      `Card ${state.card} landed after ${state.reviewRound} shipping rounds and ${state.buildRounds} build rounds. Say in one sentence what this run did.`,
-      { tracingContext },
-    );
+    let result;
+    try {
+      result = await agents.retro.stream(
+        `Card ${state.card} landed after ${state.reviewRound} shipping rounds and ${state.buildRounds} build rounds. Say in one sentence what this run did.`,
+        { tracingContext },
+      );
+    } catch (error) {
+      const stopped = await refused(context, error);
+      if (stopped) return stopped;
+      throw error;
+    }
     const text = await result.text;
     writeRetro(cardDir(state.card), state.card, text ?? '');
     return { ...inputData, detail: text ?? '' };

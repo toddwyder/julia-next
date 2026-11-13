@@ -11,7 +11,7 @@ of any size, not only a change to the sentence beside it.
 | --- | --- | --- |
 | `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `2a1ca703541f3af49106e5944dde86cc00d292c1d1a98a1167b39eb312672bfb` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `361f21401430222b9b63d78cc71d96ba8cb0d0402de8006846f56cfb450104a0` |
-| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `e4b12c1e48de3e9cc59384815725f0a1821b3b52eabcfdd1c8d57b4fee003e77` |
+| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `6ff771e8c2ed8172c2fd8fd9ab376b30d7741b87fbf927b1566f32cf6b1e800d` |
 | `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `0091885baf286c4f58929382cc424883bd9f2bddb19d19c25276f5dd12897fe9` |
 | `machine/flow/graphify.mjs` | The Graphify graph tools offered to Lead and its helpers. | `c502bc49faa96ef1de469764696d1682347679a61a17629766940de5baf546b6` |
 | `machine/flow/memory.mjs` | The memory note-takers, run on the free model the card picked. | `6cfa75c87338129593ca9997b5408be0e1ccd5e4e9a4426babb2723430d46c4a` |
