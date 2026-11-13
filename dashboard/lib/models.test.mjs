@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { mergeSweep, onePerName, readModels, startModels, priceLabel, stateDir } from './models.js';
-import { priceFor } from './model-prices.js';
+import { mergeSweep, priceLabel, pricedModels, readModels, stateDir } from './models.js';
 
 const priced = (inputPerMillion, outputPerMillion) => ({ inputPerMillion, outputPerMillion });
 const model = (id, provider, modelName) => ({ id, provider, modelName });
@@ -19,106 +18,68 @@ const catalog = {
   },
 };
 const corrections = { peakWindows: [], freeModels: [], excludeDates: [] };
-const at = new Date('2026-10-29T00:00:00.000Z');
-const price = item => priceFor({ catalog, corrections, provider: item.provider, model: item.modelName, at });
 
 test('a model that appears is added and a model that disappeared is retired', () => {
   const first = mergeSweep({
     previousModels: [],
     available: [model('anthropic/claude-opus-5-5', 'anthropic', 'claude-opus-5-5')],
-    priceFor: price,
-    readAt: '2026-10-29T00:00:00.000Z',
   });
   assert.deepEqual(first.added, ['anthropic/claude-opus-5-5']);
   assert.equal(first.models[0].displayName, 'Claude Opus 5.5');
-  assert.equal(first.models[0].priceReadAt, '2026-10-29T00:00:00.000Z');
 
   const second = mergeSweep({
     previousModels: first.models,
     available: [model('anthropic/claude-sonnet-5-5', 'anthropic', 'claude-sonnet-5-5')],
-    priceFor: price,
-    readAt: '2026-11-05T00:00:00.000Z',
   });
   assert.deepEqual(second.retired, ['anthropic/claude-opus-5-5']);
   assert.deepEqual(second.added, ['anthropic/claude-sonnet-5-5']);
   assert.deepEqual(second.models.map(row => row.id), ['anthropic/claude-sonnet-5-5']);
 });
 
-test('a model with no saved price is never written and is reported', () => {
+test('the sweep records which models the accounts offer, without a price', () => {
   const merged = mergeSweep({
     previousModels: [],
-    available: [
-      model('anthropic/claude-opus-5-5', 'anthropic', 'claude-opus-5-5'),
-      model('anthropic/claude-brand-new', 'anthropic', 'claude-brand-new'),
-    ],
-    priceFor: price,
-    readAt: '2026-10-29T00:00:00.000Z',
+    available: [model('anthropic/claude-opus-5-5', 'anthropic', 'claude-opus-5-5')],
   });
-  assert.deepEqual(merged.models.map(row => row.id), ['anthropic/claude-opus-5-5']);
-  assert.deepEqual(merged.excluded, [{ id: 'anthropic/claude-brand-new', provider: 'anthropic', reason: 'no saved price' }]);
+  assert.deepEqual(merged.models, [{
+    id: 'anthropic/claude-opus-5-5',
+    provider: 'anthropic',
+    name: 'claude-opus-5-5',
+    displayName: 'Claude Opus 5.5',
+  }]);
 });
 
-test('a model without a price on disk never reaches the Start screen', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'julia-models-test-'));
-  try {
-    writeFileSync(join(directory, 'models.json'), JSON.stringify({
-      sweptAt: '2026-10-29T00:00:00.000Z',
-      models: [{ id: 'anthropic/claude-brand-new', provider: 'anthropic', displayName: 'Claude Brand New' }],
-      defaults: { mainSession: 'anthropic/claude-brand-new', shipping: 'anthropic/claude-brand-new', effort: 'large' },
-    }));
-    const saved = readModels({ directory });
-    const picked = startModels(saved);
-    assert.equal(picked.mainSession, null);
-    assert.equal(picked.shipping, null);
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
+test('the picker prices each model from the list at load and drops one the list cannot price', () => {
+  const rows = pricedModels([
+    model('anthropic/claude-opus-5-5', 'anthropic', 'claude-opus-5-5'),
+    model('anthropic/claude-brand-new', 'anthropic', 'claude-brand-new'),
+  ], { catalog, corrections });
+  assert.deepEqual(rows.map(row => row.id), ['anthropic/claude-opus-5-5']);
+  assert.equal(priceLabel(rows[0].price), '↓$4/$20↑');
 });
 
-test('one model offered by two accounts shows once', () => {
-  const rows = [
-    { id: 'anthropic/claude-opus-5-5', provider: 'anthropic', displayName: 'Claude Opus 5.5', ...priced(4, 20) },
-    { id: 'commandcode/claude-opus-5-5', provider: 'commandcode', displayName: 'Claude Opus 5.5', ...priced(4, 20) },
-  ];
-  assert.deepEqual(onePerName(rows).map(row => row.id), ['anthropic/claude-opus-5-5']);
-});
-
-test('an alias and its dated snapshot show once, and a clash at another price stays twice', () => {
-  const rows = [
-    { id: 'anthropic/claude-haiku-4-5-20251001', provider: 'anthropic', displayName: 'Claude Haiku 4.5', ...priced(1, 5) },
-    { id: 'anthropic/claude-haiku-4-5', provider: 'anthropic', displayName: 'Claude Haiku 4.5', ...priced(1, 5) },
-    { id: 'anthropic/claude-opus-4-5', provider: 'anthropic', displayName: 'Claude Opus 4.5', ...priced(5, 25) },
-    { id: 'commandcode/claude-opus-4-5', provider: 'commandcode', displayName: 'Claude Opus 4.5', ...priced(9, 40) },
-    { id: 'openai/gpt-6.1-sol', provider: 'openai', displayName: 'GPT-6.1 Sol', ...priced(2, 10) },
-  ];
-  const kept = onePerName(rows);
-  const seenRows = kept.map(row => `${row.displayName} ${row.inputPerMillion}/${row.outputPerMillion}`);
-  assert.equal(new Set(seenRows).size, seenRows.length, `the picker lists a row twice: ${seenRows.join(', ')}`);
-  assert.equal(kept.filter(row => row.displayName === 'Claude Haiku 4.5').length, 1);
-  assert.deepEqual(kept.filter(row => row.displayName === 'Claude Opus 4.5').map(row => row.id).sort(),
-    ['anthropic/claude-opus-4-5', 'commandcode/claude-opus-4-5']);
-});
-
-test('the Start screen picks the saved defaults, and falls back when one is gone', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'julia-models-test-'));
-  const saved = {
-    sweptAt: '2026-10-29T00:00:00.000Z',
-    accounts: [],
-    models: [
-      { id: 'openai/gpt-6.1-sol', provider: 'openai', displayName: 'GPT-6.1 Sol', ...priced(2, 10) },
-      { id: 'anthropic/claude-opus-5-5', provider: 'anthropic', displayName: 'Claude Opus 5.5', ...priced(4, 20) },
-    ],
-    defaults: { mainSession: 'openai/gpt-6.1-sol', shipping: 'anthropic/claude-retired-5', effort: 'medium' },
+test('a price the list changes shows on the next picker load with no sweep', () => {
+  const rows = [model('commandcode/deepseek/deepseek-v4.1-flash', 'commandcode', 'deepseek/deepseek-v4.1-flash')];
+  const before = {
+    source: 'test-list',
+    costs: { commandcode: { models: { 'deepseek/deepseek-v4.1-flash': { cost: { input: 0.15, output: 0.6 } } } } },
   };
-  try {
-    writeFileSync(join(directory, 'models.json'), JSON.stringify(saved));
-    const picked = startModels(readModels({ directory }));
-    assert.equal(picked.mainSession.id, 'openai/gpt-6.1-sol');
-    assert.equal(picked.shipping.id, 'anthropic/claude-opus-5-5');
-    assert.equal(picked.effort, 'medium');
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
+  const after = {
+    source: 'test-list',
+    costs: { commandcode: { models: { 'deepseek/deepseek-v4.1-flash': { cost: { input: 0.2, output: 0.8 } } } } },
+  };
+  assert.equal(priceLabel(pricedModels(rows, { catalog: before, corrections })[0].price), '↓$0.15/$0.6↑');
+  assert.equal(priceLabel(pricedModels(rows, { catalog: after, corrections })[0].price), '↓$0.2/$0.8↑');
+});
+
+test('the picker shows the base rate whatever hour the sweep runs at', () => {
+  const rows = [model('commandcode/deepseek/deepseek-v4.1-flash', 'commandcode', 'deepseek/deepseek-v4.1-flash')];
+  const deepseek = {
+    source: 'test-list',
+    costs: { commandcode: { models: { 'deepseek/deepseek-v4.1-flash': { cost: { input: 0.15, output: 0.6 } } } } },
+  };
+  const peak = { peakWindows: [{ provider: 'commandcode', modelPrefix: 'deepseek/', days: ['mon'], from: '01:00', to: '04:00', timezone: 'UTC', multiplier: 2 }], freeModels: [], excludeDates: [] };
+  assert.equal(priceLabel(pricedModels(rows, { catalog: deepseek, corrections: peak })[0].price), '↓$0.15/$0.6↑');
 });
 
 test('the sweep writes beside the dashboard records, under the state folder', () => {
@@ -133,9 +94,9 @@ test('readModels reports a missing, empty, stale and fresh sweep apart', () => {
     assert.equal(readModels({ directory }).status, 'missing');
     write({ sweptAt: '2026-10-29T00:00:00.000Z', models: [] });
     assert.equal(readModels({ directory }).status, 'empty');
-    write({ sweptAt: '2026-10-01T00:00:00.000Z', models: [{ id: 'a/b', ...priced(1, 2) }] });
+    write({ sweptAt: '2026-10-01T00:00:00.000Z', models: [{ id: 'a/b' }] });
     assert.equal(readModels({ directory, now: new Date('2026-10-29T00:00:00.000Z') }).status, 'stale');
-    write({ sweptAt: '2026-10-28T00:00:00.000Z', models: [{ id: 'a/b', ...priced(1, 2) }] });
+    write({ sweptAt: '2026-10-28T00:00:00.000Z', models: [{ id: 'a/b' }] });
     assert.equal(readModels({ directory, now: new Date('2026-10-29T00:00:00.000Z') }).status, 'ok');
   } finally {
     rmSync(directory, { recursive: true, force: true });

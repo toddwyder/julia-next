@@ -57,8 +57,23 @@ const buildPrompt = (card, kind) =>
 
 export function createStages({ agents, dir }) {
   const buildGate = agents.gate;
+  const spending = agents.spending;
   const modelStep = (id, execute) => buildGate ? step(id, execute, { retries: 0 }) : agentStep(id, execute);
   const cardDir = (card) => join(dir, card);
+
+  // Once the card has spent its limit, or a call came back with no usage to count, no later stage
+  // calls a model or changes where the card is going. The card keeps the reason it stopped for,
+  // and the path ends at the stop report.
+  const halt = async ({ inputData, state, setState }) => {
+    const reason = spending?.stopReason() ?? null;
+    if (!reason) return null;
+    if (state.stopPart !== 'Spending' || state.stopWhy !== reason) {
+      await setState({ ...state, stopPart: 'Spending', stopWhy: reason });
+    }
+    // A stage whose input came from an agent (`{ text }`) still has to hand card data to the
+    // next step, so the two things the run started with come from saved state.
+    return { card: state.card, kind: state.kind, ...inputData, stopped: true, detail: reason };
+  };
 
   // The first stage of a run. It takes the two things the run form asks for
   // and puts them into the run's saved state, so every later stage and the
@@ -70,6 +85,7 @@ export function createStages({ agents, dir }) {
     execute: async ({ inputData, state, setState }) => {
       await setState({ ...state, card: inputData.card, kind: inputData.kind });
       openRun(dir, inputData.card);
+      spending?.begin(inputData.card);
       return { card: inputData.card, kind: inputData.kind };
     },
   });
@@ -77,7 +93,10 @@ export function createStages({ agents, dir }) {
   // The build is a real agent step: `createStep(agents.build)` gives it the
   // agent's own input and output, so the card data goes through a mapper either
   // side of it instead of through the stage's shared schema.
-  const startBuild = step('start-build', async ({ inputData, state, setState, requestContext }) => {
+  const startBuild = step('start-build', async (context) => {
+    const stopped = await halt(context);
+    if (stopped) return stopped;
+    const { inputData, state, setState, requestContext } = context;
     buildGate?.start();
     const card = state.card || inputData.card;
     const buildRounds = state.buildRounds + 1;
@@ -92,9 +111,12 @@ export function createStages({ agents, dir }) {
 
   const finishBuild = createStep({
     id: 'finish-build',
-    inputSchema: z.object({ text: z.string() }),
+    inputSchema: z.object({ text: z.string().optional() }),
     outputSchema: flowData,
-    execute: async ({ inputData, state }) => {
+    execute: async (context) => {
+      const stopped = await halt(context);
+      if (stopped) return stopped;
+      const { inputData, state } = context;
       const card = state.card;
       buildGate?.finish();
       const text = inputData.text ?? '';
@@ -103,7 +125,10 @@ export function createStages({ agents, dir }) {
     },
   });
 
-  const shipping = modelStep('shipping', async ({ inputData, state, tracingContext }) => {
+  const shipping = modelStep('shipping', async (context) => {
+    const stopped = await halt(context);
+    if (stopped) return stopped;
+    const { inputData, state, tracingContext } = context;
     const artifact = readArtifact(cardDir(state.card), state.card);
     const result = await agents.shipping.stream(
       `File follows. Is it a plausible recipe title?\n\n${artifact}`,
@@ -113,7 +138,10 @@ export function createStages({ agents, dir }) {
     return { ...inputData, detail: text ?? '' };
   });
 
-  const verdict = step('verdict', async ({ inputData, state, setState }) => {
+  const verdict = step('verdict', async (context) => {
+    const stopped = await halt(context);
+    if (stopped) return stopped;
+    const { inputData, state, setState } = context;
     const answer = nextVerdict(cardDir(state.card), 'review');
     const failCount = answer === 'FAIL' ? state.failCount + 1 : state.failCount;
     const reviewRound = state.reviewRound + 1;
@@ -126,7 +154,10 @@ export function createStages({ agents, dir }) {
     };
   });
 
-  const remediation = modelStep('remediation', async ({ inputData, state, tracingContext }) => {
+  const remediation = modelStep('remediation', async (context) => {
+    const stopped = await halt(context);
+    if (stopped) return stopped;
+    const { inputData, state, tracingContext } = context;
     const artifact = readArtifact(cardDir(state.card), state.card);
     const result = await agents.remediation.stream(
       `Rewrite this line so it reads better.\n\n${artifact}`,
@@ -142,7 +173,10 @@ export function createStages({ agents, dir }) {
     detail: `${inputData.detail} (no remediation needed)`,
   }));
 
-  const gate = step('gate', async ({ inputData, state, setState }) => {
+  const gate = step('gate', async (context) => {
+    const stopped = await halt(context);
+    if (stopped) return stopped;
+    const { inputData, state, setState } = context;
     if (inputData.verdict === 'PASS') {
       return { ...inputData, stopped: false };
     }
@@ -156,7 +190,10 @@ export function createStages({ agents, dir }) {
 
   const acceptance = step(
     'acceptance',
-    async ({ inputData, state, setState, resumeData, suspend, suspendData }) => {
+    async (context) => {
+      const stopped = await halt(context);
+      if (stopped) return stopped;
+      const { inputData, state, setState, resumeData, suspend, suspendData } = context;
       const open = suspendData?.request ?? state.requestId;
 
       if (!resumeData) {
@@ -181,17 +218,26 @@ export function createStages({ agents, dir }) {
     },
   );
 
-  const machineAccept = step('machine-accept', async ({ inputData, state, setState }) => {
+  const machineAccept = step('machine-accept', async (context) => {
+    const stopped = await halt(context);
+    if (stopped) return stopped;
+    const { inputData, state, setState } = context;
     await setState({ ...state, answer: 'machine card, no acceptance' });
     return { ...inputData, accepted: true, detail: 'machine card, so no acceptance is asked' };
   });
 
-  const land = step('land', async ({ inputData, state }) => {
+  const land = step('land', async (context) => {
+    const stopped = await halt(context);
+    if (stopped) return stopped;
+    const { inputData, state } = context;
     writeLanding(cardDir(state.card), state.card, `Landing after ${state.reviewRound} shipping rounds.`);
     return { ...inputData, landed: true, detail: 'landed on main' };
   });
 
-  const smoke = step('smoke', async ({ inputData, state, setState }) => {
+  const smoke = step('smoke', async (context) => {
+    const stopped = await halt(context);
+    if (stopped) return stopped;
+    const { inputData, state, setState } = context;
     const answer = nextVerdict(cardDir(state.card), 'smoke');
     const failCount = answer === 'FAIL' ? state.failCount + 1 : state.failCount;
     await setState({
@@ -217,7 +263,10 @@ export function createStages({ agents, dir }) {
     return { ...inputData, stopped: true, finished: true, detail: `stop report at ${path}` };
   });
 
-  const retro = modelStep('retro', async ({ inputData, state, tracingContext }) => {
+  const retro = modelStep('retro', async (context) => {
+    const stopped = await halt(context);
+    if (stopped) return stopped;
+    const { inputData, state, tracingContext } = context;
     const result = await agents.retro.stream(
       `Card ${state.card} landed after ${state.reviewRound} shipping rounds and ${state.buildRounds} build rounds. Say in one sentence what this run did.`,
       { tracingContext },

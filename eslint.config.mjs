@@ -155,12 +155,14 @@ export const frameworkPlugins = {
   'eslint-comments': commentsPlugin,
 };
 
-// The runner files below write the run record, the cost record and the exit timer.
-// ADR 0026 gives them that job, so the framework rules cover the flow definitions only.
+// The runner files below write the run record, the cost record, the per-card spending record and
+// the exit timer. ADR 0026 gives them that job, so the framework rules cover the flow definitions
+// only.
 const flowRunnerFiles = [
   'machine/flow/run.mjs',
   'machine/flow/start.mjs',
   'machine/flow/scratch.mjs',
+  'machine/flow/card-ledger.mjs',
   'machine/flow/trace.mjs',
   'machine/flow/**/*.test.mjs',
 ];

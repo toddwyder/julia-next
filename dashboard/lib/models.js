@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { priceFor } from './model-prices.js';
+
 export const DEFAULT_STATE_DIR = '/var/lib/julia-dashboard';
 export const STALE_AFTER_MS = 8 * 24 * 60 * 60 * 1000;
 
@@ -38,29 +40,21 @@ export function priceLabel(model) {
   return `↓$${formatMoney(model.inputPerMillion)}/$${formatMoney(model.outputPerMillion)}↑`;
 }
 
-export function mergeSweep({ previousModels = [], available, priceFor, readAt, defaultIds = {} }) {
+// The sweep records which models each account offers. Prices are not saved, because the picker
+// asks the price list on every page load: a price models.dev corrects today shows up on the next
+// reload rather than waiting for the Monday sweep.
+export function mergeSweep({ previousModels = [], available, defaultIds = {} }) {
   const models = [];
-  const excluded = [];
   const added = [];
   const kept = new Set();
   for (const model of available) {
     if (kept.has(model.id)) continue;
-    const price = priceFor(model);
-    if (!price) {
-      excluded.push({ id: model.id, provider: model.provider, reason: 'no saved price' });
-      continue;
-    }
     kept.add(model.id);
     models.push({
       id: model.id,
       provider: model.provider,
       name: model.modelName,
       displayName: displayName(model),
-      inputPerMillion: price.inputPerMillion,
-      outputPerMillion: price.outputPerMillion,
-      free: price.free === true,
-      priceSource: price.source,
-      priceReadAt: readAt,
     });
   }
   const before = new Set(previousModels.map(model => model.id));
@@ -74,7 +68,20 @@ export function mergeSweep({ previousModels = [], available, priceFor, readAt, d
     const chosen = byId.get(id) ?? models[0];
     if (chosen) defaults[slot] = chosen.id;
   }
-  return { models, excluded, added, retired, defaults };
+  return { models, added, retired, defaults };
+}
+
+// Prices are looked up at page load, so the screen always shows the list Mastra refreshed today.
+// A model the list cannot price is left off the screen: the card must never start on a model whose
+// spending it cannot count.
+export function pricedModels(models = [], { catalog = null, corrections = {} } = {}) {
+  const rows = [];
+  for (const model of models) {
+    const price = priceFor({ catalog, corrections, provider: model.provider, model: model.modelName ?? model.name ?? model.id });
+    if (!price) continue;
+    rows.push({ ...model, displayName: displayName(model), price });
+  }
+  return rows;
 }
 
 export function stateDir(env = process.env) {
@@ -120,35 +127,3 @@ export function accountProviders(account = {}) {
   return providers.filter(Boolean);
 }
 
-// Mastra Code lists one model under several ids: an alias beside its dated snapshot
-// (claude-haiku-4-5 and claude-haiku-4-5-20251001), and the same model again under a second
-// provider when two accounts can run it. Those are one model at one price, so the screen keeps
-// the shortest id and drops the rest. A name at two different prices stays twice, because
-// picking one spends a different account's money.
-export function onePerName(models = []) {
-  const kept = new Map();
-  for (const model of models) {
-    const name = model.displayName ?? displayName(model);
-    const price = model.free ? 'free' : `${model.inputPerMillion}/${model.outputPerMillion}`;
-    const key = `${name}\u0000${price}`;
-    const seen = kept.get(key);
-    if (!seen || String(model.id).length < String(seen.id).length) {
-      kept.set(key, { ...model, displayName: name });
-    }
-  }
-  return [...kept.values()];
-}
-
-export function startModels(saved) {
-  // Only a model the sweep recorded a price for may reach the screen, even if the file was
-  // edited by hand. A free model is priced at zero, so it counts as priced.
-  const priced = (saved.models ?? []).filter(model => model.free === true
-    || (Number.isFinite(model.inputPerMillion) && Number.isFinite(model.outputPerMillion)));
-  const byId = new Map(priced.map(model => [model.id, model]));
-  const mainSession = byId.get(saved.defaults?.mainSession) ?? priced[0] ?? null;
-  const shipping = byId.get(saved.defaults?.shipping)
-    ?? priced.find(model => model.id !== mainSession?.id)
-    ?? null;
-  const effort = saved.defaults?.effort ?? 'large';
-  return { mainSession, shipping, effort };
-}

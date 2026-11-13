@@ -129,10 +129,20 @@ export function readCorrections({ file = DEFAULT_CORRECTIONS, env = process.env 
   };
 }
 
+// Mastra's metric rows carry the model name with `/` and `.` replaced by `-`, so
+// `deepseek/deepseek-v4.1-flash` arrives as `deepseek-deepseek-v4-1-flash`. Comparing the letters and
+// digits alone finds the same model whichever way it was written down.
+function canonicalModel(model) {
+  return normalizeModel(model).replace(/[^a-z0-9]/g, '');
+}
+
 function indexFor(catalog, provider) {
   const bucket = catalog.costs?.[provider]?.models ?? {};
-  const index = new Map();
-  for (const [key, entry] of Object.entries(bucket)) index.set(normalizeModel(key), { key, entry });
+  const index = { exact: new Map(), loose: new Map() };
+  for (const [key, entry] of Object.entries(bucket)) {
+    index.exact.set(normalizeModel(key), { key, entry });
+    index.loose.set(canonicalModel(key), { key, entry });
+  }
   return index;
 }
 
@@ -146,16 +156,18 @@ export function findCost(catalog, provider, model) {
   if (!catalog) return null;
   const name = normalizeProvider(provider);
   let index = indexOf(catalog, name);
-  if (index.size === 0) {
+  if (index.exact.size === 0) {
     // Some accounts answer to `mastracode/commandcode`; the catalog only knows `commandcode`.
     const tail = String(provider ?? '').toLowerCase().split('/').filter(Boolean).at(-1);
     if (tail && tail !== name) index = indexOf(catalog, tail);
   }
+  const loose = index.loose.get(canonicalModel(model));
+  if (loose) return loose.entry;
   const wanted = normalizeModel(model);
-  const exact = index.get(wanted);
+  const exact = index.exact.get(wanted);
   if (exact) return exact.entry;
   let best = null;
-  for (const [key, value] of index) {
+  for (const [key, value] of index.exact) {
     if (!wanted.startsWith(`${key}-`)) continue;
     // `deepseek-v4.1-flash-1017-cm` is the same model as `deepseek-v4.1-flash`. A build or
     // date suffix starts with four digits; `claude-opus-5` must not capture `claude-opus-5-5`.
@@ -171,6 +183,12 @@ function minutesOf(text) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
+// Mastra writes `/` and `.` in a model name as `-` when it emits a metric row, so both sides of a
+// prefix check go through the same letters-and-digits form.
+function modelStartsWith(model, prefix) {
+  return canonicalModel(model).startsWith(canonicalModel(prefix));
+}
+
 function peakMultiplier(corrections, provider, model, at) {
   const date = at instanceof Date ? at : new Date(at);
   if (Number.isNaN(date.getTime())) return null;
@@ -180,7 +198,7 @@ function peakMultiplier(corrections, provider, model, at) {
   if (corrections.excludeDates?.includes(dateKey)) return null;
   for (const window of corrections.peakWindows ?? []) {
     if (window.provider && normalizeProvider(window.provider) !== normalizeProvider(provider)) continue;
-    if (window.modelPrefix && !String(model).toLowerCase().startsWith(String(window.modelPrefix).toLowerCase())) continue;
+    if (window.modelPrefix && !modelStartsWith(model, window.modelPrefix)) continue;
     if (Array.isArray(window.days) && !window.days.includes(day)) continue;
     const from = minutesOf(window.from);
     const to = minutesOf(window.to);
@@ -192,8 +210,10 @@ function peakMultiplier(corrections, provider, model, at) {
 }
 
 function isListedFree(corrections, provider, model) {
-  const wanted = `${normalizeProvider(provider)}/${String(model).toLowerCase()}`;
-  return (corrections.freeModels ?? []).some(entry => String(entry).toLowerCase() === wanted);
+  return (corrections.freeModels ?? []).some(entry => {
+    const [entryProvider, ...rest] = String(entry).split('/');
+    return normalizeProvider(entryProvider) === normalizeProvider(provider) && canonicalModel(rest.join('/')) === canonicalModel(model);
+  });
 }
 
 function baseRates(cost) {
@@ -306,12 +326,23 @@ function reasoningField(name) {
   return name === 'mastra_model_output_reasoning_tokens' ? 'outputReasoning' : null;
 }
 
-// Prices one run from its metric rows. A call is one spanId; its timestamp picks the peak or
-// off-peak rate. If any call has no price, the total is unknown rather than an undercount.
+// Prices one run from its metric rows. A call is one spanId on one model; its timestamp picks the
+// peak or off-peak rate. The model is part of the key because Mastra rolls a memory note-taker's
+// usage up to the agent's span while keeping the note-taker's own model and rate. If any call has
+// no price, the total is unknown rather than an undercount.
 export function costFromMetrics(metricRows, { catalog = null, corrections = {}, at } = {}) {
   const groups = new Map();
   for (const row of metricRows ?? []) {
-    const key = row.spanId ?? `${row.provider ?? ''}|${row.model ?? ''}|${row.timestamp ?? ''}`;
+    const name = String(row.name ?? '');
+    const field = tokenField(name) ?? reasoningField(name);
+    const total = name === 'mastra_model_total_input_tokens' ? 'totalInput'
+      : name === 'mastra_model_total_output_tokens' ? 'totalOutput'
+        : null;
+    // Every model call also emits a duration row; only token rows make a call.
+    if (!field && !total) continue;
+    const key = row.spanId
+      ? `${row.spanId}|${row.provider ?? ''}|${row.model ?? ''}`
+      : `${row.provider ?? ''}|${row.model ?? ''}|${row.timestamp ?? ''}`;
     const group = groups.get(key) ?? {
       spanId: key,
       provider: row.provider,
@@ -322,15 +353,8 @@ export function costFromMetrics(metricRows, { catalog = null, corrections = {}, 
     group.provider ??= row.provider;
     group.model ??= row.model;
     if (group.at === undefined) group.at = row.timestamp;
-    const name = String(row.name ?? '');
-    const field = tokenField(name) ?? reasoningField(name);
-    if (field) {
-      group.tokens[field] = (group.tokens[field] ?? 0) + Number(row.value ?? 0);
-    } else if (name === 'mastra_model_total_input_tokens') {
-      group.tokens.totalInput = (group.tokens.totalInput ?? 0) + Number(row.value ?? 0);
-    } else if (name === 'mastra_model_total_output_tokens') {
-      group.tokens.totalOutput = (group.tokens.totalOutput ?? 0) + Number(row.value ?? 0);
-    }
+    if (field) group.tokens[field] = (group.tokens[field] ?? 0) + Number(row.value ?? 0);
+    else group.tokens[total] = (group.tokens[total] ?? 0) + Number(row.value ?? 0);
     groups.set(key, group);
   }
 

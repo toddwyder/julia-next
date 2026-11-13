@@ -24,7 +24,10 @@ export async function openMastra({ card, agents, workflow, stateDb, traceDb }) {
     domains: { observability: await new DuckDBStore({ path: traceDb }).getStore('observability') },
   });
 
-  const { gate, ...registeredAgents } = agents ?? {};
+  // `gate` and `spending` belong to the flow, not to Mastra's agent registry.
+  const registeredAgents = Object.fromEntries(
+    Object.entries(agents ?? {}).filter(([key]) => key !== 'gate' && key !== 'spending'),
+  );
   return new Mastra({
     agents: registeredAgents,
     workflows: { [workflow.id]: workflow },
