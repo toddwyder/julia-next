@@ -79,7 +79,7 @@ Twelve branches besides `main` on `origin`, each with an open PR. None is merged
 | `spikes/deepseek-card-dollar-proof` | 13 Nov | #511 | retargeted from #510's branch to `main` today so the branch-coverage gate can see it |
 | `chore/stock-mastracode` | 13 Nov | #512 | this session's work |
 
-Two of these are abandoned in substance: #483 and #488 are `CONFLICTING` and were overtaken by main's move to stock agents and workflows (ADR 0026, 0027, 0028). The card PRs #461, #498 and #500 are green and simply unmerged. The spike branches are Todd's experiments and stay until he says otherwise.
+Two of these are abandoned in substance: #483 and #488 are `CONFLICTING` and were overtaken by main's move to stock agents and workflows (ADR 0026, 0027, 0028). The card PRs #461, #498 and #500 are green and simply unmerged — #498 matters more than its card suggests, because `web` fails whenever `next/font/google` cannot reach Google, and that branch builds both apps with the font hosts blocked. The spike branches are Todd's experiments and stay until he says otherwise.
 
 Read the evidence: `gh pr list --state open`, `git for-each-ref refs/remotes/origin`.
 
