@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -46,8 +46,8 @@ function setupEnvironment(t, extraEnv = {}) {
   return { root, home, flowDir, env };
 }
 
-test('Studio card-path starts a run from the run form and reaches the build step', t => {
-  const { env } = setupEnvironment(t);
+test('Studio card-path starts a run from the run form and stops a card whose model has no price', t => {
+  const { env, flowDir } = setupEnvironment(t);
   const childScript = `
     import assert from 'node:assert/strict';
     import { mastra } from ${JSON.stringify(indexUrl)};
@@ -57,9 +57,9 @@ test('Studio card-path starts a run from the run form and reaches the build step
       const workflow = mastra.getWorkflow('card-path');
       const run = await workflow.createRun();
       const result = await run.start({ inputData: { card: 'JUL-363-TEST', kind: 'machine' } });
-      assert.equal(result.status, 'failed');
+      assert.equal(result.status, 'success');
       assert.equal(result.steps.start.status, 'success');
-      assert.match(JSON.stringify(result), /test\\/unpriced/);
+      assert.equal(result.steps.attempt.output.stopped, true);
     } finally {
       await mastra.shutdown();
       await mastra.getStorage()?.close();
@@ -68,4 +68,8 @@ test('Studio card-path starts a run from the run form and reaches the build step
   `;
   const child = spawnSync(process.execPath, ['--input-type=module', '-e', childScript], { cwd: repoRoot, env, encoding: 'utf8' });
   assert.equal(child.status, 0, `child exited ${child.status}\nstdout:\n${child.stdout}\nstderr:\n${child.stderr}`);
+
+  const report = readFileSync(join(flowDir, 'JUL-363-TEST', 'reports', 'JUL-363-TEST.md'), 'utf8');
+  assert.match(report, /Part: Spending/);
+  assert.match(report, /model unpriced/);
 });

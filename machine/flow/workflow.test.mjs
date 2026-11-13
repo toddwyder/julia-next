@@ -17,7 +17,6 @@ const { Agent } = await import('@mastra/core/agent');
 const { createMockModel } = await import('@mastra/core/test-utils/llm-mock');
 const { buildCardPath } = await import('./workflow.mjs');
 const { openMastra } = await import('./mastra.mjs');
-const { BUILD_RETRIES } = await import('./steps.mjs');
 const { openScratch } = await import('./scratch.mjs');
 const { copiesRoot } = await import('./copy.mjs');
 const { createWorkflowStateReader } = await import('@mastra/core/workflows');
@@ -148,7 +147,8 @@ test('a passing card waits for Todd two levels deep, then lands, retros and clea
   assert.equal(result.result.finished, true);
   assert.equal(existsSync(join(caseDir, 'retro', `${CARD}.md`)), true);
   assert.equal(existsSync(join(caseDir, 'build')), false, 'cleanup sweeps the build folder');
-  assert.equal(existsSync(report), false);
+  assert.equal(existsSync(report), true, 'cleanup leaves the card report behind');
+  assert.match(readFileSync(report, 'utf8'), /## Tokens read/);
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -166,7 +166,7 @@ test('the build stage runs a real agent step and keeps what the agent wrote', as
   rmSync(dir, { recursive: true, force: true });
 });
 
-test('a model failure in the build step gets exactly the attempts its retry setting names', async () => {
+test('a model failure in the build step fails the card without a retry setting of its own', async () => {
   let attempts = 0;
   const failing = buildOn(
     createMockModel({
@@ -179,7 +179,7 @@ test('a model failure in the build step gets exactly the attempts its retry sett
   const { result, dir } = await openCase({ build: failing });
 
   assert.equal(result.status, 'failed');
-  assert.equal(attempts, BUILD_RETRIES + 1, 'the step retries its own setting, no more and no less');
+  assert.equal(attempts, 1, 'the step carries no retry setting, so it makes one attempt');
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -296,7 +296,7 @@ test('a Shipping FAIL goes to remediation and a fresh Shipping pass lands the ca
   assert.equal(result.result.failCount, 1);
   assert.equal(result.result.verdict, 'PASS');
   assert.equal(result.result.landed, true);
-  assert.equal(existsSync(report), false);
+  assert.equal(existsSync(report), true, 'cleanup leaves the card report behind');
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -387,7 +387,7 @@ test('a live smoke FAIL after landing goes to a fresh Shipping pass and straight
   assert.equal(result.result.failCount, 1);
   assert.equal(result.result.landed, true);
   assert.equal(result.result.stopped, false);
-  assert.equal(existsSync(report), false);
+  assert.equal(existsSync(report), true, 'cleanup leaves the card report behind');
   rmSync(dir, { recursive: true, force: true });
 });
 

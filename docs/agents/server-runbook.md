@@ -24,6 +24,12 @@ Studio's agent list includes **Lead**, the existing Flow build Agent. Its instru
 
 Lead reads its model from `~/.config/julia/lead-model`, independently of the coder's pstack role. Run `node scripts/install-lead-model.mjs` once to create the initial setting. It preserves an existing file. The setting holds one `openai/<model>` value and uses Mastra Code's ChatGPT login. The Lead reads the file at each model call, so an edit reaches the next call with Studio left running. A missing setting prevents Lead from starting and names the installer command. See [the Lead build record](jul-339/build.md) for the dated model choice and acceptance checks.
 
+Mastra prices a run from its own copy of models.dev. `julia-studio.service` turns the daily refresh on
+with a drop-in (`~/.config/systemd/user/julia-studio.service.d/pricing.conf` sets
+`MASTRA_AUTO_REFRESH_PRICING=true`); without it Mastra reads only the price table installed with the
+program. The run record and the model picker read the same refreshed copy, so a price corrected at
+models.dev reaches both at once.
+
 The `card-path` workflow begins in Mastra Studio's run form. No script starts a card.
 
 ```sh
@@ -112,27 +118,44 @@ User lingering is enabled, so user timers continue without a login. Inspect them
 The disk check alerts Todd on JUL-185 below 10 GB free through the Julia controller account.
 Inspect its result with `journalctl --user -u julia-disk-check.service`.
 
+### `/tmp/mc` belongs to Mastra Code and is never deleted
+
+Mastra Code keeps its cross-process signal sockets under `/tmp/mc`, one of them the lease socket
+that says which process owns a thread, and it keeps the socket of a run that is still going
+(`@mastra/code-sdk/dist/utils/signals-pubsub.js:5`). The stock `/tmp` rule removes anything there
+older than 30 days and the boot pass clears the directory, so on 13 November a cleanup that deleted
+`/tmp/mc` aborted every run in progress: the lease lookup failed, and the memory step reported it as
+`Processor "observational-memory" stopped the run: Agent execution was aborted`, which is not what
+it looked like. `/etc/tmpfiles.d/mastracode.conf` excludes the folder from every cleanup rule; the
+repository holds that file as `scripts/server/mastracode-tmpfiles.conf` and installing it is the one
+step needed on a new server:
+
+```sh
+sudo install -D -m 0644 scripts/server/mastracode-tmpfiles.conf /etc/tmpfiles.d/mastracode.conf
+```
+
+`systemd-tmpfiles --cat-config | grep tmp/mc` shows the exclusion is in force. No cleanup script of
+ours may remove `/tmp/mc` either: an idle folder is safe, a running session's folder is not, and
+telling them apart means finding its sockets in use.
+
 ## Mastra Code's trace store
 
-Mastra Code opens its trace store once, at startup, and DuckDB lets one process write a file. A
-session that starts while another holds `observability.duckdb` gets no tracing at all, silently, for
-its whole life (`@mastra/code-sdk/dist/index.js:323`), so its tokens and cost are never recorded and
-the card priced from it reads unknown. Pstack runs sessions in parallel, so this happened on the
-first slice of 30 October and nothing said so.
+Mastra Code opens its trace store once, at startup, and DuckDB lets one process write a file. The
+stock install keeps one store, `~/.local/share/mastracode/observability.duckdb`, and a session that
+starts while another holds it gets no tracing at all, silently, for its whole life
+(`@mastra/code-sdk/dist/index.js:323`), so its tokens and cost are never recorded and the card priced
+from it reads unknown. Run one traced session at a time; a session started while another is open is
+the one that loses its rows. `MASTRA_APP_DATA_DIR` moves the store with the rest of the data.
 
-The launcher at `~/.local/bin/mastracode` (`scripts/mastracode`, installed by
-`node scripts/install-launcher.mjs`) is the one place every session starts from. It gives the launch
-its own file under `~/.local/share/mastracode/traces/<utc stamp>-<pid>.duckdb` through
-`MASTRA_OBSERVABILITY_DB_PATH`, so parallel sessions never share a lock. The daily
-`julia-trace-fold.timer` folds finished traces. `JULIA_TRACES_DIR` moves the directory; `MASTRA_APP_DATA_DIR`
-moves it with the rest of the data. `mastracode` on PATH is now the launcher rather than the
-program, so a script that needs the program's own packages reads `MASTRACODE_PROGRAM_DIR` or
-`~/.local/lib/mastracode-program`, never the command's neighbours.
+The daily `julia-trace-fold.timer` runs `node scripts/trace-store.mjs fold`, which copies the store's
+cost rows into `~/.local/share/mastracode/traces/archive.duckdb` and deletes the store, so the next
+session recreates an empty one. A script that needs the program's own packages asks
+`scripts/mastra-program.mjs`, which resolves the global npm install from `npm root -g` unless
+`MASTRACODE_PROGRAM_DIR` or `MASTRACODE_PROGRAM` names another copy; `npm install -g mastracode` is
+how the program gets there and how it updates itself.
 
-A session started any other way, by a Mastra Code update that replaces the launcher or by a command
-that skips it, records nothing and leaves no file of its own. Nothing on the machine notices that, so
-the card says it. The launcher's install time is the cutover, so a run from before it is history and
-not a loss.
+A session started outside the stock CLI, or one that runs while another session holds the store,
+records nothing. Nothing on the machine notices that, so the card says it.
 
 ```sh
 node scripts/trace-store.mjs status
@@ -150,9 +173,8 @@ left as `<name>.folding` is picked up by the next fold. One file that cannot be 
 trace stopped every fold behind it for two days, so the traces of 31 October to 2 November all waited
 on the one that had failed. `status` lists what is still left behind and why.
 
-The single store the launcher replaced,
-`~/.local/share/mastracode/observability.duckdb`, is folded and deleted the same way; that happened
-on 30 October, 5,955,137,536 B into a 3,158,016 B archive holding 44,408 cost rows.
+The store is folded and deleted the same way; on 30 October
+5,955,137,536 B became a 3,158,016 B archive holding 44,408 cost rows.
 
 Deleting a file is what returns the disk. A delete inside a file gives nothing back even after a
 `CHECKPOINT`: on 30 October 52,443 rows were deleted and checkpointed and the file was 5,955,137,536
@@ -174,11 +196,11 @@ small table per file, so a 5.6 GB file folds in seconds.
 prints the directory, every file with its size, which files a fold would take, the total, the free
 space, and whether that total is over the 15 GB alarm.
 
-Reading a trace file by hand takes the client out of the repo, because it is a dev dependency here
-and the installed program also carries one:
+Reading a trace file by hand needs a DuckDB client from somewhere that has one installed, because the
+repo root does not. The dashboard's dependencies carry one, and so does the installed program:
 
 ```sh
-node -e "const {createRequire}=require('node:module');const r=createRequire('/home/ubuntu/julia-mastra/package.json');const {DuckDBInstance}=r('@duckdb/node-api');..."
+node -e "const {createRequire}=require('node:module');const r=createRequire('/home/ubuntu/julia-dashboard/dashboard/package.json');const {DuckDBInstance}=r('@duckdb/node-api');..."
 ```
 
 Four facts that cost failed runs on 30 October: `connection.runAndReadAll(sql).getRowsJS()` returns rows as arrays, not objects (`getRowObjectsJson` does not exist on the reader); values come back as `BigInt`, so `Number()` them before arithmetic; `duckdb_tables().estimated_size` is a row count, not bytes, so measure payloads with `sum(length(cast(column as varchar)))`; and `octet_length` is not implemented for `VARCHAR` here, so cast first. A connection holds a file's lock until it is closed, so close the connection and then the instance.

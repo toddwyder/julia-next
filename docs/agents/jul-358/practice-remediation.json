@@ -1,8 +1,0 @@
-{
-  "modelId": "commandcode/deepseek/deepseek-v4.1-flash",
-  "threadId": "05aad08a-a988-43dc-bb7e-47f51ffeb6f1",
-  "answer": "**What was broken:** `docs/practice/ok.txt` read `wrong`; the card's one criterion says it must read `OK`.\n\n**Root cause:** The file's content was never corrected. It was also untracked, so the fix had to be committed to the PR's branch for the criterion to be met on the change under review.\n\n**Fix:** Wrote `OK\\n` to `docs/practice/ok.txt`, committed as `039f44a`, and pushed to the PR branch.\n\n**Repro evidence:**\n```\nbefore: $ cat docs/practice/ok.txt\nwrong\nafter:  $ cat -A docs/practice/ok.txt\nOK$\n```\n\n**Verification on the pushed branch:**\n```\n$ git ls-remote origin refs/heads/jul-358-machine-stage-picks\n039f44a801f2c95a103f70803cfd7650c349027a  refs/heads/jul-358-machine-stage-picks\n$ git show FETCH_HEAD:docs/practice/ok.txt\nOK\n```\n\nOne note: `gh pr view 998` fails with `Could not resolve to a PullRequest with the number of 998` in this repo (highest PR is 486). I identified the branch from the checked-out commit instead: `git branch -a --contains HEAD` reports `jul-358-machine-stage-picks` at exactly `fb43882`, matching the stated PR head, so I pushed there.\n\nStopped as instructed: no card move, no Linear comment, no merge, no Shipping agent.",
-  "store": "/home/ubuntu/.local/state/julia-scratch/jul-358-proof/remediation-run/fresh-builder.db",
-  "answeredModel": "commandcode/deepseek/deepseek-v4.1-flash",
-  "resumed": false
-}

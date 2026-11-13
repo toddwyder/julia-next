@@ -15,9 +15,9 @@
 // so the check takes one program directory and stops there.
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import os from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { programDir as installedProgramDir } from './mastra-program.mjs';
 import { scratchDir } from './scratch-dir.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -31,7 +31,7 @@ const USAGE = 'usage: node scripts/check-machine-builder.mjs [--program-dir <dir
 const NO_TOOL = 'built no subagent tool';
 
 export function resolveProgramDir(value) {
-  return resolve(value || process.env.MASTRACODE_PROGRAM_DIR || join(os.homedir(), '.local', 'lib', 'mastracode-program'));
+  return resolve(value || process.env.MASTRACODE_PROGRAM_DIR || installedProgramDir());
 }
 
 export function codeSdkVersion(programDir) {

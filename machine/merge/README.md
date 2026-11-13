@@ -119,6 +119,7 @@ back to confirm the state. A comment already carrying that commit is not
 written twice.
 
 The Mastra modules are loaded from the installed Mastra Code program
-(`MASTRACODE_PROGRAM_DIR`, default `~/.local/lib/mastracode-program`) for the
-same reason the Shipping machine does. The departures from stock pstack and
+(`scripts/mastra-program.mjs`, which finds the global npm install unless
+`MASTRACODE_PROGRAM_DIR` names another copy) for the same reason the Shipping
+machine does. The departures from stock pstack and
 stock Mastra Code are rows in `docs/pstack-deviations.md`.

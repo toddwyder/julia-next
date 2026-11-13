@@ -8,7 +8,7 @@ import { createMockModel } from '@mastra/core/test-utils/llm-mock';
 import { createTool } from '@mastra/core/tools';
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { AGENT_MAX_OUTPUT_TOKENS, COST_LIMIT_DOLLARS, costGuard } from './agents.mjs';
+import { COST_LIMIT_DOLLARS, costGuard } from './agents.mjs';
 import { openMastra } from './mastra.mjs';
 
 // openai/gpt-6.1-sol in Mastra's table: $2 per million input, $10 per million output.
@@ -40,7 +40,7 @@ function streamModel({ id = 'gpt-6.1-sol', outputTokens = 0, toolCall, text = 'd
   return mock;
 }
 
-const options = { maxSteps: 40, modelSettings: { maxOutputTokens: AGENT_MAX_OUTPUT_TOKENS } };
+const options = { maxSteps: 40 };
 
 async function openStudioLike(t, agents, entry) {
   const dir = mkdtempSync(join(tmpdir(), 'cost-guard-'));

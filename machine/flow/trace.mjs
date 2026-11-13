@@ -5,6 +5,8 @@
 
 import { DuckDBInstance } from '@duckdb/node-api';
 
+import { costFromMetrics, loadCatalog, readCorrections } from '../../dashboard/lib/model-prices.js';
+
 const COLUMNS = [
   'eventType',
   'spanType',
@@ -88,7 +90,7 @@ function parseAttributes(value) {
 // One model call is one `model_inference` span. Mastra emits a token metric per
 // agent run, not per call, so the per-stage numbers come from the spans' own
 // usage and the stage is the workflow step the call sits under.
-export function summarise(spanRows, metricRows = []) {
+export function summarise(spanRows, metricRows = [], { catalog = null, corrections = {} } = {}) {
   const spans = mergedSpans(spanRows);
   const byId = new Map(spans.map(span => [span.spanId, span]));
   const inferences = spans.filter(span => span.spanType === 'model_inference');
@@ -115,10 +117,10 @@ export function summarise(spanRows, metricRows = []) {
     row.share = inferences.length ? Number((row.modelCalls / inferences.length).toFixed(3)) : 0;
   }
 
-  const priced = metricRows.filter(row => row.estimatedCost !== null && row.estimatedCost !== undefined);
-  const noPrice = metricRows
-    .map(row => String(row.costMetadata ?? ''))
-    .filter(text => text.includes('no_matching_model'));
+  // The spending total is recomputed from token rows against the same price list the picker
+  // uses. Mastra's own estimatedCost is left alone: it records the installed table's rate, which
+  // is DeepSeek's off-peak price during peak hours.
+  const cost = costFromMetrics(metricRows, { catalog, corrections });
 
   return {
     modelCalls: inferences.length,
@@ -128,12 +130,12 @@ export function summarise(spanRows, metricRows = []) {
       inputTokens: perStage.reduce((sum, row) => sum + row.inputTokens, 0),
       outputTokens: perStage.reduce((sum, row) => sum + row.outputTokens, 0),
     },
-    usd: priced.length ? priced.reduce((sum, row) => sum + Number(row.estimatedCost), 0) : null,
-    costNote: priced.length
-      ? 'Priced from the model table Mastra ships.'
-      : noPrice.length
-        ? 'Unknown: Mastra found no published price for this model (no_matching_model), so the run cost is not a number.'
-        : 'Unknown: the trace holds no priced metric for this run.',
+    usd: cost.usd,
+    costNote: cost.usd === null
+      ? cost.unpriced.length
+        ? `Unknown: the price list has no price for ${cost.unpriced.join(', ')}, so the run cost is not a number.`
+        : 'Unknown: the trace holds no priced metric for this run.'
+      : 'Priced from the same list the model picker uses.',
   };
 }
 
@@ -141,7 +143,19 @@ export async function costRecord(traceFile) {
   const spans = await readSpans(traceFile);
   const metricRows = await query(
     traceFile,
-    'select name, estimatedCost, costUnit, costMetadata from metric_events',
+    'select spanId, provider, model, timestamp, name, value from metric_events',
   ).catch(() => []);
-  return summarise(spans, metricRows);
+  let catalog = null;
+  let corrections = {};
+  try {
+    catalog = loadCatalog();
+  } catch {
+    // The run record still reports tokens; it just cannot put a price on them.
+  }
+  try {
+    corrections = readCorrections();
+  } catch {
+    // A broken corrections file must not hide the run record.
+  }
+  return summarise(spans, metricRows, { catalog, corrections });
 }

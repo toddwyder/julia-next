@@ -45,8 +45,14 @@ const unfold = async ({ inputData }) => {
   return ran;
 };
 
+// A card that spent its limit stops the round even though no verdict came back, and a round with
+// no verdict of its own is unreviewed rather than failed, so neither counts as another failure.
 const passed = async ({ inputData }) =>
-  inputData.verdict === 'PASS' || inputData.verdict === 'PASS+NOTES' || inputData.unreviewed === true || inputData.failCount >= 2;
+  inputData.stopped === true ||
+  inputData.verdict === 'PASS' ||
+  inputData.verdict === 'PASS+NOTES' ||
+  inputData.unreviewed === true ||
+  inputData.failCount >= 2;
 const smokeDone = async ({ inputData }) => inputData.smoke === 'PASS' || inputData.stopped === true;
 const answered = async ({ inputData }) => inputData.accepted === true || inputData.stopped === true;
 
@@ -57,6 +63,9 @@ export function buildCardPath({ agents, dir, repo, review }) {
     .then(stage.shipping)
     .then(stage.verdict)
     .branch([
+      // A card that stopped mid-round has no verdict, so it ends the round instead of failing
+      // the branch below it.
+      [async ({ inputData }) => inputData.stopped === true, stage.hold],
       [async ({ inputData }) => inputData.verdict === 'FAIL' && inputData.failCount < 2, stage.remediation],
       [async ({ inputData }) => inputData.verdict === 'PASS' || inputData.verdict === 'PASS+NOTES', stage.passNote],
       [async ({ inputData }) => inputData.unreviewed === true || (inputData.verdict === 'FAIL' && inputData.failCount >= 2), stage.hold],
@@ -78,6 +87,7 @@ export function buildCardPath({ agents, dir, repo, review }) {
   const smokeRound = createWorkflow({ ...schema, id: SMOKE_ROUND })
     .then(stage.smoke)
     .branch([
+      [async ({ inputData }) => inputData.stopped === true, stage.stopReport],
       [async ({ inputData }) => inputData.smoke === 'FAIL' && inputData.failCount < 2, fixAndLand],
       [async ({ inputData }) => inputData.smoke === 'FAIL' && inputData.failCount >= 2, stage.stopReport],
       [async ({ inputData }) => inputData.smoke === 'PASS', stage.smokePass],

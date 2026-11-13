@@ -11,12 +11,16 @@
 // some versions.
 
 import { existsSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const programDir = process.env.MASTRACODE_PROGRAM_DIR || path.join(os.homedir(), '.local', 'lib', 'mastracode-program');
-const modules = path.join(programDir, 'node_modules');
+import { programDir as installedProgramDir } from '../../scripts/mastra-program.mjs';
+
+// Resolved when a stage needs the program, not at import: a checkout without
+// Mastra Code still loads this file, so the workflow tests can skip on
+// `missingProgram()` instead of dying while the module is evaluated.
+const programDir = () => process.env.MASTRACODE_PROGRAM_DIR || installedProgramDir();
+const modulesDir = () => path.join(programDir(), 'node_modules');
 const NEEDED = ['@mastra/code-sdk', '@mastra/core', '@mastra/libsql', '@libsql/client', 'zod'];
 
 // The stock definitions the machine's stages hand work to, each with the file
@@ -45,17 +49,31 @@ export function subagentDefinitions(loaded) {
 }
 
 async function load(relative) {
-  return import(pathToFileURL(path.join(modules, relative)).href);
+  return import(pathToFileURL(path.join(modulesDir(), relative)).href);
 }
 
-export const harness = { programDir, modules };
+export const harness = {
+  get programDir() {
+    return programDir();
+  },
+  get modules() {
+    return modulesDir();
+  },
+};
 
 // A checkout without the installed program cannot boot anything, which is how a
 // runner without Mastra Code fails: name the missing packages instead of dying
 // on the first import.
 export function missingProgram() {
+  let dir;
+  try {
+    dir = programDir();
+  } catch (error) {
+    return error.message;
+  }
+  const modules = path.join(dir, 'node_modules');
   const missing = NEEDED.filter(name => !existsSync(path.join(modules, name)));
-  return missing.length ? `the installed Mastra Code program has no ${missing.join(', ')} under ${programDir}` : null;
+  return missing.length ? `the installed Mastra Code program has no ${missing.join(', ')} under ${dir}` : null;
 }
 
 export async function loadMastra() {

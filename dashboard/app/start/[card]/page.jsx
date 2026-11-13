@@ -1,6 +1,7 @@
 import { connection } from 'next/server';
 import { getReadyCard } from '../../../lib/linear.js';
-import { displayName, priceLabel, readModels } from '../../../lib/models.js';
+import { displayName, priceLabel, pricedModels } from '../../../lib/models.js';
+import { loadCatalog, readCorrections } from '../../../lib/model-prices.js';
 import { accountModels } from '../../../lib/account-models.js';
 import { ROLE_GROUPS, leadModels, readSettings, saveSettingsChoice } from '../../../lib/model-settings.js';
 import StartScreen from './start-screen.jsx';
@@ -28,27 +29,25 @@ export default async function StartPage({ params }) {
   let models;
   let choice;
   let problem;
-  let prices;
+  let catalog;
+  let corrections;
   try {
     models = await accountModels();
+    catalog = loadCatalog();
+    corrections = readCorrections();
     choice = readSettings({ modelIds: models.map(model => model.id) });
-    prices = readModels();
   } catch (error) {
     console.error('julia-dashboard: model settings failed to load:', error);
-    problem = 'The model settings could not be read. Check the account sign-ins and settings files, then reload.';
+    problem = 'The model settings could not be read. Check the account sign-ins, the price list and the settings files, then reload.';
   }
   const account = { anthropic: 'Claude subscription', openai: 'ChatGPT subscription', commandcode: 'CommandCode' };
-  const picks = (models ?? []).map(model => {
-    const priced = prices?.models.find(row => row.id === model.id || row.id === `mastracode/${model.id}`)
-      ?? (Number.isFinite(model.inputPerMillion) ? model : null);
-    return {
-      id: model.id,
-      provider: model.provider,
-      name: displayName(model),
-      price: priced ? priceLabel(priced) : 'Price unavailable',
-      account: account[model.provider],
-    };
-  });
+  const picks = pricedModels(models ?? [], { catalog, corrections }).map(model => ({
+    id: model.id,
+    provider: model.provider,
+    name: displayName(model),
+    price: priceLabel(model.price),
+    account: account[model.provider],
+  }));
   return <><a className="back" href="/">← Back to Ready cards</a>
     <header><p className="eyebrow">Start screen</p>
       {identifier ? <p className="identifier">{identifier}</p> : null}

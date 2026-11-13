@@ -17,7 +17,7 @@ import { buildCardPath } from '../../machine/flow/workflow.mjs';
 const dir = resolve(process.env.FLOW_DIR ?? '.artifacts/flow/studio');
 
 openScratch(dir);
-const agents = createAgents({ tools: await graphifyTools(), machine: true });
+const agents = createAgents({ tools: await graphifyTools(), dir });
 const workflow = buildCardPath({ agents, dir, repo: repoRoot() });
 
 // Storage and observability come from the same place a resumed run uses, so the

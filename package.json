@@ -9,6 +9,7 @@
     "start": "next start",
     "lint:framework": "eslint machine/flow --max-warnings 0",
     "guard:flow": "npm run lint:framework && depcruise --config .dependency-cruiser.mjs machine/flow machine/flow/run.mjs",
+    "guard:boundaries": "depcruise --config .dependency-cruiser.mjs app lib machine src/mastra",
     "check:programs": "node scripts/machine-programs.mjs --check",
     "check:studio": "node scripts/check-studio-start.mjs",
     "check:lead": "node scripts/check-lead.mjs",

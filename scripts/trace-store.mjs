@@ -1,28 +1,28 @@
 #!/usr/bin/env node
-// Keeps Mastra Code's trace store small by giving every session its own file.
+// Keeps Mastra Code's trace store small by folding it into an archive.
 //
 //   node scripts/trace-store.mjs status
 //   node scripts/trace-store.mjs fold [--quiet]
 //
-// Mastra Code opens its trace store once at startup, and DuckDB admits one writer per
-// file. A session that starts while another holds observability.duckdb gets no tracing at
-// all, silently, for its whole life (`@mastra/code-sdk/dist/index.js:323`), so its cost
-// rows are never recorded and the card scored from it reads unknown. So the launcher
-// `scripts/mastracode` gives each launch its own file under the traces directory, and the
-// scorecard prices a card from all of them.
+// Stock Mastra Code writes one file, ~/.local/share/mastracode/observability.duckdb, and
+// DuckDB admits one writer per file: a session that starts while another holds it gets no
+// tracing at all, silently, for its whole life (`@mastra/code-sdk/dist/index.js:323`), so
+// its cost rows are never recorded and the card scored from it reads unknown. One session
+// at a time is traced, which is what the stock install offers without a wrapper.
 //
-// Each file then has to be cleared. `fold` copies a finished file's `metric_events` rows,
-// the per-call tokens and cost a scorecard prices from, into `archive.duckdb`, then deletes
-// the file. Deleting the file is what returns the disk: DuckDB keeps freed blocks inside
-// the file, so a delete in place gives back nothing. Measured on 30 October: 52,443 rows
-// deleted and checkpointed, 5,955,137,536 B before and after. A file a running session
-// still holds is left alone. The launcher folds on every launch, so no one has to remember
-// a cleanup step.
+// `fold` copies the finished store's `metric_events` rows, the per-call tokens and cost a
+// scorecard prices from, into `archive.duckdb`, then deletes the file. Deleting the file is
+// what returns the disk: DuckDB keeps freed blocks inside the file, so a delete in place
+// gives back nothing. Measured on 30 October: 52,443 rows deleted and checkpointed,
+// 5,955,137,536 B before and after. A file a running session still holds is left alone, and
+// the daily `julia-trace-fold.timer` calls fold so no one has to remember a cleanup step.
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { homedir, totalmem } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { programDir } from './mastra-program.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ALARM_BYTES = 15 * 1024 ** 3;
@@ -38,8 +38,7 @@ export function tracesDir(env = process.env) {
   return env.JULIA_TRACES_DIR || join(appDataDir(env), 'traces');
 }
 
-// Before the launcher shipped, every session wrote to this one file. `fold` empties it the
-// same way, so the switch needs no cleanup step of its own.
+// The file stock Mastra Code writes. `fold` empties it and the next session recreates it.
 export function legacyStoreFile(env = process.env) {
   return env.MASTRA_OBSERVABILITY_DB_PATH || join(appDataDir(env), 'observability.duckdb');
 }
@@ -68,10 +67,13 @@ export function isLockedMessage(message) {
 }
 
 function duckdb() {
-  const candidates = [
-    join(REPO, 'node_modules', '@duckdb', 'node-api'),
-    join(homedir(), '.local', 'lib', 'mastracode-program', 'node_modules', '@duckdb', 'node-api'),
-  ];
+  let installed;
+  try {
+    installed = join(programDir(), 'node_modules', '@duckdb', 'node-api');
+  } catch {
+    installed = '';
+  }
+  const candidates = [join(REPO, 'node_modules', '@duckdb', 'node-api'), installed].filter(Boolean);
   const found = candidates.find(candidate => existsSync(join(candidate, 'package.json')));
   if (!found) throw new Error('no @duckdb/node-api package found to fold the trace files: run npm ci');
   return createRequire(join(found, 'package.json'))('@duckdb/node-api');
@@ -332,7 +334,7 @@ async function main(argv) {
     : null;
   const unfinished = answer.overAlarm || Boolean(answer.leftBehind?.length);
   if (flags.quiet) {
-    // Quiet is what the launcher runs, and a failure there is otherwise invisible.
+    // Quiet is what the timer runs, and a failure there is otherwise invisible.
     if (leftBehindNote) console.error(leftBehindNote);
     if (answer.overAlarm) console.error(`the trace files are ${answer.size} in ${answer.dir}, over the ${gb(ALARM_BYTES)} they are allowed to reach: a session is not being folded`);
     return unfinished ? 1 : 0;

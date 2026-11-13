@@ -7,7 +7,7 @@ Julia uses pstack (adopted 22 October 2026). pstack builds and proves. This file
 - Before planning a card, read [docs/plans/path-forward.md](docs/plans/path-forward.md) for Todd's delivery flow and decisions.
 - When pstack slices a card, each slice is a Linear sub-issue of that card, in order, carrying that slice's done-means from the plan. The parent completes only when its last sub-issue does.
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
-- A build run stops at Mastra's $4 cost guard and the Graphify exploration gate; [docs/agents/cost-guard.md](docs/agents/cost-guard.md) says what the guard cannot count.
+- A build run stops at Mastra's $4 cost guard and the card's own dollar ledger; [docs/agents/cost-guard.md](docs/agents/cost-guard.md) says what the guard cannot count.
 - Framework facts come from the installed packages and their version-matched official docs.
 - A rule or an acceptance criterion names a kind of model, a free model or a paid model. A specific model lives in the pstack models file and in the dated decision that chose it; Triage runs `node scripts/check-agent-brief.mjs`, which flags a criterion that names one.
 - A card begins in Mastra Studio's run form and nowhere else; no script starts one. [docs/agents/machine-programs.md](docs/agents/machine-programs.md) names every program that begins a card or carries a stage.
@@ -41,7 +41,7 @@ A build is done when a run produced a record, not when the builder says it passe
 ## Finish
 A card is finished when its PR is merged to main (after Todd's UAT yes when the card changes something he uses), main CI is green on the merge commit, and the card is Complete in Linear with that commit in a comment.
 
-After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Nothing in the retro touches the trace store: every session writes its own trace file, and the daily trace-fold timer folds finished files into the archive beside them, so a slice's prompt payloads leave the disk without anyone remembering. `node scripts/trace-store.mjs status` answers the size question. The next slice does not wait for that PR.
+After a slice merges, run the retro skill on that slice's session and put its fixes in one PR, with a plain-English list of each fix for Todd to approve: the mistake it came from, what the check does, and what it would now block. Nothing in the retro touches the trace store: the stock harness keeps one trace file, and the daily trace-fold timer folds its cost rows into the archive beside it and deletes the file, so a slice's prompt payloads leave the disk without anyone remembering. `node scripts/trace-store.mjs status` answers the size question. The next slice does not wait for that PR.
 
 ## Enforced rules
 
