@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { AGENT_MAX_OUTPUT_TOKENS, MEMORY_MAX_OUTPUT_TOKENS, createAgents, repoRoot } from './agents.mjs';
+import { HELPER_CONCURRENCY, STOP_REASONS } from './spending.mjs';
 import { helperKey, readRoleModels } from './role-models.mjs';
 import { buildModel, leadModelId } from './models.mjs';
 import { installLeadModel } from '../../scripts/install-lead-model.mjs';
@@ -293,4 +294,20 @@ test('the memory note-takers answer under 100,000 output tokens, as Mastra does'
   assert.equal(MEMORY_MAX_OUTPUT_TOKENS, 100_000);
   assert.equal(observational.observation.modelSettings.maxOutputTokens, 100_000);
   assert.equal(observational.reflection.modelSettings.maxOutputTokens, 100_000);
+});
+
+test('the Lead runs a fixed number of helpers at once, and a stopped card starts no new helper', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  const agents = createAgents({ repo, leadModelFile, roleModelsFile, machine: false, dir });
+  const options = await agents.build.getDefaultOptions();
+  assert.equal(options.toolCallConcurrency, HELPER_CONCURRENCY, 'the Lead is given a fixed number of helpers at once');
+  assert.equal(options.hooks.beforeToolCall({ toolName: 'agent-pstackBugFix1' }), undefined, 'an unstopped card starts a helper');
+
+  agents.spending.begin('JUL-375-CONCURRENCY');
+  agents.spending.stop(STOP_REASONS.limit);
+  assert.throws(() => options.hooks.beforeToolCall({ toolName: 'agent-pstackBugFix1' }), /card spending limit reached/);
+  assert.equal(options.hooks.beforeToolCall({ toolName: 'read_file' }), undefined, 'a stopped card still lets a helper read a file');
 });

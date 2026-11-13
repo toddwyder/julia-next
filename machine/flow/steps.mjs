@@ -9,6 +9,7 @@ import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
 import { cardState, flowData, runInput } from './schema.mjs';
+import { HELPER_CONCURRENCY } from './spending.mjs';
 import {
   nextVerdict,
   openRun,
@@ -24,9 +25,15 @@ import {
 // setting. The tests count attempts from this number instead of naming one.
 export const BUILD_RETRIES = 2;
 
-// The words a stop leaves behind are the same wherever the card stops.
-const reportText = (state, detail) =>
-  [
+// The words a stop leaves behind are the same wherever the card stops. A stop on spending also
+// states the most the card can overshoot: the helpers running when the cap was crossed, each worth
+// at worst the dearest call the card has already paid for.
+const reportText = (state, detail, spending) => {
+  const dearest = Math.max(0, ...(spending?.calls ?? []).map(call => call.usd));
+  const overshoot = state.stopPart === 'Spending' && dearest > 0
+    ? [`Worst overshoot: $${(HELPER_CONCURRENCY * dearest).toFixed(3)} (${HELPER_CONCURRENCY} helpers x $${dearest.toFixed(3)}, the dearest call on this card)`]
+    : [];
+  return [
     `# ${state.card} stopped`,
     '',
     `Part: ${state.stopPart || 'unknown'}`,
@@ -35,9 +42,11 @@ const reportText = (state, detail) =>
     `Shipping rounds: ${state.reviewRound}`,
     `Build rounds: ${state.buildRounds}`,
     `Last detail: ${detail || 'none'}`,
+    ...overshoot,
     '',
     'A second failure stops the card; the next step is an Investigation.',
   ].join('\n');
+};
 
 const step = (id, execute, extra = {}) =>
   createStep({ id, inputSchema: flowData, outputSchema: flowData, ...extra, execute });
@@ -112,7 +121,8 @@ export function createStages({ agents, dir }) {
   // The build is a real agent step, but it is called here rather than handed to createStep so a
   // card that spent its limit in the stage before cannot make the call. Mastra's agent step has
   // no way to skip its agent, and refusing at the model would fail the whole workflow instead of
-  // ending the card with a reason.
+  // ending the card with a reason. A Lead that spends the limit mid-run has its next model call
+  // refused the same way, and that refusal ends the build instead of failing the card.
   const buildAgent = createStep({
     id: 'flow-build',
     inputSchema: z.object({ prompt: z.string() }),
@@ -121,8 +131,13 @@ export function createStages({ agents, dir }) {
     execute: async ({ inputData, requestContext, tracingContext, metrics }) => {
       const reason = spending?.stopReason() ?? spending?.blockingReason(agents.spendingIds?.build?.() ?? null) ?? null;
       if (reason) return { text: '' };
-      const response = await agents.build.stream(inputData.prompt, { requestContext, tracingContext, metrics });
-      return { text: (await response.text) ?? '' };
+      try {
+        const response = await agents.build.stream(inputData.prompt, { requestContext, tracingContext, metrics });
+        return { text: (await response.text) ?? '' };
+      } catch (error) {
+        if (!/TripWire/.test(String(error?.message ?? error))) throw error;
+        return { text: '' };
+      }
     },
   });
 
@@ -276,7 +291,7 @@ export function createStages({ agents, dir }) {
   }));
 
   const stopReport = step('stop-report', async ({ inputData, state }) => {
-    const path = writeReport(cardDir(state.card), state.card, reportText(state, inputData.detail));
+    const path = writeReport(cardDir(state.card), state.card, reportText(state, inputData.detail, spending));
     return { ...inputData, stopped: true, finished: true, detail: `stop report at ${path}` };
   });
 

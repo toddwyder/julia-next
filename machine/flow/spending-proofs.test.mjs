@@ -16,7 +16,7 @@ const { simulateReadableStream } = await import('@mastra/core/test-utils/llm-moc
 const { buildCardPath } = await import('./workflow.mjs');
 const { openMastra } = await import('./mastra.mjs');
 const { openScratch } = await import('./scratch.mjs');
-const { STOP_REASONS, openSpending, spendingProcessor } = await import('./spending.mjs');
+const { STOP_REASONS, openSpending, spendingProcessor, helperStartHook, HELPER_CONCURRENCY } = await import('./spending.mjs');
 
 const CARD = 'JUL-375-CAP';
 const DEEPSEEK = 'deepseek/deepseek-v4.1-flash';
@@ -36,7 +36,7 @@ const CATALOG = {
 const OFF_PEAK = () => new Date('2026-11-13T05:00:00Z');
 const ONE_CALL_USD = Number(((100_000 * 0.15) / 1e6).toFixed(12)); // $0.015 for 100,000 input tokens
 
-function fakeModel({ usage, text = 'one line', called = () => {} }) {
+function fakeModel({ usage, text = 'one line', called = () => {}, done = () => {}, toolCalls = null, delayMs = 0 }) {
   const answer = usage ?? { inputTokens: 100_000, outputTokens: 0, totalTokens: 100_000 };
   return {
     specificationVersion: 'v2',
@@ -49,14 +49,22 @@ function fakeModel({ usage, text = 'one line', called = () => {} }) {
     },
     async doStream() {
       called();
+      const calls = typeof toolCalls === 'function' ? toolCalls() : toolCalls;
+      // A call that takes a moment is what lets the test see how many run at once.
+      if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs));
+      done();
       return {
         stream: simulateReadableStream({
           chunks: [
             { type: 'stream-start', warnings: [] },
-            { type: 'text-start', id: '1' },
-            { type: 'text-delta', id: '1', delta: text },
-            { type: 'text-end', id: '1' },
-            { type: 'finish', finishReason: 'stop', usage: answer },
+            ...(calls
+              ? calls.map((call, index) => ({ type: 'tool-call', toolCallId: `t${index}`, toolName: call.name, input: JSON.stringify(call.input) }))
+              : [
+                { type: 'text-start', id: '1' },
+                { type: 'text-delta', id: '1', delta: text },
+                { type: 'text-end', id: '1' },
+              ]),
+            { type: 'finish', finishReason: calls ? 'tool-calls' : 'stop', usage: answer },
           ],
         }),
         request: { body: '' },
@@ -67,15 +75,16 @@ function fakeModel({ usage, text = 'one line', called = () => {} }) {
 }
 
 // A real agent on the fake model, counted by the ledger. `ids` is fixed the way the picker fixes it.
-function meteredAgent({ id, spending, called = () => {}, usage }) {
-  const guard = spendingProcessor(spending, () => ({ provider: 'commandcode', model: DEEPSEEK }));
+function meteredAgent({ id, spending, called = () => {}, usage, modelOptions = {}, processorOptions, ...extra }) {
+  const guard = spendingProcessor(spending, () => ({ provider: 'commandcode', model: DEEPSEEK }), processorOptions);
   return new Agent({
     id,
     name: id,
     instructions: 'Reply with one line.',
-    model: fakeModel({ usage, called }),
+    model: fakeModel({ usage, called, ...modelOptions }),
     inputProcessors: [guard],
     outputProcessors: [guard],
+    ...extra,
   });
 }
 
@@ -220,48 +229,90 @@ test('a card whose Shipping fails again and again ends with "card spending limit
 });
 
 // ---------------------------------------------------------------------------
-// Criterion C: a lead starts 150 helpers at once, and the total stops at the cap.
+// Criterion C: a lead starts 150 helpers at once, and the total equals every answered call.
 // ---------------------------------------------------------------------------
 
-test('a lead that starts 150 helpers at once ends at its limit, and the total stays within one call per running helper', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'flow-proofs-swarm-'));
+test('a lead that starts 150 helpers at once ends at its limit, and the total equals every call the fake model answered', async () => {
+  const { dir, cardDir } = openCase({ limit: 0.04, verdicts: { review: ['PASS'], smoke: ['PASS'] } });
   const limit = 0.04;
   const spending = openSpending({ dir, limit, catalog: CATALOG, corrections: {}, now: OFF_PEAK });
-  spending.begin(CARD);
-
-  let leadCalls = 0;
-  const lead = meteredAgent({ id: 'flow-build', spending, called: () => { leadCalls += 1; } });
-  await lead.generate('start the work');
-  assert.equal(leadCalls, 1);
-  assert.equal(spending.total, ONE_CALL_USD, 'the lead paid for its own call first');
 
   const helperCount = 150;
   let helperCalls = 0;
-  const helpers = Array.from({ length: helperCount }, (_, index) =>
-    meteredAgent({
+  let running = 0;
+  let mostAtOnce = 0;
+  const helperStarted = () => {
+    helperCalls += 1;
+    running += 1;
+    mostAtOnce = Math.max(mostAtOnce, running);
+  };
+  const helpers = Object.fromEntries(Array.from({ length: helperCount }, (_, index) => {
+    const key = `pstackBugFix${index + 1}`;
+    return [key, meteredAgent({
       id: `pstack-bug-fix-${index + 1}`,
+      name: `Bug fix ${index + 1}`,
+      description: 'Does one task delegated by the Lead.',
       spending,
-      called: () => { helperCalls += 1; },
-    }),
-  );
+      modelOptions: { called: helperStarted, done: () => { running -= 1; }, delayMs: 5 },
+    })];
+  }));
 
-  // Every helper is in flight at the same moment, which is the case the cap has to survive.
-  await Promise.allSettled(helpers.map(helper => helper.generate('do the next piece')));
+  let leadCalls = 0;
+  const lead = meteredAgent({
+    id: 'flow-build',
+    spending,
+    processorOptions: { refuseAfterStop: true },
+    modelOptions: {
+      called: () => { leadCalls += 1; },
+      text: 'helpers are on it',
+      // The first answer starts every helper at once, which is the swarm the cap has to survive.
+      toolCalls: () => (leadCalls === 1
+        ? Object.keys(helpers).map(key => ({ name: `agent-${key}`, input: { prompt: 'do the next piece' } }))
+        : null),
+    },
+    agents: helpers,
+    defaultOptions: {
+      maxSteps: 10,
+      toolCallConcurrency: HELPER_CONCURRENCY,
+      hooks: helperStartHook(spending),
+    },
+  });
 
-  assert.equal(helperCalls, helperCount, 'every helper did reach its model, as a real swarm would');
+  const workflow = buildCardPath({
+    dir,
+    agents: { build: lead, shipping: stub('looked'), remediation: stub('fixed line'), retro: stub('retro line'), spending },
+  });
+  const studio = await openMastra({ card: CARD, stateDb: join(dir, 'state.db'), traceDb: join(dir, 'trace.duckdb'), workflow });
+  const run = await studio.getWorkflow(workflow.id).createRun();
+  const result = await run.start({ inputData: { card: CARD, kind: 'product' } });
+  await studio.shutdown();
+
+  const answered = leadCalls + helperCalls;
+  assert.ok(helperCalls < helperCount, 'the cap turned away the helpers the card could no longer afford');
+  assert.ok(mostAtOnce <= HELPER_CONCURRENCY, 'a fixed number of helpers runs at once');
+  assert.equal(result.status, 'success');
+  assert.equal(result.result.stopped, true);
   assert.equal(spending.stopReason(), STOP_REASONS.limit);
-  assert.equal(spending.calls.length, 3, 'the lead and two helpers are the calls the ledger counted');
-  assert.equal(spending.total, Number((3 * ONE_CALL_USD).toFixed(12)), 'the ledger stops adding at the crossing call');
 
-  // The criterion's bound: the total cannot pass the limit plus one call per helper that was still
-  // running when the limit was crossed. The helpers whose money was counted are the two after the
-  // lead, so 148 were still running at that moment.
-  const helpersCounted = spending.calls.length - 1;
-  const runningWhenCrossed = helperCount - helpersCounted;
+  // The total is what the provider would bill: every call that finished, including the helpers that
+  // were already running when the cap was crossed.
+  assert.equal(spending.calls.length, answered, 'the ledger counts every call the model answered');
+  assert.equal(spending.total, Number((answered * ONE_CALL_USD).toFixed(12)), 'each answered call added its dollars');
+
+  // The bound: the cap is crossed once, and only the helpers allowed to run at once can finish after
+  // it, so the total cannot pass the limit plus one call per helper running at that moment.
   assert.ok(
-    spending.total <= limit + runningWhenCrossed * ONE_CALL_USD,
-    `the total ${spending.total} fits the limit ${limit} plus ${runningWhenCrossed} running helpers`,
+    spending.total <= limit + HELPER_CONCURRENCY * ONE_CALL_USD,
+    `the total ${spending.total} fits the limit ${limit} plus ${HELPER_CONCURRENCY} calls`,
   );
-  assert.equal(spending.blockingReason({ provider: 'commandcode', model: DEEPSEEK }), STOP_REASONS.limit);
+
+  const report = readReport(cardDir);
+  assert.match(report, /Part: Spending/);
+  assert.match(report, /card spending limit reached/);
+  assert.match(
+    report,
+    new RegExp(`Worst overshoot: \\$${(HELPER_CONCURRENCY * ONE_CALL_USD).toFixed(3)} \\(${HELPER_CONCURRENCY} helpers`),
+    'the report states the worst overshoot the fixed number allows',
+  );
   rmSync(dir, { recursive: true, force: true });
 });

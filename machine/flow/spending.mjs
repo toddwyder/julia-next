@@ -13,6 +13,11 @@ import { readLedger, writeLedger } from './card-ledger.mjs';
 // Todd's per-card limit, decided 10 November 2026.
 export const CARD_LIMIT_DOLLARS = 4;
 
+// Mastra starts every tool call a model asks for unless a Lead is given a limit, and each extra
+// helper is a whole model call finished after the cap was crossed. A fixed number is what lets the
+// stop report state the worst overshoot: the call that crossed the limit plus this many helpers.
+export const HELPER_CONCURRENCY = 4;
+
 export const STOP_REASONS = {
   limit: 'card spending limit reached',
   unpriced: 'model unpriced',
@@ -103,15 +108,17 @@ export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, correct
     return null;
   };
 
+  // Every call that finished is counted, including the ones that finish after the cap was crossed,
+  // because the provider bills them all. Only the first crossing call reports a stop, so the calls
+  // already in flight are not turned into errors; the stage in front of the next agent refuses.
   const record = ({ provider, model, usage, at = now() } = {}) => {
     const missing = !usage || (!(Number(usage.inputTokens) > 0) && !(Number(usage.outputTokens) > 0));
     if (missing) return { usd: 0, stop: stop(STOP_REASONS.usage) };
-    const recorded = stopReason();
-    if (recorded) return { usd: 0, stop: recorded };
     const price = priceOf({ provider, model, at });
     if (!price) return { usd: 0, stop: stop(STOP_REASONS.unpriced) };
     const tokens = tokensFromUsage(usage);
     const { usd, peak } = costOfTokens({ price, tokens });
+    const alreadyStopped = Boolean(ledger.stop);
     ledger.total += usd;
     ledger.calls.push({
       at: at.toISOString(),
@@ -124,6 +131,7 @@ export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, correct
       cacheReadTokens: tokens.cacheRead,
     });
     persist();
+    if (alreadyStopped) return { usd, stop: null };
     const overLimit = ledger.total >= limit ? stop(STOP_REASONS.limit) : null;
     return { usd, stop: overLimit };
   };
@@ -151,17 +159,35 @@ function idsOf(ids, model) {
   return { provider: model?.provider ?? '', model: model?.modelId ?? '' };
 }
 
+// A stopped card starts no new helper. The hook runs before the helper does, and what it throws
+// comes back to the Lead as a failed tool call, so the run ends at its next stage with the reason
+// instead of paying for helpers it can no longer afford.
+export function helperStartHook(spending) {
+  return {
+    beforeToolCall(call) {
+      if (!call?.toolName?.startsWith('agent-')) return;
+      const reason = spending.stopReason();
+      if (reason) throw new Error(reason);
+    },
+  };
+}
+
 // A Mastra input/output processor. The input step remembers which model the call will use, and
 // the output step adds the call's dollars to the ledger and stops the card when that call spent
 // the last of its limit or came back without usage. The input step does not refuse the call: a
 // refusal at that point leaves the agent as a TripWire, which fails the whole workflow with no
 // stop report. A card that is already out of money is turned away by the stage before the agent.
-export function spendingProcessor(spending, ids = null) {
+// The Lead is the one exception. It runs its own loop, so the stage cannot turn away the next
+// model call it makes after the card stopped, and that call would be paid for outside the limit.
+// Its processor refuses that call, and the build step reads the stop as the end of the build.
+export function spendingProcessor(spending, ids = null, { refuseAfterStop = false } = {}) {
   let called = null;
   return {
     id: 'card-spending',
-    processInputStep: async ({ model }) => {
+    processInputStep: async ({ model, abort }) => {
       called = model ?? null;
+      const reason = refuseAfterStop ? spending.stopReason() : null;
+      if (reason) abort(reason, { metadata: { reason } });
     },
     processOutputStep: async ({ usage, abort }) => {
       if (!spending.started) return;

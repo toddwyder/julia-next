@@ -9,7 +9,7 @@ import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace
 
 import { buildModelReader, leadModelId } from './models.mjs';
 import { agentModel, helperKey, readRoleModels, readStageModels } from './role-models.mjs';
-import { meteredModel, openSpending, spendingProcessor, splitModelId } from './spending.mjs';
+import { HELPER_CONCURRENCY, helperStartHook, meteredModel, openSpending, spendingProcessor, splitModelId } from './spending.mjs';
 
 // Mastra caps the observer and reflector at 100,000 output tokens, but only when it picks their model.
 // An explicit model gets no cap, so the controller reserved all of the remaining token cap for one memory
@@ -54,11 +54,21 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     return { memory };
   };
   const gateOptions = gate ? { maxRetries: 0, hooks: gate.hooks } : {};
+  const startHook = helperStartHook(spending);
+  const buildHooks = {
+    beforeToolCall(call) {
+      startHook.beforeToolCall(call);
+      return gate?.hooks.beforeToolCall(call);
+    },
+    afterToolCall(call) {
+      return gate?.hooks.afterToolCall(call);
+    },
+  };
   // The input side stops a call the card cannot afford, and the output side adds the call's
   // dollars. Mastra runs `processOutputStep` only for output processors, so the same processor
   // goes into both lists and remembers the model the input step saw.
-  const cardProcessors = ids => {
-    const guard = spendingProcessor(spending, ids);
+  const cardProcessors = (ids, options) => {
+    const guard = spendingProcessor(spending, ids, options);
     return { inputProcessors: [costGuard(), guard], outputProcessors: [guard] };
   };
   const workspace = new Workspace({
@@ -95,12 +105,18 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     name: 'Lead',
     instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
     model: buildModelReader(leadModelFile),
-    ...cardProcessors(() => splitModelId(leadModelId(leadModelFile))),
+    ...cardProcessors(() => splitModelId(leadModelId(leadModelFile)), { refuseAfterStop: true }),
     ...memoryFor('lead'),
     workspace,
     agents: helpers,
     tools,
-    defaultOptions: { maxSteps: 400, ...limits, ...gateOptions },
+    defaultOptions: {
+      maxSteps: 400,
+      toolCallConcurrency: HELPER_CONCURRENCY,
+      hooks: buildHooks,
+      ...limits,
+      ...(gate ? { maxRetries: 0 } : {}),
+    },
   });
   // The reader runs later, so check the setting now: a missing Lead model stops Studio at boot
   // and names the installer, as it did when the model was resolved here.
