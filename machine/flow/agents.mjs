@@ -49,17 +49,15 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     return { memory };
   };
   const gateOptions = gate ? { maxRetries: 0, hooks: gate.hooks } : {};
-  const workspace = new Workspace({
-    id: 'machine-repo',
-    filesystem: new LocalFilesystem({ basePath: repo }),
-    sandbox: new LocalSandbox({ workingDirectory: repo, env: { HOME: homedir() } }),
-    skills: ['.agents/skills'],
-  });
-  const helperWorkspace = new Workspace({
-    id: 'machine-repo-helper',
-    filesystem: new LocalFilesystem({ basePath: repo }),
-    sandbox: new LocalSandbox({ workingDirectory: repo, env: { HOME: homedir() } }),
-  });
+  const cardWorkspace = (id, extra = {}) => ({ requestContext } = {}) => {
+    const folder = requestContext?.get?.('cardCheckout') ?? repo;
+    return new Workspace({
+      id,
+      filesystem: new LocalFilesystem({ basePath: folder }),
+      sandbox: new LocalSandbox({ workingDirectory: folder, env: { HOME: homedir() } }),
+      ...extra,
+    });
+  };
   // Mastra resolves `agents` and `model` at each call, so the picker's file and the Lead
   // setting reach the next call without a restart. 7 Nov: the save at 15:18:07 needed the
   // restart at 15:18:10 to take effect.
@@ -73,7 +71,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
       model: agentModel(modelId),
       inputProcessors: [costGuard()],
       ...memoryFor(role.name),
-      workspace: helperWorkspace,
+      workspace: cardWorkspace('machine-repo-helper'),
       tools,
       defaultOptions: { maxSteps: 100, ...limits, ...gateOptions },
     })];
@@ -85,7 +83,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     model: buildModelReader(leadModelFile),
     inputProcessors: [costGuard()],
     ...memoryFor('lead'),
-    workspace,
+    workspace: cardWorkspace('machine-repo', { skills: ['.agents/skills'] }),
     agents: helpers,
     tools,
     defaultOptions: { maxSteps: 400, ...limits, ...gateOptions },
@@ -100,8 +98,6 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
   const stages = model ? { shipping: model, remediation: model, retro: model } : readStageModels(roleModelsFile);
   const stageModel = id => (model ? model : agentModel(stages[id]));
 
-  // Shipping reviews a pull request's code, so its workspace is the checkout the stage made for
-  // this card; the stage hands the path over in the request context.
   const shipping = new Agent({
     id: 'flow-shipping',
     name: 'Shipping',
@@ -109,8 +105,8 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
       'You are the Shipping reviewer. You did not write the code. You run what the card asks you to run inside the checkout you are given, judge each criterion from what the commands printed, and answer in the shape the task gives.',
     model: stageModel('shipping'),
     inputProcessors: [costGuard()],
-    workspace: ({ requestContext }) => {
-      const checkout = requestContext.get('shippingCheckout');
+    workspace: ({ requestContext } = {}) => {
+      const checkout = requestContext?.get?.('cardCheckout');
       if (!checkout) throw new Error('Shipping has no checkout to review.');
       return new Workspace({
         id: 'shipping-checkout',

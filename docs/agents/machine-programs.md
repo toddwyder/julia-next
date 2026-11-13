@@ -11,15 +11,16 @@ of any size, not only a change to the sentence beside it.
 | --- | --- | --- |
 | `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `6b3ca4f9eff59f76ab1a7617fb8588d98f702cdee84b099c8909f70133d73f66` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `f204e3d10507440e7dce23902106c6abf9a33a96dc2901101192e59bf3aca492` |
-| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `7e1c441f928e0d432abed5ec8c51ea78de673ddc089185e13aee759a780db917` |
-| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `3b78ea5dab2a4c19b568422ced27c4ba0d03094fe94a984fb100fbcc2b4583c7` |
+| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `6c160ac4af4af8f71d0aa2b23461748286458ae8a1f04da0f9f9dcd019dda919` |
+| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `5c77e5b840160d95e2a9ec850ca04362e27b22f4a6cc4445d4e6b275926d3bd6` |
 | `machine/flow/exploration.mjs` | The gate routing raw grep and glob workspace and shell commands to Graphify. | `8308d2ba679aa9f3dcf006b0a2b5b8e735235bcc4eb77ee3765648b7efabe596` |
 | `machine/flow/graphify.mjs` | The Graphify graph tools Lead and its helpers query before reading files. | `c502bc49faa96ef1de469764696d1682347679a61a17629766940de5baf546b6` |
 | `machine/flow/models.mjs` | The Lead model, read from its independent setting and routed through its account provider. | `77d87ea289d75c4c4fb22892d86e269d49fec15241949df0a0ebb13bd590870d` |
 | `machine/flow/role-models.mjs` | The Lead helper models, read from the saved role table and routed to account providers. | `6946ce44710f02f3bfa74f5aacbe91f49fa65db28b4009cd5b1e2ccc78dbfceb` |
-| `machine/flow/schema.mjs` | What the run form asks for and what the run remembers. | `624bb6819357617db95388d8b05cb662e00c47a425f7e9b7d93f06a9e6c68d25` |
+| `machine/flow/schema.mjs` | What the run form asks for and what the run remembers. | `f70c576ec09cb56c592719f23ffd94c18ca95600345f8614452c8a778779d2c6` |
 | `machine/flow/scratch.mjs` | The run folder: artifacts, verdicts and the report a stop leaves. | `a1e2a8ce8239fb807d186c08892fe19404148a3f19dd3c7a74496237c20957aa` |
-| `machine/flow/review.mjs` | The Shipping review: finds the card's pull request, checks it out, builds the reviewer's task, reads the verdict. | `c78d473129b1d4d79b20fb8f1382e2810938aff9d12c48f4afe6f57765e9c4e9` |
+| `machine/flow/copy.mjs` | The fresh copy of the repository each card builds in, and its removal when the card ends. | `5e850b67c8bc89eeff9796092cae93b3b15988cbe7f7b02495b910a216de81f2` |
+| `machine/flow/review.mjs` | The Shipping review: finds the card's pull request, names the commit it reviews, builds the reviewer's task, reads the verdict. | `ddf6e6553c04060296b27040549c0f3137a7b1325b0395392e22aa1744b96427` |
 | `machine/flow/mastra.mjs` | Storage and tracing, so a run is written down and priced. | `30ef73ccfa6302ecdfdad10c06aff8283261f2ba82509580c383d809ee02f7e7` |
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `ef172c3fef4d2ff4c85518f17a0e5b052a2503391fcc8f064ee07173cded7723` |
 | `machine/flow/run.mjs` | Answers a waiting card, reads a run, writes its cost. No way to start one. | `6a76edaa92fdbadfbb55dd581e77c2556b33f9ccb4744c89e5fded579ab36e44` |

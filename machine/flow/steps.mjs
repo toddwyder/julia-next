@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
+import { closeCopy, openCopy } from './copy.mjs';
 import { REVIEW_TIME_LIMIT_MS, criteriaFromCard, parseVerdict, realReview, reviewTask, verdictComment } from './review.mjs';
 import { cardState, flowData, runInput } from './schema.mjs';
 import {
@@ -35,6 +36,7 @@ const reportText = (state, detail) =>
     `Failures counted: ${state.failCount}`,
     `Shipping rounds: ${state.reviewRound}`,
     `Build rounds: ${state.buildRounds}`,
+    ...(state.copy ? [`Copy: ${state.copy}`, `Started from main at: ${state.base}`] : []),
     `Last detail: ${detail || 'none'}`,
     '',
     state.unreviewed
@@ -52,6 +54,7 @@ const agentStep = (id, execute) => step(id, execute, { retries: BUILD_RETRIES })
 const buildPrompt = (card, kind) =>
   [
     `Build Linear card ${card}. It is a ${kind} card.`,
+    'You work in a fresh copy of the repository made from main for this card. No other card works there.',
     "Read the whole card first, including Todd's dated decisions on it, and move it to Implementation when you start.",
     'Open the pull request in the same step as your first push, name only this card in its description, and keep pushing as you go.',
     'When the build is ready and the pull request is up to date, stop. Shipping comes next.',
@@ -85,10 +88,12 @@ export function createStages({ agents, dir, repo, review = realReview }) {
     const card = state.card || inputData.card;
     const buildRounds = state.buildRounds + 1;
     const requestId = `${card}/build-${buildRounds}`;
+    const copy = openCopy({ repo, card });
+    requestContext?.set?.('cardCheckout', copy.folder);
     requestContext?.set?.('mastra__threadId', requestId);
     requestContext?.set?.('mastra__resourceId', card);
-    await setState({ ...state, buildRounds, requestId });
-    return { ...inputData, card, detail: `build round ${buildRounds} started`, prompt: buildPrompt(card, state.kind) };
+    await setState({ ...state, buildRounds, requestId, copy: copy.folder, base: copy.base });
+    return { ...inputData, card, detail: `build round ${buildRounds} started in ${copy.folder}`, prompt: buildPrompt(card, state.kind) };
   });
 
   const buildAgent = createStep(agents.build, { retries: buildGate ? 0 : BUILD_RETRIES });
@@ -115,12 +120,13 @@ export function createStages({ agents, dir, repo, review = realReview }) {
     const card = await review.readCard(state.card);
     const criteria = criteriaFromCard(card?.description);
     if (criteria.length === 0) return unreviewed(`${state.card} lists no acceptance criteria to judge`);
+    if (!state.copy) return unreviewed(`${state.card} has no copy of the repository to review`);
 
-    const checkout = join(cardDir(state.card), 'review');
-    const sha = review.prepareCheckout(repo, found.pr, checkout);
+    const checkout = state.copy;
+    const sha = review.headCommit(checkout);
     const clock = AbortSignal.timeout(REVIEW_TIME_LIMIT_MS);
     try {
-      requestContext?.set?.('shippingCheckout', checkout);
+      requestContext?.set?.('cardCheckout', checkout);
       const result = await agents.shipping.stream(
         reviewTask({ pr: found.pr, sha, checkout, card, criteria }),
         { tracingContext, requestContext, abortSignal: clock },
@@ -130,8 +136,6 @@ export function createStages({ agents, dir, repo, review = realReview }) {
     } catch (error) {
       if (clock.aborted) return unreviewed(`the review ran longer than ${REVIEW_TIME_LIMIT_MS / 60_000} minutes and was ended`);
       throw error;
-    } finally {
-      review.removeCheckout(repo, checkout);
     }
   });
 
@@ -272,6 +276,7 @@ export function createStages({ agents, dir, repo, review = realReview }) {
   });
 
   const cleanup = step('cleanup', async ({ inputData, state }) => {
+    closeCopy({ repo, card: state.card });
     sweepBuild(cardDir(state.card));
     return { ...inputData, finished: true, detail: `${state.card} cleaned up` };
   });

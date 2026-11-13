@@ -48,6 +48,8 @@ export const cardState = z.object({
   failCount: z.number().int().min(0).default(0),
   reviewRound: z.number().int().min(0).default(0),
   buildRounds: z.number().int().min(0).default(0),
+  copy: z.string().default(''),
+  base: z.string().default(''),
   requestId: z.string().default(''),
   request: z.string().default(''),
   answer: z.string().default(''),

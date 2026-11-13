@@ -1,11 +1,4 @@
-// The parts of a Shipping review that are fixed rules, not a model's choice:
-// how the card's pull request is found, what is checked out, what the reviewer
-// is told, how its answer is read, and the comment that goes on the pull request.
-// The reviewer itself is the plain agent in agents.mjs.
-
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
 
 import { getIssue, postComment as postCardComment } from '../../scripts/linear-cli.mjs';
 
@@ -68,40 +61,7 @@ export function findCardPr(repo, card) {
   return chooseCardPr(card, pulls);
 }
 
-// The pull request's head goes into a detached worktree beside the run's files, and the
-// dependency trees are cloned from the main checkout when its lockfile matches.
-export function prepareCheckout(repo, pr, checkout) {
-  run('git', ['fetch', '--no-tags', '--quiet', 'origin', `pull/${pr}/head`], repo);
-  const sha = run('git', ['rev-parse', 'FETCH_HEAD^{commit}'], repo);
-  try {
-    run('git', ['worktree', 'remove', '--force', checkout], repo);
-  } catch {
-    // Nothing checked out there yet.
-  }
-  rmSync(checkout, { recursive: true, force: true });
-  run('git', ['worktree', 'prune'], repo);
-  mkdirSync(join(checkout, '..'), { recursive: true });
-  run('git', ['worktree', 'add', '--detach', '--quiet', checkout, sha], repo);
-  for (const tree of ['', 'dashboard']) {
-    const lock = join(tree, 'package-lock.json');
-    const modules = join(repo, tree, 'node_modules');
-    const sameLock = existsSync(join(repo, lock)) && existsSync(join(checkout, lock)) &&
-      readFileSync(join(repo, lock)).equals(readFileSync(join(checkout, lock)));
-    if (sameLock && existsSync(join(modules, '.package-lock.json'))) {
-      rmSync(join(checkout, tree, 'node_modules'), { recursive: true, force: true });
-      execFileSync('cp', ['-al', modules, join(checkout, tree, 'node_modules')]);
-    }
-  }
-  return sha;
-}
-
-export function removeCheckout(repo, checkout) {
-  try {
-    run('git', ['worktree', 'remove', '--force', checkout], repo);
-  } catch {
-    rmSync(checkout, { recursive: true, force: true });
-  }
-}
+export const headCommit = folder => run('git', ['rev-parse', 'HEAD'], folder);
 
 export function reviewTask({ pr, sha, checkout, card, criteria }) {
   return [
@@ -142,8 +102,7 @@ export function postPrComment(repo, pr, body) {
 export const realReview = {
   findPr: findCardPr,
   readCard: identifier => getIssue(identifier),
-  prepareCheckout,
-  removeCheckout,
+  headCommit,
   postPrComment,
   postCardComment,
 };
