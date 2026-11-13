@@ -30,7 +30,7 @@ The user has asked for a **retrospective**. You are suggesting improvements to t
    node scripts/trace-store.mjs status
    ```
 
-   Paste its JSON in the retro record. This session's prompt payloads need no deleting: every session writes its own file, and the launcher folds finished files into an archive beside them at the next launch, which keeps the cost rows and deletes the file that held the prompts. There is no list of sessions, no census file, no sweep, and nothing in the retro deletes anything.
+   Paste its JSON in the retro record. This session's prompt payloads need no deleting: the stock harness keeps one trace file, and the daily trace-fold timer folds its cost rows into an archive beside it and deletes the file that held the prompts. There is no list of sessions, no census file, no sweep, and nothing in the retro deletes anything.
 
 ## Reference
 

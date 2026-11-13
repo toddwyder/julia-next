@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
@@ -12,6 +12,7 @@ import { displayName } from '../dashboard/lib/models.js';
 import { ROLE_GROUPS, leadModels, readSettings, saveSettingsChoice, settingsPaths } from '../dashboard/lib/model-settings.js';
 import { helperKey, readRoleModels } from '../machine/flow/role-models.mjs';
 import { checkStudioStart } from './check-studio-start.mjs';
+import { scratchDir } from './scratch-dir.mjs';
 
 const MARKER = 'JUL340_MODEL_OK';
 const delay = ms => new Promise(done => setTimeout(done, ms));
@@ -240,7 +241,8 @@ async function browserSave(url, current, models, alternateLead, alternateCoder) 
     await page.reload();
     assert.equal(await page.getByRole('button', { name: 'Change the Lead model' }).getAttribute('data-current-model-id'), alternateLead);
     assert.equal(await page.getByRole('button', { name: 'Change the feature, refactoring model' }).getAttribute('data-current-model-id'), alternateCoder);
-    const screenshot = resolve('docs/agents/jul-340/start-saved.png');
+    const screenshot = join(scratchDir, 'model-picker', 'start-saved.png');
+    mkdirSync(dirname(screenshot), { recursive: true });
     await page.screenshot({ path: screenshot, fullPage: true });
     return { url, screenshot, savedLead: alternateLead, savedCoder: alternateCoder, lead: { model: current.lead, savedVerdict: 'PASS', mismatch: leadMismatch }, visibleRoles: visible };
   } finally { await browser.close(); }

@@ -49,8 +49,9 @@ person. `REVIEW_TIME_LIMIT_MS` in `workflow.mjs` is the limit; callers can pass
 ## Where the pieces come from
 
 The Mastra modules are loaded from the installed Mastra Code program
-(`MASTRACODE_PROGRAM_DIR`, default `~/.local/lib/mastracode-program`) rather
-than from this repository's dependencies, because the machine must run the same
+(`scripts/mastra-program.mjs`, which finds the global npm install unless
+`MASTRACODE_PROGRAM_DIR` names another copy) rather than from this repository's
+dependencies, because the machine must run the same
 harness that made the code it reviews. The departures from stock pstack and
 stock Mastra Code are rows in `docs/pstack-deviations.md`.
 

@@ -6,13 +6,19 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { programDir } from './mastra-program.mjs';
 import { foldTraces, parseArgs, status } from './trace-store.mjs';
 
 const REPO = new URL('..', import.meta.url).pathname;
-const duckdbDir = [
-  join(REPO, 'node_modules', '@duckdb', 'node-api'),
-  join(process.env.HOME ?? '', '.local', 'lib', 'mastracode-program', 'node_modules', '@duckdb', 'node-api'),
-].find(dir => existsSync(join(dir, 'package.json')));
+let installedDuckDb = '';
+try {
+  installedDuckDb = join(programDir(), 'node_modules', '@duckdb', 'node-api');
+} catch {
+  installedDuckDb = '';
+}
+const duckdbDir = [join(REPO, 'node_modules', '@duckdb', 'node-api'), installedDuckDb]
+  .filter(Boolean)
+  .find(dir => existsSync(join(dir, 'package.json')));
 // The DuckDB client is a dev dependency, so CI opens real files. A green run that skipped
 // every store test is how an unreviewed script deleted live sessions, so a missing client
 // fails the file in CI instead of skipping it.
