@@ -214,10 +214,18 @@ async function runCheckFlow({ check, review = ['PASS'], kind = 'machine', answer
   const prompts = [];
   const shippingCalls = [];
   const queue = [...review];
+const TASK_TOOL_STUBS = {
+  task_write: { id: 'task_write' },
+  task_update: { id: 'task_update' },
+  task_complete: { id: 'task_complete' },
+  task_check: { id: 'task_check' },
+};
+
   const build = new Agent({
     id: 'flow-build',
     name: 'Flow build',
     instructions: 'Reply with one line.',
+    tools: TASK_TOOL_STUBS,
     model: createMockModel({
       mockText: 'built line',
       spyStream: props => prompts.push(JSON.stringify(props)),
@@ -426,6 +434,7 @@ test('realCheck reads live Mastra trace, git copy diff and saved evidence files'
       task_write: tool('task_write', async () => ({ ok: true })),
       task_update: tool('task_update', async () => ({ ok: true })),
       task_complete: tool('task_complete', async () => ({ ok: true })),
+      task_check: tool('task_check', async () => ({ ok: true })),
       mastra_workspace_execute_command: tool('mastra_workspace_execute_command', async () => ({ ok: true })),
     },
     defaultOptions: { maxSteps: 10 },

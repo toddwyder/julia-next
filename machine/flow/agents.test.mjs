@@ -146,7 +146,7 @@ test('the Lead and every helper keep Mastra’s refusal handler beside the spend
   completeRoleFile(roleModelsFile);
   const build = createAgents({ repo, leadModelFile, roleModelsFile }).build;
   const processorsOf = async agent => (await agent.listConfiguredOutputProcessors()).map(processor => processor.id);
-  assert.deepEqual(await processorsOf(build), ['cyber-refusal-handler', 'card-spending']);
+  assert.deepEqual(await processorsOf(build), ['cyber-refusal-handler', 'card-spending', 'task-list-guard']);
   for (const helper of Object.values(await build.listAgents())) {
     assert.deepEqual(await processorsOf(helper), ['cyber-refusal-handler', 'card-spending'], `${helper.name} lost a processor.`);
   }

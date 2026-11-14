@@ -393,6 +393,7 @@ test('the Studio record and the card ledger agree on what the card spent', async
     id: 'flow-build',
     name: 'Lead',
     instructions: 'Reply with one line.',
+    tools: { task_write: { id: 'task_write' }, task_update: { id: 'task_update' }, task_complete: { id: 'task_complete' }, task_check: { id: 'task_check' } },
     model: fakeModel({ text: 'built line', usage: { inputTokens: 100_000, outputTokens: 10_000, totalTokens: 110_000 } }),
     ...guarded(spending, () => ({ provider: 'commandcode', model: DEEPSEEK })),
   });
