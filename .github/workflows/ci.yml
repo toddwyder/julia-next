@@ -101,6 +101,10 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             dashboard/package-lock.json
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - name: Plan the test owners
         run: node scripts/test-owners.mjs --plan
       - name: Install each local owner's locked dependencies
@@ -114,6 +118,7 @@ jobs:
     runs-on: ubuntu-22.04
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -123,7 +128,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             dashboard/package-lock.json
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
