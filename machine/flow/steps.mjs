@@ -23,6 +23,17 @@ const step = (id, execute, extra = {}) =>
 
 const REQUIRED_TASK_TOOLS = ['task_write', 'task_update', 'task_complete', 'task_check'];
 
+// Stops the card when a TripWire came from observational-memory rather than a handled guard.
+function recordTripwireStop(spending, { reason, processorId, metadata } = {}) {
+  if (!spending || spending.stopReason()) return;
+  const memoryError = spending.lastMemoryError?.();
+  const isMemory = Boolean(memoryError || metadata?.observerFailure || /observational-memory/i.test(String(processorId ?? reason ?? '')));
+  if (!isMemory) return;
+  const modelName = memoryError?.model ?? spending.memoryModel ?? 'unknown';
+  const detail = memoryError?.message ?? String(reason ?? 'unknown error');
+  spending.stop(`Memory model ${modelName} failed: ${detail}`, 'Memory');
+}
+
 export function createStages({ agents, dir, repo, review = realReview, check = realCheck }) {
   const spending = agents.spending;
   const cardDir = (card) => join(dir, card);
@@ -103,18 +114,17 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
       if (reason) return { text: '' };
       try {
         const response = await agents.build.stream(inputData.prompt, { requestContext, tracingContext, metrics });
-        return { text: (await response.text) ?? '' };
+        const text = (await response.text) ?? '';
+        const tripwire = await response.tripwire;
+        if (tripwire) recordTripwireStop(spending, tripwire);
+        return { text };
       } catch (error) {
         if (error?.name !== 'TripWire' && !/TripWire/.test(String(error?.message ?? error))) throw error;
-        if (!spending?.stopReason()) {
-          const memoryError = spending?.lastMemoryError?.();
-          const observerFailure = error?.options?.metadata?.observerFailure;
-          if (memoryError || observerFailure || /observational-memory/i.test(String(error?.message ?? ''))) {
-            const modelName = memoryError?.model ?? spending?.memoryModel ?? 'unknown';
-            const detail = memoryError?.message ?? String(error?.message ?? error);
-            spending?.stop(`Memory model ${modelName} failed: ${detail}`, 'Memory');
-          }
-        }
+        recordTripwireStop(spending, {
+          reason: error?.message,
+          processorId: error?.processorId,
+          metadata: error?.options?.metadata,
+        });
         return { text: '' };
       }
     },
