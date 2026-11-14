@@ -1,0 +1,29 @@
+name: mutation-audit
+
+# Mutation testing of the machine's tests, run by hand. It finds tests that catch nothing.
+# It never gates a pull request: the report is read, and weak tests are fixed or removed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  machine-mutation-audit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+      - name: Install the application's locked dependencies
+        run: npm ci
+      - name: Mutate the whole machine
+        run: npm run test:mutation
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: reports/mutation/
