@@ -93,7 +93,12 @@ const applyTaskEvent = (tasks, span, index) => {
   });
 };
 
+const isThroughputCheckpoint = task =>
+  /^checkpoint_/i.test(String(task.id ?? '')) ||
+  /^\s*(?:\*\*)?(?:Blocking first steps|Independent workstreams|Shared mutable state|Smallest safe decomposition)\b/i.test(String(task.content ?? ''));
+
 const checkTaskWork = (task, prior) => {
+  if (isThroughputCheckpoint(task)) return null;
   const text = task.content;
   const skillText = text
     .replace(/When the implementation admits multiple valid shapes[^.]*\./gi, '')
