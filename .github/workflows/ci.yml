@@ -17,11 +17,12 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       docs_only: ${{ steps.diff.outputs.docs_only }}
+      browser_tests: ${{ steps.diff.outputs.browser_tests }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Find out whether only documents changed
+      - name: Find out whether only documents changed and whether UI tests apply
         id: diff
         env:
           EVENT: ${{ github.event_name }}
@@ -30,11 +31,40 @@ jobs:
         run: |
           set -euo pipefail
           docs_only=false
+          browser_tests=true
           if [[ "$EVENT" == pull_request ]]; then
             files=$(git diff --name-only "$BASE" "$HEAD")
-            if [[ -n "$files" ]] && ! grep -qv '\.md$' <<< "$files"; then docs_only=true; fi
+            if [[ -n "$files" ]] && ! grep -qv '\.md$' <<< "$files"; then
+              docs_only=true
+              browser_tests=false
+            elif [[ -n "$files" ]]; then
+              browser_tests=false
+              while IFS= read -r file; do
+                case "$file" in
+                  *.md|docs/*|machine/*|src/*|formal/*|graph/*|graphify-out/*|prototypes/*|spikes/*|.claude/*|.codex/*|.impeccable/*|.dependency-cruiser.mjs|.env.example|.gitattributes|.gitignore|.graphifyignore|.mcp.json|eslint.config.mjs|skills-lock.json|stryker.config.mjs)
+                    ;;
+                  .agents/skills/verify-julia/*)
+                    browser_tests=true
+                    break
+                    ;;
+                  .agents/*)
+                    ;;
+                  scripts/firebase-emulators.mjs|scripts/test-owners.mjs|scripts/test-owners-playwright.mjs)
+                    browser_tests=true
+                    break
+                    ;;
+                  scripts/*)
+                    ;;
+                  *)
+                    browser_tests=true
+                    break
+                    ;;
+                esac
+              done <<< "$files"
+            fi
           fi
           echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+          echo "browser_tests=$browser_tests" >> "$GITHUB_OUTPUT"
 
   repository-hygiene:
     runs-on: ubuntu-22.04
@@ -67,27 +97,38 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.14.1
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.4
-      - name: Cache the Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '**/bun.lock', '**/bun.lockb') }}
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            dashboard/package-lock.json
       - name: Plan the test owners
         run: node scripts/test-owners.mjs --plan
-      - name: Install locked dependencies
-        run: node scripts/test-owners.mjs --install
       - name: Install each local owner's locked dependencies
         run: node scripts/test-owners.mjs --install local
       - name: Run local owners' tests
         run: node scripts/test-owners.mjs --run local
+
+  browser-tests:
+    needs: changes
+    if: needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.browser_tests == 'true'
+    runs-on: ubuntu-22.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.1
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            dashboard/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
       - name: Install each browser owner's locked dependencies
         run: node scripts/test-owners.mjs --install browser
-      - name: Install each browser owner's Chromium
-        run: node scripts/test-owners.mjs --install-browsers browser
       - name: Run skill-owned browser tests
         run: node scripts/test-owners.mjs --run browser
 
@@ -100,12 +141,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.14.1
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
       - name: Install the application's locked dependencies
         run: npm ci
-      - name: Install each browser owner's locked dependencies
-        run: node scripts/test-owners.mjs --install browser
-      - name: Install each browser owner's Chromium
-        run: node scripts/test-owners.mjs --install-browsers browser
       - name: Guard the workflow folder
         run: npm run guard:flow
       - name: Guard the Julia and machine boundary
@@ -114,14 +153,16 @@ jobs:
         run: npm run build
 
   checks:
-    needs: [changes, repository-hygiene, package-tests, web]
+    needs: [changes, repository-hygiene, package-tests, browser-tests, web]
     if: always()
     runs-on: ubuntu-22.04
     env:
       CHANGES: ${{ needs.changes.result }}
       DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+      BROWSER_TESTS_NEEDED: ${{ needs.changes.outputs.browser_tests }}
       REPOSITORY_HYGIENE: ${{ needs.repository-hygiene.result }}
       PACKAGE_TESTS: ${{ needs.package-tests.result }}
+      BROWSER_TESTS: ${{ needs.browser-tests.result }}
       WEB: ${{ needs.web.result }}
     steps:
       - name: Require every job to pass
@@ -131,8 +172,14 @@ jobs:
           [[ "$REPOSITORY_HYGIENE" == success ]]
           if [[ "$DOCS_ONLY" == true ]]; then
             [[ "$PACKAGE_TESTS" == skipped ]]
+            [[ "$BROWSER_TESTS" == skipped ]]
             [[ "$WEB" == skipped ]]
           else
             [[ "$PACKAGE_TESTS" == success ]]
             [[ "$WEB" == success ]]
+            if [[ "$BROWSER_TESTS_NEEDED" == true ]]; then
+              [[ "$BROWSER_TESTS" == success ]]
+            else
+              [[ "$BROWSER_TESTS" == skipped ]]
+            fi
           fi
