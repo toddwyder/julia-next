@@ -34,20 +34,35 @@ export function splitModelId(id = '') {
 }
 
 // Mastra's usage counts cache reads inside the input and reasoning inside the output.
-export function tokensFromUsage(usage = {}) {
+// ModelRouterLanguageModel (AI SDK LanguageModelV3) returns nested objects for inputTokens/outputTokens.
+function normalizeUsage(usage = {}) {
   const number = value => (Number.isFinite(Number(value)) ? Number(value) : 0);
-  const input = number(usage.inputTokens);
-  const output = number(usage.outputTokens);
-  const cached = number(usage.cachedInputTokens);
-  const reasoning = number(usage.reasoningTokens);
+  if (usage && typeof usage.inputTokens === 'object' && usage.inputTokens !== null) {
+    return {
+      inputTokens: number(usage.inputTokens.total),
+      outputTokens: number(usage.outputTokens?.total),
+      cachedInputTokens: number(usage.inputTokens.cacheRead),
+      reasoningTokens: number(usage.outputTokens?.reasoning),
+    };
+  }
   return {
-    totalInput: input,
-    totalOutput: output,
-    inputText: Math.max(input - cached, 0),
-    cacheRead: cached,
+    inputTokens: number(usage?.inputTokens),
+    outputTokens: number(usage?.outputTokens),
+    cachedInputTokens: number(usage?.cachedInputTokens),
+    reasoningTokens: number(usage?.reasoningTokens),
+  };
+}
+
+export function tokensFromUsage(usage = {}) {
+  const norm = normalizeUsage(usage);
+  return {
+    totalInput: norm.inputTokens,
+    totalOutput: norm.outputTokens,
+    inputText: Math.max(norm.inputTokens - norm.cachedInputTokens, 0),
+    cacheRead: norm.cachedInputTokens,
     cacheWrite: 0,
-    outputText: Math.max(output - reasoning, 0),
-    outputReasoning: reasoning,
+    outputText: Math.max(norm.outputTokens - norm.reasoningTokens, 0),
+    outputReasoning: norm.reasoningTokens,
   };
 }
 
@@ -120,11 +135,11 @@ export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, correct
   // because the provider bills them all. Only the first crossing call reports a stop, so the calls
   // already in flight are not turned into errors; the stage in front of the next agent refuses.
   const record = ({ provider, model, usage, agent = null, at = now() } = {}) => {
-    const missing = !usage || (!(Number(usage.inputTokens) > 0) && !(Number(usage.outputTokens) > 0));
+    const tokens = tokensFromUsage(usage);
+    const missing = !usage || (!(tokens.totalInput > 0) && !(tokens.totalOutput > 0));
     if (missing) return { usd: 0, stop: stop(STOP_REASONS.usage) };
     const price = priceOf({ provider, model, at });
     if (!price) return { usd: 0, stop: stop(STOP_REASONS.unpriced) };
-    const tokens = tokensFromUsage(usage);
     const { usd, peak } = costOfTokens({ price, tokens });
     const alreadyStopped = Boolean(ledger.stop);
     ledger.total += usd;

@@ -419,3 +419,23 @@ test('the Studio record and the card ledger agree on what the card spent', async
   assert.equal(spending.total, Number(record.usd.toFixed(12)));
   rmSync(dir, { recursive: true, force: true });
 });
+
+test('spending.record accepts LanguageModelV3 nested usage objects from memory calls', () => {
+  const { dir, spending } = openCase();
+  spending.begin(CARD);
+  const res = spending.record({
+    provider: 'commandcode',
+    model: DEEPSEEK,
+    agent: 'memory',
+    usage: {
+      inputTokens: { total: 1000, noCache: 600, cacheRead: 400 },
+      outputTokens: { total: 200, text: 150, reasoning: 50 },
+    },
+  });
+  assert.equal(res.stop, null);
+  assert.ok(res.usd > 0);
+  assert.equal(spending.calls[0].inputTokens, 1000);
+  assert.equal(spending.calls[0].outputTokens, 200);
+  assert.equal(spending.calls[0].cacheReadTokens, 400);
+  rmSync(dir, { recursive: true, force: true });
+});

@@ -23,7 +23,7 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/scratch.mjs` | The run folder: artifacts, verdicts and the report a stop leaves. | `a1e2a8ce8239fb807d186c08892fe19404148a3f19dd3c7a74496237c20957aa` |
 | `machine/flow/copy.mjs` | The fresh copy of the repository each card builds in, and its removal when the card ends. | `5e850b67c8bc89eeff9796092cae93b3b15988cbe7f7b02495b910a216de81f2` |
 | `machine/flow/review.mjs` | The Shipping review: finds the card's pull request, names the commit it reviews, builds the reviewer's task, reads the verdict. | `1b3ac557ab1399b3fae8cc54e949835e8dee90151c42586fea88928fdfce9ea0` |
-| `machine/flow/spending.mjs` | The per-card spending ledger, its dollar limit and the processor that counts each model call. | `ccffc96d67219119cd7d73d0ad5aa580c13af9db0b887778cb306ec9fa8b2fe9` |
+| `machine/flow/spending.mjs` | The per-card spending ledger, its dollar limit and the processor that counts each model call. | `5168a03b3b3f176b160da0b8b0b8fd23c7557b3eea819d263b923ebc823da1d7` |
 | `machine/flow/card-ledger.mjs` | Reads and writes the spending ledger file for one card. | `ca37db467cee81f57e7da2cc852c4ed2c405a605cf8b0db6b0a6f14b21d2d5ff` |
 | `machine/flow/mastra.mjs` | Storage and tracing, so a run is written down and priced. | `9655b2ef9a05f688222fed78825a7faf8bd3e1d55ac0bcb43bc7307c90b55ab2` |
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `ebf105fa6eb755aff0b7692722982bc9986fba37dd410f018ba8ba0a2a2870c9` |
