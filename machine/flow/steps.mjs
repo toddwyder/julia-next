@@ -99,7 +99,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     if (!issue) throw new Error(`Linear card ${card} could not be read.`);
     if (buildRounds === 1) await review.moveCard(card, 'Implementation');
     const backNote = state.checkReasons?.length > 0 ? `\n\n## Previous check failure\n${state.checkReasons.at(-1)}` : '';
-    const playbookNote = '\n\n## Playbook step\nAs your first act before any other tool call, call `choose_playbook` with the poteto-mode playbook name for this card (for example `feature`, `bug-fix`, `investigation`, `refactoring`). Keep every `playbook_*` item\'s content word for word (only append `skip: <reason>` when leaving a step undone); use `task_complete` or `task_update` with `status` alone to mark a step done, and place any step-required sub-items (such as Feature step 3\'s four throughput checkpoint items) immediately after that step rather than overwriting it.';
+    const playbookNote = '\n\n## Playbook step\nAs your first act before any other tool call, call `choose_playbook` with the poteto-mode playbook name for this card (for example `feature`, `bug-fix`, `investigation`, `refactoring`). Keep every `playbook_*` item\'s content word for word (only append `skip: <reason>` when leaving a step undone); use `task_complete` or `task_update` with `status` alone to mark a step done (read a named skill\'s `SKILL.md` before marking its step done), and place any step-required sub-items (such as Feature step 3\'s four throughput checkpoint items) immediately after that step rather than overwriting it.';
     return { ...inputData, card, detail: `build round ${buildRounds} started in ${copy.folder}`, prompt: `${taskFromCard(issue)}${backNote}${playbookNote}` };
   });
 
