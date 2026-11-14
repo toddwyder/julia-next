@@ -143,17 +143,28 @@ const checkTaskList = (spans, byId) => {
   if (!chosenSteps || chosenSteps.length === 0) return ['playbook: no playbook chosen'];
   if (tasks.length === 0) return ['task list: no tasks recorded'];
 
-  const playbookFailures = chosenSteps.flatMap((step, index) => {
-    const atIndex = tasks[index];
-    if (atIndex && matchesPlaybookStep(atIndex.content, step)) return [];
-    const elsewhere = tasks.findIndex(task => matchesPlaybookStep(task.content, step));
-    if (elsewhere === -1) return [`playbook: missing step "${step}"`];
-    return [`playbook: step "${step}" must appear before card items`];
-  });
+  let cursor = -1;
+  const playbookFailures = [];
+  for (const [stepIndex, step] of chosenSteps.entries()) {
+    const foundAfterCursor = tasks.findIndex((task, idx) => idx > cursor && matchesPlaybookStep(task.content, step));
+    if (foundAfterCursor !== -1) {
+      if (stepIndex === 0 && foundAfterCursor !== 0) {
+        playbookFailures.push(`playbook: step "${step}" must appear before card items`);
+      }
+      cursor = foundAfterCursor;
+      continue;
+    }
+    const foundAnywhere = tasks.findIndex(task => matchesPlaybookStep(task.content, step));
+    if (foundAnywhere === -1) {
+      playbookFailures.push(`playbook: missing step "${step}"`);
+    } else {
+      playbookFailures.push(`playbook: step "${step}" must appear in order after previous playbook steps`);
+    }
+  }
   if (playbookFailures.length > 0) return playbookFailures;
 
   return tasks.flatMap(task => {
-    if (/\bskip\s*:\s*\S/i.test(task.content)) return [];
+    if (/\b(?:skip|n\/a)\s*:\s*\S/i.test(task.content)) return [];
     if (task.status !== 'completed') return [`task list: "${task.content}" is ${task.status}`];
     const failure = checkTaskWork(task, spans.slice(0, task.completedAtIndex));
     return failure ? [failure] : [];

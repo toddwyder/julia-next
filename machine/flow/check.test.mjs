@@ -192,6 +192,74 @@ test('evaluateBuildCheck fails when a playbook step is ticked without matching w
   assert.equal(skippedOk.ok, true);
 });
 
+test('evaluateBuildCheck allows step sub-items after a playbook step and n/a checkpoint items', () => {
+  const checkpointAfterStep3 = evaluateBuildCheck({
+    spans: [
+      span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
+      span({ spanId: 'pb', parentSpanId: 'lead', name: 'choose_playbook', input: { playbook: 'feature' }, output: { ok: true, isError: false, playbook: 'feature', steps: ['Step one', 'Step two', 'Step three', 'Step four'] } }),
+      span({
+        spanId: 'tw',
+        parentSpanId: 'lead',
+        name: 'task_write',
+        input: {
+          tasks: [
+            { id: 'playbook_1', content: 'Step one', status: 'completed' },
+            { id: 'playbook_2', content: 'Step two skip: single file', status: 'pending' },
+            { id: 'playbook_3', content: 'Step three', status: 'completed' },
+            { id: 'cp_1', content: 'Blocking first steps: none', status: 'completed' },
+            { id: 'cp_2', content: 'Independent workstreams: n/a: single file', status: 'pending' },
+            { id: 'cp_3', content: 'Shared mutable state: n/a: no shared state', status: 'pending' },
+            { id: 'cp_4', content: 'Smallest safe decomposition: one edit', status: 'completed' },
+            { id: 'playbook_4', content: 'Step four', status: 'completed' },
+          ],
+        },
+      }),
+    ],
+  });
+  assert.equal(checkpointAfterStep3.ok, true, checkpointAfterStep3.reason);
+
+  const cardBeforeFirstStep = evaluateBuildCheck({
+    spans: [
+      span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
+      span({ spanId: 'pb', parentSpanId: 'lead', name: 'choose_playbook', input: { playbook: 'feature' }, output: { ok: true, isError: false, playbook: 'feature', steps: ['Step one', 'Step two'] } }),
+      span({
+        spanId: 'tw',
+        parentSpanId: 'lead',
+        name: 'task_write',
+        input: {
+          tasks: [
+            { id: 'c1', content: 'Card item first', status: 'completed' },
+            { id: 'playbook_1', content: 'Step one', status: 'completed' },
+            { id: 'playbook_2', content: 'Step two', status: 'completed' },
+          ],
+        },
+      }),
+    ],
+  });
+  assert.equal(cardBeforeFirstStep.ok, false);
+  assert.match(cardBeforeFirstStep.reason, /must appear before card items/);
+
+  const outOfOrder = evaluateBuildCheck({
+    spans: [
+      span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
+      span({ spanId: 'pb', parentSpanId: 'lead', name: 'choose_playbook', input: { playbook: 'feature' }, output: { ok: true, isError: false, playbook: 'feature', steps: ['Step one', 'Step two'] } }),
+      span({
+        spanId: 'tw',
+        parentSpanId: 'lead',
+        name: 'task_write',
+        input: {
+          tasks: [
+            { id: 'playbook_2', content: 'Step two', status: 'completed' },
+            { id: 'playbook_1', content: 'Step one', status: 'completed' },
+          ],
+        },
+      }),
+    ],
+  });
+  assert.equal(outOfOrder.ok, false);
+  assert.match(outOfOrder.reason, /must appear in order/);
+});
+
 test('evaluateBuildCheck fails when a named proof lacks valid saved evidence', () => {
   const trivial = evaluateBuildCheck({
     spans: cleanLeadSpans(),
