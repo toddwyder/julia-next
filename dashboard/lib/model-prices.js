@@ -9,14 +9,30 @@
 import { createRequire } from 'node:module';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dashboardRoot = dirname(here);
 const require = createRequire(import.meta.url);
 
-export const DEFAULT_CORRECTIONS = join(dashboardRoot, 'config', 'price-corrections.json');
+function findCorrectionsFile() {
+  const direct = join(dashboardRoot, 'config', 'price-corrections.json');
+  if (existsSync(direct)) return direct;
+  for (const base of [process.env.FLOW_REPO, process.env.MASTRA_PROJECT_ROOT, process.cwd()].filter(Boolean)) {
+    let dir = resolve(base);
+    while (true) {
+      const candidate = join(dir, 'dashboard', 'config', 'price-corrections.json');
+      if (existsSync(candidate)) return candidate;
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
+  return direct;
+}
+
+export const DEFAULT_CORRECTIONS = findCorrectionsFile();
 export const CACHE_FILE = join(homedir(), '.cache', 'mastra', 'pricing-data.json');
 const MIN_PRICED_MODELS = 1000;
 const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
@@ -116,13 +132,14 @@ export function loadCatalog({ env = process.env, cacheFile, bundledFile } = {}) 
   throw new Error(`No Mastra price list was readable. Looked at ${files.join(', ')}.${problems.length ? ` ${problems.join('; ')}` : ''}`);
 }
 
-export function readCorrections({ file = DEFAULT_CORRECTIONS, env = process.env } = {}) {
+export function readCorrections({ file = findCorrectionsFile(), env = process.env } = {}) {
   const path = env.PRICE_CORRECTIONS || file;
-  if (!existsSync(path)) return { peakWindows: [], freeModels: [], excludeDates: [], overrides: {}, source: null };
+  if (!existsSync(path)) {
+    throw new Error(`Missing price corrections setting: ${path}`);
+  }
   const data = JSON.parse(readFileSync(path, 'utf8'));
   return {
     peakWindows: Array.isArray(data.peakWindows) ? data.peakWindows : [],
-    freeModels: Array.isArray(data.freeModels) ? data.freeModels : [],
     excludeDates: Array.isArray(data.excludeDates) ? data.excludeDates : [],
     overrides: data.overrides && typeof data.overrides === 'object' ? data.overrides : {},
     source: path,
@@ -209,13 +226,6 @@ function peakMultiplier(corrections, provider, model, at) {
   return null;
 }
 
-function isListedFree(corrections, provider, model) {
-  return (corrections.freeModels ?? []).some(entry => {
-    const [entryProvider, ...rest] = String(entry).split('/');
-    return normalizeProvider(entryProvider) === normalizeProvider(provider) && canonicalModel(rest.join('/')) === canonicalModel(model);
-  });
-}
-
 function baseRates(cost) {
   if (!cost) return null;
   const input = Number(cost.input);
@@ -250,12 +260,11 @@ function overrideCost(corrections, provider, model) {
 export function priceFor({ catalog, corrections = {}, provider, model, at = null }) {
   const override = overrideCost(corrections, provider, model);
   const cost = override ? { cost: override } : findCost(catalog, provider, model);
-  const listedFree = isListedFree(corrections, provider, model);
   const rates = baseRates(cost?.cost);
-  if (!rates && !listedFree) return null;
-  const free = listedFree || (rates?.input === 0 && rates?.output === 0);
+  if (!rates) return null;
+  const free = rates.input === 0 && rates.output === 0;
   const multiplier = free || !at ? 1 : (peakMultiplier(corrections, provider, model, at) ?? 1);
-  const base = rates ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  const base = rates;
   const scaled = value => value * multiplier;
   return {
     provider: normalizeProvider(provider),

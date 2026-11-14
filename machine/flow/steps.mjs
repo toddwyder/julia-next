@@ -11,43 +11,17 @@ import { z } from 'zod';
 
 import { realCheck } from './check.mjs';
 import { closeCopy, openCopy } from './copy.mjs';
-import { tokenReport } from './report.mjs';
+import { reportText } from './report.mjs';
 import { REVIEW_TIME_LIMIT_MS, criteriaFromCard, parseVerdict, realReview, reviewTask, verdictComment } from './review.mjs';
 import { cardState, flowData, runInput } from './schema.mjs';
 import { HELPER_CONCURRENCY } from './spending.mjs';
 import { taskFromCard } from './task.mjs';
 import { nextVerdict, openRun, readArtifact, sweepBuild, writeArtifact, writeLanding, writeReport, writeRetro } from './scratch.mjs';
 
-// The words a stop leaves behind are the same wherever the card stops. A stop on spending also
-// states the most the card can overshoot: the helpers running when the cap was crossed, each worth
-// at worst the dearest call the card has already paid for.
-const reportText = (state, detail, spending) => {
-  const dearest = Math.max(0, ...(spending?.calls ?? []).map(call => call.usd));
-  const overshoot = state.stopPart === 'Spending' && dearest > 0
-    ? [`Worst overshoot: $${(HELPER_CONCURRENCY * dearest).toFixed(3)} (${HELPER_CONCURRENCY} helpers x $${dearest.toFixed(3)}, the dearest call on this card)`]
-    : [];
-  return [
-    `# ${state.card} stopped`,
-    '',
-    `Part: ${state.stopPart || 'unknown'}`,
-    `Why: ${state.stopWhy || 'no reason recorded'}`,
-    `Check returns: ${state.checkReturns ?? 0}`,
-    `Shipping failures: ${state.failCount}`,
-    `Failures counted: ${state.failCount}`,
-    `Shipping rounds: ${state.reviewRound}`,
-    `Build rounds: ${state.buildRounds}`,
-    ...(state.copy ? [`Copy: ${state.copy}`, `Started from main at: ${state.base}`] : []),
-    `Last detail: ${detail || 'none'}`,
-    ...overshoot,
-    '',
-    ...tokenReport(spending?.calls ?? []),
-    '',
-    'A second failure stops the card; the next step is an Investigation.',
-  ].join('\n');
-};
-
 const step = (id, execute, extra = {}) =>
   createStep({ id, inputSchema: flowData, outputSchema: flowData, ...extra, execute });
+
+const REQUIRED_TASK_TOOLS = ['task_write', 'task_update', 'task_complete', 'task_check'];
 
 export function createStages({ agents, dir, repo, review = realReview, check = realCheck }) {
   const spending = agents.spending;
@@ -61,8 +35,9 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     const ids = stage ? agents.spendingIds?.[stage]?.() : null;
     const reason = spending?.stopReason() ?? spending?.blockingReason(ids ?? null) ?? null;
     if (!reason) return null;
-    if (state.stopPart !== 'Spending' || state.stopWhy !== reason) {
-      await setState({ ...state, stopPart: 'Spending', stopWhy: reason });
+    const part = spending?.stopPart?.() ?? 'Spending';
+    if (state.stopPart !== part || state.stopWhy !== reason) {
+      await setState({ ...state, stopPart: part, stopWhy: reason });
     }
     // A stage whose input came from an agent (`{ text }`) still has to hand card data to the
     // next step, so the two things the run started with come from saved state.
@@ -73,7 +48,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
   // the ledger's processor. The refusal is the card stopping, not the run failing, so the stage
   // hands back the same stopped data as a stage that was turned away before it called.
   const refused = async (context, error) => {
-    if (!/TripWire/.test(String(error?.message ?? error))) return null;
+    if (error?.name !== 'TripWire' && !/TripWire/.test(String(error?.message ?? error))) return null;
     return halt(context);
   };
 
@@ -85,6 +60,11 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     inputSchema: runInput,
     outputSchema: flowData,
     execute: async ({ inputData, state, setState }) => {
+      const toolNames = Object.keys((await agents.build.listTools?.()) ?? agents.build.tools ?? {});
+      const missing = REQUIRED_TASK_TOOLS.filter(name => !toolNames.includes(name));
+      if (missing.length > 0) {
+        throw new Error(`Lead is missing required task tools (${missing.join(', ')}). Check the Lead memory setting before starting a card.`);
+      }
       await setState({ ...state, card: inputData.card, kind: inputData.kind });
       openRun(dir, inputData.card);
       spending?.begin(inputData.card);
@@ -125,7 +105,16 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
         const response = await agents.build.stream(inputData.prompt, { requestContext, tracingContext, metrics });
         return { text: (await response.text) ?? '' };
       } catch (error) {
-        if (!/TripWire/.test(String(error?.message ?? error))) throw error;
+        if (error?.name !== 'TripWire' && !/TripWire/.test(String(error?.message ?? error))) throw error;
+        if (!spending?.stopReason()) {
+          const memoryError = spending?.lastMemoryError?.();
+          const observerFailure = error?.options?.metadata?.observerFailure;
+          if (memoryError || observerFailure || /observational-memory/i.test(String(error?.message ?? ''))) {
+            const modelName = memoryError?.model ?? spending?.memoryModel ?? 'unknown';
+            const detail = memoryError?.message ?? String(error?.message ?? error);
+            spending?.stop(`Memory model ${modelName} failed: ${detail}`, 'Memory');
+          }
+        }
         return { text: '' };
       }
     },
@@ -349,7 +338,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
   }));
 
   const stopReport = step('stop-report', async ({ inputData, state }) => {
-    const path = writeReport(cardDir(state.card), state.card, reportText(state, inputData.detail, spending));
+    const path = writeReport(cardDir(state.card), state.card, reportText(state, inputData.detail, spending, HELPER_CONCURRENCY));
     return { ...inputData, stopped: true, finished: true, detail: `stop report at ${path}` };
   });
 
@@ -378,7 +367,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
   const cleanup = step('cleanup', async ({ inputData, state }) => {
     closeCopy({ repo, card: state.card });
     const report = join(cardDir(state.card), 'reports', `${state.card}.md`);
-    if (!existsSync(report)) writeReport(cardDir(state.card), state.card, reportText(state, inputData.detail, spending));
+    if (!existsSync(report)) writeReport(cardDir(state.card), state.card, reportText(state, inputData.detail, spending, HELPER_CONCURRENCY));
     sweepBuild(cardDir(state.card));
     return { ...inputData, finished: true, detail: `${state.card} cleaned up` };
   });

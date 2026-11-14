@@ -33,15 +33,25 @@ export function repoRoot() {
 
 // The card's spending total is read from its own folder, so every agent in the run adds to the
 // same ledger and a rerun carries the total it already spent.
-export function createAgents({ model, leadModel, helperModel, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {}, dir = process.env.FLOW_DIR ?? '.artifacts/flow/studio', spending = openSpending({ dir }) } = {}) {
+export function createAgents({ model, leadModel, helperModel, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {}, dir = process.env.FLOW_DIR ?? '.artifacts/flow/studio', spending } = {}) {
+  // An explicit model is a caller's override, as in a test. Otherwise each stage takes the
+  // model Todd saved for it; a missing line stops here and names that stage.
+  const stages = model
+    ? { shipping: model, remediation: model, retro: model, memory: typeof model === 'string' ? model : null }
+    : readStageModels(roleModelsFile);
+  const stageModel = id => (model ? model : agentModel(stages[id]));
+  const cardSpending = spending ?? openSpending({
+    dir,
+    memoryModel: () => (model ? (typeof model === 'string' ? model : null) : readStageModels(roleModelsFile).memory),
+  });
   // A stopped card starts no new helper. The hook runs before the helper does, and what it throws
   // comes back to the Lead as a failed tool call.
-  const buildHooks = helperStartHook(spending);
+  const buildHooks = helperStartHook(cardSpending);
   // The input side stops a call the card cannot afford, and the output side adds the call's
   // dollars. Mastra runs `processOutputStep` only for output processors, so the same processor
   // goes into both lists and remembers the model the input step saw.
   const cardProcessors = (ids, options) => {
-    const guard = spendingProcessor(spending, ids, options);
+    const guard = spendingProcessor(cardSpending, ids, options);
     return { inputProcessors: [costGuard(), guard], outputProcessors: [guard] };
   };
   // `createCodingAgent` uses any output list it is given verbatim, so a coding agent must name
@@ -49,6 +59,39 @@ export function createAgents({ model, leadModel, helperModel, repo = repoRoot(),
   const codingProcessors = (ids, options) => {
     const processors = cardProcessors(ids, options);
     return { ...processors, outputProcessors: [new CyberRefusalHandler(), ...processors.outputProcessors] };
+  };
+  const taskListGuard = () => {
+    let opened = false;
+    let remindedAtStep = null;
+    const hasTaskWrite = calls => Array.isArray(calls) && calls.some(call => (call?.toolName ?? call?.name) === 'task_write');
+    return {
+      id: 'task-list-guard',
+      processInputStep: async ({ stepNumber = 0, steps = [], messageList, abort }) => {
+        if (stepNumber === 0) {
+          opened = false;
+          remindedAtStep = null;
+          return;
+        }
+        if (opened || steps.some(step => hasTaskWrite(step?.toolCalls))) {
+          opened = true;
+          return;
+        }
+        if (stepNumber < 2) return;
+        if (remindedAtStep === null) {
+          remindedAtStep = stepNumber;
+          messageList?.add?.({ role: 'user', content: 'You are working without a task list. Open your task list with `task_write` now before continuing.' }, 'input');
+          return;
+        }
+        if (stepNumber >= remindedAtStep + 2) {
+          const reason = 'Lead worked without opening a task list (no task_write call after reminder)';
+          cardSpending.stop(reason, 'Task list');
+          abort(reason, { metadata: { reason, part: 'Task list' } });
+        }
+      },
+      processOutputStep: async ({ toolCalls }) => {
+        if (hasTaskWrite(toolCalls)) opened = true;
+      },
+    };
   };
   // A run names the copy of the repository its card works in. A call outside a card, such as a
   // settings read, works in the repository Studio runs from.
@@ -74,19 +117,22 @@ export function createAgents({ model, leadModel, helperModel, repo = repoRoot(),
       instructions: skillInstruction,
       model: helperModel ? (typeof helperModel === 'function' ? helperModel(role, index, modelId) : helperModel) : agentModel(modelId),
       ...codingProcessors(() => splitModelId(modelId)),
-      ...cardMemory(spending),
+      ...cardMemory(cardSpending),
       workspace: cardWorkspace('machine-repo-helper', { skills: ['.agents/skills'] }),
       tools,
       defaultOptions: { maxSteps: 100 },
     })];
   })));
+  const leadTaskGuard = taskListGuard();
+  const leadProcessors = codingProcessors(() => splitModelId(leadModelId(leadModelFile)), { refuseAfterStop: true });
   const build = createCodingAgent({
     id: 'flow-build',
     name: 'Lead',
     instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
     model: leadModel ?? buildModelReader(leadModelFile),
-    ...codingProcessors(() => splitModelId(leadModelId(leadModelFile)), { refuseAfterStop: true }),
-    ...cardMemory(spending),
+    inputProcessors: [...leadProcessors.inputProcessors, leadTaskGuard],
+    outputProcessors: [...leadProcessors.outputProcessors, leadTaskGuard],
+    ...cardMemory(cardSpending),
     workspace: cardWorkspace('machine-repo', { readOnly: true, skills: ['.agents/skills'] }),
     agents: helpers,
     tools,
@@ -99,11 +145,6 @@ export function createAgents({ model, leadModel, helperModel, repo = repoRoot(),
   // The reader runs later, so check the setting now: a missing Lead model stops Studio at boot
   // and names the installer, as it did when the model was resolved here.
   leadModelId(leadModelFile);
-
-  // An explicit model is a caller's override, as in a test. Otherwise each stage takes the
-  // model Todd saved for it; a missing line stops here and names that stage.
-  const stages = model ? { shipping: model, remediation: model, retro: model } : readStageModels(roleModelsFile);
-  const stageModel = id => (model ? model : agentModel(stages[id]));
 
   const shipping = new Agent({
     id: 'flow-shipping',
@@ -149,5 +190,5 @@ export function createAgents({ model, leadModel, helperModel, repo = repoRoot(),
     retro: () => (model ? null : splitModelId(stages.retro)),
   };
 
-  return { build, shipping, remediation, retro, spending, spendingIds };
+  return { build, shipping, remediation, retro, spending: cardSpending, spendingIds };
 }

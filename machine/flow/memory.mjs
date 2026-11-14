@@ -1,8 +1,8 @@
-// The memory note-takers. Both run on the free model the card picked when it started, so a card's
-// memory adds $0 to its total and its calls still show in the total under that model's name.
+// The memory note-takers. Both run on the Memory model Todd picked in the model picker,
+// so their calls count toward the card's spending total under that model's name.
 //
-// Mastra's own defaults apply to both note-takers: eight retries after a failed call and Mastra's
-// 100,000-token answer limit. The machine sets neither.
+// Mastra's own defaults apply to both note-takers: eight retries after a failed call,
+// Mastra's 100,000-token answer limit, and `failurePolicy: 'abort'`. The machine sets none.
 
 import { ModelRouterLanguageModel } from '@mastra/core/llm';
 import { Memory } from '@mastra/memory';

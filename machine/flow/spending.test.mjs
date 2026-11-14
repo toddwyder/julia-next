@@ -343,6 +343,7 @@ test('the card path stops a card that crosses its limit and writes the reason in
         name: 'Lead',
         instructions: 'Reply with one line.',
         model: fakeModel({ text: 'built line', usage: { inputTokens: 10_000, outputTokens: 1_000, totalTokens: 11_000 } }),
+        tools: { task_write: { id: 'task_write' }, task_update: { id: 'task_update' }, task_complete: { id: 'task_complete' }, task_check: { id: 'task_check' } },
         ...guarded(spending, () => ({ provider: 'commandcode', model: DEEPSEEK })),
       });
       const stub = text => ({ generate: async () => ({ text }), stream: async () => ({ text: Promise.resolve(text) }) });

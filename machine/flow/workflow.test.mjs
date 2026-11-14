@@ -40,8 +40,15 @@ const contents = repo => readdirSync(repo, { recursive: true })
   .filter(entry => !String(entry).startsWith('.git'))
   .sort();
 
+const TASK_TOOL_STUBS = {
+  task_write: { id: 'task_write' },
+  task_update: { id: 'task_update' },
+  task_complete: { id: 'task_complete' },
+  task_check: { id: 'task_check' },
+};
+
 const buildOn = model =>
-  new Agent({ id: 'flow-build', name: 'Flow build', instructions: 'Reply with one line.', model });
+  new Agent({ id: 'flow-build', name: 'Flow build', instructions: 'Reply with one line.', model, tools: TASK_TOOL_STUBS });
 
 // The Codex route answers only a streamed request, so a stage agent that is asked to generate fails the way
 // it does there: HTTP 400 "Stream must be set to true".
@@ -259,6 +266,7 @@ const buildInCopy = (log, note) =>
     name: 'Flow build',
     instructions: 'Reply with one line.',
     model: createMockModel({ mockText: 'built line' }),
+    tools: TASK_TOOL_STUBS,
     workspace: ({ requestContext } = {}) => {
       const folder = requestContext?.get?.('cardCheckout') ?? join(tmpdir(), 'no-card-copy');
       const entry = {
@@ -534,4 +542,73 @@ test('an answer for another request is refused and the same run still takes the 
   assert.equal(right.result.landed, true);
 
   rmSync(dirCase, { recursive: true, force: true });
+});
+
+test('start refuses a card when the lead lacks its task tools and names what is missing', async t => {
+  const dirCase = mkdtempSync(join(tmpdir(), 'flow-no-tasks-'));
+  t.after(() => rmSync(dirCase, { recursive: true, force: true }));
+  const repo = studioRepo(dirCase);
+  openScratch(dirCase);
+  const noTaskBuild = new Agent({ id: 'flow-build', name: 'Flow build', instructions: 'Reply.', model: createMockModel({ mockText: 'ok' }) });
+  const caseWorkflow = buildCardPath({ agents: { ...agents, build: noTaskBuild }, dir: dirCase, repo, review: fakeReview(['PASS']).review, check: { run: async () => ({ ok: true }) } });
+  const mastra = await openMastra({
+    card: CARD,
+    stateDb: join(dirCase, 'state.db'),
+    traceDb: join(dirCase, 'trace.duckdb'),
+    workflow: caseWorkflow,
+  });
+  const w = mastra.getWorkflow(caseWorkflow.id);
+  const run = await w.createRun();
+  const result = await run.start({ inputData: { card: CARD, kind: 'machine' } });
+  assert.equal(result.status, 'failed');
+  assert.match(String(result.steps.start.error ?? result.error ?? ''), /missing required task tools/i);
+  await mastra.shutdown();
+});
+
+test('a memory model failure stops the card with a report naming the memory model and the failure', async t => {
+  const dirCase = mkdtempSync(join(tmpdir(), 'flow-mem-fail-'));
+  t.after(() => rmSync(dirCase, { recursive: true, force: true }));
+  const repo = studioRepo(dirCase);
+  openScratch(dirCase);
+  let memError = null;
+  const fakeSpending = {
+    started: true,
+    memoryModel: 'commandcode/deepseek/deepseek-v4.1-flash',
+    begin: () => {},
+    stopReason: () => memError?.reason ?? null,
+    stopPart: () => memError?.part ?? 'Spending',
+    blockingReason: () => null,
+    lastMemoryError: () => ({ model: 'commandcode/deepseek/deepseek-v4.1-flash', message: '429 rate limit' }),
+    stop: (reason, part) => { memError = { reason, part }; return reason; },
+  };
+  const { TripWire } = await import('@mastra/core/agent');
+  const failingBuild = {
+    listTools: async () => TASK_TOOL_STUBS,
+    stream: async () => {
+      throw new TripWire('Processor "observational-memory" stopped the run', { metadata: { observerFailure: { cause: { stopReason: 'model_error' } } } }, 'observational-memory');
+    },
+  };
+  const caseWorkflow = buildCardPath({
+    agents: { ...agents, build: failingBuild, spending: fakeSpending },
+    dir: dirCase,
+    repo,
+    review: fakeReview(['PASS']).review,
+    check: { run: async () => ({ ok: true }) },
+  });
+  const mastra = await openMastra({
+    card: CARD,
+    stateDb: join(dirCase, 'state.db'),
+    traceDb: join(dirCase, 'trace.duckdb'),
+    workflow: caseWorkflow,
+  });
+  const w = mastra.getWorkflow(caseWorkflow.id);
+  const run = await w.createRun();
+  const result = await run.start({ inputData: { card: CARD, kind: 'machine' } });
+  assert.equal(result.status, 'success');
+  assert.equal(result.steps.attempt.output.stopped, true);
+  const report = readFileSync(join(dirCase, CARD, 'reports', `${CARD}.md`), 'utf8');
+  assert.match(report, /Part: Memory/);
+  assert.match(report, /commandcode\/deepseek\/deepseek-v4\.1-flash/);
+  assert.match(report, /429 rate limit/);
+  await mastra.shutdown();
 });

@@ -9,25 +9,25 @@ of any size, not only a change to the sentence beside it.
 
 | Program | What it does | sha256 |
 | --- | --- | --- |
-| `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `2a1ca703541f3af49106e5944dde86cc00d292c1d1a98a1167b39eb312672bfb` |
+| `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `a2e9289b94a8564182de663f40cbfd206f5e723a66e8d82fdd189fcb00f6e48f` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `4b84d5954971a9cf744865a43b193ae752c9c77e6e303b55a918c09f607c0c9d` |
-| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `6ff220292c46c0fe0b0015681b7eabbabb4748e0d6f9dbeff9a690c394a014d8` |
+| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `87398553c813e3a39b8b5f34c90b5bcac98dd86bc1a598fc78784d034b41a1b3` |
 | `machine/flow/check.mjs` | The post-build check: verifies Lead task list and saved proof evidence before Shipping. | `8983092e73e1d715f0fe3250be133f1ef193190a8fe3f6b4d2037c3a49b9eb6d` |
 | `machine/flow/task.mjs` | The task the Lead is given, taken word for word from the card. | `21aca1ef4c2b964d729b93317061b1a23f0e38773b26e8aa1c9f951581fa62e7` |
-| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `1aa59dba274209c822adb090953ea1a17b4215d183bf59e715094bd08ffe9ba0` |
+| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `20f3f0646b5c0f6bd23805fa9e55ad6bdc6475ae687eb9ee3c6840920ea6af06` |
 | `machine/flow/graphify.mjs` | The Graphify graph tools offered to Lead and its helpers. | `c502bc49faa96ef1de469764696d1682347679a61a17629766940de5baf546b6` |
-| `machine/flow/memory.mjs` | The memory note-takers, run on the free model the card picked. | `6cfa75c87338129593ca9997b5408be0e1ccd5e4e9a4426babb2723430d46c4a` |
+| `machine/flow/memory.mjs` | The memory note-takers, run on the free model the card picked. | `37ebeb92d06754b930f8d7dad3117dd0348e5bfbb760773f7fd0b0ebaf3ebedc` |
 | `machine/flow/models.mjs` | The Lead model, read from its independent setting and routed through its account provider. | `271f19a5a292f05566244e8c5191b10526e811b9a068590d82f1b3116d83e0e9` |
 | `machine/flow/role-models.mjs` | The Lead helper models, read from the saved role table and routed to account providers. | `6946ce44710f02f3bfa74f5aacbe91f49fa65db28b4009cd5b1e2ccc78dbfceb` |
 | `machine/flow/schema.mjs` | What the run form asks for and what the run remembers. | `af611906c7b3260f625c895f13fd72a228959e444627e89b4f903d63da1c36a0` |
 | `machine/flow/scratch.mjs` | The run folder: artifacts, verdicts and the report a stop leaves. | `a1e2a8ce8239fb807d186c08892fe19404148a3f19dd3c7a74496237c20957aa` |
 | `machine/flow/copy.mjs` | The fresh copy of the repository each card builds in, and its removal when the card ends. | `5e850b67c8bc89eeff9796092cae93b3b15988cbe7f7b02495b910a216de81f2` |
 | `machine/flow/review.mjs` | The Shipping review: finds the card's pull request, names the commit it reviews, builds the reviewer's task, reads the verdict. | `1b3ac557ab1399b3fae8cc54e949835e8dee90151c42586fea88928fdfce9ea0` |
-| `machine/flow/spending.mjs` | The per-card spending ledger, its dollar limit and the processor that counts each model call. | `269f410a4f1200fd0f5566e9870ff8ea8771f28af5d1719a8b6fe038275d2139` |
+| `machine/flow/spending.mjs` | The per-card spending ledger, its dollar limit and the processor that counts each model call. | `ccffc96d67219119cd7d73d0ad5aa580c13af9db0b887778cb306ec9fa8b2fe9` |
 | `machine/flow/card-ledger.mjs` | Reads and writes the spending ledger file for one card. | `ca37db467cee81f57e7da2cc852c4ed2c405a605cf8b0db6b0a6f14b21d2d5ff` |
 | `machine/flow/mastra.mjs` | Storage and tracing, so a run is written down and priced. | `9655b2ef9a05f688222fed78825a7faf8bd3e1d55ac0bcb43bc7307c90b55ab2` |
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `ebf105fa6eb755aff0b7692722982bc9986fba37dd410f018ba8ba0a2a2870c9` |
 | `machine/flow/run.mjs` | Answers a waiting card, reads a run, writes its cost. No way to start one. | `6a76edaa92fdbadfbb55dd581e77c2556b33f9ccb4744c89e5fded579ab36e44` |
 | `machine/flow/trace.mjs` | Turns the trace file into the run cost record. | `8f5e7f991ed73a9f4c406b97862e5c335c3ece4c2f1c8440a24a2762c18c4801` |
-| `machine/flow/report.mjs` | The token table every card report carries, grouped by agent and model. | `3d9a898a9340668294c1da0f863dd21f19c562bd0f2b3047170d12913b03cf32` |
+| `machine/flow/report.mjs` | The token table every card report carries, grouped by agent and model. | `2bfc3e134e027d183c6a9b9a83f8256c4ce44c5467da1c54255ff83da6c821ad` |
 | `scripts/julia-agents.mjs` | Runs a machine command with the Julia keys it needs. | `7cfa91c10782d01d9e4130d395727ebaa195a956da65091f3acb2da9557a939a` |

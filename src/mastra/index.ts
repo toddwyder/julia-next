@@ -14,11 +14,12 @@ import { CARD_PATH } from '../../machine/flow/schema.mjs';
 import { openScratch } from '../../machine/flow/scratch.mjs';
 import { buildCardPath } from '../../machine/flow/workflow.mjs';
 
-const dir = resolve(process.env.FLOW_DIR ?? '.artifacts/flow/studio');
+const repo = repoRoot();
+const dir = resolve(repo, process.env.FLOW_DIR ?? '.artifacts/flow/studio');
 
 openScratch(dir);
-const agents = createAgents({ tools: await graphifyTools(), dir });
-const workflow = buildCardPath({ agents, dir, repo: repoRoot() });
+const agents = createAgents({ tools: await graphifyTools(), dir, repo });
+const workflow = buildCardPath({ agents, dir, repo });
 
 // Storage and observability come from the same place a resumed run uses, so the
 // model calls a Studio run makes are written to this run folder's trace file.

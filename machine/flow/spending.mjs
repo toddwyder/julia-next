@@ -51,27 +51,25 @@ export function tokensFromUsage(usage = {}) {
   };
 }
 
-export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, corrections, now = () => new Date() } = {}) {
+export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, corrections, memoryModel = null, now = () => new Date() } = {}) {
   let card = null;
   let file = null;
   let ledger = null;
-  let lists = null;
-
-  const priceList = () => {
-    if (lists) return lists;
-    lists = { catalog: catalog ?? null, corrections: corrections ?? {} };
-    if (!catalog) {
-      try { lists.catalog = loadCatalog(); } catch { lists.catalog = null; }
-    }
-    if (!corrections) {
-      try { lists.corrections = readCorrections(); } catch { lists.corrections = {}; }
-    }
-    return lists;
+  let memoryError = null;
+  const lists = {
+    catalog: catalog ?? loadCatalog(),
+    corrections: corrections ?? readCorrections(),
   };
+
+  const priceList = () => lists;
 
   const persist = () => {
     if (file) writeLedger(file, ledger);
   };
+
+  const resolveMemoryModel = () => (typeof memoryModel === 'function' ? memoryModel() : memoryModel) ?? null;
+
+  const getMemoryModel = () => ledger?.memoryModel ?? resolveMemoryModel();
 
   const begin = nextCard => {
     if (ledger && card === nextCard) return ledger;
@@ -80,9 +78,9 @@ export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, correct
     ledger = readLedger(file) ?? { card, limit, total: 0, calls: [], stop: null };
     ledger.card = card;
     ledger.limit = limit;
-    const memoryModel = getMemoryModel();
-    if (memoryModel && ledger.memoryModel !== memoryModel) {
-      ledger.memoryModel = memoryModel;
+    const chosenMemory = getMemoryModel();
+    if (chosenMemory && ledger.memoryModel !== chosenMemory) {
+      ledger.memoryModel = chosenMemory;
       persist();
     }
     return ledger;
@@ -91,22 +89,21 @@ export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, correct
   const priceOf = ({ provider, model, at = null }) =>
     priceFor({ ...priceList(), provider, model, at });
 
-  // The memory note-takers run on a free model the price list offers, so their calls add $0 to the
-  // card. The pick is made when the card starts and saved in its ledger, so a Studio restart keeps
-  // the same model even if the price list later offers another free one.
-  const freeModels = () => (priceList().corrections?.freeModels ?? []).filter(id => priceOf(splitModelId(id))?.free);
-  const getMemoryModel = () => ledger?.memoryModel ?? freeModels()[0] ?? null;
-
-  const stop = reason => {
+  const stop = (reason, part = 'Spending') => {
     if (!ledger) return reason;
     if (!ledger.stop) {
-      ledger.stop = { reason, at: now().toISOString() };
+      ledger.stop = { reason, part, at: now().toISOString() };
       persist();
     }
     return ledger.stop.reason;
   };
 
   const stopReason = () => ledger?.stop?.reason ?? null;
+  const stopPart = () => ledger?.stop?.part ?? null;
+  const recordMemoryError = (modelId, message) => {
+    memoryError = { model: modelId, message: String(message ?? 'unknown error') };
+  };
+  const lastMemoryError = () => memoryError;
 
   // Called before a model call. A card that already stopped stays stopped, a card at its limit
   // stops now, and a model the price list cannot price stops the card before it spends anything.
@@ -154,6 +151,9 @@ export function openSpending({ dir, limit = CARD_LIMIT_DOLLARS, catalog, correct
     record,
     stop,
     stopReason,
+    stopPart,
+    recordMemoryError,
+    lastMemoryError,
     blockingReason,
     get card() { return card; },
     get started() { return Boolean(ledger); },
@@ -214,28 +214,44 @@ export function spendingProcessor(spending, ids = null, { refuseAfterStop = fals
 // Memory note-takers call their own model outside the agent's processors, so that model is
 // wrapped instead. The wrapper records each call's usage and leaves the answer untouched.
 export function meteredModel(model, { spending, provider, model: name, agent = null }) {
+  const fullId = provider ? `${provider}/${name}` : name;
   const record = usage => {
     if (!spending.started) return;
     spending.record({ provider, model: name, usage, agent });
   };
+  const noteFailure = error => {
+    if (agent === 'memory') spending.recordMemoryError?.(fullId, error?.message ?? error);
+  };
   const wrapStream = async (...args) => {
-    const result = await model.doStream(...args);
+    let result;
+    try {
+      result = await model.doStream(...args);
+    } catch (error) {
+      noteFailure(error);
+      throw error;
+    }
     const [pass, tap] = result.stream.tee();
     const drain = async reader => {
       const { done, value } = await reader.read();
       if (done) return;
+      if (value?.type === 'error') noteFailure(value.error);
       if (value?.type === 'finish' || value?.type === 'finish-step') record(value.usage ?? value.totalUsage);
       await drain(reader);
     };
-    drain(tap.getReader()).catch(() => {
-      // A broken copy of the stream changes no answer, so it changes nothing here either.
+    drain(tap.getReader()).catch(error => {
+      noteFailure(error);
     });
     return { ...result, stream: pass };
   };
   const wrapGenerate = async (...args) => {
-    const result = await model.doGenerate(...args);
-    record(result?.usage);
-    return result;
+    try {
+      const result = await model.doGenerate(...args);
+      record(result?.usage);
+      return result;
+    } catch (error) {
+      noteFailure(error);
+      throw error;
+    }
   };
   return new Proxy(model, {
     get(target, key) {

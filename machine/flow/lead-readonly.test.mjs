@@ -118,7 +118,8 @@ function setupCase(t) {
     dir,
     limit: 4,
     catalog: CATALOG,
-    corrections: { freeModels: ['commandcode/inclusionai/ling-3.1-flash:free'] },
+    corrections: { peakWindows: [], excludeDates: [], overrides: {} },
+    memoryModel: 'commandcode/deepseek/deepseek-v4.1-flash',
   });
   spending.begin(CARD);
 

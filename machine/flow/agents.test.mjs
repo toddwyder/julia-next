@@ -360,15 +360,15 @@ test('every agent carries the cost guard and sets no output limit of its own', a
   }
 });
 
-test('the memory note-takers run on the free model the card picked, with the retries and answer limit Mastra gives them', async t => {
+test('the memory note-takers run on the Memory model the picker saved, with the retries and answer limit Mastra gives them', async t => {
   const dir = temporary(t);
   const leadModelFile = join(dir, 'lead-model');
   const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
   writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
   const { build, spending } = createAgents({ repo, leadModelFile, roleModelsFile, dir });
   spending.begin('JUL-375-MEMORY');
-  assert.equal(spending.memoryModel, 'commandcode/inclusionai/ling-3.1-flash:free');
-  assert.equal(readLedger(join(dir, 'JUL-375-MEMORY', 'spending.json')).memoryModel, 'commandcode/inclusionai/ling-3.1-flash:free', 'the pick is saved with the card');
+  assert.equal(spending.memoryModel, 'commandcode/deepseek/deepseek-v4.1-flash');
+  assert.equal(readLedger(join(dir, 'JUL-375-MEMORY', 'spending.json')).memoryModel, 'commandcode/deepseek/deepseek-v4.1-flash', 'the pick is saved with the card');
   const observational = (await build.getMemory()).getMergedThreadConfig({}).observationalMemory;
   assert.equal(observational.observation.maxRetries, undefined);
   assert.equal(observational.reflection.maxRetries, undefined);
@@ -418,4 +418,37 @@ test('the Lead runs a fixed number of helpers at once, and a stopped card starts
   agents.spending.stop(STOP_REASONS.limit);
   assert.throws(() => options.hooks.beforeToolCall({ toolName: 'agent-pstackBugFix1' }), /card spending limit reached/);
   assert.equal(options.hooks.beforeToolCall({ toolName: 'read_file' }), undefined, 'a stopped card still lets a helper read a file');
+});
+
+test('taskListGuard reminds the Lead to open a task list and stops the card if it still keeps none', async t => {
+  const dir = temporary(t);
+  const leadModelFile = join(dir, 'lead-model');
+  const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
+  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
+  const agents = createAgents({ repo, leadModelFile, roleModelsFile, dir });
+  agents.spending.begin('JUL-375-TASKGUARD');
+
+  const processors = await agents.build.listConfiguredInputProcessors();
+  const guard = processors.find(p => p.id === 'task-list-guard');
+  assert.ok(guard, 'Lead has the task-list-guard processor');
+
+  const added = [];
+  const messageList = { add: (msg) => added.push(msg) };
+  let aborted = null;
+  const abort = (reason, opts) => { aborted = { reason, opts }; };
+
+  await guard.processInputStep({ stepNumber: 0, steps: [], messageList, abort });
+  await guard.processInputStep({ stepNumber: 1, steps: [{ toolCalls: [] }], messageList, abort });
+  assert.equal(added.length, 0);
+  await guard.processInputStep({ stepNumber: 2, steps: [{ toolCalls: [] }, { toolCalls: [] }], messageList, abort });
+  assert.equal(added.length, 1, 'reminds the Lead at step 2');
+  assert.match(added[0].content, /task_write/);
+  assert.equal(aborted, null);
+
+  await guard.processInputStep({ stepNumber: 3, steps: [{ toolCalls: [] }, { toolCalls: [] }, { toolCalls: [] }], messageList, abort });
+  assert.equal(aborted, null);
+  await guard.processInputStep({ stepNumber: 4, steps: [{ toolCalls: [] }, { toolCalls: [] }, { toolCalls: [] }, { toolCalls: [] }], messageList, abort });
+  assert.ok(aborted, 'stops the card if Lead still keeps no task list');
+  assert.match(aborted.reason, /task list/i);
+  assert.equal(agents.spending.stopPart(), 'Task list');
 });
