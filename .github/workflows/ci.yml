@@ -83,6 +83,8 @@ jobs:
         run: node scripts/check-agent-links.mjs
       - name: Check the machine program list is up to date
         run: node scripts/machine-programs.mjs --check
+      - name: Check no font loads from an outside address
+        run: node scripts/check-font-sources.mjs
       - name: Check every branch has an open pull request
         env:
           GITHUB_TOKEN: ${{ github.token }}
