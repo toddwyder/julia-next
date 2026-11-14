@@ -146,7 +146,7 @@ test('the Lead and every helper keep Mastra’s refusal handler beside the spend
   completeRoleFile(roleModelsFile);
   const build = createAgents({ repo, leadModelFile, roleModelsFile }).build;
   const processorsOf = async agent => (await agent.listConfiguredOutputProcessors()).map(processor => processor.id);
-  assert.deepEqual(await processorsOf(build), ['cyber-refusal-handler', 'card-spending', 'task-list-guard']);
+  assert.deepEqual(await processorsOf(build), ['cyber-refusal-handler', 'card-spending', 'playbook-guard']);
   for (const helper of Object.values(await build.listAgents())) {
     assert.deepEqual(await processorsOf(helper), ['cyber-refusal-handler', 'card-spending'], `${helper.name} lost a processor.`);
   }
@@ -420,17 +420,18 @@ test('the Lead runs a fixed number of helpers at once, and a stopped card starts
   assert.equal(options.hooks.beforeToolCall({ toolName: 'read_file' }), undefined, 'a stopped card still lets a helper read a file');
 });
 
-test('taskListGuard reminds the Lead to open a task list and stops the card if it still keeps none', async t => {
+test('playbookGuard reminds the Lead to name a valid playbook and stops the card if it still names none', async t => {
   const dir = temporary(t);
   const leadModelFile = join(dir, 'lead-model');
   const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
   writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
   const agents = createAgents({ repo, leadModelFile, roleModelsFile, dir });
-  agents.spending.begin('JUL-375-TASKGUARD');
+  agents.spending.begin('JUL-375-PLAYBOOKGUARD');
 
   const processors = await agents.build.listConfiguredInputProcessors();
-  const guard = processors.find(p => p.id === 'task-list-guard');
-  assert.ok(guard, 'Lead has the task-list-guard processor');
+  const guard = processors.find(p => p.id === 'playbook-guard');
+  assert.ok(guard, 'Lead has the playbook-guard processor');
+  assert.equal(processors.find(p => p.id === 'task-list-guard'), undefined, 'old task-list-guard is gone');
 
   const added = [];
   const messageList = { add: (msg) => added.push(msg) };
@@ -438,17 +439,14 @@ test('taskListGuard reminds the Lead to open a task list and stops the card if i
   const abort = (reason, opts) => { aborted = { reason, opts }; };
 
   await guard.processInputStep({ stepNumber: 0, steps: [], messageList, abort });
-  await guard.processInputStep({ stepNumber: 1, steps: [{ toolCalls: [] }], messageList, abort });
   assert.equal(added.length, 0);
-  await guard.processInputStep({ stepNumber: 2, steps: [{ toolCalls: [] }, { toolCalls: [] }], messageList, abort });
-  assert.equal(added.length, 1, 'reminds the Lead at step 2');
-  assert.match(added[0].content, /task_write/);
+  await guard.processInputStep({ stepNumber: 1, steps: [{ toolCalls: [] }], messageList, abort });
+  assert.equal(added.length, 1, 'reminds the Lead at step 1');
+  assert.match(added[0].content, /choose_playbook/);
   assert.equal(aborted, null);
 
-  await guard.processInputStep({ stepNumber: 3, steps: [{ toolCalls: [] }, { toolCalls: [] }, { toolCalls: [] }], messageList, abort });
-  assert.equal(aborted, null);
-  await guard.processInputStep({ stepNumber: 4, steps: [{ toolCalls: [] }, { toolCalls: [] }, { toolCalls: [] }, { toolCalls: [] }], messageList, abort });
-  assert.ok(aborted, 'stops the card if Lead still keeps no task list');
-  assert.match(aborted.reason, /task list/i);
-  assert.equal(agents.spending.stopPart(), 'Task list');
+  await guard.processInputStep({ stepNumber: 2, steps: [{ toolCalls: [] }, { toolCalls: [] }], messageList, abort });
+  assert.ok(aborted, 'stops the card if Lead still names no playbook');
+  assert.match(aborted.reason, /playbook/i);
+  assert.equal(agents.spending.stopPart(), 'Playbook');
 });

@@ -8,6 +8,7 @@ import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace
 
 import { cardMemory } from './memory.mjs';
 import { buildModelReader, leadModelId } from './models.mjs';
+import { createChoosePlaybookTool } from './playbook.mjs';
 import { SHIPPING_MAX_STEPS } from './review.mjs';
 import { agentModel, helperKey, readRoleModels, readStageModels } from './role-models.mjs';
 import { HELPER_CONCURRENCY, helperStartHook, openSpending, spendingProcessor, splitModelId } from './spending.mjs';
@@ -61,36 +62,48 @@ export function createAgents({ model, leadModel, helperModel, repo = repoRoot(),
     const processors = cardProcessors(ids, options);
     return { ...processors, outputProcessors: [new CyberRefusalHandler(), ...processors.outputProcessors] };
   };
-  const taskListGuard = () => {
-    let opened = false;
+  const playbookGuard = () => {
+    let chosen = null;
+    let currentStep = 0;
     let remindedAtStep = null;
-    const hasTaskWrite = calls => Array.isArray(calls) && calls.some(call => (call?.toolName ?? call?.name) === 'task_write');
+    let invalidAttempt = '';
     return {
-      id: 'task-list-guard',
-      processInputStep: async ({ stepNumber = 0, steps = [], messageList, abort }) => {
+      id: 'playbook-guard',
+      onChosen: ({ playbook, requestContext }) => {
+        chosen = { playbook, callNumber: currentStep + 1 };
+        requestContext?.set?.('flowPlaybook', chosen);
+      },
+      onInvalid: ({ playbook }) => {
+        invalidAttempt = String(playbook ?? '');
+      },
+      processInputStep: async ({ stepNumber = 0, requestContext, messageList, abort }) => {
+        currentStep = stepNumber;
         if (stepNumber === 0) {
-          opened = false;
+          chosen = null;
           remindedAtStep = null;
+          invalidAttempt = '';
           return;
         }
-        if (opened || steps.some(step => hasTaskWrite(step?.toolCalls))) {
-          opened = true;
+        if (chosen) {
+          requestContext?.set?.('flowPlaybook', chosen);
           return;
         }
-        if (stepNumber < 2) return;
         if (remindedAtStep === null) {
           remindedAtStep = stepNumber;
-          messageList?.add?.({ role: 'user', content: 'You are working without a task list. Open your task list with `task_write` now before continuing.' }, 'input');
+          const badNote = invalidAttempt ? ` "${invalidAttempt}" is not a poteto-mode playbook.` : '';
+          messageList?.add?.({
+            role: 'user',
+            content: `You started work without naming a valid poteto-mode playbook.${badNote} Call \`choose_playbook\` with a valid playbook from \`.agents/skills/poteto-mode/playbooks/\` now before continuing.`,
+          }, 'input');
           return;
         }
-        if (stepNumber >= remindedAtStep + 2) {
-          const reason = 'Lead worked without opening a task list (no task_write call after reminder)';
-          cardSpending.stop(reason, 'Task list');
-          abort(reason, { metadata: { reason, part: 'Task list' } });
+        if (stepNumber >= remindedAtStep + 1) {
+          const reason = invalidAttempt
+            ? `Lead did not name a valid poteto-mode playbook after reminder (tried "${invalidAttempt}")`
+            : 'Lead started work without naming a poteto-mode playbook (no valid choose_playbook call after reminder)';
+          cardSpending.stop(reason, 'Playbook');
+          abort(reason, { metadata: { reason, part: 'Playbook' } });
         }
-      },
-      processOutputStep: async ({ toolCalls }) => {
-        if (hasTaskWrite(toolCalls)) opened = true;
       },
     };
   };
@@ -124,19 +137,30 @@ export function createAgents({ model, leadModel, helperModel, repo = repoRoot(),
       defaultOptions: { maxSteps: 100 },
     })];
   })));
-  const leadTaskGuard = taskListGuard();
+  const leadPlaybookGuard = playbookGuard();
+  const choosePlaybookTool = createChoosePlaybookTool({
+    repo,
+    onChosen: leadPlaybookGuard.onChosen,
+    onInvalid: leadPlaybookGuard.onInvalid,
+  });
+  const leadPlaybookNote = [
+    '',
+    '## Machine Playbook Tool',
+    'As your first act before any other tool call, call `choose_playbook` with the name of the poteto-mode playbook for this card (for example `feature`, `bug-fix`, `investigation`, `refactoring`).',
+    'The machine writes that playbook\'s steps word for word into your task list. Work through every step in order; any step you leave undone must stay in the task list with `skip: <reason>` appended to its content (via `task_update`). Add card-specific items only after the playbook steps.',
+  ].join('\n');
   const leadProcessors = codingProcessors(() => splitModelId(leadModelId(leadModelFile)), { refuseAfterStop: true });
   const build = createCodingAgent({
     id: 'flow-build',
     name: 'Lead',
-    instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
+    instructions: `${readFileSync(join(repo, POTETO_SKILL), 'utf8')}${leadPlaybookNote}`,
     model: leadModel ?? buildModelReader(leadModelFile),
-    inputProcessors: [...leadProcessors.inputProcessors, leadTaskGuard],
-    outputProcessors: [...leadProcessors.outputProcessors, leadTaskGuard],
+    inputProcessors: [...leadProcessors.inputProcessors, leadPlaybookGuard],
+    outputProcessors: [...leadProcessors.outputProcessors, leadPlaybookGuard],
     ...cardMemory(cardSpending),
     workspace: cardWorkspace('machine-repo', { readOnly: true, skills: ['.agents/skills'] }),
     agents: helpers,
-    tools,
+    tools: { ...tools, choose_playbook: choosePlaybookTool },
     defaultOptions: {
       maxSteps: 400,
       toolCallConcurrency: HELPER_CONCURRENCY,

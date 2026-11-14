@@ -11,15 +11,16 @@ of any size, not only a change to the sentence beside it.
 | --- | --- | --- |
 | `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `a2e9289b94a8564182de663f40cbfd206f5e723a66e8d82fdd189fcb00f6e48f` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `4b84d5954971a9cf744865a43b193ae752c9c77e6e303b55a918c09f607c0c9d` |
-| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `44cab1307bbf4978f9132418cf816c168e999c52c18bad8bca257de7cf620676` |
-| `machine/flow/check.mjs` | The post-build check: verifies Lead task list and saved proof evidence before Shipping. | `8983092e73e1d715f0fe3250be133f1ef193190a8fe3f6b4d2037c3a49b9eb6d` |
+| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `7b6ca976fc556cd9112de1cecd951c25e30ff27ebebe2903f64511c6e45679b2` |
+| `machine/flow/check.mjs` | The post-build check: verifies Lead task list and saved proof evidence before Shipping. | `ecd0a94cc7dc0cd10ab32f3c340d5c2a1aaeafd74cdf2001f0f58caa878bdb78` |
 | `machine/flow/task.mjs` | The task the Lead is given, taken word for word from the card. | `21aca1ef4c2b964d729b93317061b1a23f0e38773b26e8aa1c9f951581fa62e7` |
-| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `b9cf64c8824155f3da99b2417af1d4595d31eda68e9f9617c0a8a655b3f6bcc5` |
+| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `7068c58f3e7cc46610adaa42955ac35ccfca830da6cade4a99fceeebdc5d6f1a` |
+| `machine/flow/playbook.mjs` | Playbook catalog, task seeding, and the choose_playbook tool. | `90531eb2366f1c5bb03ac23014363ff8b2498c7da931d59a6a29981e276f2a31` |
 | `machine/flow/graphify.mjs` | The Graphify graph tools offered to Lead and its helpers. | `c502bc49faa96ef1de469764696d1682347679a61a17629766940de5baf546b6` |
 | `machine/flow/memory.mjs` | The memory note-takers, run on the free model the card picked. | `37ebeb92d06754b930f8d7dad3117dd0348e5bfbb760773f7fd0b0ebaf3ebedc` |
 | `machine/flow/models.mjs` | The Lead model, read from its independent setting and routed through its account provider. | `271f19a5a292f05566244e8c5191b10526e811b9a068590d82f1b3116d83e0e9` |
 | `machine/flow/role-models.mjs` | The Lead helper models, read from the saved role table and routed to account providers. | `6946ce44710f02f3bfa74f5aacbe91f49fa65db28b4009cd5b1e2ccc78dbfceb` |
-| `machine/flow/schema.mjs` | What the run form asks for and what the run remembers. | `af611906c7b3260f625c895f13fd72a228959e444627e89b4f903d63da1c36a0` |
+| `machine/flow/schema.mjs` | What the run form asks for and what the run remembers. | `644718d20884e5b84b33c401dfb16820b25b5e0800eff932fc84fa2b0aaca7a6` |
 | `machine/flow/scratch.mjs` | The run folder: artifacts, verdicts and the report a stop leaves. | `a1e2a8ce8239fb807d186c08892fe19404148a3f19dd3c7a74496237c20957aa` |
 | `machine/flow/copy.mjs` | The fresh copy of the repository each card builds in, and its removal when the card ends. | `5e850b67c8bc89eeff9796092cae93b3b15988cbe7f7b02495b910a216de81f2` |
 | `machine/flow/review.mjs` | The Shipping review: finds the card's pull request, names the commit it reviews, builds the reviewer's task, reads the verdict. | `1b3ac557ab1399b3fae8cc54e949835e8dee90151c42586fea88928fdfce9ea0` |

@@ -94,7 +94,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     requestContext?.set?.('cardCheckout', copy.folder);
     requestContext?.set?.('mastra__threadId', requestId);
     requestContext?.set?.('mastra__resourceId', card);
-    await setState({ ...state, buildRounds, requestId, copy: copy.folder, base: copy.base });
+    await setState({ ...state, buildRounds, requestId, copy: copy.folder, base: copy.base, playbook: '', playbookCall: 0 });
     const issue = await review.readCard(card);
     if (!issue) throw new Error(`Linear card ${card} could not be read.`);
     if (buildRounds === 1) await review.moveCard(card, 'Implementation');
@@ -109,7 +109,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     id: 'flow-build',
     inputSchema: z.object({ prompt: z.string() }),
     outputSchema: z.object({ text: z.string() }),
-    execute: async ({ inputData, requestContext, tracingContext, metrics }) => {
+    execute: async ({ inputData, state, setState, requestContext, tracingContext, metrics }) => {
       const reason = spending?.stopReason() ?? spending?.blockingReason(agents.spendingIds?.build?.() ?? null) ?? null;
       if (reason) return { text: '' };
       try {
@@ -126,6 +126,11 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
           metadata: error?.options?.metadata,
         });
         return { text: '' };
+      } finally {
+        const chosen = requestContext?.get?.('flowPlaybook');
+        if (chosen?.playbook) {
+          await setState({ ...state, playbook: chosen.playbook, playbookCall: chosen.callNumber ?? 0 });
+        }
       }
     },
   });
@@ -141,7 +146,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
       const card = state.card;
       const text = inputData.text ?? '';
       writeArtifact(cardDir(card), card, text);
-      return { card, kind: state.kind, detail: text, failCount: state.failCount };
+      return { card, kind: state.kind, detail: text, failCount: state.failCount, playbook: state.playbook, playbookCall: state.playbookCall };
     },
   });
 

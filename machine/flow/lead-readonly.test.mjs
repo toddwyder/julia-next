@@ -173,6 +173,7 @@ test('Criterion 1: every write poteto-mode asks of the lead itself still works',
     steps: [
       {
         toolCalls: [
+          { name: 'choose_playbook', input: { playbook: 'investigation' } },
           {
             name: 'task_write',
             input: {

@@ -41,26 +41,27 @@ function studioRepo(dir) {
   return repo;
 }
 
+const SAMPLE_STEPS = [
+  'Read poteto-mode skill',
+  'Delegate implementation to helper',
+  'Verify with proof command',
+];
+
 const cleanLeadSpans = () => [
   span({ spanId: 'wf-build', spanType: 'workflow_step', name: "workflow step: 'flow-build'" }),
   span({ spanId: 'lead', parentSpanId: 'wf-build', spanType: 'agent_run', name: 'flow-build' }),
   span({
-    spanId: 't1', parentSpanId: 'lead', name: 'task_write',
-    input: {
-      tasks: [
-        { id: '1', content: 'Read poteto-mode skill', status: 'pending' },
-        { id: '2', content: 'Delegate implementation to helper', status: 'pending' },
-        { id: '3', content: 'Verify with proof command', status: 'pending' },
-      ],
-    },
+    spanId: 'pb1', parentSpanId: 'lead', name: 'choose_playbook',
+    input: { playbook: 'feature' },
+    output: { ok: true, isError: false, playbook: 'feature', steps: SAMPLE_STEPS },
   }),
   span({ spanId: 'sk1', parentSpanId: 'lead', name: 'skill_read', input: { path: '.agents/skills/poteto-mode/SKILL.md' } }),
-  span({ spanId: 't1-done', parentSpanId: 'lead', name: 'task_update', input: { id: '1', status: 'completed' } }),
+  span({ spanId: 't1-done', parentSpanId: 'lead', name: 'task_update', input: { id: 'playbook_1', status: 'completed' } }),
   span({ spanId: 'helper', parentSpanId: 'lead', spanType: 'agent_run', name: 'pstack-feature-1' }),
   span({ spanId: 'w1', parentSpanId: 'helper', name: 'mastra_workspace_write_file', input: { path: 'app/page.jsx' } }),
-  span({ spanId: 't2-done', parentSpanId: 'lead', name: 'task_update', input: { id: '2', status: 'completed' } }),
+  span({ spanId: 't2-done', parentSpanId: 'lead', name: 'task_update', input: { id: 'playbook_2', status: 'completed' } }),
   span({ spanId: 'cmd1', parentSpanId: 'lead', name: 'mastra_workspace_execute_command', input: { command: 'npm test' } }),
-  span({ spanId: 't3-done', parentSpanId: 'lead', name: 'task_complete', input: { id: '3' } }),
+  span({ spanId: 't3-done', parentSpanId: 'lead', name: 'task_complete', input: { id: 'playbook_3' } }),
 ];
 
 test('proofsFromCard extracts items from ## Proof and ## UAT steps', () => {
@@ -119,11 +120,11 @@ test('evaluateBuildCheck passes when task list and saved evidence hold, whoever 
   const leadShell = evaluateBuildCheck({
     spans: [
       span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
-      span({ spanId: 't1', parentSpanId: 'lead', name: 'task_write', input: { tasks: [{ id: '1', content: 'Read skill', status: 'pending' }, { id: '2', content: 'Verify fonts', status: 'pending' }] } }),
+      span({ spanId: 'pb', parentSpanId: 'lead', name: 'choose_playbook', input: { playbook: 'feature' }, output: { ok: true, isError: false, playbook: 'feature', steps: ['Read skill', 'Verify fonts'] } }),
       span({ spanId: 'sk', parentSpanId: 'lead', name: 'skill_read', input: { path: '.agents/skills/poteto-mode/SKILL.md' } }),
-      span({ spanId: 't1c', parentSpanId: 'lead', name: 'task_complete', input: { id: '1' } }),
+      span({ spanId: 't1c', parentSpanId: 'lead', name: 'task_complete', input: { id: 'playbook_1' } }),
       span({ spanId: 'sh', parentSpanId: 'lead', name: 'mastra_workspace_execute_command', input: { command: 'node -e "fs.writeFileSync(...)"' } }),
-      span({ spanId: 't2c', parentSpanId: 'lead', name: 'task_complete', input: { id: '2' } }),
+      span({ spanId: 't2c', parentSpanId: 'lead', name: 'task_complete', input: { id: 'playbook_2' } }),
     ],
     cardDescription: '## UAT steps\n\n1. Open the preview and see fonts.',
     evidenceFiles: [{ path: 'proof/fonts-preview.png', content: '', size: 1200 }],
@@ -131,11 +132,12 @@ test('evaluateBuildCheck passes when task list and saved evidence hold, whoever 
   assert.deepEqual(leadShell, { ok: true });
 });
 
-test('evaluateBuildCheck fails when a playbook step is ticked without matching work or left incomplete', () => {
+test('evaluateBuildCheck fails when a playbook step is ticked without matching work, dropped, or left open', () => {
   const missingSkill = evaluateBuildCheck({
     spans: [
       span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
-      span({ spanId: 't1', parentSpanId: 'lead', name: 'task_write', input: { tasks: [{ id: '1', content: 'Read the architect skill', status: 'completed' }] } }),
+      span({ spanId: 'pb', parentSpanId: 'lead', name: 'choose_playbook', input: { playbook: 'feature' }, output: { ok: true, isError: false, playbook: 'feature', steps: ['Read the architect skill'] } }),
+      span({ spanId: 't1', parentSpanId: 'lead', name: 'task_complete', input: { id: 'playbook_1' } }),
     ],
   });
   assert.equal(missingSkill.ok, false);
@@ -144,7 +146,8 @@ test('evaluateBuildCheck fails when a playbook step is ticked without matching w
   const missingHelper = evaluateBuildCheck({
     spans: [
       span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
-      span({ spanId: 't1', parentSpanId: 'lead', name: 'task_write', input: { tasks: [{ id: '1', content: 'Delegate to helper', status: 'completed' }] } }),
+      span({ spanId: 'pb', parentSpanId: 'lead', name: 'choose_playbook', input: { playbook: 'feature' }, output: { ok: true, isError: false, playbook: 'feature', steps: ['Delegate to helper'] } }),
+      span({ spanId: 't1', parentSpanId: 'lead', name: 'task_complete', input: { id: 'playbook_1' } }),
     ],
   });
   assert.equal(missingHelper.ok, false);
@@ -153,16 +156,37 @@ test('evaluateBuildCheck fails when a playbook step is ticked without matching w
   const missingProofStep = evaluateBuildCheck({
     spans: [
       span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
-      span({ spanId: 't1', parentSpanId: 'lead', name: 'task_write', input: { tasks: [{ id: '1', content: 'Verify on matching surface', status: 'completed' }] } }),
+      span({ spanId: 'pb', parentSpanId: 'lead', name: 'choose_playbook', input: { playbook: 'feature' }, output: { ok: true, isError: false, playbook: 'feature', steps: ['Verify on matching surface'] } }),
+      span({ spanId: 't1', parentSpanId: 'lead', name: 'task_complete', input: { id: 'playbook_1' } }),
     ],
   });
   assert.equal(missingProofStep.ok, false);
   assert.match(missingProofStep.reason, /Verify on matching surface/);
 
+  const droppedStep = evaluateBuildCheck({
+    spans: [
+      span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
+      span({ spanId: 'pb', parentSpanId: 'lead', name: 'choose_playbook', input: { playbook: 'feature' }, output: { ok: true, isError: false, playbook: 'feature', steps: ['Step one', 'Step two'] } }),
+      span({ spanId: 'tw', parentSpanId: 'lead', name: 'task_write', input: { tasks: [{ id: 'playbook_1', content: 'Step one', status: 'completed' }] } }),
+    ],
+  });
+  assert.equal(droppedStep.ok, false);
+  assert.match(droppedStep.reason, /Step two/);
+
+  const leftOpen = evaluateBuildCheck({
+    spans: [
+      span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
+      span({ spanId: 'pb', parentSpanId: 'lead', name: 'choose_playbook', input: { playbook: 'feature' }, output: { ok: true, isError: false, playbook: 'feature', steps: ['Step one'] } }),
+    ],
+  });
+  assert.equal(leftOpen.ok, false);
+  assert.match(leftOpen.reason, /Step one/);
+
   const skippedOk = evaluateBuildCheck({
     spans: [
       span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
-      span({ spanId: 't1', parentSpanId: 'lead', name: 'task_write', input: { tasks: [{ id: '1', content: 'Delegate to helper skip: one-line config', status: 'pending' }] } }),
+      span({ spanId: 'pb', parentSpanId: 'lead', name: 'choose_playbook', input: { playbook: 'feature' }, output: { ok: true, isError: false, playbook: 'feature', steps: ['Delegate to helper'] } }),
+      span({ spanId: 't1', parentSpanId: 'lead', name: 'task_update', input: { id: 'playbook_1', content: 'Delegate to helper skip: one-line config', status: 'pending' } }),
     ],
   });
   assert.equal(skippedOk.ok, true);
@@ -397,13 +421,15 @@ test('realCheck reads live Mastra trace, git copy diff and saved evidence files'
       doStream: async () => {
         buildStep += 1;
         const stepCalls = {
-          1: [{ id: 'tc1', name: 'task_write', input: { tasks: [{ id: '1', content: 'Delegate to helper', status: 'pending' }, { id: '2', content: 'Verify home screenshot', status: 'pending' }] } }],
+          1: [
+            { id: 'pb1', name: 'choose_playbook', input: { playbook: 'feature' } },
+          ],
           2: [{ id: 'tc2', name: 'agent-feature', input: { prompt: 'write app/home.jsx' } }],
           3: [
-            { id: 'tc3', name: 'task_update', input: { id: '1', status: 'completed' } },
+            { id: 'tc3', name: 'task_update', input: { id: 'playbook_1', status: 'completed' } },
             { id: 'tc4', name: 'mastra_workspace_execute_command', input: { command: 'node verify.mjs' } },
           ],
-          4: [{ id: 'tc5', name: 'task_complete', input: { id: '2' } }],
+          4: [{ id: 'tc5', name: 'task_complete', input: { id: 'playbook_2' } }],
         }[buildStep];
         if (stepCalls) {
           return {
@@ -431,6 +457,7 @@ test('realCheck reads live Mastra trace, git copy diff and saved evidence files'
     },
     agents: { feature: helper },
     tools: {
+      choose_playbook: tool('choose_playbook', async () => ({ ok: true, isError: false, playbook: 'feature', steps: ['Delegate to helper', 'Verify home screenshot'] })),
       task_write: tool('task_write', async () => ({ ok: true })),
       task_update: tool('task_update', async () => ({ ok: true })),
       task_complete: tool('task_complete', async () => ({ ok: true })),
