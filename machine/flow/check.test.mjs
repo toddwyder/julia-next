@@ -194,6 +194,40 @@ test('evaluateBuildCheck fails when a named proof lacks valid saved evidence', (
   assert.match(emptyMedia.reason, /Screenshot the cookbook grid/);
 });
 
+test('evaluateBuildCheck fails when only an unrelated repository note is present as evidence', () => {
+  const card = '## UAT steps\n\n1. Open the preview of the recipe site. You see Playfair Display headings, Inter body text and Roboto Mono fixed-width text, as before.\n2. After the merge, open the dashboard. Its text shows in Public Sans, as before.\n';
+  const spans = [
+    span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
+    span({ spanId: 't', parentSpanId: 'lead', name: 'task_write', input: { tasks: [{ id: '1', content: 'Implement fonts', status: 'completed' }] } }),
+    span({ spanId: 'h', parentSpanId: 'lead', spanType: 'agent_run', name: 'pstack-feature-1' }),
+    span({ spanId: 'w', parentSpanId: 'h', name: 'write_file', input: { path: 'app/layout.jsx' } }),
+    span({ spanId: 'c', parentSpanId: 'lead', name: 'bash', input: { command: 'ls' } }),
+  ];
+  const ev = [{ path: 'docs/agents/cost-guard.md', content: 'The guard counts the cost of each call.', size: 40 }];
+  const result = evaluateBuildCheck({ spans, changedFiles: ['app/layout.jsx'], cardDescription: card, evidenceFiles: ev });
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /no matching saved evidence/);
+});
+
+test('evaluateBuildCheck passes when a helper copies files in with a shell command', () => {
+  const card = '## UAT steps\n\n1. Open the preview of the recipe site. You see Playfair Display headings, Inter body text and Roboto Mono fixed-width text, as before.\n';
+  const spans = [
+    span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
+    span({ spanId: 't', parentSpanId: 'lead', name: 'task_write', input: { tasks: [{ id: '1', content: 'Implement fonts', status: 'completed' }] } }),
+    span({ spanId: 'h', parentSpanId: 'lead', spanType: 'agent_run', name: 'pstack-feature-1' }),
+    span({ spanId: 'w', parentSpanId: 'h', name: 'write_file', input: { path: 'app/layout.jsx' } }),
+    span({ spanId: 'cp', parentSpanId: 'h', name: 'bash', input: { command: 'cp node_modules/@fontsource-variable/inter/files/*.woff2 app/fonts/' } }),
+  ];
+  const ev = [{ path: 'proof/fonts-preview.png', content: '', size: 1200 }];
+  const result = evaluateBuildCheck({
+    spans,
+    changedFiles: ['app/layout.jsx', 'app/fonts/inter-latin-wght-normal.woff2'],
+    cardDescription: card,
+    evidenceFiles: ev,
+  });
+  assert.deepEqual(result, { ok: true });
+});
+
 async function runCheckFlow({ check, review = ['PASS'], kind = 'machine', answers = ['yes'] }) {
   const dir = mkdtempSync(join(tmpdir(), 'flow-check-'));
   process.env.FLOW_SCRATCH = join(dir, 'scratch');
