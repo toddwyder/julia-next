@@ -88,8 +88,10 @@ function setupCase(t) {
     try { rmSync(dir, { recursive: true, force: true }); } catch {}
   });
   const repo = join(dir, 'repo');
-  mkdirSync(join(repo, '.agents/skills/poteto-mode'), { recursive: true });
+  mkdirSync(join(repo, '.agents/skills/poteto-mode/playbooks'), { recursive: true });
   writeFileSync(join(repo, '.agents/skills/poteto-mode/SKILL.md'), '# Poteto mode\nTest skill.\n');
+  writeFileSync(join(repo, '.agents/skills/poteto-mode/playbooks/feature.md'), '### Feature\n\n1. First step.\n');
+  writeFileSync(join(repo, '.agents/skills/poteto-mode/playbooks/investigation.md'), '### Investigation\n\n1. Investigate.\n');
   writeFileSync(join(repo, 'README.md'), 'julia\n');
   const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
   git('init', '--quiet', '--initial-branch=main');
