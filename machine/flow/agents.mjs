@@ -34,6 +34,7 @@ export function repoRoot() {
 // The card's spending total is read from its own folder, so every agent in the run adds to the
 // same ledger and a rerun carries the total it already spent.
 export function createAgents({ model, leadModel, helperModel, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {}, dir = process.env.FLOW_DIR ?? '.artifacts/flow/studio', spending } = {}) {
+  if (!model && !leadModel) leadModelId(leadModelFile);
   // An explicit model is a caller's override, as in a test. Otherwise each stage takes the
   // model Todd saved for it; a missing line stops here and names that stage.
   const stages = model

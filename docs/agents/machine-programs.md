@@ -14,7 +14,7 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `44cab1307bbf4978f9132418cf816c168e999c52c18bad8bca257de7cf620676` |
 | `machine/flow/check.mjs` | The post-build check: verifies Lead task list and saved proof evidence before Shipping. | `8983092e73e1d715f0fe3250be133f1ef193190a8fe3f6b4d2037c3a49b9eb6d` |
 | `machine/flow/task.mjs` | The task the Lead is given, taken word for word from the card. | `21aca1ef4c2b964d729b93317061b1a23f0e38773b26e8aa1c9f951581fa62e7` |
-| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `20f3f0646b5c0f6bd23805fa9e55ad6bdc6475ae687eb9ee3c6840920ea6af06` |
+| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `b9cf64c8824155f3da99b2417af1d4595d31eda68e9f9617c0a8a655b3f6bcc5` |
 | `machine/flow/graphify.mjs` | The Graphify graph tools offered to Lead and its helpers. | `c502bc49faa96ef1de469764696d1682347679a61a17629766940de5baf546b6` |
 | `machine/flow/memory.mjs` | The memory note-takers, run on the free model the card picked. | `37ebeb92d06754b930f8d7dad3117dd0348e5bfbb760773f7fd0b0ebaf3ebedc` |
 | `machine/flow/models.mjs` | The Lead model, read from its independent setting and routed through its account provider. | `271f19a5a292f05566244e8c5191b10526e811b9a068590d82f1b3116d83e0e9` |
