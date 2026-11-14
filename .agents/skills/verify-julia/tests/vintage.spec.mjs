@@ -19,8 +19,13 @@ function colour(label) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+// next/font/local names a family after its JavaScript identifier, so "Playfair Display" is declared as playfairDisplay.
+function familyKey(name) {
+  return name.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
+}
+
 function font(label) {
-  return designRow(label).split('|')[2].replaceAll('*', '').trim();
+  return familyKey(designRow(label).split('|')[2].replaceAll('*', ''));
 }
 
 const PAPER = colour('Cream page background');
@@ -39,7 +44,7 @@ function style(locator) {
     return {
       color: computed.color,
       background: computed.backgroundColor,
-      font: computed.fontFamily.split(',')[0].replaceAll(/["']/g, '').trim(),
+      font: computed.fontFamily.split(',')[0].toLowerCase().replaceAll(/[^a-z0-9]/g, ''),
     };
   });
 }
@@ -53,7 +58,7 @@ test('the design fonts are loaded, not only named', async ({ page }) => {
   await page.goto('/recipes/new');
   const loaded = await page.evaluate(async () => {
     await document.fonts.ready;
-    return [...document.fonts].filter(face => face.status === 'loaded').map(face => face.family.replaceAll(/["']/g, ''));
+    return [...document.fonts].filter(face => face.status === 'loaded').map(face => face.family.toLowerCase().replaceAll(/[^a-z0-9]/g, ''));
   });
   for (const family of [SERIF, SANS, MONO]) expect(loaded, family).toContain(family);
 });
