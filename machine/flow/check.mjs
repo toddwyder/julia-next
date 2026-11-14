@@ -19,9 +19,18 @@ const TASK_TOOLS = new Set(['task_write', 'task_update', 'task_complete']);
 const MEDIA_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.webm', '.mp4', '.svg']);
 const TEXT_EXT = new Set(['.json', '.txt', '.log', '.md', '.tsv', '.csv', '.html']);
 const STOP_WORDS = new Set([
+  'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was',
+  'one', 'our', 'out', 'has', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see',
+  'two', 'way', 'who', 'did', 'get', 'let', 'put', 'say', 'she', 'too', 'use', 'run',
   'that', 'this', 'with', 'from', 'into', 'your', 'have', 'when', 'then', 'only',
   'each', 'must', 'should', 'runs', 'show', 'shows', 'check', 'proof', 'verify',
   'save', 'saved', 'file', 'files', 'output', 'command', 'evidence',
+  'after', 'before', 'open', 'page', 'site', 'text', 'like', 'such', 'also',
+  'will', 'would', 'could', 'there', 'their', 'them', 'than', 'they', 'what',
+  'where', 'which', 'while', 'about', 'above', 'below', 'between', 'under', 'again',
+  'here', 'same', 'both', 'more', 'most', 'other', 'some', 'very', 'just', 'being',
+  'been', 'does', 'doing', 'done', 'make', 'made', 'still', 'even', 'ever', 'never',
+  'every', 'many', 'much', 'well', 'back', 'look', 'looks', 'seem', 'seems',
 ]);
 
 const normalizePath = value => String(value ?? '').replace(/\\/g, '/').replace(/^\.\//, '').trim();
@@ -56,8 +65,17 @@ const pathsFromInput = input => {
   return [];
 };
 
+const commandPaths = input => {
+  const cmd = String(input?.command ?? input?.cmd ?? '');
+  if (!cmd) return [];
+  return cmd
+    .split(/[\s"'`;&|><()]+/)
+    .map(tok => normalizePath(tok).replace(/\/+$/, ''))
+    .filter(tok => tok && tok !== '.' && tok !== '..' && (tok.includes('/') || tok.includes('.')));
+};
+
 const matchesFile = (written, target) =>
-  written === target || written.endsWith(`/${target}`) || target.endsWith(`/${written}`);
+  written === target || written.endsWith(`/${target}`) || target.endsWith(`/${written}`) || target.startsWith(`${written}/`);
 
 const taskText = item => String(item?.content ?? '').trim();
 
@@ -136,11 +154,15 @@ const checkFact1 = (spans, byId) => {
 
 const checkFact2 = (spans, byId, changedFiles) => {
   const writeSpans = spans.filter(s => s.spanType === 'tool_call' && WRITE_TOOLS.has(toolName(s)));
-  const helperWrites = [...new Set(
-    writeSpans
+  const helperCommandSpans = spans.filter(
+    s => s.spanType === 'tool_call' && COMMAND_TOOLS.has(toolName(s)) && isHelperAgent(owningAgentRun(byId, s)),
+  );
+  const helperWrites = [...new Set([
+    ...writeSpans
       .filter(s => isHelperAgent(owningAgentRun(byId, s)))
       .flatMap(s => pathsFromInput(s.input)),
-  )];
+    ...helperCommandSpans.flatMap(s => commandPaths(s.input)),
+  ])];
   const leadWrites = [...new Set(
     writeSpans
       .filter(s => {
@@ -185,8 +207,14 @@ const checkFact3 = (spans, cardDescription, evidenceFiles) => {
     const keywords = proofKeywords(proof);
     if (keywords.length === 0) return [];
     const matched = valid.some(file => {
-      const hay = `${file.path ?? ''} ${file.content ?? ''}`.toLowerCase();
-      return keywords.some(kw => hay.includes(kw));
+      const pathTokens = new Set(String(file.path ?? '').toLowerCase().match(/[a-z0-9]+/g) ?? []);
+      const contentTokens = new Set(String(file.content ?? '').toLowerCase().match(/[a-z0-9]+/g) ?? []);
+      const allTokens = new Set([...pathTokens, ...contentTokens]);
+      const hits = keywords.filter(kw => allTokens.has(kw)).length;
+      if (MEDIA_EXT.has(extname(String(file.path ?? '')).toLowerCase())) return hits >= 1;
+      return pathTokens.size > 0 && keywords.some(kw => pathTokens.has(kw))
+        ? hits >= 1
+        : hits >= Math.min(2, keywords.length);
     });
     return matched ? [] : [`evidence: "${proof}" has no matching saved evidence`];
   });
@@ -253,9 +281,12 @@ export const realCheck = {
     const cardDescription = (await review?.readCard?.(card))?.description ?? '';
     const dirs = [
       ...(cardDir ? [join(cardDir, 'evidence'), join(cardDir, 'proof'), join(cardDir, 'reports')] : []),
-      ...(copy ? [join(copy, '.artifacts'), join(copy, 'docs/agents')] : []),
+      ...(copy ? [join(copy, '.artifacts')] : []),
     ];
-    const evidenceFiles = dirs.flatMap(collectEvidenceFrom);
+    const docEvidence = copy
+      ? collectEvidenceFrom(join(copy, 'docs/agents')).filter(f => changedFiles.some(cf => matchesFile(cf, f.path)))
+      : [];
+    const evidenceFiles = [...dirs.flatMap(collectEvidenceFrom), ...docEvidence];
     return evaluateBuildCheck({ spans, changedFiles, cardDescription, evidenceFiles });
   },
 };
