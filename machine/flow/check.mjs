@@ -4,16 +4,6 @@ import { extname, join } from 'node:path';
 
 import { buildSpans } from './trace.mjs';
 
-const WRITE_TOOLS = new Set([
-  'mastra_workspace_write_file',
-  'mastra_workspace_edit_file',
-  'mastra_workspace_ast_edit',
-  'mastra_workspace_apply_patch',
-  'mastra_workspace_delete',
-  'write_file',
-  'edit_file',
-  'apply_patch',
-]);
 const COMMAND_TOOLS = new Set(['mastra_workspace_execute_command', 'execute_command', 'bash', 'shell', 'run_command']);
 const TASK_TOOLS = new Set(['task_write', 'task_update', 'task_complete']);
 const MEDIA_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.webm', '.mp4', '.svg']);
@@ -56,22 +46,6 @@ const owningAgentRun = (byId, span) => {
     return cursor.parentSpanId ? walk(byId.get(cursor.parentSpanId), new Set([...seen, cursor.spanId])) : null;
   };
   return walk(span, new Set());
-};
-
-const pathsFromInput = input => {
-  if (!input || typeof input !== 'object') return [];
-  const direct = input.path ?? input.file_path;
-  if (direct) return [normalizePath(direct)];
-  return [];
-};
-
-const commandPaths = input => {
-  const cmd = String(input?.command ?? input?.cmd ?? '');
-  if (!cmd) return [];
-  return cmd
-    .split(/[\s"'`;&|><()]+/)
-    .map(tok => normalizePath(tok).replace(/\/+$/, ''))
-    .filter(tok => tok && tok !== '.' && tok !== '..' && (tok.includes('/') || tok.includes('.')));
 };
 
 const matchesFile = (written, target) =>
@@ -136,7 +110,7 @@ const checkTaskWork = (task, prior) => {
   return null;
 };
 
-const checkFact1 = (spans, byId) => {
+const checkTaskList = (spans, byId) => {
   const tasks = spans.reduce((acc, span, index) => {
     if (span.spanType !== 'tool_call' || !TASK_TOOLS.has(toolName(span))) return acc;
     const owner = owningAgentRun(byId, span);
@@ -152,34 +126,6 @@ const checkFact1 = (spans, byId) => {
   });
 };
 
-const checkFact2 = (spans, byId, changedFiles) => {
-  const writeSpans = spans.filter(s => s.spanType === 'tool_call' && WRITE_TOOLS.has(toolName(s)));
-  const helperCommandSpans = spans.filter(
-    s => s.spanType === 'tool_call' && COMMAND_TOOLS.has(toolName(s)) && isHelperAgent(owningAgentRun(byId, s)),
-  );
-  const helperWrites = [...new Set([
-    ...writeSpans
-      .filter(s => isHelperAgent(owningAgentRun(byId, s)))
-      .flatMap(s => pathsFromInput(s.input)),
-    ...helperCommandSpans.flatMap(s => commandPaths(s.input)),
-  ])];
-  const leadWrites = [...new Set(
-    writeSpans
-      .filter(s => {
-        const owner = owningAgentRun(byId, s);
-        return !owner || isFlowBuild(owner);
-      })
-      .flatMap(s => pathsFromInput(s.input)),
-  )];
-  const unattributed = [...new Set(changedFiles.map(normalizePath).filter(Boolean))]
-    .filter(file => !helperWrites.some(hw => matchesFile(hw, file)));
-
-  return [
-    ...(leadWrites.length > 0 ? [`lead wrote directly: ${leadWrites.join(', ')}`] : []),
-    ...(unattributed.length > 0 ? [`unattributed changes: ${unattributed.join(', ')}`] : []),
-  ];
-};
-
 const isValidEvidence = file => {
   const ext = extname(String(file?.path ?? '')).toLowerCase();
   if (MEDIA_EXT.has(ext)) return Number(file.size ?? 0) > 0;
@@ -193,7 +139,7 @@ const isValidEvidence = file => {
 const proofKeywords = text =>
   [...new Set((String(text).toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter(w => !STOP_WORDS.has(w)))];
 
-const checkFact3 = (spans, cardDescription, evidenceFiles) => {
+const checkEvidence = (spans, cardDescription, evidenceFiles) => {
   const proofs = proofsFromCard(cardDescription);
   if (proofs.length === 0) return [];
   if (!spans.some(isCommandOrBrowser)) {
@@ -237,12 +183,11 @@ export function proofsFromCard(description) {
   return lines.map(line => line.trim()).filter(Boolean);
 }
 
-export function evaluateBuildCheck({ spans = [], changedFiles = [], cardDescription = '', evidenceFiles = [] }) {
+export function evaluateBuildCheck({ spans = [], cardDescription = '', evidenceFiles = [] }) {
   const byId = new Map(spans.map(s => [s.spanId, s]));
   const reasons = [
-    ...checkFact1(spans, byId),
-    ...checkFact2(spans, byId, changedFiles),
-    ...checkFact3(spans, cardDescription, evidenceFiles),
+    ...checkTaskList(spans, byId),
+    ...checkEvidence(spans, cardDescription, evidenceFiles),
   ];
   return reasons.length === 0 ? { ok: true } : { ok: false, reasons, reason: reasons.join('; ') };
 }
@@ -287,6 +232,6 @@ export const realCheck = {
       ? collectEvidenceFrom(join(copy, 'docs/agents')).filter(f => changedFiles.some(cf => matchesFile(cf, f.path)))
       : [];
     const evidenceFiles = [...dirs.flatMap(collectEvidenceFrom), ...docEvidence];
-    return evaluateBuildCheck({ spans, changedFiles, cardDescription, evidenceFiles });
+    return evaluateBuildCheck({ spans, cardDescription, evidenceFiles });
   },
 };

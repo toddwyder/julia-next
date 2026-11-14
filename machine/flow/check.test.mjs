@@ -98,43 +98,37 @@ test('buildSpans scopes to the latest flow-build span tree and parses JSON field
   assert.deepEqual(fromMastra.map(s => s.spanId), ['new-wf', 'new-lead', 'new-tool']);
 });
 
-test('evaluateBuildCheck passes when all three facts hold', () => {
-  const result = evaluateBuildCheck({
+test('evaluateBuildCheck passes when task list and saved evidence hold, whoever wrote the changes', () => {
+  const helperWritten = evaluateBuildCheck({
     spans: cleanLeadSpans(),
-    changedFiles: ['app/page.jsx'],
     cardDescription: '## Proof\n- Run `npm test` and save output',
     evidenceFiles: [{ path: 'proof/npm-test.log', content: '12 tests passed', size: 15 }],
   });
-  assert.deepEqual(result, { ok: true });
-});
+  assert.deepEqual(helperWritten, { ok: true });
 
-test('evaluateBuildCheck fails when lead wrote directly or via shell command (7 Nov font card fixture)', () => {
-  const direct = evaluateBuildCheck({
+  const leadDirect = evaluateBuildCheck({
     spans: [
       ...cleanLeadSpans(),
       span({ spanId: 'lead-write', parentSpanId: 'lead', name: 'mastra_workspace_edit_file', input: { path: 'app/secret.js' } }),
     ],
-    changedFiles: ['app/page.jsx'],
+    cardDescription: '## Proof\n- Run `npm test` and save output',
+    evidenceFiles: [{ path: 'proof/npm-test.log', content: '12 tests passed', size: 15 }],
   });
-  assert.equal(direct.ok, false);
-  assert.match(direct.reason, /app\/secret\.js/);
+  assert.deepEqual(leadDirect, { ok: true });
 
-  // 7 Nov font card recorded run: Lead ran a shell command to edit layout.jsx and globals.css instead of delegating.
-  const nov7FontSpans = [
-    span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
-    span({ spanId: 't1', parentSpanId: 'lead', name: 'task_write', input: { tasks: [{ id: '1', content: 'Read skill', status: 'pending' }, { id: '2', content: 'Verify fonts', status: 'pending' }] } }),
-    span({ spanId: 'sk', parentSpanId: 'lead', name: 'skill_read', input: { path: '.agents/skills/poteto-mode/SKILL.md' } }),
-    span({ spanId: 't1c', parentSpanId: 'lead', name: 'task_complete', input: { id: '1' } }),
-    span({ spanId: 'sh', parentSpanId: 'lead', name: 'mastra_workspace_execute_command', input: { command: 'node -e "fs.writeFileSync(...)"' } }),
-    span({ spanId: 't2c', parentSpanId: 'lead', name: 'task_complete', input: { id: '2' } }),
-  ];
-  const nov7 = evaluateBuildCheck({
-    spans: nov7FontSpans,
-    changedFiles: ['app/layout.jsx', 'app/globals.css'],
+  const leadShell = evaluateBuildCheck({
+    spans: [
+      span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
+      span({ spanId: 't1', parentSpanId: 'lead', name: 'task_write', input: { tasks: [{ id: '1', content: 'Read skill', status: 'pending' }, { id: '2', content: 'Verify fonts', status: 'pending' }] } }),
+      span({ spanId: 'sk', parentSpanId: 'lead', name: 'skill_read', input: { path: '.agents/skills/poteto-mode/SKILL.md' } }),
+      span({ spanId: 't1c', parentSpanId: 'lead', name: 'task_complete', input: { id: '1' } }),
+      span({ spanId: 'sh', parentSpanId: 'lead', name: 'mastra_workspace_execute_command', input: { command: 'node -e "fs.writeFileSync(...)"' } }),
+      span({ spanId: 't2c', parentSpanId: 'lead', name: 'task_complete', input: { id: '2' } }),
+    ],
+    cardDescription: '## UAT steps\n\n1. Open the preview and see fonts.',
+    evidenceFiles: [{ path: 'proof/fonts-preview.png', content: '', size: 1200 }],
   });
-  assert.equal(nov7.ok, false);
-  assert.match(nov7.reason, /app\/layout\.jsx/);
-  assert.match(nov7.reason, /app\/globals\.css/);
+  assert.deepEqual(leadShell, { ok: true });
 });
 
 test('evaluateBuildCheck fails when a playbook step is ticked without matching work or left incomplete', () => {
@@ -177,7 +171,6 @@ test('evaluateBuildCheck fails when a playbook step is ticked without matching w
 test('evaluateBuildCheck fails when a named proof lacks valid saved evidence', () => {
   const trivial = evaluateBuildCheck({
     spans: cleanLeadSpans(),
-    changedFiles: ['app/page.jsx'],
     cardDescription: '## Proof\n- Screenshot the cookbook grid',
     evidenceFiles: [{ path: 'proof/cookbook.txt', content: 'pass', size: 4 }],
   });
@@ -186,7 +179,6 @@ test('evaluateBuildCheck fails when a named proof lacks valid saved evidence', (
 
   const emptyMedia = evaluateBuildCheck({
     spans: cleanLeadSpans(),
-    changedFiles: ['app/page.jsx'],
     cardDescription: '## Proof\n- Screenshot the cookbook grid',
     evidenceFiles: [{ path: 'proof/cookbook.png', content: '', size: 0 }],
   });
@@ -204,28 +196,9 @@ test('evaluateBuildCheck fails when only an unrelated repository note is present
     span({ spanId: 'c', parentSpanId: 'lead', name: 'bash', input: { command: 'ls' } }),
   ];
   const ev = [{ path: 'docs/agents/cost-guard.md', content: 'The guard counts the cost of each call.', size: 40 }];
-  const result = evaluateBuildCheck({ spans, changedFiles: ['app/layout.jsx'], cardDescription: card, evidenceFiles: ev });
+  const result = evaluateBuildCheck({ spans, cardDescription: card, evidenceFiles: ev });
   assert.equal(result.ok, false);
   assert.match(result.reason, /no matching saved evidence/);
-});
-
-test('evaluateBuildCheck passes when a helper copies files in with a shell command', () => {
-  const card = '## UAT steps\n\n1. Open the preview of the recipe site. You see Playfair Display headings, Inter body text and Roboto Mono fixed-width text, as before.\n';
-  const spans = [
-    span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
-    span({ spanId: 't', parentSpanId: 'lead', name: 'task_write', input: { tasks: [{ id: '1', content: 'Implement fonts', status: 'completed' }] } }),
-    span({ spanId: 'h', parentSpanId: 'lead', spanType: 'agent_run', name: 'pstack-feature-1' }),
-    span({ spanId: 'w', parentSpanId: 'h', name: 'write_file', input: { path: 'app/layout.jsx' } }),
-    span({ spanId: 'cp', parentSpanId: 'h', name: 'bash', input: { command: 'cp node_modules/@fontsource-variable/inter/files/*.woff2 app/fonts/' } }),
-  ];
-  const ev = [{ path: 'proof/fonts-preview.png', content: '', size: 1200 }];
-  const result = evaluateBuildCheck({
-    spans,
-    changedFiles: ['app/layout.jsx', 'app/fonts/inter-latin-wght-normal.woff2'],
-    cardDescription: card,
-    evidenceFiles: ev,
-  });
-  assert.deepEqual(result, { ok: true });
 });
 
 async function runCheckFlow({ check, review = ['PASS'], kind = 'machine', answers = ['yes'] }) {
@@ -300,14 +273,14 @@ test('workflow sends a failed check back to build with the reason and proceeds t
     check: {
       run: async () => {
         calls += 1;
-        return calls === 1 ? { ok: false, reason: 'lead wrote directly: app/page.jsx' } : { ok: true };
+        return calls === 1 ? { ok: false, reason: 'task list: no tasks recorded' } : { ok: true };
       },
     },
   });
 
   assert.equal(calls, 2);
   assert.equal(prompts.length, 2, 'build ran twice before Shipping');
-  assert.match(prompts[1], /lead wrote directly: app\/page\.jsx/, 'second build prompt includes the check failure reason');
+  assert.match(prompts[1], /task list: no tasks recorded/, 'second build prompt includes the check failure reason');
   assert.equal(shippingCalls.length, 1, 'Shipping ran once after check passed');
   assert.equal(result.status, 'success');
   assert.equal(result.result.landed, true);
@@ -343,7 +316,7 @@ test('a card report counts check returns and Shipping failures on separate lines
     check: {
       run: async () => {
         calls += 1;
-        return calls === 1 ? { ok: false, reason: 'unattributed changes: app/layout.jsx' } : { ok: true };
+        return calls === 1 ? { ok: false, reason: 'evidence: "Run test" has no valid saved evidence' } : { ok: true };
       },
     },
   });

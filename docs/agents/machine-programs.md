@@ -12,7 +12,7 @@ of any size, not only a change to the sentence beside it.
 | `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `2a1ca703541f3af49106e5944dde86cc00d292c1d1a98a1167b39eb312672bfb` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `4b84d5954971a9cf744865a43b193ae752c9c77e6e303b55a918c09f607c0c9d` |
 | `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `6ff220292c46c0fe0b0015681b7eabbabb4748e0d6f9dbeff9a690c394a014d8` |
-| `machine/flow/check.mjs` | The post-build check: verifies Lead task list, helper authorship, and saved proof evidence before Shipping. | `0fe3ab790437c11e8261112804c4ddc258b8f7e46cb46bd2cf4755e08c2de423` |
+| `machine/flow/check.mjs` | The post-build check: verifies Lead task list and saved proof evidence before Shipping. | `8983092e73e1d715f0fe3250be133f1ef193190a8fe3f6b4d2037c3a49b9eb6d` |
 | `machine/flow/task.mjs` | The task the Lead is given, taken word for word from the card. | `21aca1ef4c2b964d729b93317061b1a23f0e38773b26e8aa1c9f951581fa62e7` |
 | `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `a214fad1fc50bfc7a4eafc482b46ae1c5a8078ab77c8d50c22de5f59ec7c2081` |
 | `machine/flow/graphify.mjs` | The Graphify graph tools offered to Lead and its helpers. | `c502bc49faa96ef1de469764696d1682347679a61a17629766940de5baf546b6` |
