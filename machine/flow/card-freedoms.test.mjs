@@ -35,12 +35,13 @@ const CATALOG = {
     commandcode: {
       models: {
         'deepseek/deepseek-v4.1-flash': { cost: { input: 0.15, output: 0.6, cache_read: 0.003 } },
+        'inclusionai/ling-3.1-flash:free': { cost: { input: 0, output: 0, cache_read: 0 } },
       },
     },
   },
 };
 
-const CORRECTIONS = { freeModels: [FREE] };
+const CORRECTIONS = { peakWindows: [], excludeDates: [], overrides: {} };
 
 // Off peak, so every paid call below prices at the advertised base rate.
 const OFF_PEAK = () => new Date('2026-11-13T05:00:00Z');
