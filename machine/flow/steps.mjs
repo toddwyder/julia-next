@@ -9,22 +9,14 @@ import { join } from 'node:path';
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
+import { realCheck } from './check.mjs';
 import { closeCopy, openCopy } from './copy.mjs';
 import { tokenReport } from './report.mjs';
 import { REVIEW_TIME_LIMIT_MS, criteriaFromCard, parseVerdict, realReview, reviewTask, verdictComment } from './review.mjs';
 import { cardState, flowData, runInput } from './schema.mjs';
 import { HELPER_CONCURRENCY } from './spending.mjs';
 import { taskFromCard } from './task.mjs';
-import {
-  nextVerdict,
-  openRun,
-  readArtifact,
-  sweepBuild,
-  writeArtifact,
-  writeLanding,
-  writeReport,
-  writeRetro,
-} from './scratch.mjs';
+import { nextVerdict, openRun, readArtifact, sweepBuild, writeArtifact, writeLanding, writeReport, writeRetro } from './scratch.mjs';
 
 // The words a stop leaves behind are the same wherever the card stops. A stop on spending also
 // states the most the card can overshoot: the helpers running when the cap was crossed, each worth
@@ -39,6 +31,8 @@ const reportText = (state, detail, spending) => {
     '',
     `Part: ${state.stopPart || 'unknown'}`,
     `Why: ${state.stopWhy || 'no reason recorded'}`,
+    `Check returns: ${state.checkReturns ?? 0}`,
+    `Shipping failures: ${state.failCount}`,
     `Failures counted: ${state.failCount}`,
     `Shipping rounds: ${state.reviewRound}`,
     `Build rounds: ${state.buildRounds}`,
@@ -55,7 +49,7 @@ const reportText = (state, detail, spending) => {
 const step = (id, execute, extra = {}) =>
   createStep({ id, inputSchema: flowData, outputSchema: flowData, ...extra, execute });
 
-export function createStages({ agents, dir, repo, review = realReview }) {
+export function createStages({ agents, dir, repo, review = realReview, check = realCheck }) {
   const spending = agents.spending;
   const cardDir = (card) => join(dir, card);
 
@@ -113,7 +107,8 @@ export function createStages({ agents, dir, repo, review = realReview }) {
     const issue = await review.readCard(card);
     if (!issue) throw new Error(`Linear card ${card} could not be read.`);
     if (buildRounds === 1) await review.moveCard(card, 'Implementation');
-    return { ...inputData, card, detail: `build round ${buildRounds} started in ${copy.folder}`, prompt: taskFromCard(issue) };
+    const backNote = state.checkReasons?.length > 0 ? `\n\n## Previous check failure\n${state.checkReasons.at(-1)}` : '';
+    return { ...inputData, card, detail: `build round ${buildRounds} started in ${copy.folder}`, prompt: `${taskFromCard(issue)}${backNote}` };
   });
 
   // The build is called here rather than handed to `createStep(agents.build)` so a card that spent
@@ -149,6 +144,26 @@ export function createStages({ agents, dir, repo, review = realReview }) {
       writeArtifact(cardDir(card), card, text);
       return { card, kind: state.kind, detail: text, failCount: state.failCount };
     },
+  });
+
+  const buildCheck = step('build-check', async (context) => {
+    if (context.inputData.stopped) return context.inputData;
+    const stopped = await halt(context);
+    if (stopped) return stopped;
+    const { inputData, state, setState, mastra, tracingContext } = context;
+    const result = await check.run({
+      mastra, traceId: tracingContext?.currentSpan?.traceId,
+      card: state.card, copy: state.copy, base: state.base, repo, cardDir: cardDir(state.card), review,
+    });
+    if (result.ok) return { ...inputData, checkPassed: true, checkReason: '' };
+    const checkReturns = state.checkReturns + 1;
+    const checkReasons = [...state.checkReasons, result.reason];
+    const stop = checkReturns >= 2;
+    await setState({
+      ...state, checkReturns, checkReasons,
+      ...(stop ? { stopPart: 'check step', stopWhy: `stopped at the check step: (1) ${checkReasons[0]}; (2) ${checkReasons[1]}` } : {}),
+    });
+    return { ...inputData, checkPassed: false, checkReason: result.reason, stopped: stop, detail: result.reason };
   });
 
   // Shipping is a fresh agent that gets the card and the card's pull request, nothing the builder
@@ -371,23 +386,9 @@ export function createStages({ agents, dir, repo, review = realReview }) {
   const hold = step('hold', async ({ inputData }) => inputData);
 
   return {
-    start,
-    startBuild,
-    buildAgent,
-    finishBuild,
-    shipping,
-    verdict,
-    remediation,
-    passNote,
-    gate,
-    acceptance,
-    land,
-    smoke,
-    smokePass,
-    stopReport,
-    retro,
-    hold,
-    machineAccept,
-    cleanup,
+    start, startBuild, buildAgent, finishBuild, buildCheck,
+    shipping, verdict, remediation, passNote, gate,
+    acceptance, land, smoke, smokePass, stopReport,
+    retro, hold, machineAccept, cleanup,
   };
 }

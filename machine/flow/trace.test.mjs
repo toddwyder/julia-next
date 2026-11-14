@@ -157,6 +157,7 @@ test('the run record on disk answers the same way for a real trace file', async 
       headCommit: () => 'abc',
       postPrComment: () => {},
     },
+    check: { run: async () => ({ ok: true }) },
   });
   const mastra = await openMastra({
     card: CARD,

@@ -6,6 +6,8 @@ import { z } from 'zod';
 
 export const CARD_PATH = 'card-path';
 export const ATTEMPT = 'attempt';
+export const BUILD_ROUND = 'build-round';
+export const REVIEW_PHASE = 'review-phase';
 export const REVIEW_ROUND = 'review-round';
 export const SMOKE_LOOP = 'smoke-loop';
 export const SMOKE_ROUND = 'smoke-round';
@@ -37,6 +39,8 @@ export const flowData = z
     landed: z.boolean().default(false),
     stopped: z.boolean().default(false),
     finished: z.boolean().default(false),
+    checkPassed: z.boolean().default(false),
+    checkReason: z.string().default(''),
   })
   .passthrough();
 
@@ -56,4 +60,6 @@ export const cardState = z.object({
   stopPart: z.string().default(''),
   stopWhy: z.string().default(''),
   unreviewed: z.boolean().default(false),
+  checkReturns: z.number().int().min(0).default(0),
+  checkReasons: z.array(z.string()).default([]),
 });

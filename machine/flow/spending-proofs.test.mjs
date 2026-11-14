@@ -146,6 +146,7 @@ test('a card killed while it waits for Todd resumes after the restart with the m
   const firstWorkflow = buildCardPath({
     dir,
     repo,
+    check: { run: async () => ({ ok: true }) },
     review: fakeReview(),
     agents: {
       build: meteredAgent({ id: 'flow-build', spending: firstSpending, called: () => { firstBuildCalls += 1; } }),
@@ -174,6 +175,7 @@ test('a card killed while it waits for Todd resumes after the restart with the m
   const secondWorkflow = buildCardPath({
     dir,
     repo,
+    check: { run: async () => ({ ok: true }) },
     review: fakeReview(),
     agents: {
       build: meteredAgent({ id: 'flow-build', spending: secondSpending, called: () => { secondBuildCalls += 1; } }),
@@ -225,6 +227,7 @@ test('a card whose Shipping fails again and again ends with "card spending limit
   const workflow = buildCardPath({
     dir,
     repo,
+    check: { run: async () => ({ ok: true }) },
     review: fakeReview(),
     agents: {
       build: meteredAgent({ id: 'flow-build', spending }),
@@ -318,6 +321,7 @@ test('a lead that starts 150 helpers at once ends at its limit, and the total eq
   const workflow = buildCardPath({
     dir,
     repo,
+    check: { run: async () => ({ ok: true }) },
     review: fakeReview(),
     agents: { build: lead, shipping: stub(PASS), remediation: stub('fixed line'), retro: stub('retro line'), spending },
   });

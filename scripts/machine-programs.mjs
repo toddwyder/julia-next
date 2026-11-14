@@ -27,6 +27,7 @@ export const PROGRAMS = [
   ['src/mastra/index.ts', 'The Studio entry. Registers the card workflow so the run form can start a card.'],
   ['machine/flow/workflow.mjs', 'The order of the stages, the loops and the one place a card waits.'],
   ['machine/flow/steps.mjs', 'What each stage does, including the build being a real agent step.'],
+  ['machine/flow/check.mjs', 'The post-build check: verifies Lead task list and saved proof evidence before Shipping.'],
   ['machine/flow/task.mjs', 'The task the Lead is given, taken word for word from the card.'],
   ['machine/flow/agents.mjs', 'The agents the stages run, and what the build agent may touch.'],
   ['machine/flow/graphify.mjs', 'The Graphify graph tools offered to Lead and its helpers.'],
