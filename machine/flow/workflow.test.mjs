@@ -91,6 +91,7 @@ async function openCase({
   smoke = ['PASS'],
   answers = ['yes'],
   build,
+  check = { run: async () => ({ ok: true }) },
   untilFirstWait = false,
 }) {
   const dir = givenDir ?? mkdtempSync(join(tmpdir(), 'flow-case-'));
@@ -109,6 +110,7 @@ async function openCase({
     dir,
     repo,
     review: fake.review,
+    check: typeof check === 'function' ? { run: check } : check,
   });
   const mastra = await openMastra({
     card,
@@ -503,7 +505,7 @@ test('an answer for another request is refused and the same run still takes the 
   writeFileSync(join(caseDir, 'verdicts.json'), JSON.stringify({ smoke: ['PASS'] }));
   writeFileSync(join(caseDir, 'cursors.json'), '{}');
   const fake = fakeReview(['PASS']);
-  const caseWorkflow = buildCardPath({ agents: { ...agents, shipping: fake.shipping }, dir: dirCase, repo, review: fake.review });
+  const caseWorkflow = buildCardPath({ agents: { ...agents, shipping: fake.shipping }, dir: dirCase, repo, review: fake.review, check: { run: async () => ({ ok: true }) } });
   const mastra = await openMastra({
     card: CARD,
     stateDb: join(dirCase, 'state.db'),

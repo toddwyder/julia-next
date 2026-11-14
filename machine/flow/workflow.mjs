@@ -13,8 +13,10 @@ import { createWorkflow } from '@mastra/core/workflows';
 
 import {
   ATTEMPT,
+  BUILD_ROUND,
   CARD_PATH,
   FIX_AND_LAND,
+  REVIEW_PHASE,
   REVIEW_ROUND,
   SMOKE_LOOP,
   SMOKE_ROUND,
@@ -55,9 +57,10 @@ const passed = async ({ inputData }) =>
   inputData.failCount >= 2;
 const smokeDone = async ({ inputData }) => inputData.smoke === 'PASS' || inputData.stopped === true;
 const answered = async ({ inputData }) => inputData.accepted === true || inputData.stopped === true;
+const buildChecked = async ({ inputData }) => inputData.stopped === true || inputData.checkPassed === true;
 
-export function buildCardPath({ agents, dir, repo, review }) {
-  const stage = createStages({ agents, dir, repo, review });
+export function buildCardPath({ agents, dir, repo, review, check }) {
+  const stage = createStages({ agents, dir, repo, review, check });
 
   const reviewRound = createWorkflow({ ...schema, id: REVIEW_ROUND })
     .then(stage.shipping)
@@ -100,13 +103,26 @@ export function buildCardPath({ agents, dir, repo, review }) {
     .dountil(smokeRound, smokeDone)
     .commit();
 
-  const attempt = createWorkflow({ ...schema, id: ATTEMPT })
+  const buildRound = createWorkflow({ ...schema, id: BUILD_ROUND })
     .then(stage.startBuild)
     .map(toPrompt)
     .then(stage.buildAgent)
     .then(stage.finishBuild)
+    .then(stage.buildCheck)
+    .commit();
+
+  const reviewPhase = createWorkflow({ ...schema, id: REVIEW_PHASE })
     .dountil(reviewRound, passed)
     .then(stage.gate)
+    .commit();
+
+  const attempt = createWorkflow({ ...schema, id: ATTEMPT })
+    .dountil(buildRound, buildChecked)
+    .branch([
+      [async ({ inputData }) => inputData.stopped === true, stage.hold],
+      [async ({ inputData }) => inputData.stopped !== true, reviewPhase],
+    ])
+    .map(unfold)
     .branch([
       [async ({ inputData }) => inputData.stopped === true, stage.stopReport],
       [async ({ inputData }) => inputData.stopped !== true && inputData.kind === 'machine', stage.machineAccept],
