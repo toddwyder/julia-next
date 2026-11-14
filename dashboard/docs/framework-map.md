@@ -8,7 +8,7 @@ Read from installed Next 16.3.5 before app code. The package includes these page
 | Fresh server reads per request | connection and fetch no-store | https://nextjs.org/docs/app/api-reference/functions/connection and https://nextjs.org/docs/app/api-reference/functions/fetch |
 | Card id in the URL | Async params | https://nextjs.org/docs/app/api-reference/file-conventions/page |
 | Loading during real reads | Suspense and loading.jsx | https://nextjs.org/docs/app/api-reference/file-conventions/loading |
-| Public Sans without browser font requests | next/font/google | https://nextjs.org/docs/app/api-reference/components/font |
+| Public Sans without browser font requests | next/font/local | https://nextjs.org/docs/app/api-reference/components/font |
 | App isolation | Turbopack root | https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory |
 | Named role assertions and screenshots | Playwright Test | https://playwright.dev/docs/test-assertions and https://playwright.dev/docs/test-use-options |
 | GraphQL connections | Linear pagination | https://linear.app/developers/pagination |

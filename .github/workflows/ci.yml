@@ -83,6 +83,8 @@ jobs:
         run: node scripts/check-agent-links.mjs
       - name: Check the machine program list is up to date
         run: node scripts/machine-programs.mjs --check
+      - name: Check no font loads from an outside address
+        run: node scripts/check-font-sources.mjs
       - name: Check every branch has an open pull request
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -109,6 +111,8 @@ jobs:
         run: node scripts/test-owners.mjs --plan
       - name: Install each local owner's locked dependencies
         run: node scripts/test-owners.mjs --install local
+      - name: Block outside font hosts
+        run: node scripts/block-font-hosts.mjs
       - name: Run local owners' tests
         run: node scripts/test-owners.mjs --run local
 
@@ -154,6 +158,8 @@ jobs:
         run: npm run guard:flow
       - name: Guard the Julia and machine boundary
         run: npm run guard:boundaries
+      - name: Block outside font hosts
+        run: node scripts/block-font-hosts.mjs
       - name: Build application
         run: npm run build
 
