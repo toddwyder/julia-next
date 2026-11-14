@@ -31,9 +31,6 @@
       "multiplier": 2
     }
   ],
-  "freeModels": [
-    "commandcode/inclusionai/ling-3.1-flash:free"
-  ],
   "excludeDates": [],
   "overrides": {
     "commandcode/moonshotai/Kimi-K3.1-Pro": {

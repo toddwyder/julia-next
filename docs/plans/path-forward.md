@@ -169,3 +169,9 @@ Agents use judgment; runners are machines.
 - **Agents write, runners post.** The builder writes its pull request's title and description following pstack's Opening a PR; Shipping writes its verdict. The runner opens the pull request and posts the verdict exactly as written.
 - **Until runners start every agent**, an agent started by hand ends by telling the runner its build is done, and the runner takes over. It never starts Shipping itself.
 - **Crash recovery.** The runner's saved state survives a crash, and it resumes at the step it was on.
+
+## 14 November decisions (Todd)
+
+- **Memory model.** Observational memory (observer and reflector) moves out of `price-corrections.json`'s `freeModels` list onto its own `Memory` line in the model picker (`dashboard/config/roles.json`, saved in `~/.config/julia/lead-role-models.md`). Its chosen model is `commandcode/deepseek/deepseek-v4.1-flash`, picked after a side-by-side test against `thinkingmachines/inkling-2-small:free` and `stealth/glyph-cluster:free` on a 33,825-token slice of JUL-362/build-1.
+- **Task tools and task list enforcement.** Studio refuses to start a card when the Lead lacks its task tools. During a build, if the Lead starts working without opening a task list, the machine reminds it within its first few steps and stops the card if it still keeps none.
+- **Memory failure.** Mastra's `failurePolicy` default (`abort`) stays as installed. When the memory model fails after Mastra's retries, the card stops and its stop report names the memory model and the failure.

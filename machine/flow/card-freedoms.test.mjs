@@ -35,12 +35,13 @@ const CATALOG = {
     commandcode: {
       models: {
         'deepseek/deepseek-v4.1-flash': { cost: { input: 0.15, output: 0.6, cache_read: 0.003 } },
+        'inclusionai/ling-3.1-flash:free': { cost: { input: 0, output: 0, cache_read: 0 } },
       },
     },
   },
 };
 
-const CORRECTIONS = { freeModels: [FREE] };
+const CORRECTIONS = { peakWindows: [], excludeDates: [], overrides: {} };
 
 // Off peak, so every paid call below prices at the advertised base rate.
 const OFF_PEAK = () => new Date('2026-11-13T05:00:00Z');
@@ -96,8 +97,24 @@ function fakeModel({
   };
 }
 
+const taskToolStubs = () => {
+  const stubTool = id => createTool({
+    id,
+    description: id,
+    inputSchema: z.object({}).passthrough(),
+    outputSchema: z.object({}).passthrough(),
+    execute: async () => ({ ok: true }),
+  });
+  return {
+    task_write: stubTool('task_write'),
+    task_update: stubTool('task_update'),
+    task_complete: stubTool('task_complete'),
+    task_check: stubTool('task_check'),
+  };
+};
+
 // A real agent on the fake model, counted by the ledger the way the machine wires it.
-function meteredAgent({ id, spending, called = () => {}, usage, modelOptions = {}, processorOptions, ...extra }) {
+function meteredAgent({ id, spending, called = () => {}, usage, modelOptions = {}, processorOptions, tools, ...extra }) {
   const guard = spendingProcessor(spending, () => ({ provider: 'commandcode', model: PAID }), processorOptions);
   return new Agent({
     id,
@@ -106,6 +123,7 @@ function meteredAgent({ id, spending, called = () => {}, usage, modelOptions = {
     model: fakeModel({ usage, called, ...modelOptions }),
     inputProcessors: [guard],
     outputProcessors: [guard],
+    tools: id === 'flow-build' ? { ...taskToolStubs(), ...tools } : tools,
     ...extra,
   });
 }
@@ -345,13 +363,13 @@ test('no output limit reaches the model, a long answer passes, and the card cap 
 // Criterion D: memory note-takers run on the free model the card picked, at $0.
 // ---------------------------------------------------------------------------
 
-test('memory runs on the free model the card picked, and its calls show in the card total at zero', async t => {
+test('memory runs on the configured Memory model, and its calls show in the card total at zero when free', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'flow-free-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const spending = openSpending({ dir, limit: 4, catalog: CATALOG, corrections: CORRECTIONS, now: OFF_PEAK });
+  const spending = openSpending({ dir, limit: 4, catalog: CATALOG, corrections: CORRECTIONS, memoryModel: FREE, now: OFF_PEAK });
 
   spending.begin(CARD);
-  assert.equal(spending.memoryModel, FREE, 'the card picked the free model from the price list');
+  assert.equal(spending.memoryModel, FREE, 'the card picked the configured Memory model');
 
   // The card's own note-takers are pointed at that pick, not at a name written in the machine.
   const ledger = JSON.parse(readFileSync(join(dir, CARD, 'spending.json'), 'utf8'));

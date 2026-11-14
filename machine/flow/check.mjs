@@ -2,10 +2,11 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
+import { seedPlaybookTasks } from './playbook.mjs';
 import { buildSpans } from './trace.mjs';
 
 const COMMAND_TOOLS = new Set(['mastra_workspace_execute_command', 'execute_command', 'bash', 'shell', 'run_command']);
-const TASK_TOOLS = new Set(['task_write', 'task_update', 'task_complete']);
+const TASK_TOOLS = new Set(['choose_playbook', 'task_write', 'task_update', 'task_complete']);
 const MEDIA_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.webm', '.mp4', '.svg']);
 const TEXT_EXT = new Set(['.json', '.txt', '.log', '.md', '.tsv', '.csv', '.html']);
 const STOP_WORDS = new Set([
@@ -56,6 +57,14 @@ const taskText = item => String(item?.content ?? '').trim();
 const applyTaskEvent = (tasks, span, index) => {
   const name = toolName(span);
   const input = span.input ?? {};
+  if (name === 'choose_playbook') {
+    const steps = Array.isArray(span.output?.steps) ? span.output.steps : [];
+    if (!span.output?.ok || steps.length === 0) return tasks;
+    return seedPlaybookTasks(tasks, steps).map(task => {
+      const prev = tasks.find(t => t.id === task.id);
+      return { ...task, completedAtIndex: prev?.completedAtIndex ?? null };
+    });
+  }
   if (name === 'task_write') {
     const raw = Array.isArray(input.tasks) ? input.tasks : [];
     return raw.filter(item => taskText(item)).map((item, pos) => {
@@ -84,9 +93,17 @@ const applyTaskEvent = (tasks, span, index) => {
   });
 };
 
+const isThroughputCheckpoint = task =>
+  /^checkpoint_/i.test(String(task.id ?? '')) ||
+  /^\s*(?:\*\*)?(?:Blocking first steps|Independent workstreams|Shared mutable state|Smallest safe decomposition)\b/i.test(String(task.content ?? ''));
+
 const checkTaskWork = (task, prior) => {
+  if (isThroughputCheckpoint(task)) return null;
   const text = task.content;
-  const needsSkill = /\bskill\b|\b(how|architect|arena|interrogate|deslop|no-comments|unslop|technical-writing|opening a pr)\b/i.test(text);
+  const skillText = text
+    .replace(/When the implementation admits multiple valid shapes[^.]*\./gi, '')
+    .replace(/\*\*?(?:separate-before-serializing-shared-state|sequence-verifiable-units)\*\*?\s+principle\s+skill/gi, '');
+  const needsSkill = /\bskill\b|\b(how|architect|arena|interrogate|deslop|no-comments|unslop|technical-writing|opening a pr)\b/i.test(skillText);
   const needsHelper = /delegate|handover|hand off|helper|subagent|poteto-agent|arena|swarm|architect|interrogate/i.test(text);
   const needsProof = /\b(proof|prove|verify|verification|test|matching surface)\b/i.test(text);
 
@@ -110,16 +127,52 @@ const checkTaskWork = (task, prior) => {
   return null;
 };
 
+const matchesPlaybookStep = (taskContent, step) => {
+  const text = String(taskContent ?? '').trim();
+  if (text === step) return true;
+  if (!text.startsWith(step)) return false;
+  const rest = text.slice(step.length).trim();
+  return /^skip\s*:\s*\S/i.test(rest);
+};
+
 const checkTaskList = (spans, byId) => {
+  let chosenSteps = null;
   const tasks = spans.reduce((acc, span, index) => {
-    if (span.spanType !== 'tool_call' || !TASK_TOOLS.has(toolName(span))) return acc;
+    if (span.spanType !== 'tool_call') return acc;
+    const name = toolName(span);
+    if (!TASK_TOOLS.has(name)) return acc;
     const owner = owningAgentRun(byId, span);
     if (owner && !isFlowBuild(owner)) return acc;
+    if (name === 'choose_playbook' && span.output?.ok && Array.isArray(span.output?.steps)) {
+      chosenSteps = span.output.steps;
+    }
     return applyTaskEvent(acc, span, index);
   }, []);
+  if (!chosenSteps || chosenSteps.length === 0) return ['playbook: no playbook chosen'];
   if (tasks.length === 0) return ['task list: no tasks recorded'];
+
+  let cursor = -1;
+  const playbookFailures = [];
+  for (const [stepIndex, step] of chosenSteps.entries()) {
+    const foundAfterCursor = tasks.findIndex((task, idx) => idx > cursor && matchesPlaybookStep(task.content, step));
+    if (foundAfterCursor !== -1) {
+      if (stepIndex === 0 && foundAfterCursor !== 0) {
+        playbookFailures.push(`playbook: step "${step}" must appear before card items`);
+      }
+      cursor = foundAfterCursor;
+      continue;
+    }
+    const foundAnywhere = tasks.findIndex(task => matchesPlaybookStep(task.content, step));
+    if (foundAnywhere === -1) {
+      playbookFailures.push(`playbook: missing step "${step}"`);
+    } else {
+      playbookFailures.push(`playbook: step "${step}" must appear in order after previous playbook steps`);
+    }
+  }
+  if (playbookFailures.length > 0) return playbookFailures;
+
   return tasks.flatMap(task => {
-    if (/\bskip\s*:\s*\S/i.test(task.content)) return [];
+    if (/\b(?:skip|n\/a)\s*:\s*\S/i.test(task.content)) return [];
     if (task.status !== 'completed') return [`task list: "${task.content}" is ${task.status}`];
     const failure = checkTaskWork(task, spans.slice(0, task.completedAtIndex));
     return failure ? [failure] : [];

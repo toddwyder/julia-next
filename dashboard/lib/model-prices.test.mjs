@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { costOfTokens, costFromMetrics, findCost, loadCatalog, priceFor, readCorrections } from './model-prices.js';
 
 const catalog = {
@@ -25,11 +26,11 @@ const catalog = {
   },
 };
 
-const corrections = readCorrections({ file: new URL('../config/price-corrections.json', import.meta.url).pathname });
+const corrections = readCorrections({ file: fileURLToPath(new URL('../config/price-corrections.json', import.meta.url)) });
 
-test('the corrections file holds DeepSeek peak hours and the free CommandCode model', () => {
+test('the corrections file holds DeepSeek peak hours and missing file throws', () => {
   assert.equal(corrections.peakWindows.length, 2);
-  assert.deepEqual(corrections.freeModels, ['commandcode/inclusionai/ling-3.1-flash:free']);
+  assert.throws(() => readCorrections({ file: '/nonexistent/price-corrections.json' }), /Missing price corrections setting/);
 });
 
 test('a model models.dev leaves out is priced from the corrections file', () => {

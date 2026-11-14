@@ -41,6 +41,8 @@ export const flowData = z
     finished: z.boolean().default(false),
     checkPassed: z.boolean().default(false),
     checkReason: z.string().default(''),
+    playbook: z.string().default(''),
+    playbookCall: z.number().int().min(0).default(0),
   })
   .passthrough();
 
@@ -62,4 +64,6 @@ export const cardState = z.object({
   unreviewed: z.boolean().default(false),
   checkReturns: z.number().int().min(0).default(0),
   checkReasons: z.array(z.string()).default([]),
+  playbook: z.string().default(''),
+  playbookCall: z.number().int().min(0).default(0),
 });

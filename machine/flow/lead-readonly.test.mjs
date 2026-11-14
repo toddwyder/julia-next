@@ -88,8 +88,10 @@ function setupCase(t) {
     try { rmSync(dir, { recursive: true, force: true }); } catch {}
   });
   const repo = join(dir, 'repo');
-  mkdirSync(join(repo, '.agents/skills/poteto-mode'), { recursive: true });
+  mkdirSync(join(repo, '.agents/skills/poteto-mode/playbooks'), { recursive: true });
   writeFileSync(join(repo, '.agents/skills/poteto-mode/SKILL.md'), '# Poteto mode\nTest skill.\n');
+  writeFileSync(join(repo, '.agents/skills/poteto-mode/playbooks/feature.md'), '### Feature\n\n1. First step.\n');
+  writeFileSync(join(repo, '.agents/skills/poteto-mode/playbooks/investigation.md'), '### Investigation\n\n1. Investigate.\n');
   writeFileSync(join(repo, 'README.md'), 'julia\n');
   const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
   git('init', '--quiet', '--initial-branch=main');
@@ -118,7 +120,8 @@ function setupCase(t) {
     dir,
     limit: 4,
     catalog: CATALOG,
-    corrections: { freeModels: ['commandcode/inclusionai/ling-3.1-flash:free'] },
+    corrections: { peakWindows: [], excludeDates: [], overrides: {} },
+    memoryModel: 'commandcode/deepseek/deepseek-v4.1-flash',
   });
   spending.begin(CARD);
 
@@ -172,6 +175,7 @@ test('Criterion 1: every write poteto-mode asks of the lead itself still works',
     steps: [
       {
         toolCalls: [
+          { name: 'choose_playbook', input: { playbook: 'investigation' } },
           {
             name: 'task_write',
             input: {
@@ -231,6 +235,7 @@ test('Criterion 2: a lead that reaches to change the card work gets one clear an
     steps: [
       {
         toolCalls: [
+          { name: 'choose_playbook', input: { playbook: 'feature' } },
           { name: 'mastra_workspace_write_file', input: { path: 'work.txt', content: 'lead edit' } },
         ],
       },
@@ -277,6 +282,7 @@ test('Criterion 3: the change lands when a helper makes it', async t => {
     steps: [
       {
         toolCalls: [
+          { name: 'choose_playbook', input: { playbook: 'feature' } },
           { name: 'agent-featureRefactoring', input: { prompt: 'Create feature.txt' } },
         ],
       },

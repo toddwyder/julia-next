@@ -142,6 +142,7 @@ test('the run record on disk answers the same way for a real trace file', async 
         id: 'flow-build',
         name: 'Flow build',
         instructions: 'Reply with one line.',
+        tools: { task_write: { id: 'task_write' }, task_update: { id: 'task_update' }, task_complete: { id: 'task_complete' }, task_check: { id: 'task_check' } },
         model: createMockModel({ mockText: 'built line' }),
       }),
       shipping: { stream: async () => ({ text: Promise.resolve('VERDICT: PASS\nCRITERION 1: PASS — ok\nNOTES: none') }) },

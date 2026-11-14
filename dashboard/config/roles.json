@@ -161,6 +161,12 @@
           "name": "Retro",
           "default": "openai/gpt-6.1-sol",
           "explanation": "The lesson pass after a card lands."
+        },
+        {
+          "id": "memory",
+          "name": "Memory",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
+          "explanation": "Takes observational notes and condenses context during a build."
         }
       ]
     }

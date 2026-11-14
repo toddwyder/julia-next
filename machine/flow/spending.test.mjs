@@ -343,6 +343,7 @@ test('the card path stops a card that crosses its limit and writes the reason in
         name: 'Lead',
         instructions: 'Reply with one line.',
         model: fakeModel({ text: 'built line', usage: { inputTokens: 10_000, outputTokens: 1_000, totalTokens: 11_000 } }),
+        tools: { task_write: { id: 'task_write' }, task_update: { id: 'task_update' }, task_complete: { id: 'task_complete' }, task_check: { id: 'task_check' } },
         ...guarded(spending, () => ({ provider: 'commandcode', model: DEEPSEEK })),
       });
       const stub = text => ({ generate: async () => ({ text }), stream: async () => ({ text: Promise.resolve(text) }) });
@@ -392,6 +393,7 @@ test('the Studio record and the card ledger agree on what the card spent', async
     id: 'flow-build',
     name: 'Lead',
     instructions: 'Reply with one line.',
+    tools: { task_write: { id: 'task_write' }, task_update: { id: 'task_update' }, task_complete: { id: 'task_complete' }, task_check: { id: 'task_check' } },
     model: fakeModel({ text: 'built line', usage: { inputTokens: 100_000, outputTokens: 10_000, totalTokens: 110_000 } }),
     ...guarded(spending, () => ({ provider: 'commandcode', model: DEEPSEEK })),
   });
@@ -415,5 +417,25 @@ test('the Studio record and the card ledger agree on what the card spent', async
   assert.equal(spending.calls.length, 1);
   assert.ok(record.usd > 0, `the trace prices the call: ${record.costNote}`);
   assert.equal(spending.total, Number(record.usd.toFixed(12)));
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('spending.record accepts LanguageModelV3 nested usage objects from memory calls', () => {
+  const { dir, spending } = openCase();
+  spending.begin(CARD);
+  const res = spending.record({
+    provider: 'commandcode',
+    model: DEEPSEEK,
+    agent: 'memory',
+    usage: {
+      inputTokens: { total: 1000, noCache: 600, cacheRead: 400 },
+      outputTokens: { total: 200, text: 150, reasoning: 50 },
+    },
+  });
+  assert.equal(res.stop, null);
+  assert.ok(res.usd > 0);
+  assert.equal(spending.calls[0].inputTokens, 1000);
+  assert.equal(spending.calls[0].outputTokens, 200);
+  assert.equal(spending.calls[0].cacheReadTokens, 400);
   rmSync(dir, { recursive: true, force: true });
 });

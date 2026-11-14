@@ -75,8 +75,15 @@ function fakeModel({ usage, text = 'one line', called = () => {}, done = () => {
   };
 }
 
+const TASK_TOOL_STUBS = {
+  task_write: { id: 'task_write' },
+  task_update: { id: 'task_update' },
+  task_complete: { id: 'task_complete' },
+  task_check: { id: 'task_check' },
+};
+
 // A real agent on the fake model, counted by the ledger. `ids` is fixed the way the picker fixes it.
-function meteredAgent({ id, spending, called = () => {}, usage, modelOptions = {}, processorOptions, ...extra }) {
+function meteredAgent({ id, spending, called = () => {}, usage, modelOptions = {}, processorOptions, tools, ...extra }) {
   const guard = spendingProcessor(spending, () => ({ provider: 'commandcode', model: DEEPSEEK }), processorOptions);
   return new Agent({
     id,
@@ -85,6 +92,7 @@ function meteredAgent({ id, spending, called = () => {}, usage, modelOptions = {
     model: fakeModel({ usage, called, ...modelOptions }),
     inputProcessors: [guard],
     outputProcessors: [guard],
+    tools: id === 'flow-build' ? { ...TASK_TOOL_STUBS, ...tools } : tools,
     ...extra,
   });
 }
