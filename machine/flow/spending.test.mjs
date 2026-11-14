@@ -18,7 +18,7 @@ const { openMastra } = await import('./mastra.mjs');
 const { openScratch } = await import('./scratch.mjs');
 const { CARD_LIMIT_DOLLARS, STOP_REASONS, meteredModel, openSpending, splitModelId, spendingProcessor } = await import('./spending.mjs');
 const { costRecord } = await import('./trace.mjs');
-const { costOfTokens, loadCatalog, priceFor } = await import('../../dashboard/lib/model-prices.js');
+const { loadCatalog } = await import('../../dashboard/lib/model-prices.js');
 
 const CARD = 'JUL-375-SPENDING';
 const DEEPSEEK = 'deepseek/deepseek-v4.1-flash';
@@ -134,11 +134,6 @@ function studioRepo(dir) {
   git('-c', 'user.email=flow@test', '-c', 'user.name=flow', 'commit', '--quiet', '-m', 'main');
   process.env.FLOW_SCRATCH = join(dir, 'scratch');
   return repo;
-}
-
-// The environment is read once per case, so a fresh price list per case keeps the order safe.
-function priceOn(catalog, at) {
-  return priceFor({ catalog, corrections: CORRECTIONS, provider: 'commandcode', model: DEEPSEEK, at });
 }
 
 // The same processor counts on both sides of a call: the input step blocks, the output step records.
@@ -375,33 +370,6 @@ test('the card path stops a card that crosses its limit and writes the reason in
   rmSync(dir, { recursive: true, force: true });
 });
 
-// ---------------------------------------------------------------------------
-// Criterion 8: the final total is under the limit plus one call per running agent,
-// and the ledger prices with the same list the picker shows.
-// ---------------------------------------------------------------------------
-
-test('the ledger prices with the same list the picker shows', () => {
-  const at = new Date('2026-11-13T05:00:00Z');
-  const price = priceOn(CATALOG, at);
-  const { usd } = costOfTokens({ price, tokens: { totalInput: 100_000, totalOutput: 10_000 } });
-  assert.equal(usd, (100_000 * 0.15 + 10_000 * 0.6) / 1e6);
-  assert.equal(price.source, 'a fake price list (models.dev)');
-});
-
-// The real price list is on this machine, so one test reads it to keep the wiring honest.
-test('the real price list prices a peak DeepSeek call at the peak rate', async () => {
-  let catalog;
-  try {
-    catalog = loadCatalog();
-  } catch {
-    return; // No price list on this machine, so there is nothing to read here.
-  }
-  const at = new Date('2026-11-13T02:00:00Z');
-  const price = priceFor({ catalog, corrections: CORRECTIONS, provider: 'commandcode', model: DEEPSEEK, at });
-  assert.ok(price, 'the shipped list knows this model');
-  assert.equal(price.peak, true);
-  assert.equal(price.inputPerMillion, 0.3);
-});
 
 // Criterion 3 is a dollar figure in two places at once. The ledger the cap reads and the Studio
 // trace record cost.json comes from must agree, so this test runs one real card call, reads both

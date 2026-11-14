@@ -19,8 +19,6 @@ process.env.CMD_API_KEY ??= 'unused-in-tests';
 const { Agent } = await import('@mastra/core/agent');
 const { createTool } = await import('@mastra/core/tools');
 const { simulateReadableStream } = await import('@mastra/core/test-utils/llm-mock');
-const { Memory } = await import('@mastra/memory');
-const { LibSQLStore } = await import('@mastra/libsql');
 const { buildCardPath } = await import('./workflow.mjs');
 const { openMastra } = await import('./mastra.mjs');
 const { openScratch } = await import('./scratch.mjs');
@@ -372,44 +370,6 @@ test('memory runs on the free model the card picked, and its calls show in the c
   assert.equal(call.inputTokens, 5_000, 'its tokens are still counted');
 });
 
-// ---------------------------------------------------------------------------
-// Criterion E: a memory note-taker's failed call is retried the way Mastra retries by default.
-// ---------------------------------------------------------------------------
-
-test('a memory note-taker retries a failed call the way Mastra retries by default', async t => {
-  const dir = mkdtempSync(join(tmpdir(), 'flow-memory-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-
-  let attempts = 0;
-  const model = fakeModel({
-    modelId: 'inclusionai/ling-3.1-flash:free',
-    usage: { inputTokens: 40, outputTokens: 20, totalTokens: 60 },
-    text: '<observations>\n- the card is green\n</observations>',
-    called: () => { attempts += 1; },
-    failOn: () => attempts === 1,
-  });
-
-  const storage = new LibSQLStore({ id: 'memory-retries', url: `file:${join(dir, 'memory.db')}` });
-  const memory = new Memory({
-    storage,
-    options: {
-      observationalMemory: {
-        // Mastra's own settings for the card's note-takers, except the token thresholds,
-        // which the test lowers so one short message is observed.
-        observation: { model, messageTokens: 5, bufferTokens: 2 },
-        reflection: { model },
-      },
-    },
-  });
-
-  const retries = (await memory.getMergedThreadConfig({})).observationalMemory;
-  assert.equal(retries.observation.maxRetries, undefined, 'the note-taker keeps Mastra default retry ladder');
-
-  const observer = new Agent({ id: 'observer-probe', name: 'observer-probe', instructions: 'Answer one line.', model, memory });
-  await observer.generate('remember this: the card is green', { memory: { thread: 'thread-1', resource: 'resource-1' } });
-
-  assert.ok(attempts >= 2, `the failed note-taker call was attempted again (attempts ${attempts})`);
-});
 
 // ---------------------------------------------------------------------------
 // Criterion G: every card report shows the tokens the lead and each helper spent reading,

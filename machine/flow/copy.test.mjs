@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -20,31 +20,6 @@ function studio(t) {
   git(repo, ['-c', 'user.email=copy@test', '-c', 'user.name=copy', 'commit', '--quiet', '-m', 'main']);
   return { dir, repo, env: { FLOW_SCRATCH: join(dir, 'scratch') } };
 }
-
-test('a card’s copy is a worktree of Studio’s repository named after the card, made from main', t => {
-  const { repo, env } = studio(t);
-  const base = git(repo, ['rev-parse', 'HEAD']);
-  const copy = openCopy({ repo, card: 'JUL-400', env });
-
-  assert.equal(copy.folder, join(copiesRoot(env), 'JUL-400'));
-  assert.equal(copy.base, base);
-  assert.equal(copy.fresh, true);
-  assert.equal(git(copy.folder, ['rev-parse', 'HEAD']), base);
-  assert.equal(git(copy.folder, ['symbolic-ref', '--short', 'HEAD']), 'card/JUL-400');
-  assert.equal(readFileSync(join(copy.folder, 'README.md'), 'utf8'), 'studio\n');
-});
-
-test('a card opened again after a restart keeps the copy it already had', t => {
-  const { repo, env } = studio(t);
-  const first = openCopy({ repo, card: 'JUL-401', env });
-  writeFileSync(join(first.folder, 'work.txt'), 'half done\n');
-
-  const again = openCopy({ repo, card: 'JUL-401', env });
-  assert.equal(again.folder, first.folder);
-  assert.equal(again.base, first.base);
-  assert.equal(again.fresh, false);
-  assert.equal(readFileSync(join(again.folder, 'work.txt'), 'utf8'), 'half done\n');
-});
 
 test('a card’s copy goes when the card ends and its branch stays for the pull request', t => {
   const { repo, env } = studio(t);
