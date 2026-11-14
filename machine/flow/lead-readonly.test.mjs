@@ -233,6 +233,7 @@ test('Criterion 2: a lead that reaches to change the card work gets one clear an
     steps: [
       {
         toolCalls: [
+          { name: 'choose_playbook', input: { playbook: 'feature' } },
           { name: 'mastra_workspace_write_file', input: { path: 'work.txt', content: 'lead edit' } },
         ],
       },
@@ -279,6 +280,7 @@ test('Criterion 3: the change lands when a helper makes it', async t => {
     steps: [
       {
         toolCalls: [
+          { name: 'choose_playbook', input: { playbook: 'feature' } },
           { name: 'agent-featureRefactoring', input: { prompt: 'Create feature.txt' } },
         ],
       },

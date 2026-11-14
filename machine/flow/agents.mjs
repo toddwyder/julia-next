@@ -143,17 +143,11 @@ export function createAgents({ model, leadModel, helperModel, repo = repoRoot(),
     onChosen: leadPlaybookGuard.onChosen,
     onInvalid: leadPlaybookGuard.onInvalid,
   });
-  const leadPlaybookNote = [
-    '',
-    '## Machine Playbook Tool',
-    'As your first act before any other tool call, call `choose_playbook` with the name of the poteto-mode playbook for this card (for example `feature`, `bug-fix`, `investigation`, `refactoring`).',
-    'The machine writes that playbook\'s steps word for word into your task list. Work through every step in order; any step you leave undone must stay in the task list with `skip: <reason>` appended to its content (via `task_update`). Add card-specific items only after the playbook steps.',
-  ].join('\n');
   const leadProcessors = codingProcessors(() => splitModelId(leadModelId(leadModelFile)), { refuseAfterStop: true });
   const build = createCodingAgent({
     id: 'flow-build',
     name: 'Lead',
-    instructions: `${readFileSync(join(repo, POTETO_SKILL), 'utf8')}${leadPlaybookNote}`,
+    instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
     model: leadModel ?? buildModelReader(leadModelFile),
     inputProcessors: [...leadProcessors.inputProcessors, leadPlaybookGuard],
     outputProcessors: [...leadProcessors.outputProcessors, leadPlaybookGuard],

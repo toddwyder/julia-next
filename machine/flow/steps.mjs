@@ -99,7 +99,8 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     if (!issue) throw new Error(`Linear card ${card} could not be read.`);
     if (buildRounds === 1) await review.moveCard(card, 'Implementation');
     const backNote = state.checkReasons?.length > 0 ? `\n\n## Previous check failure\n${state.checkReasons.at(-1)}` : '';
-    return { ...inputData, card, detail: `build round ${buildRounds} started in ${copy.folder}`, prompt: `${taskFromCard(issue)}${backNote}` };
+    const playbookNote = '\n\n## Playbook step\nAs your first act before any other tool call, call `choose_playbook` with the poteto-mode playbook name for this card (for example `feature`, `bug-fix`, `investigation`, `refactoring`). Any step you leave undone must stay in the task list with `skip: <reason>` appended to its content.';
+    return { ...inputData, card, detail: `build round ${buildRounds} started in ${copy.folder}`, prompt: `${taskFromCard(issue)}${backNote}${playbookNote}` };
   });
 
   // The build is called here rather than handed to `createStep(agents.build)` so a card that spent
