@@ -258,6 +258,32 @@ test('evaluateBuildCheck allows step sub-items after a playbook step and n/a che
   });
   assert.equal(outOfOrder.ok, false);
   assert.match(outOfOrder.reason, /must appear in order/);
+
+  const featureStep4And6 = evaluateBuildCheck({
+    spans: [
+      span({ spanId: 'lead', spanType: 'agent_run', name: 'flow-build' }),
+      span({
+        spanId: 'pb',
+        parentSpanId: 'lead',
+        name: 'choose_playbook',
+        input: { playbook: 'feature' },
+        output: {
+          ok: true,
+          isError: false,
+          playbook: 'feature',
+          steps: [
+            'Delegate code-writing to a subagent. When the implementation admits multiple valid shapes (error handling, abstraction layer, test structure), delegate via the **arena** skill instead so the runners surface the alternatives and the cross-judge guards the pick.',
+            'Rebase into small, ordered commits. Stack follow-ups.\n   Use the **sequence-verifiable-units** principle skill, building, verifying, and committing each small unit before the next.',
+          ],
+        },
+      }),
+      span({ spanId: 'h1', parentSpanId: 'lead', spanType: 'agent_run', name: 'pstack-feature-1' }),
+      span({ spanId: 'c1', parentSpanId: 'lead', name: 'bash', input: { command: 'npm test' } }),
+      span({ spanId: 't1', parentSpanId: 'lead', name: 'task_complete', input: { id: 'playbook_1' } }),
+      span({ spanId: 't2', parentSpanId: 'lead', name: 'task_complete', input: { id: 'playbook_2' } }),
+    ],
+  });
+  assert.equal(featureStep4And6.ok, true, featureStep4And6.reason);
 });
 
 test('evaluateBuildCheck fails when a named proof lacks valid saved evidence', () => {

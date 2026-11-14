@@ -95,7 +95,10 @@ const applyTaskEvent = (tasks, span, index) => {
 
 const checkTaskWork = (task, prior) => {
   const text = task.content;
-  const needsSkill = /\bskill\b|\b(how|architect|arena|interrogate|deslop|no-comments|unslop|technical-writing|opening a pr)\b/i.test(text);
+  const skillText = text
+    .replace(/When the implementation admits multiple valid shapes[^.]*\./gi, '')
+    .replace(/\*\*?(?:separate-before-serializing-shared-state|sequence-verifiable-units)\*\*?\s+principle\s+skill/gi, '');
+  const needsSkill = /\bskill\b|\b(how|architect|arena|interrogate|deslop|no-comments|unslop|technical-writing|opening a pr)\b/i.test(skillText);
   const needsHelper = /delegate|handover|hand off|helper|subagent|poteto-agent|arena|swarm|architect|interrogate/i.test(text);
   const needsProof = /\b(proof|prove|verify|verification|test|matching surface)\b/i.test(text);
 
