@@ -33,7 +33,7 @@ export function repoRoot() {
 
 // The card's spending total is read from its own folder, so every agent in the run adds to the
 // same ledger and a rerun carries the total it already spent.
-export function createAgents({ model, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {}, dir = process.env.FLOW_DIR ?? '.artifacts/flow/studio', spending = openSpending({ dir }) } = {}) {
+export function createAgents({ model, leadModel, helperModel, repo = repoRoot(), leadModelFile, roleModelsFile, tools = {}, dir = process.env.FLOW_DIR ?? '.artifacts/flow/studio', spending = openSpending({ dir }) } = {}) {
   // A stopped card starts no new helper. The hook runs before the helper does, and what it throws
   // comes back to the Lead as a failed tool call.
   const buildHooks = helperStartHook(spending);
@@ -52,11 +52,11 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
   };
   // A run names the copy of the repository its card works in. A call outside a card, such as a
   // settings read, works in the repository Studio runs from.
-  const cardWorkspace = (id, extra = {}) => ({ requestContext } = {}) => {
+  const cardWorkspace = (id, { readOnly = false, ...extra } = {}) => ({ requestContext } = {}) => {
     const folder = requestContext?.get?.('cardCheckout') ?? repo;
     return new Workspace({
       id,
-      filesystem: new LocalFilesystem({ basePath: folder }),
+      filesystem: new LocalFilesystem({ basePath: folder, ...(readOnly ? { readOnly: true } : {}) }),
       sandbox: new LocalSandbox({ workingDirectory: folder, env: { HOME: homedir() } }),
       ...extra,
     });
@@ -72,7 +72,7 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
       name: role.name,
       description: `${role.name} pstack role on ${modelId}${choice}. ${role.explanation} Use this helper when delegating ${role.name} work.`,
       instructions: skillInstruction,
-      model: agentModel(modelId),
+      model: helperModel ? (typeof helperModel === 'function' ? helperModel(role, index, modelId) : helperModel) : agentModel(modelId),
       ...codingProcessors(() => splitModelId(modelId)),
       ...cardMemory(spending),
       workspace: cardWorkspace('machine-repo-helper', { skills: ['.agents/skills'] }),
@@ -84,10 +84,10 @@ export function createAgents({ model, repo = repoRoot(), leadModelFile, roleMode
     id: 'flow-build',
     name: 'Lead',
     instructions: readFileSync(join(repo, POTETO_SKILL), 'utf8'),
-    model: buildModelReader(leadModelFile),
+    model: leadModel ?? buildModelReader(leadModelFile),
     ...codingProcessors(() => splitModelId(leadModelId(leadModelFile)), { refuseAfterStop: true }),
     ...cardMemory(spending),
-    workspace: cardWorkspace('machine-repo', { skills: ['.agents/skills'] }),
+    workspace: cardWorkspace('machine-repo', { readOnly: true, skills: ['.agents/skills'] }),
     agents: helpers,
     tools,
     defaultOptions: {
