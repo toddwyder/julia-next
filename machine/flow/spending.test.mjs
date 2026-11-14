@@ -354,7 +354,7 @@ test('the card path stops a card that crosses its limit and writes the reason in
   openScratch(dir);
   const repo = studioRepo(dir);
 
-  const workflow = buildCardPath({ agents, dir, repo, review: fakeReview() });
+  const workflow = buildCardPath({ agents, dir, repo, check: { run: async () => ({ ok: true }) }, review: fakeReview() });
   const mastra = await openMastra({ card: CARD, stateDb: join(dir, 'state.db'), traceDb: join(dir, 'trace.duckdb'), workflow });
   const wf = mastra.getWorkflow(workflow.id);
   const run = await wf.createRun();
@@ -399,7 +399,7 @@ test('the Studio record and the card ledger agree on what the card spent', async
   const agents = { build, shipping: stub(PASS), remediation: stub('fixed line'), retro: stub('retro line'), spending };
   const repo = studioRepo(dir);
 
-  const workflow = buildCardPath({ agents, dir, repo, review: fakeReview() });
+  const workflow = buildCardPath({ agents, dir, repo, check: { run: async () => ({ ok: true }) }, review: fakeReview() });
   const mastra = await openMastra({ card: CARD, stateDb: join(dir, 'state.db'), traceDb: join(dir, 'trace.duckdb'), workflow });
   const wf = mastra.getWorkflow(workflow.id);
   const run = await wf.createRun();

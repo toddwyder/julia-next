@@ -151,7 +151,7 @@ function openCase({ limit, verdicts }) {
 }
 
 async function runCard({ dir, repo, agents }) {
-  const workflow = buildCardPath({ dir, repo, review: fakeReview(), agents });
+  const workflow = buildCardPath({ dir, repo, check: { run: async () => ({ ok: true }) }, review: fakeReview(), agents });
   const studio = await openMastra({ card: CARD, stateDb: join(dir, 'state.db'), traceDb: join(dir, 'trace.duckdb'), workflow });
   const run = await studio.getWorkflow(workflow.id).createRun();
   const result = await run.start({ inputData: { card: CARD, kind: 'product' } });

@@ -327,6 +327,7 @@ test('a card resumed after a restart carries on in the same copy', async () => {
     agents: { ...agents, build, shipping: fake.shipping },
     dir,
     repo,
+    check: { run: async () => ({ ok: true }) },
     review: fake.review,
   });
   assert.equal(restarted.id, workflow.id);
