@@ -1,7 +1,7 @@
 import { readFileSync, statfsSync } from 'node:fs';
 import { freemem } from 'node:os';
 
-import { cleanLeftovers, collectSnapshot } from '../../scripts/check-server-in-use.mjs';
+import { cleanLeftoversAsync, collectSnapshotAsync } from '../../scripts/check-server-in-use.mjs';
 import { evaluateServerState } from '../../scripts/server-in-use.mjs';
 
 export const DEFAULT_MIN_FREE_MEMORY_MB = 1024;
@@ -66,23 +66,23 @@ export function measureShortages({
   return { availableMemoryMb, availableDiskGb, minMemoryMb, minDiskGb, short };
 }
 
-export function defaultCleanIdle({ card, studioUrl = process.env.FLOW_STUDIO_URL ?? 'http://127.0.0.1:4111' } = {}) {
+export async function defaultCleanIdle({ card, studioUrl = process.env.FLOW_STUDIO_URL ?? 'http://127.0.0.1:4111' } = {}) {
   try {
-    const snapshot = collectSnapshot({
+    const snapshot = await collectSnapshotAsync({
       local: true,
       studioUrl,
       extraActiveCards: card ? [card] : [],
     });
     const evaluation = evaluateServerState(snapshot);
     if (evaluation.studioReachable === false || evaluation.leftovers.length === 0) return false;
-    cleanLeftovers(evaluation, { local: true, allowStudioRestart: false });
+    await cleanLeftoversAsync(evaluation, { local: true, allowStudioRestart: false });
     return true;
   } catch {
     return false;
   }
 }
 
-export function ensureCardResources({
+export async function ensureCardResources({
   card = '',
   dir = '/',
   minMemoryMb,
@@ -96,7 +96,7 @@ export function ensureCardResources({
     return { ok: true, cleaned: false, ...initial, reason: '' };
   }
 
-  const cleaned = Boolean(cleanIdle({ card, short: initial.short }));
+  const cleaned = Boolean(await cleanIdle({ card, short: initial.short }));
   const after = measureShortages({ path: dir, minMemoryMb, minDiskGb, readMemoryMb, readDiskGb });
   if (after.short.length === 0) {
     return { ok: true, cleaned, ...after, reason: '' };
@@ -107,7 +107,7 @@ export function ensureCardResources({
 }
 
 export async function stopIfResourcesShort({ inputData, state, setState }, dir, options) {
-  const check = ensureCardResources({ card: state.card || inputData.card, dir, ...options });
+  const check = await ensureCardResources({ card: state.card || inputData.card, dir, ...options });
   if (check.ok) return null;
   await setState({ ...state, stopPart: 'Resources', stopWhy: check.reason, stopped: true });
   return { card: state.card || inputData.card, kind: state.kind || inputData.kind, ...inputData, stopped: true, detail: check.reason };

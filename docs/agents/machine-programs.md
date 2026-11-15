@@ -14,7 +14,7 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `26984456834e1640fdb49d55d6579a19b7124aa45d51285ed13f2984c7f0f7f9` |
 | `machine/flow/check.mjs` | The post-build check: verifies Lead task list in Mastra state before Shipping. | `698b9481a66e2d533c5c9603d9fec6b8797030efebb410d95519c80cb0754cf8` |
 | `machine/flow/task.mjs` | The task the Lead is given, taken word for word from the card. | `21aca1ef4c2b964d729b93317061b1a23f0e38773b26e8aa1c9f951581fa62e7` |
-| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `b4c2f3793c9b71381d2b39d216086bd2a53f3d7ce33b577d4f06dbf5a660144b` |
+| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `9874bf8a6c12f7b929afc58cdae151d553697d9ed147b8dcf5145e295fc02fa6` |
 | `machine/flow/playbook.mjs` | Playbook catalog, task seeding, and the choose_playbook tool. | `90531eb2366f1c5bb03ac23014363ff8b2498c7da931d59a6a29981e276f2a31` |
 | `machine/flow/graphify.mjs` | The Graphify graph tools offered to Lead and its helpers. | `c502bc49faa96ef1de469764696d1682347679a61a17629766940de5baf546b6` |
 | `machine/flow/memory.mjs` | The memory note-takers, run on the free model the card picked. | `c166620cff305155382848e9e2c7bf09b24641bb14d3a0ed8bca242a852835b1` |
@@ -29,5 +29,5 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `ebf105fa6eb755aff0b7692722982bc9986fba37dd410f018ba8ba0a2a2870c9` |
 | `machine/flow/run.mjs` | Answers a waiting card and reads a run. No way to start one. | `6aa66f1d72561054364ad8ffe90a19d5d3119ebcd8dd3539df3cbb57c14f4338` |
 | `machine/flow/report.mjs` | Builds the card report and tripwire stop helper. | `c559b908de72737afbfced4a3d607e5d22c2af95e3177de8c8b95a511a8a5df4` |
-| `machine/flow/resources.mjs` | Checks memory and disk before and during every card and clears idle leftovers when short. | `46de57d83924535c77f2091dd2f4bb968fe87f86ad98b9d8965821f395417f07` |
+| `machine/flow/resources.mjs` | Checks memory and disk before and during every card and clears idle leftovers when short. | `4f2e46154aa4d7ca0726e5fbced2edf6a265b8696771286b443608e8506f63d6` |
 | `scripts/julia-agents.mjs` | Runs a machine command with the Julia keys it needs. | `58edde255a25e6a4b4aa43fa802a121b934320d41ffdd45ce741a393c48fd3cf` |

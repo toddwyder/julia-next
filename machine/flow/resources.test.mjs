@@ -39,9 +39,9 @@ test('readAvailableMemoryMb parses /proc/meminfo MemAvailable on Linux and falls
   assert.equal(fallback, 2048);
 });
 
-test('ensureCardResources skips cleanup when memory and disk are above thresholds', () => {
+test('ensureCardResources skips cleanup when memory and disk are above thresholds', async () => {
   let cleaned = false;
-  const result = ensureCardResources({
+  const result = await ensureCardResources({
     card: 'JUL-362',
     minMemoryMb: 1024,
     minDiskGb: 10,
@@ -57,10 +57,10 @@ test('ensureCardResources skips cleanup when memory and disk are above threshold
   assert.equal(cleaned, false);
 });
 
-test('ensureCardResources clears idle leftovers when memory or disk is short and passes if recovered', () => {
+test('ensureCardResources clears idle leftovers when memory or disk is short and passes if recovered', async () => {
   let memory = 512;
   let cleaned = false;
-  const result = ensureCardResources({
+  const result = await ensureCardResources({
     card: 'JUL-362',
     minMemoryMb: 1024,
     minDiskGb: 10,
@@ -77,8 +77,8 @@ test('ensureCardResources clears idle leftovers when memory or disk is short and
   assert.equal(result.cleaned, true);
 });
 
-test('ensureCardResources fails with a report naming what ran short when still short after cleanup', () => {
-  const result = ensureCardResources({
+test('ensureCardResources fails with a report naming what ran short when still short after cleanup', async () => {
+  const result = await ensureCardResources({
     card: 'JUL-362',
     minMemoryMb: 1024,
     minDiskGb: 10,

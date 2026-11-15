@@ -58,10 +58,10 @@ export function createAgents({ model, leadModel, helperModel, costLimit, repo = 
   };
   const resourceGuard = {
     id: 'resource-guard',
-    processInputStep({ requestContext, abort }) {
+    async processInputStep({ requestContext, abort }) {
       const card = requestContext?.get?.('flowCard') ?? '';
       const dir = requestContext?.get?.('cardCheckout') ?? repo;
-      const check = ensureCardResources({ card, dir });
+      const check = await ensureCardResources({ card, dir });
       if (!check.ok) {
         abort(check.reason, { metadata: { part: 'Resources', reason: check.reason } });
       }

@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 import { evaluateServerState, formatReport } from './server-in-use.mjs';
+
+const execFileAsync = promisify(execFile);
 
 const COLLECT_SCRIPT = `python3 - << 'PY'
 import json, os, re, subprocess, urllib.request
@@ -144,22 +147,45 @@ function runTarget(script, { local, sshHost, studioUrl }) {
   });
 }
 
+async function runTargetAsync(script, { local, sshHost, studioUrl }) {
+  const env = studioUrl ? { ...process.env, FLOW_STUDIO_URL: studioUrl } : process.env;
+  const cmd = local ? 'bash' : 'ssh';
+  const args = local ? ['-s'] : ['-o', 'BatchMode=yes', sshHost, `${studioUrl ? `FLOW_STUDIO_URL=${JSON.stringify(studioUrl)} ` : ''}bash -s`];
+  return await new Promise((resolve, reject) => {
+    const child = execFile(cmd, args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, env }, (err, stdout) => {
+      if (err) reject(err);
+      else resolve(stdout);
+    });
+    child.stdin.end(script);
+  });
+}
+
+function parseSnapshot(raw, extraActiveCards) {
+  const snapshot = JSON.parse(raw);
+  if (Array.isArray(extraActiveCards) && extraActiveCards.length > 0) {
+    snapshot.activeCards = [...new Set([...(snapshot.activeCards ?? []), ...extraActiveCards])];
+  }
+  return snapshot;
+}
+
 export function collectSnapshot(options = {}) {
   const local = options.local ?? process.platform === 'linux';
   const sshHost = options.sshHost ?? 'ovh';
   const studioUrl = options.studioUrl ?? process.env.FLOW_STUDIO_URL;
   const raw = runTarget(COLLECT_SCRIPT, { local, sshHost, studioUrl });
-  const snapshot = JSON.parse(raw);
-  if (Array.isArray(options.extraActiveCards) && options.extraActiveCards.length > 0) {
-    snapshot.activeCards = [...new Set([...(snapshot.activeCards ?? []), ...options.extraActiveCards])];
-  }
-  return snapshot;
+  return parseSnapshot(raw, options.extraActiveCards);
 }
 
-export function cleanLeftovers(evaluation, options = {}) {
+export async function collectSnapshotAsync(options = {}) {
   const local = options.local ?? process.platform === 'linux';
   const sshHost = options.sshHost ?? 'ovh';
-  if (evaluation.leftovers.length === 0) return;
+  const studioUrl = options.studioUrl ?? process.env.FLOW_STUDIO_URL;
+  const raw = await runTargetAsync(COLLECT_SCRIPT, { local, sshHost, studioUrl });
+  return parseSnapshot(raw, options.extraActiveCards);
+}
+
+function buildCleanScript(evaluation, options = {}) {
+  if (evaluation.leftovers.length === 0) return '';
 
   const commands = [];
   let resetFlowStudio = false;
@@ -206,8 +232,23 @@ export function cleanLeftovers(evaluation, options = {}) {
     commands.push('sleep 3');
   }
 
-  if (commands.length === 0) return;
-  runTarget(commands.join('\n'), { local, sshHost });
+  return commands.join('\n');
+}
+
+export function cleanLeftovers(evaluation, options = {}) {
+  const local = options.local ?? process.platform === 'linux';
+  const sshHost = options.sshHost ?? 'ovh';
+  const script = buildCleanScript(evaluation, options);
+  if (!script) return;
+  runTarget(script, { local, sshHost });
+}
+
+export async function cleanLeftoversAsync(evaluation, options = {}) {
+  const local = options.local ?? process.platform === 'linux';
+  const sshHost = options.sshHost ?? 'ovh';
+  const script = buildCleanScript(evaluation, options);
+  if (!script) return;
+  await runTargetAsync(script, { local, sshHost });
 }
 
 function parseArgs(argv) {
