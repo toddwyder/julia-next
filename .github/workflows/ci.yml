@@ -81,6 +81,8 @@ jobs:
         run: node scripts/check-skill-names.mjs
       - name: Check agent-read files point at paths that exist
         run: node scripts/check-agent-links.mjs
+      - name: Check no font is loaded from outside the repository
+        run: node scripts/check-font-hosts.mjs
       - name: Check the machine program list is up to date
         run: node scripts/machine-programs.mjs --check
       - name: Check every branch has an open pull request
@@ -109,6 +111,8 @@ jobs:
         run: node scripts/test-owners.mjs --plan
       - name: Install each local owner's locked dependencies
         run: node scripts/test-owners.mjs --install local
+      - name: Block the outside font hosts, so the dashboard build cannot fetch a font
+        run: node scripts/block-font-hosts.mjs
       - name: Run local owners' tests
         run: node scripts/test-owners.mjs --run local
 
@@ -154,6 +158,8 @@ jobs:
         run: npm run guard:flow
       - name: Guard the Julia and machine boundary
         run: npm run guard:boundaries
+      - name: Block the outside font hosts, so the application build cannot fetch a font
+        run: node scripts/block-font-hosts.mjs
       - name: Build application
         run: npm run build
 
