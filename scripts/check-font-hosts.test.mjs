@@ -48,6 +48,23 @@ test('refuses a font file read from an outside address', t => {
   assert.match(checkFontHosts({ root })[0], /^app\/fonts\.css:1: remote-font-url: /);
 });
 
+test('refuses outside font sources without extensions and across CSS lines', t => {
+  for (const source of [
+    "url('https://example.com/font')",
+    "url(\n'https://example.com/inter.woff2'\n)",
+    "url('./local.woff2'), url('//example.com/font')",
+  ]) {
+    const root = app(t, { 'app/fonts.css': `/* typography */\n@font-face {\n  src: ${source};\n}\n` });
+    const found = checkFontHosts({ root });
+    assert.ok(found.some(line => /^app\/fonts\.css:3: remote-font-url: /.test(line)), source);
+  }
+});
+
+test('refuses an outside stylesheet import split across lines', t => {
+  const root = app(t, { 'dashboard/app/fonts.css': "/* typography */\n@import\nurl(\n'https://example.com/fonts.css'\n);\n" });
+  assert.match(checkFontHosts({ root })[0], /^dashboard\/app\/fonts\.css:2: remote-import: /);
+});
+
 test('refuses an @font-face whose file is not in the repository', t => {
   const root = app(t, { 'app/fonts.css': FACE });
   const found = checkFontHosts({ root });
