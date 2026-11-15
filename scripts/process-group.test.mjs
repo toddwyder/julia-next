@@ -26,12 +26,11 @@ test('runWithFreshToken terminates its child when the parent receives SIGTERM', 
         '--input-type=module',
         '-e',
         `
-        import { writeFileSync } from 'node:fs';
         import { runWithFreshToken } from ${JSON.stringify(new URL('./linear-token.mjs', import.meta.url).href)};
         await runWithFreshToken(
           [process.execPath, '-e', 'require("node:fs").writeFileSync(process.env.TEST_MARKER, String(process.pid)); setInterval(() => {}, 1000);'],
           {
-            env: { ...process.env, TEST_MARKER: marker, LINEAR_CLIENT_ID: 'id', LINEAR_CLIENT_SECRET: 'secret' },
+            env: { ...process.env, TEST_MARKER: ${JSON.stringify(marker)}, LINEAR_CLIENT_ID: 'id', LINEAR_CLIENT_SECRET: 'secret' },
             fetchImpl: async () => new Response(JSON.stringify({ access_token: 'tok' }), { status: 200 }),
           }
         );
