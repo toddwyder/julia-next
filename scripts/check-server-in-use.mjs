@@ -190,10 +190,15 @@ function buildCleanScript(evaluation, options = {}) {
   const commands = [];
   let resetFlowStudio = false;
 
+  const killedPids = [];
   for (const item of evaluation.leftovers) {
     switch (item.kind) {
       case 'process':
-        if (item.pid) commands.push(`kill -9 ${Number(item.pid)} 2>/dev/null || true`);
+        if (item.pid) {
+          const pid = Number(item.pid);
+          commands.push(`kill -9 ${pid} 2>/dev/null || true`);
+          killedPids.push(pid);
+        }
         break;
       case 'user-unit':
         commands.push(`systemctl --user disable --now ${JSON.stringify(item.name)} 2>/dev/null || true`);
@@ -224,6 +229,10 @@ function buildCleanScript(evaluation, options = {}) {
   commands.push('git -C /home/ubuntu/julia-builder worktree prune 2>/dev/null || true');
   commands.push('git -C /home/ubuntu/julia-flow-repo worktree prune 2>/dev/null || true');
   commands.push('git -C /home/ubuntu/julia-mastra worktree prune 2>/dev/null || true');
+
+  if (killedPids.length > 0) {
+    commands.push(`for _i in $(seq 1 20); do alive=0; for p in ${killedPids.join(' ')}; do kill -0 "$p" 2>/dev/null && alive=1; done; [ "$alive" -eq 0 ] && break; sleep 0.1; done`);
+  }
 
   if (resetFlowStudio && options.allowStudioRestart !== false && evaluation.studioReachable !== false) {
     commands.push('systemctl --user stop julia-studio.service');
