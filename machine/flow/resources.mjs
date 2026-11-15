@@ -30,7 +30,12 @@ export function readAvailableMemoryMb({
 }
 
 export function readAvailableDiskGb({ path = '/', statfs = statfsSync } = {}) {
-  const disk = statfs(path);
+  let disk;
+  try {
+    disk = statfs(path);
+  } catch {
+    disk = statfs('/');
+  }
   const bytes = Number(disk.bavail) * Number(disk.bsize);
   return Number((bytes / 1_000_000_000).toFixed(2));
 }
