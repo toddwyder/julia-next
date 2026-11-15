@@ -25,3 +25,15 @@ test('each test or build job runs at most one dependency install step', () => {
     assert.equal(installs.length, 1, `${jobName} should install once, found: ${installs.join(', ')}`);
   }
 });
+
+test('the font hosts are blocked before the application and the dashboard are built, and the check runs in hygiene', () => {
+  const jobs = Object.fromEntries(
+    ci.split(/\r?\n  (?=[a-z-]+:\r?\n)/).slice(1).map(block => [block.slice(0, block.indexOf(':')), block]),
+  );
+  for (const [jobName, build] of [['web', 'npm run build'], ['package-tests', 'test-owners.mjs --run local']]) {
+    const block = jobs[jobName].indexOf('node scripts/block-font-hosts.mjs');
+    assert.ok(block > -1, `${jobName} should block the font hosts`);
+    assert.ok(block < jobs[jobName].indexOf(build), `${jobName} should block the font hosts before ${build}`);
+  }
+  assert.match(jobs['repository-hygiene'], /node scripts\/check-font-hosts\.mjs/);
+});
