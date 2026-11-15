@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
 import { statfsSync } from 'node:fs';
+import { cleanLeftovers, collectSnapshot } from './check-server-in-use.mjs';
 import { postComment } from './linear-cli.mjs';
+import { evaluateServerState } from './server-in-use.mjs';
+
+const evaluation = evaluateServerState(collectSnapshot({ local: true }));
+if (!evaluation.ok) cleanLeftovers(evaluation, { local: true });
 
 const thresholdGb = Number(process.env.JULIA_DISK_THRESHOLD_GB ?? 10);
 if (!Number.isFinite(thresholdGb) || thresholdGb <= 0) throw new Error('JULIA_DISK_THRESHOLD_GB must be a positive number');

@@ -8,7 +8,7 @@ import { DuckDBStore } from '@mastra/duckdb';
 import { LibSQLStore } from '@mastra/libsql';
 import { MastraStorageExporter, Observability } from '@mastra/observability';
 
-export const DEFAULT_TRACE_MAX_AGE = '7d';
+export const DEFAULT_TRACE_MAX_AGE = '1d';
 
 export const cardStamper = card => ({
   name: 'card-stamper',
