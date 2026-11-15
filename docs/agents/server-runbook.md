@@ -47,7 +47,7 @@ In Studio, pick the `card-path` workflow and press run. The form asks for `card`
 (`product` or `machine`) and nothing else; the workflow copies both into saved state and opens
 `<FLOW_DIR>/<card>/` for that card's artifacts, verdict queues and stop report.
 Because the saved state starts empty, a run started here needs no preparation.
-Each card slice starts under a built-in $4 spending limit (`CARD_LIMIT_DOLLARS` in `machine/flow/spending.mjs` and `COST_LIMIT_DOLLARS` in `machine/flow/agents.mjs`). Studio enforces no token cap and does not read `FLOW_DOLLAR_CAP` or `FLOW_TOKEN_CAP` from the environment.
+Each card slice starts under a built-in $4 spending limit (`COST_LIMIT_DOLLARS` in `machine/flow/agents.mjs`, overridable with `FLOW_CARD_LIMIT_DOLLARS`). Studio enforces no token cap and does not read `FLOW_DOLLAR_CAP` or `FLOW_TOKEN_CAP` from the environment.
 
 A card that waits for Todd is answered from the command line, which reads the card out of the run's
 saved snapshot:
@@ -113,8 +113,7 @@ cleans entries untouched for three days. The cleaner does not cover `/tmp`; Ubun
 `systemd-tmpfiles-clean.timer` runs daily.
 User lingering is enabled, so user timers continue without a login. Inspect them with
 `systemctl --user list-timers --all` and inspect cleanup with
-`journalctl --user -u systemd-tmpfiles-clean.service`. `julia-trace-fold.timer` and
-`julia-disk-check.timer` also run daily. Their unit files live in `~/.config/systemd/user`.
+`journalctl --user -u systemd-tmpfiles-clean.service`. `julia-disk-check.timer` also runs daily. Its unit file lives in `~/.config/systemd/user`.
 The disk check alerts Todd on JUL-185 below 10 GB free through the Julia controller account.
 Inspect its result with `journalctl --user -u julia-disk-check.service`.
 
@@ -147,54 +146,7 @@ starts while another holds it gets no tracing at all, silently, for its whole li
 from it reads unknown. Run one traced session at a time; a session started while another is open is
 the one that loses its rows. `MASTRA_APP_DATA_DIR` moves the store with the rest of the data.
 
-The daily `julia-trace-fold.timer` runs `node scripts/trace-store.mjs fold`, which copies the store's
-cost rows into `~/.local/share/mastracode/traces/archive.duckdb` and deletes the store, so the next
-session recreates an empty one. A script that needs the program's own packages asks
-`scripts/mastra-program.mjs`, which resolves the global npm install from `npm root -g` unless
-`MASTRACODE_PROGRAM_DIR` or `MASTRACODE_PROGRAM` names another copy; `npm install -g mastracode` is
-how the program gets there and how it updates itself.
-
-A session started outside the stock CLI, or one that runs while another session holds the store,
-records nothing. Nothing on the machine notices that, so the card says it.
-
-```sh
-node scripts/trace-store.mjs status
-node scripts/trace-store.mjs fold [--quiet]
-```
-
-`fold` copies each finished file's `metric_events` rows, the per-call tokens and cost, into `traces/archive.duckdb`, then deletes the file. `archive.duckdb` holds cost rows
-and nothing else: no prompt payloads, no spans. A file a running session still holds is skipped and
-its PID reported, because that session holds it for writing. A finished file is only ever attached
-`READ_ONLY`: attaching one for writing and detaching it checkpointed the file, and on 2 November that
-rewrote a 14.2 GiB trace to 18.1 GiB, filled the disk and failed. Folding the same file name twice
-replaces its rows instead of adding a second copy, so an interrupted fold is safe to re-run; a file
-left as `<name>.folding` is picked up by the next fold. One file that cannot be folded is recorded in
-`traces/left-behind.json` with its reason and the run carries on with the rest: on 2 November one
-trace stopped every fold behind it for two days, so the traces of 31 October to 2 November all waited
-on the one that had failed. `status` lists what is still left behind and why.
-
-The store is folded and deleted the same way; on 30 October
-5,955,137,536 B became a 3,158,016 B archive holding 44,408 cost rows.
-
-Deleting a file is what returns the disk. A delete inside a file gives nothing back even after a
-`CHECKPOINT`: on 30 October 52,443 rows were deleted and checkpointed and the file was 5,955,137,536
-B before and after, with 99.9% of it freed blocks the next writes would reuse.
-
-The daily timer folds finished traces without a session id or card. The archive is only as big as
-the cost rows.
-
-`fold` prints one JSON answer and exits 0. When the traces directory is over 15 GB after a fold it
-prints a loud warning and exits 1, and it also exits 1 when it left a trace behind: at either size a
-round was too big or half done, and Todd needs to know. Inspect `journalctl --user -u julia-trace-fold.service` for the daily fold result.
-
-DuckDB's default memory limit is 85% of the machine, which on this 7 GB server is 6 GB, and on
-30 October the kernel killed a run at 6.15 GB before it deleted a row. `fold` opens each file with a
-budget of a third of the machine, at most 2 GB, spilling to a temp directory beside it. It reads one
-small table per file, so a 5.6 GB file folds in seconds.
-
-`status` asks the filesystem and opens nothing, so it answers while a session holds a file. It
-prints the directory, every file with its size, which files a fold would take, the total, the free
-space, and whether that total is over the 15 GB alarm.
+Trace size is held by Mastra's storage retention (`retention.observability`), which `machine/flow/mastra.mjs` prunes at the end of every card.
 
 Reading a trace file by hand needs a DuckDB client from somewhere that has one installed, because the
 repo root does not. The dashboard's dependencies carry one, and so does the installed program:

@@ -91,7 +91,6 @@ test('the folder guard covers the flow definitions and leaves the runner files a
   assert.equal(await eslint.isPathIgnored('machine/flow/run.mjs'), true);
   assert.equal(await eslint.isPathIgnored('machine/flow/start.mjs'), true);
   assert.equal(await eslint.isPathIgnored('machine/flow/scratch.mjs'), true);
-  assert.equal(await eslint.isPathIgnored('machine/flow/trace.mjs'), true);
   assert.equal(await eslint.isPathIgnored('machine/flow/workflow.test.mjs'), true);
 });
 

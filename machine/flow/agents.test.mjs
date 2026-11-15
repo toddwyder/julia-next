@@ -3,11 +3,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { readLedger } from './card-ledger.mjs';
 import test from 'node:test';
 
 import { createAgents, repoRoot } from './agents.mjs';
-import { HELPER_CONCURRENCY, openSpending, STOP_REASONS } from './spending.mjs';
 import { helperKey, readRoleModels } from './role-models.mjs';
 import { buildModel, leadModelId } from './models.mjs';
 import { installLeadModel } from '../../scripts/install-lead-model.mjs';
@@ -138,72 +136,22 @@ test('Lead exposes one stock helper per role and one per saved panel model', asy
   assert.equal((await helpers.arenaRunners2.getModel()).modelId, 'deepseek/deepseek-v4.1-flash');
 });
 
-test('the Lead and every helper keep Mastra’s refusal handler beside the spending guard', async t => {
+test('the Lead and every helper keep Mastra’s refusal handler beside the resource-scoped TokenCostControl', async t => {
   const dir = temporary(t);
   const leadModelFile = join(dir, 'lead-model');
   const roleModelsFile = join(dir, 'lead-role-models.md');
   writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
   completeRoleFile(roleModelsFile);
   const build = createAgents({ repo, leadModelFile, roleModelsFile }).build;
-  const processorsOf = async agent => (await agent.listConfiguredOutputProcessors()).map(processor => processor.id);
-  assert.deepEqual(await processorsOf(build), ['cyber-refusal-handler', 'card-spending', 'playbook-guard']);
+  const outputOf = async agent => (await agent.listConfiguredOutputProcessors()).map(processor => processor.id);
+  const inputOf = async agent => (await agent.listConfiguredInputProcessors()).map(processor => processor.id);
+  assert.deepEqual(await outputOf(build), ['cyber-refusal-handler', 'playbook-guard']);
+  assert.ok((await inputOf(build)).includes('token-cost-control'));
   for (const helper of Object.values(await build.listAgents())) {
-    assert.deepEqual(await processorsOf(helper), ['cyber-refusal-handler', 'card-spending'], `${helper.name} lost a processor.`);
+    assert.deepEqual(await outputOf(helper), ['cyber-refusal-handler'], `${helper.name} lost an output processor.`);
+    assert.ok((await inputOf(helper)).includes('token-cost-control'), `${helper.name} lost TokenCostControl.`);
   }
 });
-
-test('the card ledger names the model each saved pick chose, not the one the framework reports', async t => {
-  const dir = temporary(t);
-  const leadModelFile = join(dir, 'lead-model');
-  const roleModelsFile = join(dir, 'lead-role-models.md');
-  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
-  completeRoleFile(roleModelsFile);
-  const spending = openSpending({ dir: join(dir, 'ledger'), catalog: LEDGER_CATALOG, corrections: {} });
-  const agents = createAgents({ repo, leadModelFile, roleModelsFile, spending });
-  spending.begin('JUL-404-LEDGER');
-  const guardOf = async agent => (await agent.listConfiguredOutputProcessors()).find(processor => processor.id === 'card-spending');
-  const helper = (await agents.build.listAgents()).featureRefactoring;
-  const guards = [['Lead', await guardOf(agents.build)], ['helper', await guardOf(helper)]];
-  const usage = { inputTokens: 1000, outputTokens: 100 };
-  for (const [, guard] of guards) {
-    await guard.processInputStep({ model: { provider: 'openai', modelId: 'gpt-6-luna' }, agent: { id: 'wrong' }, abort() {} });
-    await guard.processOutputStep({ usage });
-  }
-  assert.deepEqual(spending.calls.map(call => [call.provider, call.model]), [
-    ['openai', 'gpt-6.1-sol'],
-    ['commandcode', 'deepseek/deepseek-v4.1-flash'],
-  ]);
-});
-
-test('only the Lead is turned away once the card has spent its limit', async t => {
-  const dir = temporary(t);
-  const leadModelFile = join(dir, 'lead-model');
-  const roleModelsFile = join(dir, 'lead-role-models.md');
-  writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
-  completeRoleFile(roleModelsFile);
-  const spending = openSpending({ dir: join(dir, 'ledger'), catalog: LEDGER_CATALOG, corrections: {} });
-  const agents = createAgents({ repo, leadModelFile, roleModelsFile, spending });
-  spending.begin('JUL-405-STOPPED');
-  spending.stop(STOP_REASONS.limit);
-  const guardOf = async agent => (await agent.listConfiguredOutputProcessors()).find(processor => processor.id === 'card-spending');
-  const helper = (await agents.build.listAgents()).featureRefactoring;
-  const turnAway = async agent => {
-    const reasons = [];
-    const guard = await guardOf(agent);
-    await guard.processInputStep({ model: { provider: 'openai', modelId: 'gpt-6.1-sol' }, agent: { id: agent.id }, abort: reason => reasons.push(reason) });
-    return reasons;
-  };
-  assert.deepEqual(await turnAway(agents.build), [STOP_REASONS.limit]);
-  assert.deepEqual(await turnAway(helper), [], 'a helper is turned away by the stage before it starts, not by its own processor');
-});
-
-const LEDGER_CATALOG = {
-  source: 'a fake price list',
-  costs: {
-    openai: { models: { 'gpt-6.1-sol': { cost: { input: 2, output: 10 } } } },
-    commandcode: { models: { 'deepseek/deepseek-v4.1-flash': { cost: { input: 0.15, output: 0.6 } } } },
-  },
-};
 
 test('the role file the Start screen writes reads back with every saved model', async t => {  const dir = temporary(t);
   const roleModelsFile = join(dir, 'lead-role-models.md');
@@ -365,10 +313,7 @@ test('the memory note-takers run on the Memory model the picker saved, with the 
   const leadModelFile = join(dir, 'lead-model');
   const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
   writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
-  const { build, spending } = createAgents({ repo, leadModelFile, roleModelsFile, dir });
-  spending.begin('JUL-375-MEMORY');
-  assert.equal(spending.memoryModel, 'commandcode/deepseek/deepseek-v4.1-flash');
-  assert.equal(readLedger(join(dir, 'JUL-375-MEMORY', 'spending.json')).memoryModel, 'commandcode/deepseek/deepseek-v4.1-flash', 'the pick is saved with the card');
+  const { build } = createAgents({ repo, leadModelFile, roleModelsFile });
   const observational = (await build.getMemory()).getMergedThreadConfig({}).observationalMemory;
   assert.equal(observational.observation.maxRetries, undefined);
   assert.equal(observational.reflection.maxRetries, undefined);
@@ -381,8 +326,7 @@ test("every helper reads poteto-mode's one line and can load the skills, and the
   const leadModelFile = join(dir, 'lead-model');
   const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
   writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
-  const agents = createAgents({ repo, leadModelFile, roleModelsFile, dir });
-  agents.spending.begin('JUL-375-STOCK');
+  const agents = createAgents({ repo, leadModelFile, roleModelsFile });
 
   const skillFile = '.agents/skills/poteto-mode/SKILL.md';
   const quoted = /"Read <this file's absolute path> in full, including its Principles section, before any work\."/
@@ -404,20 +348,14 @@ test("every helper reads poteto-mode's one line and can load the skills, and the
   }
 });
 
-test('the Lead runs a fixed number of helpers at once, and a stopped card starts no new helper', async t => {
+test('the Lead runs a fixed number of helpers at once', async t => {
   const dir = temporary(t);
   const leadModelFile = join(dir, 'lead-model');
   const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
   writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
-  const agents = createAgents({ repo, leadModelFile, roleModelsFile, machine: false, dir });
+  const agents = createAgents({ repo, leadModelFile, roleModelsFile });
   const options = await agents.build.getDefaultOptions();
-  assert.equal(options.toolCallConcurrency, HELPER_CONCURRENCY, 'the Lead is given a fixed number of helpers at once');
-  assert.equal(options.hooks.beforeToolCall({ toolName: 'agent-pstackBugFix1' }), undefined, 'an unstopped card starts a helper');
-
-  agents.spending.begin('JUL-375-CONCURRENCY');
-  agents.spending.stop(STOP_REASONS.limit);
-  assert.throws(() => options.hooks.beforeToolCall({ toolName: 'agent-pstackBugFix1' }), /card spending limit reached/);
-  assert.equal(options.hooks.beforeToolCall({ toolName: 'read_file' }), undefined, 'a stopped card still lets a helper read a file');
+  assert.equal(options.toolCallConcurrency, 4, 'the Lead is given a fixed number of helpers at once');
 });
 
 test('playbookGuard reminds the Lead to name a valid playbook and stops the card if it still names none', async t => {
@@ -425,8 +363,7 @@ test('playbookGuard reminds the Lead to name a valid playbook and stops the card
   const leadModelFile = join(dir, 'lead-model');
   const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
   writeFileSync(leadModelFile, 'openai/gpt-6.1-sol\n');
-  const agents = createAgents({ repo, leadModelFile, roleModelsFile, dir });
-  agents.spending.begin('JUL-375-PLAYBOOKGUARD');
+  const agents = createAgents({ repo, leadModelFile, roleModelsFile });
 
   const processors = await agents.build.listConfiguredInputProcessors();
   const guard = processors.find(p => p.id === 'playbook-guard');
@@ -448,5 +385,5 @@ test('playbookGuard reminds the Lead to name a valid playbook and stops the card
   await guard.processInputStep({ stepNumber: 2, steps: [{ toolCalls: [] }, { toolCalls: [] }], messageList, abort });
   assert.ok(aborted, 'stops the card if Lead still names no playbook');
   assert.match(aborted.reason, /playbook/i);
-  assert.equal(agents.spending.stopPart(), 'Playbook');
+  assert.equal(aborted.opts?.metadata?.part, 'Playbook');
 });

@@ -162,8 +162,6 @@ const flowRunnerFiles = [
   'machine/flow/run.mjs',
   'machine/flow/start.mjs',
   'machine/flow/scratch.mjs',
-  'machine/flow/card-ledger.mjs',
-  'machine/flow/trace.mjs',
   'machine/flow/**/*.test.mjs',
 ];
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -14,19 +14,24 @@ const graphifyUrl = new URL('../../machine/flow/graphify.mjs', import.meta.url).
 
 const ROLE_FILE_TEXT = [
   '# budget: medium (high)',
-  ...ROLE_GROUPS.flatMap(group => group.roles.map(role => `${role.name}: test/unpriced`)),
+  ...ROLE_GROUPS.flatMap(group => group.roles.map(role => `${role.name}: commandcode/deepseek/deepseek-v4.1-flash`)),
   '',
 ].join('\n');
 
-function setupEnvironment(t, extraEnv = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'studio-limits-'));
+function setupEnvironment(t) {
+  const root = mkdtempSync(join(tmpdir(), 'studio-card-path-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const home = join(root, 'home');
   const flowDir = join(root, 'flow');
+  const repo = join(root, 'repo');
   const juliaConfig = join(home, '.config', 'julia');
   mkdirSync(juliaConfig, { recursive: true });
   mkdirSync(flowDir, { recursive: true });
-  writeFileSync(join(juliaConfig, 'lead-model'), 'test/unpriced\n');
+  mkdirSync(join(repo, '.agents', 'skills', 'poteto-mode'), { recursive: true });
+  writeFileSync(join(repo, '.agents', 'skills', 'poteto-mode', 'SKILL.md'), '# poteto\n');
+  execFileSync('git', ['init', '-b', 'main', repo]);
+  execFileSync('git', ['-C', repo, 'remote', 'add', 'origin', join(root, 'missing-origin.git')]);
+  writeFileSync(join(juliaConfig, 'lead-model'), 'commandcode/deepseek/deepseek-v4.1-flash\n');
   writeFileSync(join(juliaConfig, 'lead-role-models.md'), ROLE_FILE_TEXT);
 
   const env = {
@@ -34,19 +39,16 @@ function setupEnvironment(t, extraEnv = {}) {
     HOME: home,
     USERPROFILE: home,
     FLOW_DIR: flowDir,
-    ...extraEnv,
+    FLOW_REPO: repo,
   };
   delete env.JULIA_LEAD_MODEL_FILE;
   delete env.JULIA_LEAD_ROLE_MODELS_FILE;
-  delete env.FLOW_REPO;
   delete env.FLOW_CARD;
-  if (!Object.hasOwn(extraEnv, 'FLOW_DOLLAR_CAP')) delete env.FLOW_DOLLAR_CAP;
-  if (!Object.hasOwn(extraEnv, 'FLOW_TOKEN_CAP')) delete env.FLOW_TOKEN_CAP;
 
-  return { root, home, flowDir, env };
+  return { flowDir, env };
 }
 
-test('Studio card-path starts a run from the run form and stops a card whose model has no price', t => {
+test('Studio card-path starts a run from the run form and stops cleanly when origin main cannot be fetched', t => {
   const { env, flowDir } = setupEnvironment(t);
   const childScript = `
     import assert from 'node:assert/strict';
@@ -70,6 +72,6 @@ test('Studio card-path starts a run from the run form and stops a card whose mod
   assert.equal(child.status, 0, `child exited ${child.status}\nstdout:\n${child.stdout}\nstderr:\n${child.stderr}`);
 
   const report = readFileSync(join(flowDir, 'JUL-363-TEST', 'reports', 'JUL-363-TEST.md'), 'utf8');
-  assert.match(report, /Part: Spending/);
-  assert.match(report, /model unpriced/);
+  assert.match(report, /Part: start-build/);
+  assert.match(report, /Failed to fetch latest main from origin/);
 });

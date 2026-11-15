@@ -24,13 +24,7 @@ The user has asked for a **retrospective**. You are suggesting improvements to t
 
 4. Present these candidates to the user, in order of severity.
 
-5. Last, record where the trace store stands:
-
-   ```sh
-   node scripts/trace-store.mjs status
-   ```
-
-   Paste its JSON in the retro record. This session's prompt payloads need no deleting: the stock harness keeps one trace file, and the daily trace-fold timer folds its cost rows into an archive beside it and deletes the file that held the prompts. There is no list of sessions, no census file, no sweep, and nothing in the retro deletes anything.
+5. Mastra's storage retention prunes old trace rows at the end of every card. There is no list of sessions, no census file, no sweep, and nothing in the retro deletes anything.
 
 ## Reference
 

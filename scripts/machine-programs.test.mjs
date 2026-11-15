@@ -48,9 +48,9 @@ test('a new program in the workflow folder fails until the list names it', () =>
 
 test('a listed program that is gone fails', () => {
   const root = plant();
-  rmSync(join(root, 'machine/flow/trace.mjs'));
+  rmSync(join(root, 'machine/flow/cost-record.mjs'));
   const failures = checkPrograms(root);
   assert.equal(failures.length, 1);
-  assert.match(failures[0], /machine\/flow\/trace\.mjs, which no longer exists/);
+  assert.match(failures[0], /machine\/flow\/cost-record\.mjs, which no longer exists/);
   rmSync(root, { recursive: true, force: true });
 });
