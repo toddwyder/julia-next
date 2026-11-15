@@ -52,6 +52,16 @@ try:
 except Exception as exc:
     studio_error = str(exc)
 
+ancestor_pids = set()
+cur = os.getpid()
+while cur > 1 and cur not in ancestor_pids:
+    ancestor_pids.add(cur)
+    try:
+        stat = open(f'/proc/{cur}/stat').read()
+        cur = int(stat[stat.rfind(')') + 2:].split()[1])
+    except Exception:
+        break
+
 processes = []
 for line in run(['ps', '-u', 'ubuntu', '-o', 'pid=,rss=,args=']).splitlines():
     m = re.match(r'^\\s*(\\d+)\\s+(\\d+)\\s+(.*)$', line)
@@ -73,7 +83,7 @@ for line in run(['ps', '-u', 'ubuntu', '-o', 'pid=,rss=,args=']).splitlines():
             in_use_op = cwd == '/home/ubuntu' or cwd == '/home/ubuntu/julia-builder'
         except Exception:
             pass
-    processes.append({'pid': pid, 'rssKb': rss_kb, 'cmd': cmd, 'serviceUnit': service_unit, 'inUseOpDaemon': in_use_op})
+    processes.append({'pid': pid, 'rssKb': rss_kb, 'cmd': cmd, 'serviceUnit': service_unit, 'inUseOpDaemon': in_use_op, 'isSelfOrAncestor': pid in ancestor_pids})
 
 checkouts = []
 worktrees = []

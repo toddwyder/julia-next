@@ -68,6 +68,9 @@ export const IN_USE_SPEC = {
 
 function classifyProcess(proc, activeCards) {
   const cmd = proc.cmd ?? '';
+  if (proc.isSelfOrAncestor) {
+    return { allowed: true, usedBy: 'Current inspection/cleanup process chain' };
+  }
   if (proc.serviceUnit && (IN_USE_SPEC.userUnits.has(proc.serviceUnit) || IN_USE_SPEC.systemUnits.has(proc.serviceUnit))) {
     return { allowed: true, usedBy: proc.serviceUnit };
   }

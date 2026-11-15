@@ -120,10 +120,14 @@ test('stopIfResourcesShort sets state stopped with stopPart Resources', async ()
 test('card-path stops cleanly with a stop report naming memory when memory stays short', async t => {
   const dir = tempDir(t);
   const prev = process.env.FLOW_MIN_FREE_MEMORY_MB;
+  const prevStudio = process.env.FLOW_STUDIO_URL;
   process.env.FLOW_MIN_FREE_MEMORY_MB = '999999999';
+  process.env.FLOW_STUDIO_URL = 'http://127.0.0.1:1';
   t.after(() => {
     if (prev === undefined) delete process.env.FLOW_MIN_FREE_MEMORY_MB;
     else process.env.FLOW_MIN_FREE_MEMORY_MB = prev;
+    if (prevStudio === undefined) delete process.env.FLOW_STUDIO_URL;
+    else process.env.FLOW_STUDIO_URL = prevStudio;
   });
 
   const dummyAgent = new Agent({
