@@ -37,13 +37,18 @@ export function dashboardNotice({ kind, detail = '', address = '', at = new Date
   ].join('\n');
 }
 
-export async function sendDashboardNotice(notice, { apiKey, fetchImpl = fetch, card = DASHBOARD_CARD } = {}) {
-  const body = dashboardNotice(notice);
+export async function sendCardAlert({ body, apiKey, fetchImpl = fetch, card = DASHBOARD_CARD } = {}) {
   const { issue } = await linearGraphQL(ISSUE_ID_QUERY, { id: card }, { apiKey, fetchImpl });
   if (typeof issue?.id !== 'string' || !issue.id) throw new Error(`no issue id for ${card}`);
   const comment = await postCommentToIssueId(issue.id, body, { apiKey, fetchImpl });
   const remindAt = new Date(Date.now() + REMINDER_LEAD_MS).toISOString();
   const { issueReminder } = await linearGraphQL(REMINDER_MUTATION, { id: issue.id, at: remindAt }, { apiKey, fetchImpl });
   if (!issueReminder?.success) throw new Error(`issueReminder did not report success for ${card}`);
-  return { kind: notice.kind, comment: comment.url ?? null, commentId: comment.id ?? null, reminded: issueReminder.success, remindAt };
+  return { comment: comment.url ?? null, commentId: comment.id ?? null, reminded: issueReminder.success, remindAt };
+}
+
+export async function sendDashboardNotice(notice, { apiKey, fetchImpl = fetch, card = DASHBOARD_CARD } = {}) {
+  const body = dashboardNotice(notice);
+  const sent = await sendCardAlert({ body, apiKey, fetchImpl, card });
+  return { kind: notice.kind, ...sent };
 }

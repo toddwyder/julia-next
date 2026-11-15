@@ -14,6 +14,7 @@ import { closeCopy, openCopy } from './copy.mjs';
 import { sendCardCostRecord } from './cost-record.mjs';
 import { pruneTrace } from './mastra.mjs';
 import { reportText, tripwireStop } from './report.mjs';
+import { stopIfResourcesShort } from './resources.mjs';
 import { REVIEW_TIME_LIMIT_MS, criteriaFromCard, parseVerdict, realReview, reviewTask, verdictComment } from './review.mjs';
 import { cardState, flowData, runInput } from './schema.mjs';
 import { nextVerdict, openRun, readArtifact, sweepBuild, writeArtifact, writeLanding, writeReport, writeRetro } from './scratch.mjs';
@@ -24,10 +25,8 @@ const step = (id, execute, extra = {}) =>
 
 const REQUIRED_TASK_TOOLS = ['task_write', 'task_update', 'task_complete', 'task_check'];
 
-async function finishCard({ mastra, card, status }) {
-  await sendCardCostRecord({ mastra, card, status }).catch(() => null);
-  await pruneTrace(mastra).catch(() => null);
-}
+const finishCard = ({ mastra, card, status }) =>
+  Promise.allSettled([sendCardCostRecord({ mastra, card, status }), pruneTrace(mastra)]);
 
 export function createStages({ agents, dir, repo, review = realReview, check = realCheck }) {
   const cardDir = (card) => join(dir, card);
@@ -36,6 +35,8 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     if (!state.stopped) return null;
     return { card: state.card, kind: state.kind, ...inputData, stopped: true, detail: state.stopWhy };
   };
+
+  const haltOrShort = async context => (await halt(context)) ?? stopIfResourcesShort(context, dir);
 
   const refused = async ({ inputData, state, setState }, error) => {
     if (error?.name !== 'TripWire' && !/TripWire/.test(String(error?.message ?? error))) return null;
@@ -60,12 +61,14 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
       }
       await setState({ ...state, card: inputData.card, kind: inputData.kind });
       openRun(dir, inputData.card);
+      const short = await stopIfResourcesShort({ inputData, state: { ...state, card: inputData.card, kind: inputData.kind }, setState }, dir);
+      if (short) return short;
       return { card: inputData.card, kind: inputData.kind };
     },
   });
 
   const startBuild = step('start-build', async (context) => {
-    const stopped = await halt(context);
+    const stopped = await haltOrShort(context);
     if (stopped) return stopped;
     const { inputData, state, setState, requestContext } = context;
     const card = state.card || inputData.card;
@@ -158,7 +161,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
   });
 
   const shipping = step('shipping', async (context) => {
-    const stopped = await halt(context);
+    const stopped = await haltOrShort(context);
     if (stopped) return stopped;
     const { inputData, state, tracingContext, requestContext } = context;
     const unreviewed = reason => ({ ...inputData, unreviewed: true, pr: null, answer: '', detail: reason });
@@ -229,7 +232,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
   });
 
   const remediation = step('remediation', async (context) => {
-    const stopped = await halt(context);
+    const stopped = await haltOrShort(context);
     if (stopped) return stopped;
     const { inputData, state, tracingContext, requestContext } = context;
     const artifact = readArtifact(cardDir(state.card), state.card);
@@ -352,7 +355,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
   });
 
   const retro = step('retro', async (context) => {
-    const stopped = await halt(context);
+    const stopped = await haltOrShort(context);
     if (stopped) return stopped;
     const { inputData, state, tracingContext, requestContext } = context;
     requestContext?.set?.('mastra__resourceId', state.card);

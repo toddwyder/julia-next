@@ -13,6 +13,7 @@
     "test:mutation": "stryker run stryker.config.mjs",
     "test:mutation:changed": "node scripts/mutation-changed.mjs",
     "check:programs": "node scripts/machine-programs.mjs --check",
+    "check:server": "node scripts/check-server-in-use.mjs",
     "check:studio": "node scripts/check-studio-start.mjs",
     "check:lead": "node scripts/check-lead.mjs",
     "check:model-picker": "node scripts/check-model-picker.mjs",
