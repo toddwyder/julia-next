@@ -379,7 +379,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
   });
 
   const cleanup = step('cleanup', async ({ inputData, state, mastra }) => {
-    await finishCard({ mastra, card: state.card, status: 'finished' });
+    if (!state.stopped) await finishCard({ mastra, card: state.card, status: 'finished' });
     closeCopy({ repo, card: state.card });
     const report = join(cardDir(state.card), 'reports', `${state.card}.md`);
     if (!existsSync(report)) writeReport(cardDir(state.card), state.card, reportText(state, inputData.detail));

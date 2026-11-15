@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { resolvePlaybook } from './playbook.mjs';
@@ -41,8 +41,13 @@ export function evaluateBuildCheck({ tasks = [], steps = [], playbook = '' } = {
 }
 
 const selfScript = () => {
-  const fromRoot = resolve(process.env.MASTRA_PROJECT_ROOT ?? process.cwd(), 'machine/flow/check.mjs');
-  return existsSync(fromRoot) ? fromRoot : fileURLToPath(import.meta.url);
+  const here = dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    process.env.MASTRA_PROJECT_ROOT && resolve(process.env.MASTRA_PROJECT_ROOT, 'machine/flow/check.mjs'),
+    resolve(process.cwd(), 'machine/flow/check.mjs'),
+    resolve(here, '../../machine/flow/check.mjs'),
+  ].filter(Boolean);
+  return candidates.find(existsSync) ?? fileURLToPath(import.meta.url);
 };
 
 const crashCause = (error, stderr) => {
