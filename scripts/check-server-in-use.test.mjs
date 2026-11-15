@@ -137,3 +137,37 @@ test('allows an active Studio card worktree and run folder, but rejects inactive
   assert.ok(result.leftovers.every(item => item.name.includes('JUL-387')));
   assert.ok(result.kept.some(item => item.name.includes('JUL-410')));
 });
+
+test('when Studio is unreachable, every card worktree, copy, run folder, trace db, and potential card process is kept', () => {
+  const result = evaluateServerState(cleanSnapshot({
+    studioReachable: false,
+    studioError: 'Connection refused',
+    activeCards: [],
+    processes: [
+      ...cleanSnapshot().processes,
+      { pid: 999, rssKb: 230000, cmd: 'command-code --yolo', serviceUnit: null },
+    ],
+    worktrees: [
+      ...cleanSnapshot().worktrees,
+      { path: '/home/ubuntu/.local/state/julia-scratch/cards/JUL-362', diskMb: 400 },
+    ],
+    scratchCards: [
+      { name: 'JUL-362', path: '/home/ubuntu/.local/state/julia-scratch/cards/JUL-362', diskMb: 400 },
+    ],
+    flowStudioEntries: [
+      { name: 'state.db', path: '/home/ubuntu/julia-flow-repo/.artifacts/flow/studio/state.db', diskMb: 1 },
+      { name: 'trace.duckdb', path: '/home/ubuntu/julia-flow-repo/.artifacts/flow/studio/trace.duckdb', diskMb: 900 },
+      { name: 'JUL-362', path: '/home/ubuntu/julia-flow-repo/.artifacts/flow/studio/JUL-362', diskMb: 4 },
+    ],
+  }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.studioReachable, false);
+  assert.equal(result.leftovers.length, 0);
+  assert.ok(result.kept.some(item => item.name.includes('JUL-362') && item.kind === 'worktree'));
+  assert.ok(result.kept.some(item => item.name.includes('JUL-362') && item.kind === 'scratch-card'));
+  assert.ok(result.kept.some(item => item.name.includes('JUL-362') && item.kind === 'flow-studio-card'));
+  assert.ok(result.kept.some(item => item.name.includes('command-code') && item.kind === 'process'));
+  assert.ok(result.kept.some(item => item.name.includes('trace.duckdb') && item.kind === 'flow-studio'));
+  assert.match(formatReport(result), /Studio unreachable: Connection refused; preserving card work/);
+});

@@ -39,7 +39,6 @@ export async function openMastra({
     retention: {
       observability: {
         spans: { maxAge: traceMaxAge },
-        metrics: { maxAge: traceMaxAge },
       },
     },
   });

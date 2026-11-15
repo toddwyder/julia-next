@@ -2,8 +2,8 @@ export const IN_USE_SPEC = {
   userUnits: new Map([
     ['julia-studio.service', 'Live Mastra Studio on :4111'],
     ['datasette-viewer.service', 'Datasette read-only viewer on :8801 opened by Todd'],
-    ['julia-disk-check.timer', 'Daily disk space check alerting Todd on JUL-185'],
-    ['julia-disk-check.service', 'Daily disk space check service'],
+    ['julia-disk-check.timer', 'Daily server resource check alerting Todd on JUL-276'],
+    ['julia-disk-check.service', 'Daily server resource check service'],
     ['dbus.service', 'Ubuntu user D-Bus session bus'],
     ['dbus.socket', 'Ubuntu user D-Bus socket'],
     ['gnome-keyring-daemon.service', 'Ubuntu user keyring daemon'],
@@ -92,6 +92,8 @@ function classifyProcess(proc, activeCards) {
 }
 
 export function evaluateServerState(snapshot) {
+  const studioReachable = snapshot.studioReachable !== false;
+  const studioError = snapshot.studioError ?? null;
   const activeCards = [...new Set(snapshot.activeCards ?? [])].sort();
   const activeSet = new Set(activeCards);
   const kept = [];
@@ -121,6 +123,8 @@ export function evaluateServerState(snapshot) {
     const verdict = classifyProcess(proc, activeCards);
     if (verdict.allowed) {
       kept.push({ kind: 'process', name: `${proc.pid} ${proc.cmd}`, pid: proc.pid, rssMb, diskMb: 0, usedBy: verdict.usedBy });
+    } else if (!studioReachable) {
+      kept.push({ kind: 'process', name: `${proc.pid} ${proc.cmd}`, pid: proc.pid, rssMb, diskMb: 0, usedBy: 'Studio unreachable; preserving potential card process' });
     } else {
       leftovers.push({ kind: 'process', name: `${proc.pid} ${proc.cmd}`, pid: proc.pid, rssMb, diskMb: 0, reason: 'Orphaned or non-service process' });
     }
@@ -139,14 +143,16 @@ export function evaluateServerState(snapshot) {
     const isDashboard = wt.path === '/home/ubuntu/julia-dashboard';
     const isMainRepo = IN_USE_SPEC.checkouts.has(wt.path);
     const cardMatch = wt.path.match(/\/\.local\/state\/julia-scratch\/cards\/([^/]+)$/);
-    const isActiveCard = cardMatch && activeSet.has(cardMatch[1]);
+    const isActiveCard = cardMatch && (activeSet.has(cardMatch[1]) || !studioReachable);
     if (isDashboard || isMainRepo || isActiveCard) {
       kept.push({
         kind: 'worktree',
         name: wt.path,
         rssMb: 0,
         diskMb: wt.diskMb ?? 0,
-        usedBy: isActiveCard ? `Active Studio card ${cardMatch[1]}` : (IN_USE_SPEC.checkouts.get(wt.path) ?? 'Registered main checkout'),
+        usedBy: isActiveCard
+          ? (studioReachable ? `Active Studio card ${cardMatch[1]}` : `Studio unreachable; preserving card worktree ${cardMatch[1]}`)
+          : (IN_USE_SPEC.checkouts.get(wt.path) ?? 'Registered main checkout'),
       });
     } else {
       leftovers.push({ kind: 'worktree', name: wt.path, rssMb: 0, diskMb: wt.diskMb ?? 0, reason: 'Leftover git worktree not tied to an active card' });
@@ -163,8 +169,14 @@ export function evaluateServerState(snapshot) {
   }
 
   for (const cardEntry of snapshot.scratchCards ?? []) {
-    if (activeSet.has(cardEntry.name)) {
-      kept.push({ kind: 'scratch-card', name: cardEntry.path, rssMb: 0, diskMb: cardEntry.diskMb ?? 0, usedBy: `Active Studio card ${cardEntry.name}` });
+    if (activeSet.has(cardEntry.name) || !studioReachable) {
+      kept.push({
+        kind: 'scratch-card',
+        name: cardEntry.path,
+        rssMb: 0,
+        diskMb: cardEntry.diskMb ?? 0,
+        usedBy: studioReachable ? `Active Studio card ${cardEntry.name}` : `Studio unreachable; preserving card copy ${cardEntry.name}`,
+      });
     } else {
       leftovers.push({ kind: 'scratch-card', name: cardEntry.path, rssMb: 0, diskMb: cardEntry.diskMb ?? 0, reason: 'Inactive, finished, paused, or abandoned card copy' });
     }
@@ -177,13 +189,19 @@ export function evaluateServerState(snapshot) {
   for (const entry of snapshot.flowStudioEntries ?? []) {
     const allowedReason = IN_USE_SPEC.flowStudioFixed.get(entry.name);
     if (allowedReason) {
-      if (entry.name === 'trace.duckdb' && activeCards.length === 0 && (entry.diskMb ?? 0) > IN_USE_SPEC.maxIdleTraceMb) {
+      if (entry.name === 'trace.duckdb' && studioReachable && activeCards.length === 0 && (entry.diskMb ?? 0) > IN_USE_SPEC.maxIdleTraceMb) {
         leftovers.push({ kind: 'trace-db', name: entry.path, rssMb: 0, diskMb: entry.diskMb ?? 0, reason: `Idle trace.duckdb exceeds ${IN_USE_SPEC.maxIdleTraceMb} MB` });
       } else {
         kept.push({ kind: 'flow-studio', name: entry.path, rssMb: 0, diskMb: entry.diskMb ?? 0, usedBy: allowedReason });
       }
-    } else if (activeSet.has(entry.name)) {
-      kept.push({ kind: 'flow-studio-card', name: entry.path, rssMb: 0, diskMb: entry.diskMb ?? 0, usedBy: `Active Studio card ${entry.name}` });
+    } else if (activeSet.has(entry.name) || !studioReachable) {
+      kept.push({
+        kind: 'flow-studio-card',
+        name: entry.path,
+        rssMb: 0,
+        diskMb: entry.diskMb ?? 0,
+        usedBy: studioReachable ? `Active Studio card ${entry.name}` : `Studio unreachable; preserving Studio card folder ${entry.name}`,
+      });
     } else {
       leftovers.push({ kind: 'flow-studio-card', name: entry.path, rssMb: 0, diskMb: entry.diskMb ?? 0, reason: 'Finished or abandoned Studio card run folder' });
     }
@@ -206,7 +224,9 @@ export function evaluateServerState(snapshot) {
 
   const sum = (items, key) => Math.round(items.reduce((acc, item) => acc + (item[key] ?? 0), 0) * 10) / 10;
   return {
-    ok: leftovers.length === 0,
+    ok: leftovers.length === 0 && studioReachable,
+    studioReachable,
+    studioError,
     activeCards,
     kept,
     leftovers,
@@ -220,8 +240,11 @@ export function evaluateServerState(snapshot) {
 }
 
 export function formatReport(evaluation) {
+  const activeLabel = evaluation.studioReachable === false
+    ? `unknown (Studio unreachable${evaluation.studioError ? `: ${evaluation.studioError}` : ''}; preserving card work)`
+    : (evaluation.activeCards.length > 0 ? evaluation.activeCards.join(', ') : 'none');
   const lines = [
-    `Server in-use check: ${evaluation.ok ? 'PASS' : 'FAIL'} (active cards: ${evaluation.activeCards.length > 0 ? evaluation.activeCards.join(', ') : 'none'})`,
+    `Server in-use check: ${evaluation.ok ? 'PASS' : 'FAIL'} (active cards: ${activeLabel})`,
     `Kept: ${evaluation.kept.length} items (${evaluation.summary.keptRssMb} MB RSS, ${evaluation.summary.keptDiskMb} MB disk)`,
     `Leftovers: ${evaluation.leftovers.length} items (${evaluation.summary.leftoverRssMb} MB RSS, ${evaluation.summary.leftoverDiskMb} MB disk)`,
   ];

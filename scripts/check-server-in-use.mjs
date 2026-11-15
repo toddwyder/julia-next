@@ -29,17 +29,28 @@ def du_entries(base):
     return items
 
 active_cards = []
+studio_reachable = False
+studio_error = None
+studio_url = os.environ.get('FLOW_STUDIO_URL', 'http://127.0.0.1:4111').rstrip('/')
 try:
-    with urllib.request.urlopen('http://127.0.0.1:4111/api/workflows/card-path/runs', timeout=3) as resp:
-        data = json.loads(resp.read().decode())
-        for r in data.get('runs', []):
-            snap = r.get('snapshot') or {}
-            if snap.get('status') == 'running':
-                card = (snap.get('value') or {}).get('card')
-                if card:
-                    active_cards.append(card)
-except Exception:
-    pass
+    with urllib.request.urlopen(f'{studio_url}/api/workflows/card-path/runs', timeout=3) as resp:
+        if resp.status != 200:
+            studio_error = f'HTTP {resp.status}'
+        else:
+            data = json.loads(resp.read().decode())
+            runs = data.get('runs') if isinstance(data, dict) else None
+            if not isinstance(runs, list):
+                studio_error = 'Unexpected Studio response shape'
+            else:
+                studio_reachable = True
+                for r in runs:
+                    snap = r.get('snapshot') or {}
+                    if snap.get('status') in ('running', 'suspended', 'waiting'):
+                        card = (snap.get('value') or {}).get('card')
+                        if card:
+                            active_cards.append(card)
+except Exception as exc:
+    studio_error = str(exc)
 
 processes = []
 for line in run(['ps', '-u', 'ubuntu', '-o', 'pid=,rss=,args=']).splitlines():
@@ -93,6 +104,8 @@ for name in ('dist', '%ln'):
         home_extras.append({'name': name, 'path': p, 'diskMb': mb})
 
 print(json.dumps({
+    'studioReachable': studio_reachable,
+    'studioError': studio_error,
     'activeCards': active_cards,
     'userUnits': parse_units(['systemctl', '--user', 'list-units', '--type=service,timer', '--all', '--no-legend', '--plain']),
     'systemUnits': parse_units(['systemctl', 'list-units', '--type=service,timer', '--all', '--no-legend', '--plain']),
@@ -108,11 +121,13 @@ print(json.dumps({
 }))
 PY`;
 
-function runTarget(script, { local, sshHost }) {
+function runTarget(script, { local, sshHost, studioUrl }) {
+  const env = studioUrl ? { ...process.env, FLOW_STUDIO_URL: studioUrl } : process.env;
   if (local) {
-    return execFileSync('bash', ['-s'], { input: script, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    return execFileSync('bash', ['-s'], { input: script, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, env });
   }
-  return execFileSync('ssh', ['-o', 'BatchMode=yes', sshHost, 'bash', '-s'], {
+  const remotePrefix = studioUrl ? `FLOW_STUDIO_URL=${JSON.stringify(studioUrl)} ` : '';
+  return execFileSync('ssh', ['-o', 'BatchMode=yes', sshHost, `${remotePrefix}bash -s`], {
     input: script,
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
@@ -122,8 +137,13 @@ function runTarget(script, { local, sshHost }) {
 export function collectSnapshot(options = {}) {
   const local = options.local ?? process.platform === 'linux';
   const sshHost = options.sshHost ?? 'ovh';
-  const raw = runTarget(COLLECT_SCRIPT, { local, sshHost });
-  return JSON.parse(raw);
+  const studioUrl = options.studioUrl ?? process.env.FLOW_STUDIO_URL;
+  const raw = runTarget(COLLECT_SCRIPT, { local, sshHost, studioUrl });
+  const snapshot = JSON.parse(raw);
+  if (Array.isArray(options.extraActiveCards) && options.extraActiveCards.length > 0) {
+    snapshot.activeCards = [...new Set([...(snapshot.activeCards ?? []), ...options.extraActiveCards])];
+  }
+  return snapshot;
 }
 
 export function cleanLeftovers(evaluation, options = {}) {
@@ -169,13 +189,14 @@ export function cleanLeftovers(evaluation, options = {}) {
   commands.push('git -C /home/ubuntu/julia-flow-repo worktree prune 2>/dev/null || true');
   commands.push('git -C /home/ubuntu/julia-mastra worktree prune 2>/dev/null || true');
 
-  if (resetFlowStudio) {
+  if (resetFlowStudio && options.allowStudioRestart !== false && evaluation.studioReachable !== false) {
     commands.push('systemctl --user stop julia-studio.service');
     commands.push('rm -rf /home/ubuntu/julia-flow-repo/.artifacts/flow/studio');
     commands.push('systemctl --user start julia-studio.service');
     commands.push('sleep 3');
   }
 
+  if (commands.length === 0) return;
   runTarget(commands.join('\n'), { local, sshHost });
 }
 

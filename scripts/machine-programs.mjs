@@ -44,6 +44,7 @@ export const PROGRAMS = [
   ['machine/flow/start.mjs', 'Assembles a run to read it back and to resume a card.'],
   ['machine/flow/run.mjs', 'Answers a waiting card and reads a run. No way to start one.'],
   ['machine/flow/report.mjs', 'Builds the card report and tripwire stop helper.'],
+  ['machine/flow/resources.mjs', 'Checks memory and disk before and during every card and clears idle leftovers when short.'],
   ['scripts/julia-agents.mjs', 'Runs a machine command with the Julia keys it needs.'],
 ].map(([path, what]) => ({ path, what }));
 

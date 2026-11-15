@@ -9,8 +9,8 @@ export function tripwireStop({ reason, processorId, metadata } = {}) {
       stopWhy: `Card cost limit $${limit.toFixed(2)} reached (card spend: $${spend.toFixed(4)})`,
     };
   }
-  if (metadata?.part === 'Playbook') {
-    return { stopPart: 'Playbook', stopWhy: String(metadata?.reason ?? reason ?? 'Playbook not chosen') };
+  if (metadata?.part === 'Playbook' || metadata?.part === 'Resources') {
+    return { stopPart: metadata.part, stopWhy: String(metadata?.reason ?? reason ?? `${metadata.part} check failed`) };
   }
   if (metadata?.observerFailure || /observational-memory/i.test(`${id} ${reason ?? ''}`)) {
     return { stopPart: 'Memory', stopWhy: `Memory model failed: ${String(reason ?? 'unknown error')}` };

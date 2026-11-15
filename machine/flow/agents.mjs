@@ -9,6 +9,7 @@ import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace
 import { cardMemory } from './memory.mjs';
 import { buildModelReader, leadModelId } from './models.mjs';
 import { createChoosePlaybookTool } from './playbook.mjs';
+import { ensureCardResources } from './resources.mjs';
 import { SHIPPING_MAX_STEPS } from './review.mjs';
 import { agentModel, helperKey, readRoleModels, readStageModels } from './role-models.mjs';
 
@@ -26,7 +27,7 @@ const resolveCostLimit = override => {
 };
 
 const cardCostControl = maxCost =>
-  new TokenCostControl({ maxCost, scope: 'resource', window: '30d', includeBreakdown: true });
+  new TokenCostControl({ maxCost, scope: 'resource', window: '365d', includeBreakdown: true });
 
 function repositoryContaining(directory) {
   if (existsSync(join(directory, POTETO_SKILL))) return directory;
@@ -55,9 +56,20 @@ export function createAgents({ model, leadModel, helperModel, costLimit, repo = 
       if (card) requestContext.set('mastra__resourceId', card);
     },
   };
-  const cardProcessors = () => ({ inputProcessors: [cardResource, cardCostControl(limit)], outputProcessors: [] });
+  const resourceGuard = {
+    id: 'resource-guard',
+    processInputStep({ requestContext, abort }) {
+      const card = requestContext?.get?.('flowCard') ?? '';
+      const dir = requestContext?.get?.('cardCheckout') ?? repo;
+      const check = ensureCardResources({ card, dir });
+      if (!check.ok) {
+        abort(check.reason, { metadata: { part: 'Resources', reason: check.reason } });
+      }
+    },
+  };
+  const cardProcessors = () => ({ inputProcessors: [cardResource, resourceGuard, cardCostControl(limit)], outputProcessors: [] });
   const codingProcessors = () => ({
-    inputProcessors: [cardResource, cardCostControl(limit)],
+    inputProcessors: [cardResource, resourceGuard, cardCostControl(limit)],
     outputProcessors: [new CyberRefusalHandler()],
   });
 

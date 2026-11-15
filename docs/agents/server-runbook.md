@@ -114,7 +114,7 @@ cleans entries untouched for three days. The cleaner does not cover `/tmp`; Ubun
 User lingering is enabled, so user timers continue without a login. Inspect them with
 `systemctl --user list-timers --all` and inspect cleanup with
 `journalctl --user -u systemd-tmpfiles-clean.service`. `julia-disk-check.timer` also runs daily. Its unit file lives in `~/.config/systemd/user`.
-The disk check alerts Todd on JUL-185 below 10 GB free through the Julia controller account.
+The disk check alerts Todd on JUL-276 only when the machine fails to recover alone (below 10 GB free disk, below 1024 MB available memory, or leftovers remain after cleanup) through the Julia controller account.
 Inspect its result with `journalctl --user -u julia-disk-check.service`.
 
 ### `/tmp/mc` belongs to Mastra Code and is never deleted
