@@ -74,7 +74,7 @@ export function defaultCleanIdle({ card, studioUrl = process.env.FLOW_STUDIO_URL
       extraActiveCards: card ? [card] : [],
     });
     const evaluation = evaluateServerState(snapshot);
-    if (evaluation.leftovers.length === 0) return false;
+    if (evaluation.studioReachable === false || evaluation.leftovers.length === 0) return false;
     cleanLeftovers(evaluation, { local: true, allowStudioRestart: false });
     return true;
   } catch {
