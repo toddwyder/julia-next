@@ -29,5 +29,5 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `ebf105fa6eb755aff0b7692722982bc9986fba37dd410f018ba8ba0a2a2870c9` |
 | `machine/flow/run.mjs` | Answers a waiting card and reads a run. No way to start one. | `6aa66f1d72561054364ad8ffe90a19d5d3119ebcd8dd3539df3cbb57c14f4338` |
 | `machine/flow/report.mjs` | Builds the card report and tripwire stop helper. | `c559b908de72737afbfced4a3d607e5d22c2af95e3177de8c8b95a511a8a5df4` |
-| `machine/flow/resources.mjs` | Checks memory and disk before and during every card and clears idle leftovers when short. | `cd830adaac7c9baea45a36976dc5de516a2ad78b1ced858cb3c0b03eff041d90` |
+| `machine/flow/resources.mjs` | Checks memory and disk before and during every card and clears idle leftovers when short. | `46de57d83924535c77f2091dd2f4bb968fe87f86ad98b9d8965821f395417f07` |
 | `scripts/julia-agents.mjs` | Runs a machine command with the Julia keys it needs. | `58edde255a25e6a4b4aa43fa802a121b934320d41ffdd45ce741a393c48fd3cf` |
