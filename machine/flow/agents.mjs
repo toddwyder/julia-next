@@ -122,7 +122,12 @@ export function createAgents({ model, leadModel, helperModel, costLimit, repo = 
       const original = agent[method].bind(agent);
       agent[method] = (messages, opts = {}) => {
         const card = opts.requestContext?.get?.('flowCard');
-        if (card) opts.requestContext.set('mastra__resourceId', card);
+        if (card) {
+          opts.requestContext.set('mastra__resourceId', card);
+          if (Array.isArray(messages)) {
+            messages = messages.map(m => (m && typeof m === 'object' && m.resourceId ? { ...m, resourceId: card } : m));
+          }
+        }
         return original(messages, opts);
       };
     }
