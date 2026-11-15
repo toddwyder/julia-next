@@ -159,15 +159,13 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     const result = await check.run({
       mastra, traceId: tracingContext?.currentSpan?.traceId,
       card: state.card, copy: state.copy, base: state.base, repo, cardDir: cardDir(state.card), review,
-    });
+    }).catch(error => ({ ok: false, fatal: true, reason: String(error?.message ?? error) }));
     if (result.ok) return { ...inputData, checkPassed: true, checkReason: '' };
-    const checkReturns = state.checkReturns + 1;
-    const checkReasons = [...state.checkReasons, result.reason];
-    const stop = checkReturns >= 2;
-    await setState({
-      ...state, checkReturns, checkReasons,
-      ...(stop ? { stopPart: 'check step', stopWhy: `stopped at the check step: (1) ${checkReasons[0]}; (2) ${checkReasons[1]}` } : {}),
-    });
+    const checkReturns = result.fatal ? state.checkReturns : state.checkReturns + 1;
+    const checkReasons = result.fatal ? state.checkReasons : [...state.checkReasons, result.reason];
+    const stop = result.fatal || checkReturns >= 2;
+    const stopWhy = result.fatal ? `stopped at the check step: ${result.reason}` : `stopped at the check step: (1) ${checkReasons[0]}; (2) ${checkReasons[1]}`;
+    await setState({ ...state, checkReturns, checkReasons, ...(stop ? { stopPart: 'check step', stopWhy } : {}) });
     return { ...inputData, checkPassed: false, checkReason: result.reason, stopped: stop, detail: result.reason };
   });
 
@@ -391,9 +389,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
   const hold = step('hold', async ({ inputData }) => inputData);
 
   return {
-    start, startBuild, buildAgent, finishBuild, buildCheck,
-    shipping, verdict, remediation, passNote, gate,
-    acceptance, land, smoke, smokePass, stopReport,
-    retro, hold, machineAccept, cleanup,
+    start, startBuild, buildAgent, finishBuild, buildCheck, shipping, verdict, remediation, passNote,
+    gate, acceptance, land, smoke, smokePass, stopReport, retro, hold, machineAccept, cleanup,
   };
 }

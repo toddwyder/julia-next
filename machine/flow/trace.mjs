@@ -22,6 +22,30 @@ const COLUMNS = [
   'attributes',
 ].join(', ');
 
+const CHECK_COLUMNS = [
+  'eventType',
+  'spanType',
+  'name',
+  'runId',
+  'traceId',
+  'spanId',
+  'parentSpanId',
+  'timestamp',
+  'endedAt',
+  "CASE WHEN spanType = 'tool_call' THEN input ELSE NULL END AS input",
+  "CASE WHEN spanType = 'tool_call' THEN output ELSE NULL END AS output",
+  "CASE WHEN spanType IN ('tool_call', 'agent_run') THEN attributes ELSE NULL END AS attributes",
+].join(', ');
+
+const COST_COLUMNS = [
+  'eventType',
+  'spanType',
+  'name',
+  'spanId',
+  'parentSpanId',
+  "CASE WHEN spanType = 'model_inference' THEN attributes ELSE NULL END AS attributes",
+].join(', ');
+
 function plain(rows) {
   return rows.map(row =>
     Object.fromEntries(
@@ -200,16 +224,24 @@ export async function buildSpans({ mastra, traceId, traceFile, spans } = {}) {
     raw = mergedSpans(spans);
   } else if (mastra && traceId) {
     const obs = await mastra.getStorage()?.getStore('observability');
-    const trace = await obs?.getTrace({ traceId });
-    raw = mergedSpans(Array.isArray(trace) ? trace : (trace?.spans ?? []));
+    if (obs?.db?.query) {
+      const rows = await obs.db.query(
+        `SELECT ${CHECK_COLUMNS} FROM span_events WHERE traceId = ? ORDER BY timestamp`,
+        [traceId],
+      );
+      raw = mergedSpans(plain(rows));
+    } else {
+      const trace = await obs?.getTrace({ traceId });
+      raw = mergedSpans(Array.isArray(trace) ? trace : (trace?.spans ?? []));
+    }
   } else if (traceFile) {
-    raw = mergedSpans(await readSpans(traceFile));
+    raw = mergedSpans(await query(traceFile, `select ${CHECK_COLUMNS} from span_events order by timestamp`));
   }
   return scopeToFlowBuild(raw.map(normalizeSpan));
 }
 
 export async function costRecord(traceFile) {
-  const spans = await readSpans(traceFile);
+  const spans = await query(traceFile, `select ${COST_COLUMNS} from span_events`);
   const metricRows = await query(
     traceFile,
     'select spanId, provider, model, timestamp, name, value from metric_events',

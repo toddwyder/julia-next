@@ -1,6 +1,7 @@
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { extname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { seedPlaybookTasks } from './playbook.mjs';
 import { buildSpans } from './trace.mjs';
@@ -272,19 +273,65 @@ const gitChangedFiles = (copy, base) => {
   return [...new Set([...diff, ...status].map(normalizePath).filter(Boolean))];
 };
 
+const runLocal = ({ spans, cardDescription, copy, base, cardDir }) => {
+  const changedFiles = gitChangedFiles(copy, base);
+  const dirs = [
+    ...(cardDir ? [join(cardDir, 'evidence'), join(cardDir, 'proof'), join(cardDir, 'reports')] : []),
+    ...(copy ? [join(copy, '.artifacts')] : []),
+  ];
+  const docEvidence = copy
+    ? collectEvidenceFrom(join(copy, 'docs/agents')).filter(f => changedFiles.some(cf => matchesFile(cf, f.path)))
+    : [];
+  const evidenceFiles = [...dirs.flatMap(collectEvidenceFrom), ...docEvidence];
+  return evaluateBuildCheck({ spans, cardDescription, evidenceFiles });
+};
+
+const selfScript = () => {
+  const fromRoot = resolve(process.env.MASTRA_PROJECT_ROOT ?? process.cwd(), 'machine/flow/check.mjs');
+  return existsSync(fromRoot) ? fromRoot : fileURLToPath(import.meta.url);
+};
+
+const crashCause = (error, stderr) => {
+  const text = String(stderr ?? '');
+  if (/heap out of memory|allocation failed/i.test(text)) return 'JavaScript heap out of memory';
+  const lastLine = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean).at(-1);
+  if (lastLine) return lastLine;
+  if (error?.signal) return `process killed by ${error.signal}`;
+  return String(error?.message ?? error ?? 'unknown check failure');
+};
+
+const runCheckInChild = (payload) =>
+  new Promise((resolvePromise) => {
+    const child = execFile(
+      process.execPath,
+      [selfScript(), '--eval'],
+      { maxBuffer: 50 * 1024 * 1024, encoding: 'utf8' },
+      (error, stdout, stderr) => {
+        if (error) {
+          resolvePromise({ ok: false, fatal: true, reason: crashCause(error, stderr) });
+          return;
+        }
+        try {
+          resolvePromise(JSON.parse(stdout));
+        } catch (parseError) {
+          resolvePromise({ ok: false, fatal: true, reason: `invalid check output: ${parseError.message}` });
+        }
+      },
+    );
+    child.stdin.end(JSON.stringify(payload));
+  });
+
 export const realCheck = {
   async run({ mastra, traceId, traceFile, card, copy, base, cardDir, review }) {
     const spans = await buildSpans({ mastra, traceId, traceFile });
-    const changedFiles = gitChangedFiles(copy, base);
     const cardDescription = (await review?.readCard?.(card))?.description ?? '';
-    const dirs = [
-      ...(cardDir ? [join(cardDir, 'evidence'), join(cardDir, 'proof'), join(cardDir, 'reports')] : []),
-      ...(copy ? [join(copy, '.artifacts')] : []),
-    ];
-    const docEvidence = copy
-      ? collectEvidenceFrom(join(copy, 'docs/agents')).filter(f => changedFiles.some(cf => matchesFile(cf, f.path)))
-      : [];
-    const evidenceFiles = [...dirs.flatMap(collectEvidenceFrom), ...docEvidence];
-    return evaluateBuildCheck({ spans, cardDescription, evidenceFiles });
+    return runCheckInChild({ spans, cardDescription, copy, base, cardDir });
   },
 };
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url) && process.argv.includes('--eval')) {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  process.stdout.write(`${JSON.stringify(runLocal(payload))}\n`);
+}

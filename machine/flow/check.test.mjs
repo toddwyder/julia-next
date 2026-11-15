@@ -605,3 +605,48 @@ test('realCheck reads live Mastra trace, git copy diff and saved evidence files'
   await mastra.shutdown();
   try { rmSync(dir, { recursive: true, force: true }); } catch {}
 });
+
+test('a fatal check failure stops the card immediately with a report naming the check step and cause', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'flow-check-fatal-'));
+  process.env.FLOW_SCRATCH = join(dir, 'scratch');
+  const repo = studioRepo(dir);
+  openScratch(dir);
+  const caseDir = join(dir, CARD);
+  mkdirSync(caseDir, { recursive: true });
+  writeFileSync(join(caseDir, 'verdicts.json'), JSON.stringify({ smoke: ['PASS'] }));
+  writeFileSync(join(caseDir, 'cursors.json'), '{}');
+
+  const build = new Agent({
+    id: 'flow-build',
+    name: 'Flow build',
+    instructions: 'Build.',
+    model: createMockModel({ mockText: 'built' }),
+    tools: { task_write: { id: 'task_write' }, task_update: { id: 'task_update' }, task_complete: { id: 'task_complete' }, task_check: { id: 'task_check' } },
+  });
+  const stub = (text) => ({ stream: async () => ({ text: Promise.resolve(text) }) });
+  const workflow = buildCardPath({
+    agents: { build, shipping: stub('VERDICT: PASS\nCRITERION 1: PASS — ok\nNOTES: none'), remediation: stub('fixed'), retro: stub('retro') },
+    dir,
+    repo,
+    review: {
+      findPr: () => ({ pr: 499 }),
+      readCard: async identifier => ({ identifier, title: 'Fatal check', description: '## Acceptance criteria\n- works' }),
+      moveCard: async () => {},
+      headCommit: () => 'abc123',
+      postPrComment: () => {},
+    },
+    check: { run: async () => ({ ok: false, fatal: true, reason: 'JavaScript heap out of memory' }) },
+  });
+
+  const mastra = await openMastra({ card: CARD, stateDb: join(dir, 'state.db'), traceDb: join(dir, 'trace.duckdb'), workflow });
+  const wf = mastra.getWorkflow(workflow.id);
+  const run = await wf.createRun();
+  const result = await run.start({ inputData: { card: CARD, kind: 'machine' } });
+  const reportText = readFileSync(join(caseDir, 'reports', `${CARD}.md`), 'utf8');
+  assert.equal(result.status, 'success');
+  assert.equal(result.result.stopped, true);
+  assert.match(reportText, /Part: check step/);
+  assert.match(reportText, /JavaScript heap out of memory/);
+  await mastra.shutdown();
+  try { rmSync(dir, { recursive: true, force: true }); } catch {}
+});

@@ -12,7 +12,7 @@ process.env.CMD_API_KEY ??= 'unused-in-tests';
 
 const { Agent } = await import('@mastra/core/agent');
 const { createMockModel } = await import('@mastra/core/test-utils/llm-mock');
-const { costRecord, summarise } = await import('./trace.mjs');
+const { buildSpans, costRecord, summarise } = await import('./trace.mjs');
 const { buildCardPath } = await import('./workflow.mjs');
 const { openMastra } = await import('./mastra.mjs');
 const { openScratch } = await import('./scratch.mjs');
@@ -182,4 +182,33 @@ test('the run record on disk answers the same way for a real trace file', async 
   assert.equal(record.usd, null, 'the free mock model has no published price');
   assert.equal(typeof record.costNote, 'string');
   rmSync(dir, { recursive: true, force: true });
+});
+
+test('buildSpans queries obs.db directly without loading full trace payloads via getTrace', async () => {
+  let getTraceCalled = false;
+  let queriedSql = '';
+  const mastra = {
+    getStorage: () => ({
+      getStore: async () => ({
+        db: {
+          query: async (sql) => {
+            queriedSql = sql;
+            return [
+              { eventType: 'end', spanType: 'workflow_step', name: "workflow step: 'flow-build'", spanId: 'wf-1', parentSpanId: null, timestamp: '2026-11-14T00:00:00Z', input: null, output: null, attributes: null },
+              { eventType: 'end', spanType: 'tool_call', name: 'task_write', spanId: 'tc-1', parentSpanId: 'wf-1', timestamp: '2026-11-14T00:00:01Z', input: '{"tasks":[]}', output: '{"ok":true}', attributes: '{}' },
+            ];
+          },
+        },
+        getTrace: async () => {
+          getTraceCalled = true;
+          return { spans: [] };
+        },
+      }),
+    }),
+  };
+  const spans = await buildSpans({ mastra, traceId: 'trace-1' });
+  assert.equal(getTraceCalled, false);
+  assert.match(queriedSql, /CASE WHEN spanType = 'tool_call' THEN input ELSE NULL END/i);
+  assert.equal(spans.length, 2);
+  assert.deepEqual(spans[1].input, { tasks: [] });
 });
