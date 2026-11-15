@@ -20,18 +20,33 @@ export function copyFolder(card, env = process.env) {
   return join(copiesRoot(env), name(card));
 }
 
-export function startedFrom(repo) {
+function hasOrigin(repo) {
   try {
-    git(repo, ['fetch', '--no-tags', '--quiet', 'origin', 'main']);
+    return git(repo, ['remote']).split(/\r?\n/).includes('origin');
   } catch {
+    return false;
   }
-  for (const ref of ['origin/main', 'refs/heads/main']) {
+}
+
+export function startedFrom(repo) {
+  if (hasOrigin(repo)) {
     try {
-      return git(repo, ['rev-parse', '--verify', `${ref}^{commit}`]);
+      git(repo, ['fetch', '--no-tags', '--quiet', 'origin', 'main']);
+    } catch (error) {
+      const detail = String(error?.stderr ?? error?.message ?? error).trim();
+      throw new Error(`Failed to fetch latest main from origin in ${repo}: ${detail}`);
+    }
+    try {
+      return git(repo, ['rev-parse', '--verify', 'origin/main^{commit}']);
     } catch {
+      throw new Error(`${repo} has no origin/main commit after fetch.`);
     }
   }
-  throw new Error(`${repo} has no main branch to make a card's copy from.`);
+  try {
+    return git(repo, ['rev-parse', '--verify', 'refs/heads/main^{commit}']);
+  } catch {
+    throw new Error(`${repo} has no main branch to make a card's copy from.`);
+  }
 }
 
 function linkModules(repo, folder) {

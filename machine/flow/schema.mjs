@@ -61,6 +61,7 @@ export const cardState = z.object({
   answer: z.string().default(''),
   stopPart: z.string().default(''),
   stopWhy: z.string().default(''),
+  stopped: z.boolean().default(false),
   unreviewed: z.boolean().default(false),
   checkReturns: z.number().int().min(0).default(0),
   checkReasons: z.array(z.string()).default([]),

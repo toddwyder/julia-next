@@ -4,9 +4,9 @@ Todd decided on 11 November 2026 to use stock Mastra for the machine's spending 
 
 ## What it is
 
-Every agent the machine builds (the Lead, each helper, Shipping, Remediation, Retro) carries Mastra's `TokenCostControl` set to $4, scoped to one run. Before each model step it asks Mastra's saved metrics what the run has cost so far. If the figure is $4 or more, it stops that agent with a tripwire. The cost is Mastra's own estimate: tokens the provider reported, times the price in Mastra's price table. The exporter writes after every event so the saved figure is as fresh as Mastra allows.
+Every agent the machine builds (the Lead, each helper, Shipping, Remediation, Retro) carries Mastra's `TokenCostControl` set to $4, scoped to the card (`scope: 'resource'` with `mastra__resourceId` set to the card). Before each model step it asks Mastra's saved metrics what the card has cost so far. If the figure is $4 or more, it stops that agent with a tripwire. The cost is Mastra's own estimate: tokens the provider reported, times the price in Mastra's price table. The exporter writes after every event so the saved figure is as fresh as Mastra allows.
 
-Every agent answers to the model's own length limit, and the card's own dollar ledger (`machine/flow/spending.mjs`) adds each finished call and stops the card at its limit. The ledger is what ends a runaway answer.
+Every agent answers to the model's own length limit.
 
 The old controller (`machine/budget`) is deleted.
 
@@ -21,7 +21,7 @@ The old controller (`machine/budget`) is deleted.
 2. **A call made outside an agent**, such as a model called directly from a workflow step. Mastra's docs say these are not counted. The machine makes none today.
 3. **A model with no price in Mastra's table.** It counts as zero.
 4. **A cost it cannot read.** If the saved cost cannot be read, the guard lets the call through.
-5. **The memory note-takers.** They run inside the Lead's calls and are not guarded before they run. They cost $0: both run on a free model the price list offers, and that model is metered into the card's ledger like any other.
+5. **The memory note-takers.** They run inside the Lead's calls and are not guarded before they run, though Mastra's resource-scoped guard counts any memory calls tagged with the card's `resourceId`.
 
 ## Worst case past $4
 

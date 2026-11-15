@@ -50,3 +50,10 @@ test('a repository with no main branch says so instead of making an empty copy',
 
   assert.throws(() => startedFrom(dir), /has no main branch/);
 });
+
+test('a repository whose origin fetch fails throws instead of using a stale main', t => {
+  const { repo } = studio(t);
+  git(repo, ['remote', 'add', 'origin', join(repo, 'missing-remote')]);
+
+  assert.throws(() => startedFrom(repo), /Failed to fetch latest main from origin/);
+});

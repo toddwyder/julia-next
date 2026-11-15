@@ -13,10 +13,15 @@ const { createAgents } = await import('./agents.mjs');
 const { openMastra } = await import('./mastra.mjs');
 const { buildCardPath } = await import('./workflow.mjs');
 const { openScratch } = await import('./scratch.mjs');
-const { readSpans, mergedSpans } = await import('./trace.mjs');
-const { openSpending } = await import('./spending.mjs');
 const { ROLE_GROUPS, formatSettings } = await import('../../dashboard/lib/model-settings.js');
 const { initialChoice } = await import('../../dashboard/lib/roles.js');
+
+async function readMastraSpans(mastra) {
+  const obs = await mastra.getStorage().getStore('observability');
+  const { spans } = await obs.listTraces({ pagination: { page: 0, perPage: 50 } });
+  const loaded = await Promise.all(spans.map(s => obs.getTrace({ traceId: s.traceId })));
+  return loaded.flatMap(t => t?.spans ?? []);
+}
 
 const CARD = 'JUL-376-READONLY';
 const LEAD_MODEL_ID = 'openai/gpt-6.1-sol';
@@ -116,19 +121,11 @@ function setupCase(t) {
   gitCheckout('-c', 'user.email=lead@test', '-c', 'user.name=Lead', 'commit', '--quiet', '-m', 'main');
 
   openScratch(dir);
-  const spending = openSpending({
-    dir,
-    limit: 4,
-    catalog: CATALOG,
-    corrections: { peakWindows: [], excludeDates: [], overrides: {} },
-    memoryModel: 'commandcode/deepseek/deepseek-v4.1-flash',
-  });
-  spending.begin(CARD);
 
-  return { dir, repo, checkout, leadModelFile, roleModelsFile, spending };
+  return { dir, repo, checkout, leadModelFile, roleModelsFile };
 }
 
-async function runLead({ dir, repo, checkout, leadModelFile, roleModelsFile, spending, leadModel, helperModel }) {
+async function runLead({ dir, repo, checkout, leadModelFile, roleModelsFile, leadModel, helperModel }) {
   const agents = createAgents({
     model: 'openai/gpt-6.1-sol',
     leadModel,
@@ -136,8 +133,6 @@ async function runLead({ dir, repo, checkout, leadModelFile, roleModelsFile, spe
     repo,
     leadModelFile,
     roleModelsFile,
-    dir,
-    spending,
   });
   const workflow = buildCardPath({ agents, dir, repo });
   const mastra = await openMastra({
@@ -154,7 +149,8 @@ async function runLead({ dir, repo, checkout, leadModelFile, roleModelsFile, spe
   try {
     const response = await agents.build.stream('Build the card.', { requestContext });
     const text = await response.text;
-    return { text, agents };
+    const spans = await readMastraSpans(mastra);
+    return { text, agents, spans };
   } finally {
     await mastra.shutdown();
   }
@@ -200,7 +196,7 @@ test('Criterion 1: every write poteto-mode asks of the lead itself still works',
     ],
   });
 
-  const { text } = await runLead({ ...ctx, leadModel, helperModel: fakeModel({ modelId: HELPER_MODEL_ID, provider: 'commandcode' }) });
+  const { text, spans } = await runLead({ ...ctx, leadModel, helperModel: fakeModel({ modelId: HELPER_MODEL_ID, provider: 'commandcode' }) });
   assert.equal(text, 'Checklist, decision log, and commit succeeded.');
 
   for (const writeTool of WRITE_TOOLS) {
@@ -210,7 +206,6 @@ test('Criterion 1: every write poteto-mode asks of the lead itself still works',
   assert.ok(startTools.includes('task_complete'), 'Lead keeps task_complete');
   assert.ok(startTools.includes('mastra_workspace_execute_command'), 'Lead keeps execute_command');
 
-  const spans = mergedSpans(await readSpans(join(ctx.dir, 'trace.duckdb')));
   const toolSpans = spans.filter(s => s.spanType === 'tool_call');
   const toolCalls = toolSpans.map(toolSpanName);
   assert.ok(toolCalls.includes('task_write'), 'trace records task_write');
@@ -261,7 +256,7 @@ test('Criterion 2: a lead that reaches to change the card work gets one clear an
     ],
   });
 
-  const { text } = await runLead({ ...ctx, leadModel, helperModel });
+  const { text, spans } = await runLead({ ...ctx, leadModel, helperModel });
   assert.match(text, /Handed the change to featureRefactoring/);
 
   for (const writeTool of WRITE_TOOLS) {
@@ -270,7 +265,6 @@ test('Criterion 2: a lead that reaches to change the card work gets one clear an
   assert.match(secondPrompt, /Tool \\"mastra_workspace_write_file\\" not found/, 'Lead received one clear answer');
   assert.equal(readFileSync(join(ctx.checkout, 'work.txt'), 'utf8'), 'helper edit\n');
 
-  const spans = mergedSpans(await readSpans(join(ctx.dir, 'trace.duckdb')));
   const helperRuns = spans.filter(s => s.spanType === 'agent_run' && /pstack-feature-refactoring/i.test(`${s.name} ${s.attributes?.agentId ?? ''}`));
   assert.equal(helperRuns.length, 1, 'trace records the helper run in the same trace');
 });
@@ -306,12 +300,11 @@ test('Criterion 3: the change lands when a helper makes it', async t => {
     ],
   });
 
-  await runLead({ ...ctx, leadModel, helperModel });
+  const { spans } = await runLead({ ...ctx, leadModel, helperModel });
   assert.ok(helperStartTools.includes('mastra_workspace_write_file'), 'helper keeps mastra_workspace_write_file');
   assert.ok(helperStartTools.includes('mastra_workspace_edit_file'), 'helper keeps mastra_workspace_edit_file');
   assert.equal(readFileSync(join(ctx.checkout, 'feature.txt'), 'utf8'), 'landed by helper\n');
 
-  const spans = mergedSpans(await readSpans(join(ctx.dir, 'trace.duckdb')));
   const writeSpans = spans.filter(s => s.spanType === 'tool_call' && toolSpanName(s) === 'mastra_workspace_write_file');
   assert.equal(writeSpans.length, 1, 'trace records helper write_file call');
 });
@@ -348,12 +341,11 @@ test('Criterion 4: the lead still reads the card work, runs its proofs, saves ev
   });
 
   mkdirSync(join(ctx.checkout, '.artifacts'), { recursive: true });
-  await runLead({ ...ctx, leadModel, helperModel: fakeModel({ modelId: HELPER_MODEL_ID, provider: 'commandcode' }) });
+  const { spans } = await runLead({ ...ctx, leadModel, helperModel: fakeModel({ modelId: HELPER_MODEL_ID, provider: 'commandcode' }) });
 
   assert.match(readOutput, /export const value = 42/, 'Lead read app.mjs');
   assert.match(readFileSync(join(ctx.checkout, '.artifacts/proof.txt'), 'utf8'), /PROOF_OK 42/, 'Lead saved proof evidence');
 
-  const spans = mergedSpans(await readSpans(join(ctx.dir, 'trace.duckdb')));
   const toolCalls = spans.filter(s => s.spanType === 'tool_call').map(toolSpanName);
   assert.ok(toolCalls.includes('mastra_workspace_read_file'), 'trace records Lead read_file');
   assert.ok(toolCalls.includes('mastra_workspace_execute_command'), 'trace records Lead execute_command');

@@ -1,18 +1,16 @@
 #!/usr/bin/env node
-// The runner. It reports where a run is waiting, resumes it with Todd's answer,
-// and writes the run's cost record beside the run's own files. It does not
-// start a card and it does not decide anything: a card begins in Mastra
+// The runner. It reports where a run is waiting and resumes it with Todd's answer.
+// It does not start a card and it does not decide anything: a card begins in Mastra
 // Studio, on the card workflow's own run form.
 
 process.env.CMD_API_KEY ??= process.env.COMMANDCODE_API_KEY;
 
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const usage = `usage:
   node machine/flow/run.mjs resume --dir <dir> --run-id <id> [--request <id>] --answer yes|no
-  node machine/flow/run.mjs status --dir <dir> --run-id <id>
-  node machine/flow/run.mjs cost --dir <dir>`;
+  node machine/flow/run.mjs status --dir <dir> --run-id <id>`;
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -44,19 +42,8 @@ function recordPath(dir) {
   return join(dir, 'record.json');
 }
 
-// A finished run's cost record is read after the exporter shut down, because
-// spans still in the exporter are not in the trace file yet.
-let costWhenDone = null;
-
 function keep(dir, event) {
   appendFileSync(recordPath(dir), `${JSON.stringify(event)}\n`);
-}
-
-async function writeCost(dir) {
-  const { costRecord } = await import('./trace.mjs');
-  const record = await costRecord(join(dir, 'trace.duckdb'));
-  writeFileSync(join(dir, 'cost.json'), `${JSON.stringify(record, null, 2)}\n`);
-  return record;
 }
 
 async function resume() {
@@ -70,8 +57,6 @@ async function resume() {
 
   keep(dir, { at: new Date().toISOString(), event: 'resume', ...result });
   console.log(JSON.stringify(result, null, 2));
-
-  if (result.status !== 'suspended') costWhenDone = dir;
 }
 
 async function status() {
@@ -81,12 +66,7 @@ async function status() {
   console.log(JSON.stringify(await readState({ dir, runId }), null, 2));
 }
 
-async function cost() {
-  const dir = resolve(need('dir'));
-  console.log(JSON.stringify(await writeCost(dir), null, 2));
-}
-
-const commands = { resume, status, cost };
+const commands = { resume, status };
 
 if (!commands[command]) {
   console.error(usage);
@@ -99,12 +79,7 @@ commands[command]().then(
       const { closeFlow } = await import('./start.mjs');
       await closeFlow();
     }
-    if (costWhenDone) {
-      await writeCost(costWhenDone);
-      console.log(`\nRun record: ${recordPath(costWhenDone)}\nCost record: ${join(costWhenDone, 'cost.json')}`);
-    }
     process.exitCode = 0;
-    // Some storage handles keep the loop alive after the run is done.
     setTimeout(() => process.exit(0), 2000).unref();
   },
   error => {
