@@ -117,9 +117,20 @@ export function createAgents({ model, leadModel, helperModel, costLimit, repo = 
   };
 
   const skillInstruction = `Read ${join(repo, POTETO_SKILL)} in full, including its Principles section, before any work.`;
+  const stampCardResource = agent => {
+    for (const method of ['stream', 'generate']) {
+      const original = agent[method].bind(agent);
+      agent[method] = (messages, opts = {}) => {
+        const card = opts.requestContext?.get?.('flowCard');
+        if (card) opts.requestContext.set('mastra__resourceId', card);
+        return original(messages, opts);
+      };
+    }
+    return agent;
+  };
   const helpers = () => Object.fromEntries(readRoleModels(roleModelsFile).flatMap(role => role.models.map((modelId, index) => {
     const choice = role.models.length > 1 ? `, choice ${index + 1}` : '';
-    return [helperKey(role, index), createCodingAgent({
+    return [helperKey(role, index), stampCardResource(createCodingAgent({
       id: `pstack-${role.id}-${index + 1}`,
       name: role.name,
       description: `${role.name} pstack role on ${modelId}${choice}. ${role.explanation} Use this helper when delegating ${role.name} work.`,
@@ -130,7 +141,7 @@ export function createAgents({ model, leadModel, helperModel, costLimit, repo = 
       workspace: cardWorkspace('machine-repo-helper', { skills: ['.agents/skills'] }),
       tools,
       defaultOptions: { maxSteps: 100 },
-    })];
+    }))];
   })));
 
   const leadPlaybookGuard = playbookGuard();
