@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { killProcessGroupNow, terminateProcessGroup } from './process-group.mjs';
 import { scratchDir } from './scratch-dir.mjs';
 
 export const WORKFLOW = 'card-path';
@@ -72,10 +73,21 @@ export async function checkStudioStart({ root = process.cwd(), timeoutMs = 18000
   const log = { text: '' };
   const child = spawn('npm', ['exec', '--yes', 'mastra@1.38.0', 'dev'], {
     cwd: root,
-    detached: true,
+    detached: process.platform !== 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...env, PORT: String(port), FLOW_DIR: dir, MASTRA_TELEMETRY_DISABLED: '1' },
   });
+  const onExit = () => {
+    if (child.exitCode === null && child.signalCode === null) killProcessGroupNow(child.pid, 'SIGKILL');
+  };
+  const onSignal = sig => {
+    void terminateProcessGroup(child.pid, { signal: sig, graceMs: 2000 }).finally(() => {
+      process.exit(sig === 'SIGINT' ? 130 : 143);
+    });
+  };
+  process.on('exit', onExit);
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
   const keep = chunk => {
     log.text = (log.text + chunk).slice(-20000);
   };
@@ -87,10 +99,10 @@ export async function checkStudioStart({ root = process.cwd(), timeoutMs = 18000
     const checked = onReady ? await onReady({ port, dir }) : undefined;
     return { port, fields: form.fields, failures: form.failures, log: log.text, dir, checked };
   } finally {
-    try {
-      process.kill(-child.pid, 'SIGTERM');
-    } catch {}
-    await new Promise(done => setTimeout(done, 2000));
+    process.off('exit', onExit);
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
+    await terminateProcessGroup(child.pid, { graceMs: 2000 });
     rmSync(dir, { recursive: true, force: true });
   }
 }

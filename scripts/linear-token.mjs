@@ -1,9 +1,9 @@
 // No long-lived Linear key lives on this machine: a run trades the app's client
 // pair for an access token at the start, so a revoked or leaked key cannot
 // outlive the run that used it.
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { runWithSignalForwarding } from './process-group.mjs';
 
 export const TOKEN_URL = 'https://api.linear.app/oauth/token';
 export const DEFAULT_SCOPE = 'read,write,issues:create,comments:create';
@@ -33,7 +33,7 @@ export async function requestToken({ clientId, clientSecret, scope = DEFAULT_SCO
   throw new Error(message.replaceAll(clientSecret, '[redacted]'));
 }
 
-export async function runWithFreshToken(argv, { env = process.env, fetchImpl = fetch, spawn = spawnSync } = {}) {
+export async function runWithFreshToken(argv, { env = process.env, fetchImpl = fetch, spawn } = {}) {
   if (!Array.isArray(argv) || !argv.length || argv.some(argument => typeof argument !== 'string' || !argument)) {
     throw new Error('runWithFreshToken needs a command to run.');
   }
@@ -44,7 +44,9 @@ export async function runWithFreshToken(argv, { env = process.env, fetchImpl = f
   // The command never needs the secret, and a reviewer once republished a
   // credential it found in its environment.
   delete childEnv.LINEAR_CLIENT_SECRET;
-  const child = spawn(argv[0], argv.slice(1), { env: childEnv, stdio: 'inherit' });
+  const child = spawn
+    ? await spawn(argv[0], argv.slice(1), { env: childEnv, stdio: 'inherit' })
+    : await runWithSignalForwarding(argv[0], argv.slice(1), { env: childEnv, stdio: 'inherit' });
   if (child.error) throw child.error;
   return child.status ?? 1;
 }
