@@ -4,34 +4,53 @@ import { mkdirSync,readFileSync,statSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { resolve,dirname } from 'node:path'
+import { runWithSignalForwarding } from './process-group.mjs'
 import { scratchDir } from './scratch-dir.mjs'
 export const agentsTokenPath='/home/ubuntu/.config/julia-agents/service-account-token'
 const referencesPath=fileURLToPath(new URL('./julia-agents.env',import.meta.url))
 const tokenScript=fileURLToPath(new URL('./linear-token.mjs',import.meta.url))
 const fields=new Set(['CMD_API_KEY','COMMANDCODE_API_KEY','LINEAR_API_KEY','LINEAR_CLIENT_ID','LINEAR_CLIENT_SECRET','LINEAR_OAUTH_SCOPE','SENTRY_AUTH_TOKEN','NEXT_PUBLIC_SENTRY_DSN','SENTRY_ORG','SENTRY_PROJECT','AXIOM_TOKEN','AXIOM_DATASET','STITCH_API_KEY'])
+function prepareAgentsInvocation(argv,{tokenPath=agentsTokenPath,environment=process.env}={}){
+ if(!Array.isArray(argv))throw Error()
+ const linearOnly=argv[0]==='--linear'
+ if(linearOnly)argv=argv.slice(1)
+ if(argv[0]==='--')argv=argv.slice(1)
+ if(!argv.length||argv.some(s=>typeof s!=='string'||!s))throw Error()
+ const file=statSync(tokenPath),directory=statSync(dirname(tokenPath))
+ if(file.uid!==process.getuid()||(file.mode&0o777)!==0o600||directory.uid!==process.getuid()||(directory.mode&0o777)!==0o700)throw Error()
+ const token=readFileSync(tokenPath,'utf8').trim()
+ if(!token)throw Error()
+ const env=Object.fromEntries(Object.entries(environment).filter(([key,value])=>!key.startsWith('OP_')&&!fields.has(key)&&!value.startsWith('op://')))
+ mkdirSync(scratchDir,{recursive:true})
+ Object.assign(env,{TMPDIR:scratchDir,OP_SERVICE_ACCOUNT_TOKEN:token,OP_BIOMETRIC_UNLOCK_ENABLED:'false',OP_CACHE:'false'})
+ if(linearOnly){
+  const lines=readFileSync(referencesPath,'utf8').split('\n')
+  for(const key of ['LINEAR_CLIENT_ID','LINEAR_CLIENT_SECRET','LINEAR_OAUTH_SCOPE']){
+   const line=lines.find(line=>line.startsWith(`${key}=`))
+   if(!line||!line.slice(key.length+1).trim())throw Error()
+   env[key]=line.slice(key.length+1).trim()
+  }
+ }
+ return {
+  args:['run',...(linearOnly?[]:['--env-file',referencesPath]),'--',process.execPath,tokenScript,'--',...argv],
+  options:{env,stdio:'inherit',timeout:undefined},
+ }
+}
 export function runAgentsCommand(argv,{tokenPath=agentsTokenPath,environment=process.env,spawn=spawnSync}={}){
  try{
-  if(!Array.isArray(argv))throw Error()
-  const linearOnly=argv[0]==='--linear'
-  if(linearOnly)argv=argv.slice(1)
-  if(argv[0]==='--')argv=argv.slice(1)
-  if(!argv.length||argv.some(s=>typeof s!=='string'||!s))throw Error()
-  const file=statSync(tokenPath),directory=statSync(dirname(tokenPath))
-  if(file.uid!==process.getuid()||(file.mode&0o777)!==0o600||directory.uid!==process.getuid()||(directory.mode&0o777)!==0o700)throw Error()
-  const token=readFileSync(tokenPath,'utf8').trim()
-  if(!token)throw Error()
-  const env=Object.fromEntries(Object.entries(environment).filter(([key,value])=>!key.startsWith('OP_')&&!fields.has(key)&&!value.startsWith('op://')))
-  mkdirSync(scratchDir,{recursive:true})
-  Object.assign(env,{TMPDIR:scratchDir,OP_SERVICE_ACCOUNT_TOKEN:token,OP_BIOMETRIC_UNLOCK_ENABLED:'false',OP_CACHE:'false'})
-  if(linearOnly){
-   const lines=readFileSync(referencesPath,'utf8').split('\n')
-   for(const key of ['LINEAR_CLIENT_ID','LINEAR_CLIENT_SECRET','LINEAR_OAUTH_SCOPE']){
-    const line=lines.find(line=>line.startsWith(`${key}=`))
-    if(!line||!line.slice(key.length+1).trim())throw Error()
-    env[key]=line.slice(key.length+1).trim()
-   }
-  }
-  const child=spawn('op',['run',...(linearOnly?[]:['--env-file',referencesPath]),'--',process.execPath,tokenScript,'--',...argv],{env,stdio:'inherit',timeout:undefined})
+  const {args,options}=prepareAgentsInvocation(argv,{tokenPath,environment})
+  const child=spawn('op',args,options)
+  if(child.error)throw Error()
+  return child.status??1
+ }catch{
+  console.error('provider unavailable')
+  return 1
+ }
+}
+export async function runAgentsCommandAsync(argv,{tokenPath=agentsTokenPath,environment=process.env}={}){
+ try{
+  const {args,options}=prepareAgentsInvocation(argv,{tokenPath,environment})
+  const child=await runWithSignalForwarding('op',args,options)
   if(child.error)throw Error()
   return child.status??1
  }catch{
@@ -42,5 +61,5 @@ export function runAgentsCommand(argv,{tokenPath=agentsTokenPath,environment=pro
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const args=process.argv.slice(2)
  if(args[0]==='--')args.shift()
- process.exitCode=runAgentsCommand(args)
+ process.exitCode=await runAgentsCommandAsync(args)
 }

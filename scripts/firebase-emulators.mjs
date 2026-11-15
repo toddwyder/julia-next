@@ -2,6 +2,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { killProcessGroupNow } from './process-group.mjs';
 
 // Starts the Auth and Firestore emulators from firebase.json under the
 // demo-julia project, which needs no Google account or credentials.
@@ -49,7 +50,7 @@ export async function startEmulators({ timeoutMs = 120_000, signal } = {}) {
   const child = spawn('npx', ['--no-install', 'firebase', 'emulators:start', '--only', 'auth,firestore', '--project', EMULATOR_PROJECT_ID], {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true,
+    detached: process.platform !== 'win32',
     env: javaHome && javaHome !== 'mine'
       ? { ...process.env, JAVA_HOME: javaHome, PATH: `${join(javaHome, 'bin')}${delimiter}${process.env.PATH}` }
       : process.env,
@@ -58,27 +59,48 @@ export async function startEmulators({ timeoutMs = 120_000, signal } = {}) {
   child.stdout.on('data', chunk => { output += chunk; });
   child.stderr.on('data', chunk => { output += chunk; });
   const exited = new Promise(resolve => child.once('exit', resolve));
+  const onExit = () => {
+    if (child.exitCode === null && child.signalCode === null) killProcessGroupNow(child.pid, 'SIGKILL');
+  };
+  const onSignal = sig => {
+    void stop().finally(() => {
+      process.exit(sig === 'SIGINT' ? 130 : 143);
+    });
+  };
+  const detachCleanup = () => {
+    process.off('exit', onExit);
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
+  };
+  process.on('exit', onExit);
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
+  exited.then(detachCleanup);
   async function stop() {
-    if (child.exitCode !== null) return;
-    process.kill(-child.pid, 'SIGTERM');
+    if (child.exitCode !== null) {
+      detachCleanup();
+      return;
+    }
+    killProcessGroupNow(child.pid, 'SIGTERM');
     // The CLI runs Java in its own process group, so only the CLI's own shutdown
     // stops it; that can take ~30 s if it is still starting. SIGKILL is the last resort.
-    const timer = setTimeout(() => process.kill(-child.pid, 'SIGKILL'), 45_000);
+    const timer = setTimeout(() => killProcessGroupNow(child.pid, 'SIGKILL'), 45_000);
     await exited;
     clearTimeout(timer);
+    detachCleanup();
   }
   signal?.addEventListener('abort', stop, { once: true });
   const deadline = Date.now() + timeoutMs;
   while (!output.includes('All emulators ready')) {
     if (child.exitCode !== null) throw new Error(`Firebase emulators exited early:\n${output}`);
     if (Date.now() > deadline) {
-      process.kill(-child.pid, 'SIGKILL');
+      killProcessGroupNow(child.pid, 'SIGKILL');
       throw new Error(`Firebase emulators did not start in ${timeoutMs} ms:\n${output}`);
     }
     await new Promise(resolve => setTimeout(resolve, 250));
   }
   if (!(await reachable(EMULATOR_HOSTS.firestore)) || !(await reachable(EMULATOR_HOSTS.auth))) {
-    process.kill(-child.pid, 'SIGKILL');
+    killProcessGroupNow(child.pid, 'SIGKILL');
     throw new Error(`Firebase emulators reported ready but are not reachable:\n${output}`);
   }
   return { stop };
