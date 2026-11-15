@@ -11,10 +11,10 @@ of any size, not only a change to the sentence beside it.
 | --- | --- | --- |
 | `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `a2e9289b94a8564182de663f40cbfd206f5e723a66e8d82fdd189fcb00f6e48f` |
 | `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `4b84d5954971a9cf744865a43b193ae752c9c77e6e303b55a918c09f607c0c9d` |
-| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `0f48b89cd53ab3862f52e4ac02e96420f3fb94722a1ba55b34cb643b7cf90a24` |
+| `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `cafb2aeca3ad8234c2ac38805484d1c7690d88c688f211bdceebafb54ef543cc` |
 | `machine/flow/check.mjs` | The post-build check: verifies Lead task list in Mastra state before Shipping. | `89d3c87aa20b8129bc9d2ac123d106576ba2b3a5251ccba995bf9c019e851295` |
 | `machine/flow/task.mjs` | The task the Lead is given, taken word for word from the card. | `21aca1ef4c2b964d729b93317061b1a23f0e38773b26e8aa1c9f951581fa62e7` |
-| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `d101ec498d38fb81eb1e0004d9a52f88f27253c451c6103e16a821ec5b0f2fc2` |
+| `machine/flow/agents.mjs` | The agents the stages run, and what the build agent may touch. | `a9de68be4ad53a43eebcf21a61d1c5a42ebcf7aeb1e930183e3c9665fd3beb4f` |
 | `machine/flow/playbook.mjs` | Playbook catalog, task seeding, and the choose_playbook tool. | `90531eb2366f1c5bb03ac23014363ff8b2498c7da931d59a6a29981e276f2a31` |
 | `machine/flow/graphify.mjs` | The Graphify graph tools offered to Lead and its helpers. | `c502bc49faa96ef1de469764696d1682347679a61a17629766940de5baf546b6` |
 | `machine/flow/memory.mjs` | The memory note-takers, run on the free model the card picked. | `c166620cff305155382848e9e2c7bf09b24641bb14d3a0ed8bca242a852835b1` |
@@ -25,7 +25,7 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/copy.mjs` | The fresh copy of the repository each card builds in, and its removal when the card ends. | `c54e98eedc89732774928ee93e6da7231f36c7b1a436b27cd335e5236c8aa118` |
 | `machine/flow/review.mjs` | The Shipping review: finds the card's pull request, names the commit it reviews, builds the reviewer's task, reads the verdict. | `1b3ac557ab1399b3fae8cc54e949835e8dee90151c42586fea88928fdfce9ea0` |
 | `machine/flow/cost-record.mjs` | Builds the per-card cost record from Mastra metrics and sends it to Axiom. | `2b8a1ad2bd83455f13b9cf6715c217d2434b2fc9072717dfd7f8b788569ca1f5` |
-| `machine/flow/mastra.mjs` | Storage, tracing and trace retention, so a run is written down and pruned. | `e346dc9470a464e899c72d1a70e8eb2095723d0b89df32805fce72cc72a41618` |
+| `machine/flow/mastra.mjs` | Storage, tracing and trace retention, so a run is written down and pruned. | `86f85ab2b01baf67fec45f43d53e293b1361d187315e0db2ff51ba9a7331a9ff` |
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `ebf105fa6eb755aff0b7692722982bc9986fba37dd410f018ba8ba0a2a2870c9` |
 | `machine/flow/run.mjs` | Answers a waiting card and reads a run. No way to start one. | `6aa66f1d72561054364ad8ffe90a19d5d3119ebcd8dd3539df3cbb57c14f4338` |
 | `machine/flow/report.mjs` | Builds the card report and tripwire stop helper. | `dd860cc4c4f79919b1e290469dfda80e792a81f6fe7424468a1673d2e6b19613` |

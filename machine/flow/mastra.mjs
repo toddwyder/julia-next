@@ -13,8 +13,12 @@ export const DEFAULT_TRACE_MAX_AGE = '7d';
 export const cardStamper = card => ({
   name: 'card-stamper',
   process(span) {
-    if (!span || !card) return span;
-    span.attributes = { ...(span.attributes ?? {}), card };
+    if (!span) return span;
+    if (card) span.attributes = { ...(span.attributes ?? {}), card };
+    if (typeof span.resourceId === 'string') {
+      const match = span.resourceId.match(/^([A-Z]+-\d+)-.+$/);
+      if (match) span.resourceId = match[1];
+    }
     return span;
   },
 });

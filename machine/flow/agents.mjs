@@ -48,9 +48,16 @@ export function createAgents({ model, leadModel, helperModel, costLimit, repo = 
   const stageModel = id => (model ? model : agentModel(stages[id]));
   const memoryModelId = () => (model ? (typeof model === 'string' ? model : null) : readStageModels(roleModelsFile).memory);
 
-  const cardProcessors = () => ({ inputProcessors: [cardCostControl(limit)], outputProcessors: [] });
+  const cardResource = {
+    id: 'card-resource',
+    processInputStep({ requestContext }) {
+      const card = requestContext?.get?.('flowCard');
+      if (card) requestContext.set('mastra__resourceId', card);
+    },
+  };
+  const cardProcessors = () => ({ inputProcessors: [cardResource, cardCostControl(limit)], outputProcessors: [] });
   const codingProcessors = () => ({
-    inputProcessors: [cardCostControl(limit)],
+    inputProcessors: [cardResource, cardCostControl(limit)],
     outputProcessors: [new CyberRefusalHandler()],
   });
 

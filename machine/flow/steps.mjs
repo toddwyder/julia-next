@@ -80,6 +80,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
       return { ...inputData, card, stopped: true, detail: stopWhy, prompt: '' };
     }
     requestContext?.set?.('cardCheckout', copy.folder);
+    requestContext?.set?.('flowCard', card);
     requestContext?.set?.('mastra__threadId', requestId);
     requestContext?.set?.('mastra__resourceId', card);
     await setState({ ...state, buildRounds, requestId, copy: copy.folder, base: copy.base, playbook: '', playbookCall: 0 });
