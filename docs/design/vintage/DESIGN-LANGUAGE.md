@@ -29,19 +29,23 @@ system is documented at the end only so its leftovers can be recognised and igno
 
 ## 1. Fonts
 
-Four Google Fonts are loaded by `next/font/google` `[layout.tsx]`, each exposed as a
-CSS variable and a Tailwind utility class `[live-css]`:
+Three fonts are served from files kept in the repository, declared with `@font-face` in
+`app/fonts.css`, which the root layout imports. Each has its licence (`OFL.txt`) beside it
+in `app/fonts/<family>/`. No build or page reaches an outside font service, and
+`scripts/check-font-hosts.mjs` fails a change that loads a font from one. Each family is
+exposed as a CSS variable `[fonts.css]`:
 
 | Role | Family | Weights loaded | CSS variable / class | Where it is used |
 |---|---|---|---|---|
-| **Serif: the "voice of the chef"** | **Playfair Display** | 400, 500, 600, 700 | `--font-serif` / `.font-vintageSerif` | The default font for the whole page (set on `<body>`). Page titles ("Library", "Menu Planning Hub"), recipe titles, section headings ("The Ingredients", "Preparation"), the masthead line "THE JULIA COOKBOOK", ingredient names, instruction paragraphs, giant cook-mode step text, shopping-list category headers, small-caps eyebrow labels on the Lab page. `[layout.tsx]` `[component: RecipeContent, RecipeHeader, CookModeView, lab/page]` |
+| **Serif: the "voice of the chef"** | **Playfair Display** | 400 to 900 (variable), normal and italic | `--font-serif` / `.font-vintageSerif` | The default font for the whole page (set on `<body>`). Page titles ("Library", "Menu Planning Hub"), recipe titles, section headings ("The Ingredients", "Preparation"), the masthead line "THE JULIA COOKBOOK", ingredient names, instruction paragraphs, giant cook-mode step text, shopping-list category headers, small-caps eyebrow labels on the Lab page. `[layout.tsx]` `[component: RecipeContent, RecipeHeader, CookModeView, lab/page]` |
 | **Sans: the "voice of the utility"** | **Inter** | variable (all) | `--font-sans` / `.font-vintageSans` | Nav tab labels, most buttons, form inputs and placeholders, field labels ("RECIPE TITLE"), metadata lines under recipe names ("40 MINS • 75 SERVINGS"), shopping list item text, descriptive body copy on Lab/Menus. `[component: VintageNav, page.tsx, new/page]` |
 | **Mono: quantities and "typewriter" controls** | **Roboto Mono** | variable | `--font-mono` / `.font-vintageMono` / Tailwind `.font-mono` | Ingredient quantities ("2", "½"), Time and Serves values ("40 mins", "75"), the SCORE / GL badge, the recipe action buttons ("Start Cooking Mode", "Share Recipe", "Edit Recipe"), every button in cook mode, the "EXIT CART" pill, loading messages ("Loading recipe archive..."), the ingredient and instruction textareas on Edit/Manual Entry. `[component: NutritionBadge, RecipeContent, CookModeView, ShoppingListDisplay]` |
 | **Script / handwriting** | **Caveat** | 400, 700 | `--font-cursive` / `.font-cursive` / `.font-vintageCursive` | Only the "Chef's Notes" block on a recipe (italic quotation signed "— Julia"). Not visible in any screenshot because the sample recipes have no notes. `[component: RecipeContent]` |
 
 Fallback stacks declared in `[vintage.css]`: serif → `Georgia, serif`; sans →
 `Helvetica, sans-serif`; mono → `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas`;
-cursive → `Caveat, cursive`.
+cursive → `Caveat, cursive`. No layout loads Caveat, so `--font-cursive` is not defined and
+the "Chef's Notes" block renders in the `cursive` fallback.
 
 **The script "Julia" logo is an image, not a font.** `/public/assets/vintage-logo.png`
 (1024×499 px) shows the word "Julia" in a dark-green brush-script hand next to an
