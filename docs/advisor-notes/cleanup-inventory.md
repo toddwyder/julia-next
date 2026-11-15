@@ -59,7 +59,7 @@ are closed with a reason: #483 `jul-342-helpers` and #488 `jul-359-review-stops`
 | --- | --- | --- |
 | `jul-341-apothecary` | #461 | green, no review |
 | `toddwyder-patch-1` | #493 | docs: a parking-lot idea |
-| `jul-362-self-hosted-fonts` | #498 | green. Matters beyond its card: `web` fails whenever `next/font/google` cannot reach Google |
+| `jul-362-self-hosted-fonts` | #498 | closed unmerged; JUL-362 was re-run from main on `card/JUL-362`, which serves every font from the repository |
 | `jul-365-real-shipping` | #500 | green except Vercel |
 | `spike/luna-runaway-proof` … `spikes/deepseek-card-dollar-proof` | #507, #508, #509, #510, #511 | Todd's spikes; they stay |
 | `chore/stock-mastracode` | #512 | this branch |
