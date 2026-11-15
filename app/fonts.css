@@ -1,0 +1,65 @@
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url(./fonts/playfair-display/playfair-display-latin-wght-normal.woff2) format('woff2');
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url(./fonts/playfair-display/playfair-display-latin-wght-italic.woff2) format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(./fonts/inter/inter-latin-wght-normal.woff2) format('woff2');
+}
+
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url(./fonts/roboto-mono/roboto-mono-latin-wght-normal.woff2) format('woff2');
+}
+
+/* Metrics copied from the build that loaded these fonts from Google, at 65b5855. */
+@font-face {
+  font-family: 'Playfair Display Fallback';
+  src: local('Times New Roman');
+  ascent-override: 97.25%;
+  descent-override: 22.56%;
+  line-gap-override: 0%;
+  size-adjust: 111.26%;
+}
+
+@font-face {
+  font-family: 'Inter Fallback';
+  src: local('Arial');
+  ascent-override: 90.44%;
+  descent-override: 22.52%;
+  line-gap-override: 0%;
+  size-adjust: 107.12%;
+}
+
+@font-face {
+  font-family: 'Roboto Mono Fallback';
+  src: local('Arial');
+  ascent-override: 77.84%;
+  descent-override: 20.13%;
+  line-gap-override: 0%;
+  size-adjust: 134.61%;
+}
+
+:root {
+  --font-serif: 'Playfair Display', 'Playfair Display Fallback';
+  --font-sans: 'Inter', 'Inter Fallback';
+  --font-mono: 'Roboto Mono', 'Roboto Mono Fallback';
+}
