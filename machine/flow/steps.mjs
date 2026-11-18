@@ -10,10 +10,10 @@ import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 
 import { realCheck } from './check.mjs';
-import { closeCopy, openCopy } from './copy.mjs';
+import { closeCopy, findLeftoverWork, openCopy } from './copy.mjs';
 import { sendCardCostRecord } from './cost-record.mjs';
 import { pruneTrace } from './mastra.mjs';
-import { reportText, tripwireStop } from './report.mjs';
+import { acceptanceWaitMessage, notifyCard, reportText, tripwireStop } from './report.mjs';
 import { stopIfResourcesShort } from './resources.mjs';
 import { REVIEW_TIME_LIMIT_MS, criteriaFromCard, parseVerdict, realReview, reviewTask, verdictComment } from './review.mjs';
 import { cardState, flowData, runInput } from './schema.mjs';
@@ -31,10 +31,8 @@ const finishCard = ({ mastra, card, status }) =>
 export function createStages({ agents, dir, repo, review = realReview, check = realCheck }) {
   const cardDir = (card) => join(dir, card);
 
-  const halt = async ({ inputData, state }) => {
-    if (!state.stopped) return null;
-    return { card: state.card, kind: state.kind, ...inputData, stopped: true, detail: state.stopWhy };
-  };
+  const halt = async ({ inputData, state }) =>
+    state.stopped ? { card: state.card, kind: state.kind, ...inputData, stopped: true, detail: state.stopWhy } : null;
 
   const haltOrShort = async context => (await halt(context)) ?? stopIfResourcesShort(context, dir);
 
@@ -74,6 +72,11 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     const card = state.card || inputData.card;
     const buildRounds = state.buildRounds + 1;
     const requestId = `${card}/build-${buildRounds}`;
+    const leftover = buildRounds === 1 ? findLeftoverWork({ repo, card, findPr: review.findPr }) : '';
+    if (leftover) {
+      await setState({ ...state, stopPart: 'Leftover work', stopWhy: leftover, stopped: true });
+      return { ...inputData, card, stopped: true, detail: leftover, prompt: '' };
+    }
     let copy;
     try {
       copy = openCopy({ repo, card });
@@ -145,12 +148,8 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     const stopped = await halt(context);
     if (stopped) return stopped;
     const { inputData, state, setState, mastra } = context;
-    const result = await check.run({
-      mastra,
-      threadId: state.requestId,
-      playbook: state.playbook,
-      repo,
-    }).catch(error => ({ ok: false, fatal: true, reason: String(error?.message ?? error) }));
+    const result = await check.run({ mastra, threadId: state.requestId, playbook: state.playbook, repo })
+      .catch(error => ({ ok: false, fatal: true, reason: String(error?.message ?? error) }));
     if (result.ok) return { ...inputData, checkPassed: true, checkReason: '' };
     const checkReturns = result.fatal ? state.checkReturns : state.checkReturns + 1;
     const checkReasons = result.fatal ? state.checkReasons : [...state.checkReasons, result.reason];
@@ -259,10 +258,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     }
   });
 
-  const passNote = step('pass-note', async ({ inputData }) => ({
-    ...inputData,
-    detail: `${inputData.detail} (no remediation needed)`,
-  }));
+  const passNote = step('pass-note', async ({ inputData }) => ({ ...inputData, detail: `${inputData.detail} (no remediation needed)` }));
 
   const gate = step('gate', async (context) => {
     const stopped = await halt(context);
@@ -291,6 +287,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
       const open = suspendData?.request ?? state.requestId;
 
       if (!resumeData || resumeData.request !== open) {
+        await notifyCard(review, state.card, acceptanceWaitMessage(state.card, open));
         return await suspend({ request: open });
       }
 
@@ -343,14 +340,13 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     return { ...inputData, smoke: answer, failCount, detail: `live smoke test returned ${answer}` };
   });
 
-  const smokePass = step('smoke-pass', async ({ inputData }) => ({
-    ...inputData,
-    detail: `${inputData.detail}; the landed change stays live`,
-  }));
+  const smokePass = step('smoke-pass', async ({ inputData }) => ({ ...inputData, detail: `${inputData.detail}; the landed change stays live` }));
 
   const stopReport = step('stop-report', async ({ inputData, state, mastra }) => {
     await finishCard({ mastra, card: state.card, status: 'stopped' });
-    const path = writeReport(cardDir(state.card), state.card, reportText(state, inputData.detail));
+    const report = reportText(state, inputData.detail);
+    const path = writeReport(cardDir(state.card), state.card, report);
+    await notifyCard(review, state.card, report);
     return { ...inputData, stopped: true, finished: true, detail: `stop report at ${path}` };
   });
 

@@ -236,9 +236,9 @@ function buildCleanScript(evaluation, options = {}) {
 
   if (resetFlowStudio && options.allowStudioRestart !== false && evaluation.studioReachable !== false) {
     commands.push('systemctl --user stop julia-studio.service');
-    commands.push('rm -rf /home/ubuntu/julia-flow-repo/.artifacts/flow/studio');
+    commands.push('rm -f /home/ubuntu/julia-flow-repo/.artifacts/flow/studio/trace.duckdb /home/ubuntu/julia-flow-repo/.artifacts/flow/studio/trace.duckdb.wal');
     commands.push('systemctl --user start julia-studio.service');
-    commands.push('sleep 3');
+    commands.push('for _i in $(seq 1 30); do curl -sf http://127.0.0.1:4111/api/workflows/card-path/runs >/dev/null 2>&1 && break; sleep 1; done');
   }
 
   return commands.join('\n');

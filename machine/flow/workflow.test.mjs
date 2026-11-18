@@ -599,3 +599,72 @@ test('a memory model failure stops the card with a report naming the failure', a
   assert.match(report, /429 rate limit/);
   await mastra.shutdown();
 });
+
+test('starting a card with leftover GitHub work stops and posts the recorded outcome to the card', async () => {
+  const dirCase = mkdtempSync(join(tmpdir(), 'flow-leftover-'));
+  const repo = studioRepo(dirCase);
+  const origin = join(dirCase, 'origin.git');
+  git(dirCase, ['clone', '--bare', '--quiet', repo, origin]);
+  git(repo, ['remote', 'add', 'origin', origin]);
+  git(repo, ['branch', `card/${CARD}`]);
+  git(repo, ['push', '--quiet', 'origin', `card/${CARD}`]);
+  git(repo, ['branch', '-D', `card/${CARD}`]);
+  openScratch(dirCase);
+
+  const cardComments = [];
+  const { review } = fakeReview(['PASS']);
+  review.postCardComment = async (identifier, body) => { cardComments.push({ identifier, body }); };
+  const caseWorkflow = buildCardPath({
+    agents,
+    dir: dirCase,
+    repo,
+    review,
+    check: { run: async () => ({ ok: true }) },
+  });
+  const mastra = await openMastra({
+    card: CARD,
+    stateDb: join(dirCase, 'state.db'),
+    traceDb: join(dirCase, 'trace.duckdb'),
+    workflow: caseWorkflow,
+  });
+  const w = mastra.getWorkflow(caseWorkflow.id);
+  const run = await w.createRun();
+  const result = await run.start({ inputData: { card: CARD, kind: 'product' } });
+  assert.equal(result.status, 'success');
+  assert.equal(result.steps.attempt.output.stopped, true);
+  const report = readFileSync(join(dirCase, CARD, 'reports', `${CARD}.md`), 'utf8');
+  assert.match(report, /Part: Leftover work/);
+  assert.match(report, new RegExp(`card/${CARD} already exists on origin`));
+  assert.equal(cardComments.length, 1);
+  assert.equal(cardComments[0].identifier, CARD);
+  assert.match(cardComments[0].body, /Part: Leftover work/);
+  await mastra.shutdown();
+});
+
+test('a run that pauses at acceptance or stops posts its reason and wait state to the card', async () => {
+  const dirCase = mkdtempSync(join(tmpdir(), 'flow-notify-'));
+  const repo = studioRepo(dirCase);
+  openScratch(dirCase);
+  const cardComments = [];
+  const { shipping, review } = fakeReview(['PASS']);
+  review.postCardComment = async (identifier, body) => { cardComments.push({ identifier, body }); };
+  const caseWorkflow = buildCardPath({
+    agents: { ...agents, shipping },
+    dir: dirCase,
+    repo,
+    review,
+    check: { run: async () => ({ ok: true }) },
+  });
+  const mastra = await openMastra({
+    card: CARD,
+    stateDb: join(dirCase, 'state.db'),
+    traceDb: join(dirCase, 'trace.duckdb'),
+    workflow: caseWorkflow,
+  });
+  const w = mastra.getWorkflow(caseWorkflow.id);
+  const run = await w.createRun();
+  const suspended = await run.start({ inputData: { card: CARD, kind: 'product' } });
+  assert.equal(suspended.status, 'suspended');
+  assert.equal(cardComments.some(c => c.identifier === CARD && /paused at acceptance/i.test(c.body) && /waiting for Todd/i.test(c.body)), true);
+  await mastra.shutdown();
+});

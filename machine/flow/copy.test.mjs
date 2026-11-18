@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { closeCopy, copyFolder, copiesRoot, openCopy, startedFrom } from './copy.mjs';
+import { closeCopy, copyFolder, copiesRoot, findLeftoverWork, openCopy, startedFrom } from './copy.mjs';
 
 const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
@@ -56,4 +56,19 @@ test('a repository whose origin fetch fails throws instead of using a stale main
   git(repo, ['remote', 'add', 'origin', join(repo, 'missing-remote')]);
 
   assert.throws(() => startedFrom(repo), /Failed to fetch latest main from origin/);
+});
+
+test('a card with an existing remote branch is refused before creating a diverging worktree', t => {
+  const { dir, repo, env } = studio(t);
+  const origin = join(dir, 'origin.git');
+  git(dir, ['clone', '--bare', '--quiet', repo, origin]);
+  git(repo, ['remote', 'add', 'origin', origin]);
+  git(repo, ['branch', 'card/JUL-404']);
+  git(repo, ['push', '--quiet', 'origin', 'card/JUL-404']);
+  git(repo, ['branch', '-D', 'card/JUL-404']);
+
+  const reason = findLeftoverWork({ repo, card: 'JUL-404', findPr: () => ({ pr: 534 }), env });
+  assert.match(reason, /card\/JUL-404 already exists on origin/);
+  assert.match(reason, /open pull request #534/);
+  assert.throws(() => openCopy({ repo, card: 'JUL-404', env }), /Leftover work on GitHub for JUL-404/);
 });
