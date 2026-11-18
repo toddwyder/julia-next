@@ -1,6 +1,4 @@
 import { timingSafeEqual } from 'node:crypto';
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
 
 // Operator-controlled proof of a real caught application exception. Disabled
 // unless a temporary secret is configured; never put that secret in the URL.

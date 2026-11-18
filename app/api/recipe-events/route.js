@@ -4,9 +4,6 @@ import { getAuth } from 'firebase-admin/auth';
 import { FIREBASE_WEB_CONFIG } from '../../../lib/firebase-project.js';
 import { parseRecipeEvent, recordRecipeEvent } from '../../../lib/recipe-events.js';
 
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-
 // Only a browser signed in to Julia's Firebase project can report, and only
 // the fields parseRecipeEvent allows.
 export async function POST(request) {

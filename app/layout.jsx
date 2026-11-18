@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -27,7 +28,9 @@ export default function RootLayout({ children }) {
           <span className={styles.flourish} aria-hidden="true" />
         </header>
         <div className="vintage-column">
-          <SiteNav />
+          <Suspense fallback={null}>
+            <SiteNav />
+          </Suspense>
         </div>
         {children}
       </body>
