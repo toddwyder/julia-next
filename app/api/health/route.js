@@ -2,11 +2,9 @@
 //
 // The rest of this app is static, so on Vercel no Node server runtime would
 // ever start and `instrumentation.js`'s `register()` (and its boot telemetry)
-// would never run. This handler forces a Node runtime to boot in production.
-// It uses only the web-standard `Response`, so it stays testable and has no
-// dependency on Next.js internals.
-export const dynamic = 'force-dynamic';
-
-export async function GET() {
+// would never run. Reading request headers forces a dynamic Node runtime to
+// boot in production while keeping the handler testable with no Next.js imports.
+export async function GET(request) {
+  request?.headers?.get('x-health-probe');
   return Response.json({ status: 'ok', ...(process.env.VERCEL_GIT_COMMIT_SHA ? { commit: process.env.VERCEL_GIT_COMMIT_SHA } : {}) });
 }
