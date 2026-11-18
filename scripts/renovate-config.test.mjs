@@ -43,6 +43,12 @@ function assertRenovateConfig(config) {
   assert.ok(config.extends.includes('config:best-practices'), 'renovate.json must extend config:best-practices');
   assert.ok(config.extends.includes('schedule:weekly'), 'renovate.json must extend schedule:weekly');
 
+  assert.notEqual(config.automerge, true, 'renovate.json must not enable top-level automerge');
+  assert.equal(config.automergeType, 'pr', 'renovate.json must set automergeType to "pr"');
+  assert.equal(config.platformAutomerge, false, 'renovate.json must set platformAutomerge to false');
+  assert.equal(config.lockFileMaintenance?.enabled, true, 'renovate.json must enable lockFileMaintenance');
+  assert.equal(config.lockFileMaintenance?.automerge, true, 'renovate.json must enable lockFileMaintenance.automerge');
+
   assert.ok(Array.isArray(config.packageRules), 'renovate.json must define packageRules');
   const minorPatchIndex = config.packageRules.findIndex(
     (rule) =>
@@ -67,6 +73,29 @@ function assertRenovateConfig(config) {
     mastraRuleIndex > minorPatchIndex,
     'renovate.json must group @mastra/** packages as "mastra packages" after "minor and patch updates"',
   );
+
+  const lowRiskTypes = ['minor', 'patch', 'pin', 'digest'];
+  const hasLowRiskAutomerge = config.packageRules.some(
+    (rule) =>
+      rule.automerge === true &&
+      Array.isArray(rule.matchUpdateTypes) &&
+      lowRiskTypes.every((type) => rule.matchUpdateTypes.includes(type)),
+  );
+  assert.ok(
+    hasLowRiskAutomerge,
+    'renovate.json must automerge minor, patch, pin, and digest updates',
+  );
+
+  for (const rule of config.packageRules) {
+    if (rule.automerge === true) {
+      assert.ok(
+        Array.isArray(rule.matchUpdateTypes) &&
+          rule.matchUpdateTypes.length > 0 &&
+          !rule.matchUpdateTypes.includes('major'),
+        'renovate.json automerge rules must specify non-empty matchUpdateTypes without major',
+      );
+    }
+  }
 }
 
 test('every workflow Action reference is pinned to a full commit SHA with a version comment', () => {
@@ -158,5 +187,34 @@ test('planted violation: missing or misordered @mastra/** group fails assertReno
         packageRules: [mastraRule, minorPatchRule],
       }),
     /must group @mastra\/\*\* packages/,
+  );
+});
+
+test('planted violation: unsafe automerge config fails assertRenovateConfig', () => {
+  const base = JSON.parse(readFileSync(join(root, 'renovate.json'), 'utf8'));
+
+  assert.throws(
+    () =>
+      assertRenovateConfig({
+        ...base,
+        automerge: true,
+      }),
+    /must not enable top-level automerge/,
+  );
+  assert.throws(
+    () =>
+      assertRenovateConfig({
+        ...base,
+        packageRules: [...base.packageRules, { matchUpdateTypes: ['major'], automerge: true }],
+      }),
+    /non-empty matchUpdateTypes without major/,
+  );
+  assert.throws(
+    () =>
+      assertRenovateConfig({
+        ...base,
+        packageRules: [...base.packageRules, { matchPackageNames: ['lodash'], automerge: true }],
+      }),
+    /non-empty matchUpdateTypes without major/,
   );
 });
