@@ -8,6 +8,10 @@
     {
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "minor and patch updates"
+    },
+    {
+      "matchPackageNames": ["@mastra/**"],
+      "groupName": "mastra packages"
     }
   ]
 }
