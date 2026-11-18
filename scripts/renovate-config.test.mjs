@@ -44,7 +44,7 @@ function assertRenovateConfig(config) {
   assert.ok(config.extends.includes('schedule:weekly'), 'renovate.json must extend schedule:weekly');
 
   assert.ok(Array.isArray(config.packageRules), 'renovate.json must define packageRules');
-  const minorPatchRule = config.packageRules.find(
+  const minorPatchIndex = config.packageRules.findIndex(
     (rule) =>
       rule.groupName === 'minor and patch updates' &&
       Array.isArray(rule.matchUpdateTypes) &&
@@ -53,8 +53,19 @@ function assertRenovateConfig(config) {
       !rule.matchUpdateTypes.includes('major'),
   );
   assert.ok(
-    minorPatchRule,
+    minorPatchIndex !== -1,
     'renovate.json must group minor and patch updates as "minor and patch updates" without grouping majors',
+  );
+
+  const mastraRuleIndex = config.packageRules.findIndex(
+    (rule) =>
+      rule.groupName === 'mastra packages' &&
+      Array.isArray(rule.matchPackageNames) &&
+      rule.matchPackageNames.includes('@mastra/**'),
+  );
+  assert.ok(
+    mastraRuleIndex > minorPatchIndex,
+    'renovate.json must group @mastra/** packages as "mastra packages" after "minor and patch updates"',
   );
 }
 
@@ -124,5 +135,28 @@ test('planted violation: changed minor/patch grouping fails assertRenovateConfig
         packageRules: [{ matchUpdateTypes: ['minor', 'patch'], groupName: 'all updates' }],
       }),
     /must group minor and patch updates/,
+  );
+});
+
+test('planted violation: missing or misordered @mastra/** group fails assertRenovateConfig', () => {
+  const base = JSON.parse(readFileSync(join(root, 'renovate.json'), 'utf8'));
+  const minorPatchRule = { matchUpdateTypes: ['minor', 'patch'], groupName: 'minor and patch updates' };
+  const mastraRule = { matchPackageNames: ['@mastra/**'], groupName: 'mastra packages' };
+
+  assert.throws(
+    () =>
+      assertRenovateConfig({
+        ...base,
+        packageRules: [minorPatchRule],
+      }),
+    /must group @mastra\/\*\* packages/,
+  );
+  assert.throws(
+    () =>
+      assertRenovateConfig({
+        ...base,
+        packageRules: [mastraRule, minorPatchRule],
+      }),
+    /must group @mastra\/\*\* packages/,
   );
 });
