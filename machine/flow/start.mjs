@@ -16,7 +16,7 @@ import { CARD_PATH } from './schema.mjs';
 // whatever the exporter still holds.
 let opened = null;
 
-async function assemble({ dir, card, model, agents: injected, traceDb = join(dir, `trace-resume-${process.pid}.duckdb`) }) {
+async function assemble({ dir, card, model, agents: injected, traceDb = join(dir, 'trace.duckdb') }) {
   const { openScratch } = await import('./scratch.mjs');
   const { buildCardPath } = await import('./workflow.mjs');
   const { openMastra } = await import('./mastra.mjs');
@@ -63,10 +63,47 @@ async function cardOfRun(dir, runId) {
   }
 }
 
-async function waiting(wf, runId) {
-  const { createWorkflowStateReader } = await import('@mastra/core/workflows');
-  const state = await wf.getWorkflowRunById(runId);
+function studioBaseUrl(studioUrl) {
+  if (studioUrl === null || studioUrl === false || studioUrl === '') return null;
+  return String(studioUrl).replace(/\/+$/, '');
+}
+
+async function fetchStudioRun(studioUrl, runId) {
+  const base = studioBaseUrl(studioUrl);
+  if (!base) return null;
+  let response;
+  try {
+    response = await fetch(`${base}/api/workflows/${CARD_PATH}/runs/${encodeURIComponent(runId)}`);
+  } catch {
+    return null;
+  }
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`Studio returned ${response.status} reading workflow run ${runId}`);
+  }
+  return response.json();
+}
+
+async function resumeViaStudio(studioUrl, runId, { step, resumeData }) {
+  const base = studioBaseUrl(studioUrl);
+  const response = await fetch(
+    `${base}/api/workflows/${CARD_PATH}/resume-async?runId=${encodeURIComponent(runId)}`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ step, resumeData }),
+    },
+  );
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Studio returned ${response.status} resuming workflow run ${runId}: ${detail}`);
+  }
+  return response.json();
+}
+
+async function waitingFromState(state) {
   if (!state) return { status: 'unknown', card: '' };
+  const { createWorkflowStateReader } = await import('@mastra/core/workflows');
   const suspended = createWorkflowStateReader(state).getSuspendedStep();
   return {
     card: state.initialState?.card ?? '',
@@ -77,13 +114,45 @@ async function waiting(wf, runId) {
   };
 }
 
+async function waiting(wf, runId) {
+  return waitingFromState(await wf.getWorkflowRunById(runId));
+}
+
 export async function closeFlow() {
   const mastra = opened;
   opened = null;
   if (mastra) await mastra.shutdown();
 }
 
-export async function resumeCard({ dir, runId, request, answer, agents }) {
+export async function resumeCard({
+  dir,
+  runId,
+  request,
+  answer,
+  agents,
+  studioUrl = process.env.FLOW_STUDIO_URL ?? 'http://127.0.0.1:4111',
+}) {
+  const studioState = await fetchStudioRun(studioUrl, runId);
+  if (studioState) {
+    const open = await waitingFromState(studioState);
+    const card = open.card || (await cardOfRun(dir, runId));
+    const result = await resumeViaStudio(studioUrl, runId, {
+      step: open.step ?? undefined,
+      resumeData: { request: request ?? open.request, answer },
+    });
+    const after = result.status === 'suspended' ? await waitingFromState(await fetchStudioRun(studioUrl, runId)) : null;
+    return {
+      card,
+      runId,
+      status: result.status,
+      suspended: result.suspended ?? null,
+      request: after?.request ?? null,
+      step: after?.step ?? null,
+      result: result.result ?? null,
+      dir,
+    };
+  }
+
   const card = await cardOfRun(dir, runId);
   const { wf } = await assemble({ dir, card, agents });
   const open = await waiting(wf, runId);
@@ -107,7 +176,15 @@ export async function resumeCard({ dir, runId, request, answer, agents }) {
   };
 }
 
-export async function readState({ dir, runId, agents }) {
+export async function readState({
+  dir,
+  runId,
+  agents,
+  studioUrl = process.env.FLOW_STUDIO_URL ?? 'http://127.0.0.1:4111',
+}) {
+  const studioState = await fetchStudioRun(studioUrl, runId);
+  if (studioState) return waitingFromState(studioState);
+
   const card = await cardOfRun(dir, runId);
   const { wf } = await assemble({ dir, card, agents, traceDb: null });
   return waiting(wf, runId);
