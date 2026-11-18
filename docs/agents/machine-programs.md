@@ -26,7 +26,7 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/review.mjs` | The Shipping review: finds the card's pull request, names the commit it reviews, builds the reviewer's task, reads the verdict. | `1b3ac557ab1399b3fae8cc54e949835e8dee90151c42586fea88928fdfce9ea0` |
 | `machine/flow/cost-record.mjs` | Builds the per-card cost record from Mastra metrics and sends it to Axiom. | `2b8a1ad2bd83455f13b9cf6715c217d2434b2fc9072717dfd7f8b788569ca1f5` |
 | `machine/flow/mastra.mjs` | Storage, tracing and trace retention, so a run is written down and pruned. | `a891def59e00e4816d6981b18dd168922f5568c6e71dbae8554cbc0af9574a8b` |
-| `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `22af522d3c51490b59a5e4123e02281135470072284a6eaf119289d7452cab53` |
+| `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `8e210c21669d1b95e24eeaec504bcd42aeb00a0a5b5c05ac8f6561fd21dd172f` |
 | `machine/flow/run.mjs` | Answers a waiting card and reads a run. No way to start one. | `6aa66f1d72561054364ad8ffe90a19d5d3119ebcd8dd3539df3cbb57c14f4338` |
 | `machine/flow/report.mjs` | Builds the card report and tripwire stop helper. | `73092dd6925cba0014dc078e82be1d71686a9c35c1357cec9433f200bcf57499` |
 | `machine/flow/resources.mjs` | Checks memory and disk before and during every card and clears idle leftovers when short. | `4734373a90d3cafd03cfd2d2959d6345b3dba39feaa729da5e3417d3cf450e4a` |
