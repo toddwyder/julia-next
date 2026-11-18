@@ -143,14 +143,14 @@ test('a double click on Save stores one recipe', async ({ page }) => {
   expect(await storedRecipeCount()).toBe(1);
 });
 
-test('an empty search lists the newest recipe first', async ({ page }) => {
+test('an empty search lists recipes alphabetically', async ({ page }) => {
   await signIn(page, TODD);
   await save(page, A);
   await save(page, B);
 
   await page.goto('/recipes');
   await expect(rows(page)).toHaveCount(2);
-  expect(await rows(page).locator('a').allTextContents()).toEqual([B.title, A.title]);
+  expect(await rows(page).locator('a').allTextContents()).toEqual([A.title, B.title]);
   expect(await storedRecipeCount()).toBe(2);
 });
 
@@ -167,7 +167,7 @@ test('recipes kept in this browser move to the household library on sign-in and 
   expect((await moved).postDataJSON()).toEqual({ action: 'move', outcome: 'ok', count: 2 });
 
   await expect(rows(page)).toHaveCount(2);
-  expect(await rows(page).locator('a').allTextContents()).toEqual(['Shortbread', 'Pea Soup']);
+  expect(await rows(page).locator('a').allTextContents()).toEqual(['Pea Soup', 'Shortbread']);
   expect(await page.evaluate(key => window.localStorage.getItem(key), LIBRARY_KEY)).toBeNull();
   expect(await storedRecipeCount()).toBe(2);
 
