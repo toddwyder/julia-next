@@ -1,0 +1,42 @@
+/* The files here come from scripts/vendor-fonts.mjs, which pins the package and
+   version it copied each one out of. The family names are the real ones because
+   DESIGN-LANGUAGE.md and vintage.spec.mjs compare them against what the browser
+   renders. */
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('./fonts/playfair-display/playfair-display-latin-wght-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: italic;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('./fonts/playfair-display/playfair-display-latin-wght-italic.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/inter/inter-latin-wght-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Roboto Mono';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('./fonts/roboto-mono/roboto-mono-latin-wght-normal.woff2') format('woff2');
+}
+
+:root {
+  --font-serif: 'Playfair Display';
+  --font-sans: 'Inter';
+  --font-mono: 'Roboto Mono';
+}

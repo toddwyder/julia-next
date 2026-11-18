@@ -1,0 +1,15 @@
+/* The file here comes from scripts/vendor-fonts.mjs, which pins the package and
+   version it copied out of. The dashboard builds on its own, so its fonts live
+   under dashboard/ rather than in the recipe app's folder. */
+
+@font-face {
+  font-family: 'Public Sans';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/public-sans/public-sans-latin-wght-normal.woff2') format('woff2');
+}
+
+:root {
+  --font-public-sans: 'Public Sans';
+}
