@@ -16,7 +16,7 @@ import { CARD_PATH } from './schema.mjs';
 // whatever the exporter still holds.
 let opened = null;
 
-async function assemble({ dir, card, model, agents: injected }) {
+async function assemble({ dir, card, model, agents: injected, traceDb = join(dir, `trace-resume-${process.pid}.duckdb`) }) {
   const { openScratch } = await import('./scratch.mjs');
   const { buildCardPath } = await import('./workflow.mjs');
   const { openMastra } = await import('./mastra.mjs');
@@ -35,7 +35,7 @@ async function assemble({ dir, card, model, agents: injected }) {
     agents: injected ? undefined : agents,
     workflow,
     stateDb: join(dir, 'state.db'),
-    traceDb: join(dir, 'trace.duckdb'),
+    traceDb,
   });
   // A workflow carries a `.then` builder method, so returning it from an async
   // function makes the promise adopt it as a thenable and never settle. Hand it
@@ -107,8 +107,8 @@ export async function resumeCard({ dir, runId, request, answer, agents }) {
   };
 }
 
-export async function readState({ dir, runId }) {
+export async function readState({ dir, runId, agents }) {
   const card = await cardOfRun(dir, runId);
-  const { wf } = await assemble({ dir, card });
+  const { wf } = await assemble({ dir, card, agents, traceDb: null });
   return waiting(wf, runId);
 }
