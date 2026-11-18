@@ -35,3 +35,14 @@ export function reportText(state, detail) {
     'A second failure stops the card; the next step is an Investigation.',
   ].join('\n');
 }
+
+export const acceptanceWaitMessage = (card, request) =>
+  `${card} is paused at acceptance (${request}), waiting for Todd's yes/no answer in Mastra Studio.`;
+
+export async function notifyCard(review, card, body) {
+  if (!review?.postCardComment || !card || !body) return;
+  try {
+    await review.postCardComment(card, body);
+  } catch {
+  }
+}

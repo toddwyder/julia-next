@@ -70,11 +70,44 @@ function baseOf(repo, card) {
   }
 }
 
+export function findExistingRemoteBranch(repo, card) {
+  if (!hasOrigin(repo)) return null;
+  try {
+    const out = git(repo, ['ls-remote', '--heads', 'origin', branch(card)]);
+    if (!out) return null;
+    const sha = out.split(/\s+/)[0];
+    return { branch: branch(card), sha };
+  } catch {
+    return null;
+  }
+}
+
+export function findLeftoverWork({ repo, card, findPr, env = process.env }) {
+  if (existsSync(copyFolder(card, env))) return '';
+  const reasons = [];
+  const remote = findExistingRemoteBranch(repo, card);
+  if (remote) reasons.push(`branch ${remote.branch} already exists on origin at ${remote.sha.slice(0, 8)}`);
+  if (hasOrigin(repo) && findPr) {
+    try {
+      const found = findPr(repo, card);
+      if (found?.pr) reasons.push(`open pull request #${found.pr} already exists for ${card}`);
+      else if (/\d+ open pull requests name/i.test(found?.reason ?? '')) reasons.push(found.reason);
+    } catch {
+    }
+  }
+  if (reasons.length === 0) return '';
+  return `Leftover work on GitHub for ${card}: ${reasons.join('; ')}. Stopped before creating a diverging branch; decide whether to resume, merge, or close and delete the earlier work.`;
+}
+
 export function openCopy({ repo, card, env = process.env }) {
   const folder = copyFolder(card, env);
   if (existsSync(folder)) {
     const base = baseOf(repo, card);
     if (base) return { folder, base, fresh: false };
+  }
+  const remote = findExistingRemoteBranch(repo, card);
+  if (remote) {
+    throw new Error(`Leftover work on GitHub for ${card}: branch ${remote.branch} already exists on origin at ${remote.sha.slice(0, 8)}.`);
   }
   closeCopy({ repo, card, env });
 
