@@ -25,7 +25,7 @@ test('parsePlaybookSteps extracts numbered steps and indented continuations word
   const featureMd = readFileSync(resolve(repo, '.agents/skills/poteto-mode/playbooks/feature.md'), 'utf8');
   const steps = parsePlaybookSteps(featureMd);
   assert.equal(steps.length, 8);
-  assert.equal(steps[0], '`how` over the affected subsystem.');
+  assert.equal(steps[0], 'Trace the affected subsystem.');
   assert.match(steps[2], /^Write the throughput checkpoint as four todo items\./);
   assert.match(steps[2], /- \*\*Blocking first steps\.\*\* Gates run before fan-out\./);
   assert.equal(steps[7], 'Run **Opening a PR**.');
