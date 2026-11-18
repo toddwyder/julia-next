@@ -16,6 +16,9 @@ const APP_DIR = path.resolve(import.meta.dirname, '..', 'app');
 const DYNAMIC_MARKERS = [
   /export\s+const\s+dynamic\s*=\s*['"]force-dynamic['"]/,
   /export\s+const\s+revalidate\s*=\s*0\b/,
+  /request\??\.headers\b/,
+  /\bconnection\s*\(/,
+  /export\s+async\s+function\s+POST\b/,
 ];
 
 function walk(dir) {
