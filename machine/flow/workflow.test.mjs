@@ -668,3 +668,33 @@ test('a run that pauses at acceptance or stops posts its reason and wait state t
   assert.equal(cardComments.some(c => c.identifier === CARD && /paused at acceptance/i.test(c.body) && /waiting for Todd/i.test(c.body)), true);
   await mastra.shutdown();
 });
+
+test('a failed card post leaves a record under reports/<card>-post-failures.log', async () => {
+  const dirCase = mkdtempSync(join(tmpdir(), 'flow-post-fail-'));
+  const repo = studioRepo(dirCase);
+  openScratch(dirCase);
+  const { shipping, review } = fakeReview(['PASS']);
+  review.postCardComment = async () => { throw new Error('Linear API unreachable'); };
+  const caseWorkflow = buildCardPath({
+    agents: { ...agents, shipping },
+    dir: dirCase,
+    repo,
+    review,
+    check: { run: async () => ({ ok: true }) },
+  });
+  const mastra = await openMastra({
+    card: CARD,
+    stateDb: join(dirCase, 'state.db'),
+    traceDb: join(dirCase, 'trace.duckdb'),
+    workflow: caseWorkflow,
+  });
+  const w = mastra.getWorkflow(caseWorkflow.id);
+  const run = await w.createRun();
+  const suspended = await run.start({ inputData: { card: CARD, kind: 'product' } });
+  assert.equal(suspended.status, 'suspended');
+  const failureLog = join(dirCase, CARD, 'reports', `${CARD}-post-failures.log`);
+  assert.equal(existsSync(failureLog), true);
+  assert.match(readFileSync(failureLog, 'utf8'), /Linear API unreachable/);
+  await mastra.shutdown();
+  try { rmSync(dirCase, { recursive: true, force: true }); } catch {}
+});

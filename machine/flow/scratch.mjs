@@ -67,6 +67,14 @@ export function writeReport(dir, card, text) {
   return path;
 }
 
+export function writePostFailure(dir, card, message) {
+  const path = join(dir, 'reports', `${card}-post-failures.log`);
+  mkdirSync(join(dir, 'reports'), { recursive: true });
+  const previous = existsSync(path) ? readFileSync(path, 'utf8') : '';
+  writeFileSync(path, `${previous}${new Date().toISOString()} ${message}\n`);
+  return path;
+}
+
 // The verdict is a fixed rule, not a model's opinion. A run is handed a queue
 // of answers in verdicts.json, so a test and a proof can make Shipping pass or
 // fail on purpose without asking the free model to be unreliable on cue.
