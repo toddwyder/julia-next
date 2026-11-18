@@ -4,6 +4,10 @@
     "config:best-practices",
     "schedule:weekly"
   ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    ".agents/skills/**"
+  ],
   "automergeType": "pr",
   "platformAutomerge": false,
   "lockFileMaintenance": {
