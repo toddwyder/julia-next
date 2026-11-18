@@ -4,6 +4,12 @@
     "config:best-practices",
     "schedule:weekly"
   ],
+  "automergeType": "pr",
+  "platformAutomerge": false,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
   "packageRules": [
     {
       "matchUpdateTypes": ["minor", "patch"],
@@ -12,6 +18,14 @@
     {
       "matchPackageNames": ["@mastra/**"],
       "groupName": "mastra packages"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "automerge": false
     }
   ]
 }
