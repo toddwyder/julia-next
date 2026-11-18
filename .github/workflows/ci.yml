@@ -83,6 +83,8 @@ jobs:
         run: node scripts/check-agent-links.mjs
       - name: Check the machine program list is up to date
         run: node scripts/machine-programs.mjs --check
+      - name: Check every font is read from a file in this repository
+        run: node scripts/check-font-sources.mjs --all
       - name: Check every branch has an open pull request
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -109,6 +111,8 @@ jobs:
         run: node scripts/test-owners.mjs --plan
       - name: Install each local owner's locked dependencies
         run: node scripts/test-owners.mjs --install local
+      - name: Block the font hosts
+        run: sudo node scripts/block-font-hosts.mjs
       - name: Run local owners' tests
         run: node scripts/test-owners.mjs --run local
 
@@ -150,6 +154,8 @@ jobs:
           cache-dependency-path: package-lock.json
       - name: Install the application's locked dependencies
         run: npm ci
+      - name: Block the font hosts
+        run: sudo node scripts/block-font-hosts.mjs
       - name: Guard the workflow folder
         run: npm run guard:flow
       - name: Guard the Julia and machine boundary
