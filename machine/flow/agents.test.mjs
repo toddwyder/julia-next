@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import test from 'node:test';
+import { RequestContext } from '@mastra/core/request-context';
 
 import { createAgents, repoRoot } from './agents.mjs';
 import { helperKey, readRoleModels } from './role-models.mjs';
@@ -190,7 +191,8 @@ test('the build and its helpers work in the card copy the run names', async t =>
   const roleModelsFile = completeRoleFile(join(dir, 'lead-role-models.md'));
   const cardCopy = join(dir, 'cards', 'JUL-400');
   mkdirSync(cardCopy, { recursive: true });
-  const requestContext = new Map([['cardCheckout', cardCopy]]);
+  const requestContext = new RequestContext();
+  requestContext.set('cardCheckout', cardCopy);
   const agents = createAgents({ repo, leadModelFile, roleModelsFile, model: 'openai/gpt-6.1-sol' });
 
   const lead = (await agents.build.getWorkspace({ requestContext })).getPathContext();
