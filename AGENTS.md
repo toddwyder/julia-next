@@ -52,6 +52,8 @@ After a slice merges, run the retro skill on that slice's session and put its fi
 | Every branch except `main` has an open pull request to `main`. | `node scripts/check-branch-pr.mjs` audits GitHub branches and open pull requests in CI. |
 | The machine program list names every program that begins a card or carries a stage, and stays current. | `node scripts/machine-programs.mjs --check` fails when a listed program's file changed, when a listed program is gone, or when `machine/flow` holds a program the list never names. CI runs it in the hygiene job, and the failure names the program and the `--write` command. |
 | The workflow folder keeps the stock shape: no old stage, no library outside the allowed set, no piece the entry cannot reach, no timer or retry loop, no hand-built progress file, no comment that switches a guard off. | `npm run guard:flow` runs ESLint and dependency-cruiser on `machine/flow` as the one CI guard check. `machine/guards/guard.test.mjs` plants one violation per kind and fails if a rule stops catching it. |
+| Renovate configuration is valid and strict-checked. | `npx --yes --package renovate@44.251.0 -- renovate-config-validator --strict` runs in the `repository-hygiene` CI job. |
+| Every workflow `uses:` reference is pinned to a full commit SHA, no workflow sets a literal `node-version`, and `renovate.json` preserves minor/patch grouping. | `scripts/renovate-config.test.mjs` runs with the local package tests and plants one violation per rule to prove each check catches it. |
 
 <!-- BEGIN:nextjs-agent-rules -->
 
