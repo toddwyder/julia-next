@@ -26,8 +26,8 @@
   },
   "dependencies": {
     "@sentry/node": "^10.75.0",
-    "firebase": "13.1.0",
-    "firebase-admin": "14.5.0",
+    "firebase": "13.3.0",
+    "firebase-admin": "14.5.1",
     "next": "^16.4.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
@@ -42,12 +42,12 @@
     "@mastra/libsql": "1.29.0",
     "@mastra/mcp": "2.8.0",
     "@mastra/observability": "1.23.1",
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.65.1",
     "@stryker-mutator/core": "10.1.1",
     "@stryker-mutator/tap-runner": "10.1.1",
     "dependency-cruiser": "18.7.2",
-    "eslint": "10.11.0",
-    "firebase-tools": "15.34.1",
+    "eslint": "10.15.0",
+    "firebase-tools": "15.36.0",
     "zod": "4.6.7"
   }
 }
