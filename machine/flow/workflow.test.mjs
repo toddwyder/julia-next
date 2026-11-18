@@ -303,19 +303,56 @@ test("a card builds in a fresh copy named after it, and the copy goes when the c
 
 test('two cards started together each work in their own copy and leave the Studio folder alone', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'flow-two-'));
+  process.env.FLOW_SCRATCH = join(dir, 'scratch');
   const repo = studioRepo(dir);
+  openScratch(dir);
   const before = contents(repo);
   const log = [];
+  const cards = ['JUL-100-ONE', 'JUL-101-TWO'];
+  for (const card of cards) {
+    const caseDir = join(dir, card);
+    mkdirSync(caseDir, { recursive: true });
+    writeFileSync(join(caseDir, 'verdicts.json'), JSON.stringify({ smoke: ['PASS'] }));
+    writeFileSync(join(caseDir, 'cursors.json'), '{}');
+  }
 
-  const [one, two] = await Promise.all([
-    openCase({ card: 'JUL-100-ONE', dir, repo, build: buildInCopy(log, 'one.txt') }),
-    openCase({ card: 'JUL-101-TWO', dir, repo, build: buildInCopy(log, 'two.txt') }),
-  ]);
+  const fake = fakeReview(['PASS', 'PASS']);
+  const workflow = buildCardPath({
+    agents: { ...agents, build: buildInCopy(log, 'card-note.txt'), shipping: fake.shipping },
+    dir,
+    repo,
+    review: fake.review,
+    check: { run: async () => ({ ok: true }) },
+  });
+  const mastra = await openMastra({
+    card: '',
+    stateDb: join(dir, 'state.db'),
+    traceDb: join(dir, 'trace.duckdb'),
+    workflow,
+  });
+  const wf = mastra.getWorkflow(workflow.id);
+
+  async function drive(card) {
+    const run = await wf.createRun();
+    let result = await run.start({ inputData: { card, kind: 'product' } });
+    while (result.status === 'suspended') {
+      const state = await wf.getWorkflowRunById(run.runId);
+      const open = createWorkflowStateReader(state).getSuspendedStep();
+      result = await run.resume({
+        step: open.stepId,
+        resumeData: { request: open.suspendPayload.request, answer: 'yes' },
+      });
+    }
+    return result;
+  }
+
+  const [one, two] = await Promise.all(cards.map(drive));
+  await mastra.shutdown();
 
   const folders = [...new Set(log.map(entry => entry.folder))].sort();
   assert.deepEqual(folders, [join(copiesRoot(), 'JUL-100-ONE'), join(copiesRoot(), 'JUL-101-TWO')].sort());
-  assert.equal(one.result.status, 'success');
-  assert.equal(two.result.status, 'success');
+  assert.equal(one.status, 'success');
+  assert.equal(two.status, 'success');
   assert.deepEqual(contents(repo), before, 'the Studio folder is exactly as it was');
   assert.equal(git(repo, ['status', '--porcelain']), '', 'the Studio repository has no stray work in it');
   assert.equal(git(repo, ['worktree', 'list']).trim().split('\n').length, 1, 'only the Studio folder is left as a worktree');
