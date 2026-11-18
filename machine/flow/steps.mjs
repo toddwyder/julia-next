@@ -287,7 +287,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
       const open = suspendData?.request ?? state.requestId;
 
       if (!resumeData || resumeData.request !== open) {
-        await notifyCard(review, state.card, acceptanceWaitMessage(state.card, open));
+        await notifyCard(review, state.card, acceptanceWaitMessage(state.card, open), cardDir(state.card));
         return await suspend({ request: open });
       }
 
@@ -346,7 +346,7 @@ export function createStages({ agents, dir, repo, review = realReview, check = r
     await finishCard({ mastra, card: state.card, status: 'stopped' });
     const report = reportText(state, inputData.detail);
     const path = writeReport(cardDir(state.card), state.card, report);
-    await notifyCard(review, state.card, report);
+    await notifyCard(review, state.card, report, cardDir(state.card));
     return { ...inputData, stopped: true, finished: true, detail: `stop report at ${path}` };
   });
 

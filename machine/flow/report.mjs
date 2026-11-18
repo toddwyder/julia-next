@@ -1,4 +1,6 @@
 // The words a stop leaves behind are the same wherever the card stops.
+import { writePostFailure } from './scratch.mjs';
+
 export function tripwireStop({ reason, processorId, metadata } = {}) {
   const id = metadata?.processorId ?? processorId ?? '';
   if (id === 'token-cost-control') {
@@ -39,10 +41,13 @@ export function reportText(state, detail) {
 export const acceptanceWaitMessage = (card, request) =>
   `${card} is paused at acceptance (${request}), waiting for Todd's yes/no answer in Mastra Studio.`;
 
-export async function notifyCard(review, card, body) {
+export async function notifyCard(review, card, body, cardDir) {
   if (!review?.postCardComment || !card || !body) return;
   try {
     await review.postCardComment(card, body);
-  } catch {
+  } catch (error) {
+    if (!cardDir) return;
+    const message = error instanceof Error ? error.message : String(error);
+    writePostFailure(cardDir, card, message);
   }
 }
