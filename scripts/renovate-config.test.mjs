@@ -43,6 +43,16 @@ function assertRenovateConfig(config) {
   assert.ok(config.extends.includes('config:best-practices'), 'renovate.json must extend config:best-practices');
   assert.ok(config.extends.includes('schedule:weekly'), 'renovate.json must extend schedule:weekly');
 
+  assert.ok(Array.isArray(config.ignorePaths), 'renovate.json must define ignorePaths');
+  assert.ok(
+    config.ignorePaths.includes('**/node_modules/**'),
+    'renovate.json must ignore **/node_modules/**',
+  );
+  assert.ok(
+    config.ignorePaths.includes('.agents/skills/**'),
+    'renovate.json must ignore .agents/skills/**',
+  );
+
   assert.notEqual(config.automerge, true, 'renovate.json must not enable top-level automerge');
   assert.equal(config.automergeType, 'pr', 'renovate.json must set automergeType to "pr"');
   assert.equal(config.platformAutomerge, false, 'renovate.json must set platformAutomerge to false');
@@ -216,5 +226,31 @@ test('planted violation: unsafe automerge config fails assertRenovateConfig', ()
         packageRules: [...base.packageRules, { matchPackageNames: ['lodash'], automerge: true }],
       }),
     /non-empty matchUpdateTypes without major/,
+  );
+});
+
+test('planted violation: missing or incomplete ignorePaths fails assertRenovateConfig', () => {
+  const base = JSON.parse(readFileSync(join(root, 'renovate.json'), 'utf8'));
+  const { ignorePaths: _ignorePaths, ...withoutIgnorePaths } = base;
+
+  assert.throws(
+    () => assertRenovateConfig(withoutIgnorePaths),
+    /must define ignorePaths/,
+  );
+  assert.throws(
+    () =>
+      assertRenovateConfig({
+        ...base,
+        ignorePaths: ['**/node_modules/**'],
+      }),
+    /must ignore \.agents\/skills\/\*\*/,
+  );
+  assert.throws(
+    () =>
+      assertRenovateConfig({
+        ...base,
+        ignorePaths: ['.agents/skills/**'],
+      }),
+    /must ignore \*\*\/node_modules\/\*\*/,
   );
 });
