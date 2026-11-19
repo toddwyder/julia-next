@@ -178,16 +178,15 @@ The page that created the App was a one-off script, never a service. It ran on 1
 
 ## Update notifications
 
-`scripts/update-report.mjs` posts Julia update alerts to the ntfy topic configured in `/home/ubuntu/.config/julia-runner/ntfy.json` (`server` is `https://ntfy.sh`, `topic` is `julia-updates-079acbee353d302aceebdebd`).
+`scripts/update-report.mjs` posts Julia update alerts to the ntfy topic named in `/home/ubuntu/.config/julia-runner/ntfy.json`. On ntfy.sh the topic name works as a password: anyone who knows it can read the alerts and post to it. It stays in that file and is never written in the repository.
 
-Join the topic on any new device with one of these links:
+Join the topic on a new device by reading the name from that file on the server, then:
 
-- Desktop Chrome: open `https://ntfy.sh/julia-updates-079acbee353d302aceebdebd` and allow notifications when the browser prompts you.
-- Android: install the ntfy app and tap `ntfy://ntfy.sh/julia-updates-079acbee353d302aceebdebd` to subscribe in one tap.
+- Desktop Chrome: open `https://ntfy.sh/<topic>` and allow notifications when the browser prompts you.
+- Android: install the ntfy app and subscribe to `<topic>` on `ntfy.sh`.
 
-To verify delivery after subscribing, post a test message to the topic endpoint:
+To verify delivery after subscribing, post a test message from the server:
 
 ```sh
-curl -H "Title: Julia update test" -d "Test notification from Julia." https://ntfy.sh/julia-updates-079acbee353d302aceebdebd
+curl -H "Title: Julia update test" -d "Test notification from Julia." "$(jq -r '.server + "/" + .topic' /home/ubuntu/.config/julia-runner/ntfy.json)"
 ```
-
