@@ -77,11 +77,12 @@ function assertRenovateConfig(config) {
     (rule) =>
       rule.groupName === 'mastra packages' &&
       Array.isArray(rule.matchPackageNames) &&
+      rule.matchPackageNames.includes('mastra') &&
       rule.matchPackageNames.includes('@mastra/**'),
   );
   assert.ok(
     mastraRuleIndex > minorPatchIndex,
-    'renovate.json must group @mastra/** packages as "mastra packages" after "minor and patch updates"',
+    'renovate.json must group mastra and @mastra/** packages as "mastra packages" after "minor and patch updates"',
   );
 
   const lowRiskTypes = ['minor', 'patch', 'pin', 'digest'];
@@ -177,10 +178,10 @@ test('planted violation: changed minor/patch grouping fails assertRenovateConfig
   );
 });
 
-test('planted violation: missing or misordered @mastra/** group fails assertRenovateConfig', () => {
+test('planted violation: missing or misordered mastra packages group fails assertRenovateConfig', () => {
   const base = JSON.parse(readFileSync(join(root, 'renovate.json'), 'utf8'));
   const minorPatchRule = { matchUpdateTypes: ['minor', 'patch'], groupName: 'minor and patch updates' };
-  const mastraRule = { matchPackageNames: ['@mastra/**'], groupName: 'mastra packages' };
+  const mastraRule = { matchPackageNames: ['mastra', '@mastra/**'], groupName: 'mastra packages' };
 
   assert.throws(
     () =>
@@ -188,7 +189,15 @@ test('planted violation: missing or misordered @mastra/** group fails assertReno
         ...base,
         packageRules: [minorPatchRule],
       }),
-    /must group @mastra\/\*\* packages/,
+    /must group mastra and @mastra\/\*\* packages/,
+  );
+  assert.throws(
+    () =>
+      assertRenovateConfig({
+        ...base,
+        packageRules: [minorPatchRule, { matchPackageNames: ['@mastra/**'], groupName: 'mastra packages' }],
+      }),
+    /must group mastra and @mastra\/\*\* packages/,
   );
   assert.throws(
     () =>
@@ -196,7 +205,7 @@ test('planted violation: missing or misordered @mastra/** group fails assertReno
         ...base,
         packageRules: [mastraRule, minorPatchRule],
       }),
-    /must group @mastra\/\*\* packages/,
+    /must group mastra and @mastra\/\*\* packages/,
   );
 });
 
