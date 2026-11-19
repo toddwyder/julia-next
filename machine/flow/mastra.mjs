@@ -31,6 +31,9 @@ export async function openMastra({
   traceDb,
   traceMaxAge = process.env.FLOW_TRACE_MAX_AGE || DEFAULT_TRACE_MAX_AGE,
 }) {
+  if (workflow?.options?.autoRestartActiveRuns !== false) {
+    throw new Error(`Workflow ${workflow?.id ?? '(unknown)'} must set options.autoRestartActiveRuns to false.`);
+  }
   const obs = traceDb ? await new DuckDBStore({ path: traceDb }).getStore('observability') : null;
   const storage = new MastraCompositeStore({
     id: 'flow-storage',

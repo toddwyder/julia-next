@@ -150,7 +150,12 @@ export async function runShipping({ pr, sha, checkout, card, cardRecord = null, 
     },
   });
 
-  const workflow = createWorkflow({ id: WORKFLOW_ID, inputSchema, outputSchema: reviewSchema })
+  const workflow = createWorkflow({
+    id: WORKFLOW_ID,
+    inputSchema,
+    outputSchema: reviewSchema,
+    options: { autoRestartActiveRuns: false },
+  })
     .then(gather)
     .then(review)
     .commit();

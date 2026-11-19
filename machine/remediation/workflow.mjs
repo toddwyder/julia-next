@@ -302,6 +302,7 @@ export async function createRemediationWorkflow({ mastra, deps, log = console.lo
     id: WORKFLOW_ID,
     inputSchema: startSchema,
     outputSchema: recordSchema,
+    options: { autoRestartActiveRuns: false },
   })
     .then(gather)
     .then(reviewStep(1))

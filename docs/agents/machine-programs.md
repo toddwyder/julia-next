@@ -10,7 +10,7 @@ of any size, not only a change to the sentence beside it.
 | Program | What it does | sha256 |
 | --- | --- | --- |
 | `src/mastra/index.ts` | The Studio entry. Registers the card workflow so the run form can start a card. | `a2e9289b94a8564182de663f40cbfd206f5e723a66e8d82fdd189fcb00f6e48f` |
-| `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `4b84d5954971a9cf744865a43b193ae752c9c77e6e303b55a918c09f607c0c9d` |
+| `machine/flow/workflow.mjs` | The order of the stages, the loops and the one place a card waits. | `7f9fe940fb0c2d05309b3611e94501e35e601bf093993cd366361ab203711029` |
 | `machine/flow/steps.mjs` | What each stage does, including the build being a real agent step. | `2f6d23414d09beec99abdeb6e24d469a31744ee0745a4a03b245392460dc57e7` |
 | `machine/flow/check.mjs` | The post-build check: verifies Lead task list in Mastra state before Shipping. | `698b9481a66e2d533c5c9603d9fec6b8797030efebb410d95519c80cb0754cf8` |
 | `machine/flow/task.mjs` | The task the Lead is given, taken word for word from the card. | `21aca1ef4c2b964d729b93317061b1a23f0e38773b26e8aa1c9f951581fa62e7` |
@@ -25,7 +25,7 @@ of any size, not only a change to the sentence beside it.
 | `machine/flow/copy.mjs` | The fresh copy of the repository each card builds in, and its removal when the card ends. | `dcb5d7b4c3d14e70cb4a6a3799860faacc356ef57c16db3fd68fcba45808ec65` |
 | `machine/flow/review.mjs` | The Shipping review: finds the card's pull request, names the commit it reviews, builds the reviewer's task, reads the verdict. | `1b3ac557ab1399b3fae8cc54e949835e8dee90151c42586fea88928fdfce9ea0` |
 | `machine/flow/cost-record.mjs` | Builds the per-card cost record from Mastra metrics and sends it to Axiom. | `2b8a1ad2bd83455f13b9cf6715c217d2434b2fc9072717dfd7f8b788569ca1f5` |
-| `machine/flow/mastra.mjs` | Storage, tracing and trace retention, so a run is written down and pruned. | `a891def59e00e4816d6981b18dd168922f5568c6e71dbae8554cbc0af9574a8b` |
+| `machine/flow/mastra.mjs` | Storage, tracing and trace retention, so a run is written down and pruned. | `37ccc5a9f54f89a762746a6234e45a49232bad510c9ff66e5d228fe3bd4a3f74` |
 | `machine/flow/start.mjs` | Assembles a run to read it back and to resume a card. | `8e210c21669d1b95e24eeaec504bcd42aeb00a0a5b5c05ac8f6561fd21dd172f` |
 | `machine/flow/run.mjs` | Answers a waiting card and reads a run. No way to start one. | `6aa66f1d72561054364ad8ffe90a19d5d3119ebcd8dd3539df3cbb57c14f4338` |
 | `machine/flow/report.mjs` | Builds the card report and tripwire stop helper. | `73092dd6925cba0014dc078e82be1d71686a9c35c1357cec9433f200bcf57499` |
