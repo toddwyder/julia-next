@@ -1,5 +1,4 @@
 # Domain Docs
 
-Single-context repository. The culinary domain model is `GLOSSARY.md` at the repo root; decisions
-are in `docs/adr/`. Read the ADRs that touch an area before working it. Delivery route:
+Single-context repository. The culinary domain model is `GLOSSARY.md` at the repo root; decisions live in code, checks, and history (git, pull requests, and Linear). Delivery route:
 `docs/agents/work-execution.md`.

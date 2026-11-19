@@ -1,6 +1,5 @@
 // Requires an open pull request to main for every branch. CI asks it, where the branch and the
-// checkout are the same thing. (The scorecard check that lived here was removed on 7 Nov 2026;
-// see docs/adr/0024-run-scorecard-and-stop-ping.md.)
+// checkout are the same thing. (The scorecard check that lived here was removed on 7 Nov 2026.)
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

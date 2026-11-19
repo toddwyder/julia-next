@@ -211,7 +211,7 @@ What Proof produces, showing that every acceptance criterion was met. No Evidenc
 _Avoid_: Demo, proof of work, "it works"
 
 **Adversarial review**:
-A review by a different model maker than the builder's that tries to break the work rather
+A review by an agent other than the builder, whichever company made either agent, that tries to break the work rather
 than confirm it, giving a verdict on every acceptance criterion or naming the evidence that is
 missing.
 _Avoid_: Second opinion, sign-off, approval
