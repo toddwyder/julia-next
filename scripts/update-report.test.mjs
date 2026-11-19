@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,12 +8,15 @@ import {
   NTFY_MAX_BYTES,
   formatNtfyMessage,
   formatReportMarkdown,
+  generateUpdateReport,
   hasExistingReport,
   isUpdatePr,
   parsePackageUpdatesFromDiff,
+  processPullRequest,
   readState,
   reportLinkTarget,
   reportMarker,
+  sendNtfyNotification,
   shouldNotify,
   truncateUtf8Bytes,
   validateReport,
@@ -137,6 +140,98 @@ test('writeStateAtomic and readState round-trip state cleanly', () => {
     writeStateAtomic({ reports: { 'pr=564 commit=abc': { commentedAt: '2026-11-19T00:00:00Z' } } }, file);
     const loaded = readState(file);
     assert.equal(loaded.reports['pr=564 commit=abc'].commentedAt, '2026-11-19T00:00:00Z');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('every candidate model failing sends one high-priority ntfy notification across repeated runs', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'update-report-fail-'));
+  try {
+    const statePath = join(dir, 'update-reports.json');
+    const configDir = join(dir, 'config');
+    mkdirSync(configDir);
+    writeFileSync(join(configDir, 'ntfy.json'), JSON.stringify({ server: 'https://ntfy.example', topic: 'julia-test' }));
+
+    const pr = {
+      number: 570,
+      title: 'chore(deps): update dependency eslint to v10.16.0',
+      html_url: 'https://github.com/toddwyder/julia-next/pull/570',
+      state: 'closed',
+      merged_at: '2026-11-19T06:00:00Z',
+      merge_commit_sha: 'deadbeef1234',
+      head: { sha: 'head1234', ref: 'renovate/eslint' },
+      user: { login: 'renovate[bot]' },
+      body: 'Updates eslint.',
+    };
+
+    const ntfyPosts = [];
+    const fetchImpl = async (url, init = {}) => {
+      const target = String(url);
+      if (target.startsWith('https://ntfy.example/')) {
+        ntfyPosts.push({ url: target, headers: init.headers, body: init.body });
+        return { ok: true, status: 200, text: async () => 'ok' };
+      }
+      if (target.includes('/issues/570/comments')) {
+        return { ok: true, status: 200, text: async () => '[]' };
+      }
+      if (target.includes('/check-runs')) {
+        return { ok: true, status: 200, text: async () => JSON.stringify({ check_runs: [] }) };
+      }
+      if (target.includes('/pulls/570/files')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify([{
+            filename: 'package.json',
+            patch: '@@ -1,3 +1,3 @@\n-    "eslint": "10.15.0",\n+    "eslint": "10.16.0",',
+          }]),
+        };
+      }
+      if (target.includes('registry.npmjs.org')) {
+        return { ok: false, status: 404 };
+      }
+      throw new Error(`Unexpected fetch URL in test: ${target}`);
+    };
+
+    const failingGenerate = input => generateUpdateReport({
+      ...input,
+      modelCandidates: ['commandcode/model-a', 'commandcode/model-b'],
+      modelCaller: async ({ modelId }) => {
+        throw new Error(`CommandCode ${modelId} failed (429): Rate limit exceeded`);
+      },
+    });
+
+    const first = await processPullRequest(pr, {
+      token: 'test-token',
+      state: readState(statePath),
+      statePath,
+      configDir,
+      fetchImpl,
+      generateImpl: failingGenerate,
+      notifyImpl: opts => sendNtfyNotification({ ...opts, fetchImpl }),
+    });
+
+    const second = await processPullRequest(pr, {
+      token: 'test-token',
+      state: readState(statePath),
+      statePath,
+      configDir,
+      fetchImpl,
+      generateImpl: failingGenerate,
+      notifyImpl: opts => sendNtfyNotification({ ...opts, fetchImpl }),
+    });
+
+    assert.equal(first.reportGenerationFailed, true);
+    assert.equal(first.notified, true);
+    assert.equal(second.reportGenerationFailed, true);
+    assert.equal(second.notified, false);
+    assert.equal(ntfyPosts.length, 1);
+    assert.equal(ntfyPosts[0].headers.Priority, 'high');
+    assert.equal(ntfyPosts[0].headers.Click, pr.html_url);
+    assert.match(ntfyPosts[0].body, /eslint 10\.15\.0->10\.16\.0/);
+    assert.match(ntfyPosts[0].body, /rate limit/i);
+    assert.match(ntfyPosts[0].body, /https:\/\/github\.com\/toddwyder\/julia-next\/pull\/570/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

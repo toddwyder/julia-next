@@ -163,7 +163,7 @@ export function formatReportMarkdown({ report, prNumber, commitSha, modelId, rel
   return lines.join('\n');
 }
 
-export function formatNtfyMessage({ prNumber, prTitle, report }) {
+export function formatNtfyMessage({ prNumber, prTitle, report, linkUrl = null }) {
   const reasons = [];
   if (report.failed) reasons.push('failed');
   if (report.hasNewFeatures) reasons.push('new features');
@@ -181,6 +181,9 @@ export function formatNtfyMessage({ prNumber, prTitle, report }) {
   parts.push(`Outcome: ${report.outcome}`);
   if (report.needsToddDecision || report.failed) {
     parts.push(`Todd action: ${report.toddAction}`);
+  }
+  if (linkUrl) {
+    parts.push(`Pull request: ${linkUrl}`);
   }
   return {
     title,
@@ -348,6 +351,35 @@ async function callCommandCodeModel({ modelId, instructions, prompt, fetchImpl =
   return String(data?.choices?.[0]?.message?.content ?? '').trim();
 }
 
+export function describeReportFailureCause(error) {
+  const raw = String(error?.message ?? error ?? '').trim();
+  if (/missing|api[_ ]?key/i.test(raw)) return 'the report service key is missing';
+  if (/429|rate limit|quota/i.test(raw)) return 'every report model hit a rate limit';
+  if (/401|403|unauthorized|forbidden/i.test(raw)) return 'the report service rejected the login key';
+  if (/timeout|timed out|abort/i.test(raw)) return 'every report model timed out before replying';
+  if (/\b5\d\d\b|unavailable|bad gateway|gateway/i.test(raw)) return 'the report service is temporarily unavailable';
+  if (/json/i.test(raw)) return 'every report model returned an unreadable reply';
+  if (!raw) return 'every candidate model failed without details';
+  return raw.replace(/\s+/g, ' ').slice(0, 180);
+}
+
+export function buildFailureReport({ pr, updates = [], error }) {
+  const cause = describeReportFailureCause(error);
+  const updateName = updates.length > 0
+    ? updates.map(u => `${u.name} (${u.from} -> ${u.to})`).join(', ')
+    : pr?.title ?? `PR #${pr?.number ?? 'unknown'}`;
+  return validateReport({
+    updated: updates,
+    newFeatures: [],
+    fixes: [],
+    outcome: `Could not write the update report for ${updateName} because ${cause}.`,
+    toddAction: `Open pull request #${pr?.number ?? ''} to review the update directly.`,
+    needsToddDecision: false,
+    hasNewFeatures: false,
+    failed: true,
+  }, { prFailed: true });
+}
+
 export async function generateUpdateReport({ pr, updates, releaseNotes, ciSummary, modelCandidates = pickReportModelCandidates(), modelCaller = callCommandCodeModel }) {
   const instructions = [
     'You write plain-English software update reports for Todd, a non-developer homeowner using Julia.',
@@ -425,7 +457,7 @@ export async function sendNtfyNotification({ report, pr, commentUrl, configDir =
   if (!topic) throw new Error(`Missing ntfy topic in ${ntfyPath}.`);
 
   const target = reportLinkTarget({ prUrl: pr.html_url, commentUrl });
-  const { title, message } = formatNtfyMessage({ prNumber: pr.number, prTitle: pr.title, report });
+  const { title, message } = formatNtfyMessage({ prNumber: pr.number, prTitle: pr.title, report, linkUrl: target });
   const endpoint = `${server.replace(/\/$/, '')}/${encodeURIComponent(topic)}`;
   const headers = {
     Title: title,
@@ -498,11 +530,19 @@ export async function processPullRequest(pr, {
   const releaseNotes = await Promise.all(updates.map(pkg => fetchReleaseNotesForPackage(pkg, { fetchImpl, githubToken: token })));
   const releaseUrls = releaseNotes.flatMap(r => r.urls);
 
-  const { report, modelId } = await generateImpl({ pr, updates, releaseNotes, ciSummary });
+  let report;
+  let modelId = null;
+  let reportGenerationFailed = false;
+  try {
+    ({ report, modelId } = await generateImpl({ pr, updates, releaseNotes, ciSummary }));
+  } catch (error) {
+    reportGenerationFailed = true;
+    report = buildFailureReport({ pr, updates, error });
+  }
   const needsNotification = shouldNotify(report);
 
   let commentUrl = existingRecord.commentUrl ?? comments.find(c => String(c?.body ?? '').includes(reportMarker({ prNumber: pr.number, commitSha })))?.html_url ?? null;
-  if (!alreadyCommented && !dryRun) {
+  if (!reportGenerationFailed && !alreadyCommented && !dryRun) {
     const body = formatReportMarkdown({ report, prNumber: pr.number, commitSha, modelId, releaseUrls });
     const posted = await githubApi(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, {
       token,
@@ -512,7 +552,7 @@ export async function processPullRequest(pr, {
     });
     commentUrl = posted.html_url;
   }
-  if (!dryRun && !existingRecord.commentedAt) {
+  if (!reportGenerationFailed && !dryRun && !existingRecord.commentedAt) {
     state.reports[key] = {
       ...existingRecord,
       prNumber: pr.number,
@@ -529,14 +569,20 @@ export async function processPullRequest(pr, {
   if (needsNotification && !existingRecord.notifiedAt && !dryRun) {
     await notifyImpl({ report, pr, commentUrl, configDir, fetchImpl });
     state.reports[key] = {
+      ...existingRecord,
       ...state.reports[key],
+      prNumber: pr.number,
+      commitSha,
+      needsNotification,
+      reportGenerationFailed,
       notifiedAt: new Date().toISOString(),
+      ...(commentUrl ? { commentUrl } : {}),
     };
     writeStateAtomic(state, statePath);
     notified = true;
   }
 
-  return { prNumber: pr.number, commitSha, modelId, needsNotification, notified, commentUrl, report };
+  return { prNumber: pr.number, commitSha, modelId, reportGenerationFailed, needsNotification, notified, commentUrl, report };
 }
 
 export async function runUpdateReports({
