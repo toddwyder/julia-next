@@ -1,4 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import http from 'node:http';
+import https from 'node:https';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -387,7 +389,33 @@ export async function generateUpdateReport({ pr, updates, releaseNotes, ciSummar
   throw lastError ?? new Error('No report model succeeded.');
 }
 
-export async function sendNtfyNotification({ report, pr, commentUrl, configDir = runnerConfigDir(), fetchImpl = fetch }) {
+function postIpv4(urlString, { headers, body }) {
+  const url = new URL(urlString);
+  const transport = url.protocol === 'http:' ? http : https;
+  return new Promise((resolve, reject) => {
+    const req = transport.request(url, {
+      method: 'POST',
+      family: 4,
+      headers: {
+        ...headers,
+        'Content-Length': Buffer.byteLength(body, 'utf8'),
+      },
+      timeout: 15_000,
+    }, res => {
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, text: async () => text });
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('ntfy request timed out')));
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
+export async function sendNtfyNotification({ report, pr, commentUrl, configDir = runnerConfigDir(), fetchImpl }) {
   const ntfyPath = join(configDir, 'ntfy.json');
   if (!existsSync(ntfyPath)) {
     throw new Error(`Missing ntfy config at ${ntfyPath}.`);
@@ -397,18 +425,17 @@ export async function sendNtfyNotification({ report, pr, commentUrl, configDir =
 
   const target = reportLinkTarget({ prUrl: pr.html_url, commentUrl });
   const { title, message } = formatNtfyMessage({ prNumber: pr.number, prTitle: pr.title, report });
-  const response = await fetchImpl(`${server.replace(/\/$/, '')}/${encodeURIComponent(topic)}`, {
-    method: 'POST',
-    headers: {
-      Title: title,
-      Click: target,
-      Priority: report.failed ? 'high' : 'default',
-      Tags: report.failed ? 'warning' : report.hasNewFeatures ? 'sparkles' : 'bell',
-      'Content-Type': 'text/plain; charset=utf-8',
-    },
-    body: message,
-    signal: AbortSignal.timeout(15_000),
-  });
+  const endpoint = `${server.replace(/\/$/, '')}/${encodeURIComponent(topic)}`;
+  const headers = {
+    Title: title,
+    Click: target,
+    Priority: report.failed ? 'high' : 'default',
+    Tags: report.failed ? 'warning' : report.hasNewFeatures ? 'sparkles' : 'bell',
+    'Content-Type': 'text/plain; charset=utf-8',
+  };
+  const response = fetchImpl
+    ? await fetchImpl(endpoint, { method: 'POST', headers, body: message, signal: AbortSignal.timeout(15_000) })
+    : await postIpv4(endpoint, { headers, body: message });
   if (!response.ok) {
     throw new Error(`ntfy POST failed (${response.status}): ${await response.text()}`);
   }
