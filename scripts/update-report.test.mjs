@@ -6,10 +6,14 @@ import { join } from 'node:path';
 
 import {
   NTFY_MAX_BYTES,
+  assertReportHasAllFiveParts,
   formatNtfyMessage,
   formatReportMarkdown,
   generateUpdateReport,
   hasExistingReport,
+  isMajorUpdate,
+  isOpenReportPr,
+  isSecurityUpdate,
   isUpdatePr,
   parsePackageUpdatesFromDiff,
   processPullRequest,
@@ -235,4 +239,79 @@ test('every candidate model failing sends one high-priority ntfy notification ac
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('assertReportHasAllFiveParts fails when any of the five report parts is missing', () => {
+  const report = validateReport({
+    updated: [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }],
+    newFeatures: [{ title: 'v11 tracing', plainEnglish: 'New tracing API.', machineUse: 'Better error traces.' }],
+    fixes: [],
+    machineSummary: 'Could improve dashboard error tracing.',
+    outcome: 'Open and awaiting Todd decision.',
+    toddAction: 'Decide whether to merge @sentry/node v11.',
+    needsToddDecision: true,
+  }, { isMajor: true });
+  const md = formatReportMarkdown({
+    report,
+    prNumber: 575,
+    commitSha: 'abc1234',
+    modelId: 'commandcode/test',
+  });
+  assert.equal(assertReportHasAllFiveParts(md), true);
+
+  for (const heading of [
+    '**What was updated**',
+    '**New features**',
+    '**How the machine could use this**:',
+    '**What happened**:',
+    '**What Todd needs to do**:',
+  ]) {
+    if (heading === '**New features**') {
+      const withoutBrought = md.replace('**New features**', '**Other**').replace('**Fixes**', '**Other2**');
+      assert.throws(() => assertReportHasAllFiveParts(withoutBrought), /what it brought/);
+    } else {
+      assert.throws(() => assertReportHasAllFiveParts(md.replace(heading, '**Removed**')), /missing required part/i);
+    }
+  }
+});
+
+test('major updates and security advisories are recognized and major updates force needsToddDecision', async () => {
+  const majorPr = {
+    number: 575,
+    title: 'fix(deps): update dependency @sentry/node to v11',
+    head: { ref: 'renovate/major-sentry-javascript-monorepo' },
+    user: { login: 'renovate[bot]' },
+    state: 'open',
+  };
+  assert.equal(isMajorUpdate(majorPr, [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }]), true);
+  assert.equal(isOpenReportPr(majorPr), true);
+
+  const { report } = await generateUpdateReport({
+    pr: majorPr,
+    updates: [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }],
+    releaseNotes: [],
+    ciSummary: { failed: false, pending: false },
+    modelCandidates: ['commandcode/test'],
+    modelCaller: async () => JSON.stringify({
+      updated: [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }],
+      newFeatures: [{ title: 'v11 SDK', plainEnglish: 'Major SDK upgrade.', machineUse: 'Cleaner tracing.' }],
+      fixes: [],
+      machineSummary: 'Cleaner tracing for dashboard errors.',
+      outcome: 'Waiting for Todd decision.',
+      toddAction: 'Approve merge of @sentry/node v11.',
+      needsToddDecision: false,
+    }),
+  });
+  assert.equal(report.needsToddDecision, true);
+
+  const secPr = {
+    number: 576,
+    title: 'fix(security): bump basic-ftp to 6.2.4 (GHSA-xxxx)',
+    head: { ref: 'fix/security-basic-ftp' },
+    user: { login: 'toddwyder' },
+    body: 'Fixes Dependabot security advisory.',
+  };
+  assert.equal(isSecurityUpdate(secPr), true);
+  assert.equal(isUpdatePr(secPr), true);
+  assert.equal(isOpenReportPr(secPr), true);
 });

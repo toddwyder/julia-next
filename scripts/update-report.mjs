@@ -74,7 +74,7 @@ export function truncateUtf8Bytes(text, maxBytes = NTFY_MAX_BYTES) {
   return `${input.slice(0, end)}${suffix}`;
 }
 
-export function validateReport(raw, { prFailed = false } = {}) {
+export function validateReport(raw, { prFailed = false, isMajor = false } = {}) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error('Report agent output must be a JSON object.');
   }
@@ -98,10 +98,14 @@ export function validateReport(raw, { prFailed = false } = {}) {
         plainEnglish: String(item.plainEnglish ?? '').trim(),
       }))
     : [];
+  const machineSummary = String(
+    raw.machineSummary
+    ?? (newFeatures.length > 0 ? newFeatures.map(f => f.machineUse).join(' ') : 'No machine change needed for this update.'),
+  ).trim();
   const outcome = String(raw.outcome ?? '').trim();
   if (!outcome) throw new Error('Report agent output must include a non-empty outcome.');
-  const toddAction = String(raw.toddAction ?? 'Nothing.').trim() || 'Nothing.';
-  const needsToddDecision = Boolean(raw.needsToddDecision);
+  const toddAction = String(raw.toddAction ?? (isMajor ? 'Decide whether to merge this major update.' : 'Nothing.')).trim() || 'Nothing.';
+  const needsToddDecision = Boolean(isMajor || raw.needsToddDecision);
   const failed = Boolean(prFailed || raw.failed);
   const hasNewFeatures = newFeatures.length > 0 || Boolean(raw.hasNewFeatures);
 
@@ -109,12 +113,29 @@ export function validateReport(raw, { prFailed = false } = {}) {
     updated,
     newFeatures,
     fixes,
+    machineSummary,
     outcome,
     toddAction,
     needsToddDecision,
     hasNewFeatures,
     failed,
   };
+}
+
+export function assertReportHasAllFiveParts(markdown) {
+  const text = String(markdown ?? '');
+  const required = [
+    { name: 'what was updated', pattern: /\*\*What was updated\*\*/ },
+    { name: 'what it brought', pattern: /\*\*(?:New features|Fixes)\*\*/ },
+    { name: 'how the machine could use it', pattern: /\*\*How the machine could use this\*\*:/ },
+    { name: 'what happened to the update', pattern: /\*\*What happened\*\*:/ },
+    { name: 'what Todd must do', pattern: /\*\*What Todd needs to do\*\*:/ },
+  ];
+  const missing = required.filter(part => !part.pattern.test(text)).map(part => part.name);
+  if (missing.length > 0) {
+    throw new Error(`Report is missing required part(s): ${missing.join(', ')}`);
+  }
+  return true;
 }
 
 export function formatReportMarkdown({ report, prNumber, commitSha, modelId, releaseUrls = [] }) {
@@ -150,6 +171,8 @@ export function formatReportMarkdown({ report, prNumber, commitSha, modelId, rel
   }
   lines.push('');
 
+  lines.push(`**How the machine could use this**: ${report.machineSummary ?? 'No machine change needed for this update.'}`);
+  lines.push('');
   lines.push(`**What happened**: ${report.outcome}`);
   lines.push('');
   lines.push(`**What Todd needs to do**: ${report.toddAction}`);
@@ -420,7 +443,30 @@ export function buildFailureReport({ pr, updates = [], error }) {
   }, { prFailed: true });
 }
 
+export function isMajorUpdate(pr, updates = []) {
+  const branch = String(pr?.head?.ref ?? '').toLowerCase();
+  const title = String(pr?.title ?? '').toLowerCase();
+  if (branch.startsWith('renovate/major-') || branch.startsWith('renovate/node-') || branch.startsWith('renovate/ubuntu-')) return true;
+  if (/\bmajor\b/.test(title)) return true;
+  return updates.some(u => {
+    const fromMajor = String(u.from ?? '').replace(/^v/, '').match(/^(\d+)\./)?.[1];
+    const toMajor = String(u.to ?? '').replace(/^v/, '').match(/^(\d+)\./)?.[1];
+    return fromMajor && toMajor && fromMajor !== toMajor;
+  });
+}
+
+export function isSecurityUpdate(pr) {
+  const author = String(pr?.user?.login ?? '').toLowerCase();
+  const branch = String(pr?.head?.ref ?? '').toLowerCase();
+  const text = `${pr?.title ?? ''}\n${pr?.body ?? ''}`.toLowerCase();
+  if (author.includes('dependabot')) return true;
+  if (branch.startsWith('dependabot/') || branch.startsWith('fix/security-') || branch.startsWith('chore/security-')) return true;
+  return /\b(security|advisory|cve-\d{4}-\d+|ghsa-[a-z0-9-]+)\b/i.test(text);
+}
+
 export async function generateUpdateReport({ pr, updates, releaseNotes, ciSummary, modelCandidates = pickReportModelCandidates(), modelCaller = callCommandCodeModel }) {
+  const major = isMajorUpdate(pr, updates);
+  const security = isSecurityUpdate(pr);
   const instructions = [
     'You write plain-English software update reports for Todd, a non-developer homeowner using Julia.',
     'Use ONLY facts present in the pull request, updated package list, CI status, and maker release notes provided.',
@@ -428,8 +474,10 @@ export async function generateUpdateReport({ pr, updates, releaseNotes, ciSummar
     'Classify genuine new capabilities, new CLI/API flags, new runtime support, or new tools as newFeatures.',
     'For each new feature, explain what it does in plain English AND how Julia (a Next.js household cookbook + Mastra/pstack coding machine) could use it.',
     'Classify bug fixes, security patches, dependency bumps, and refactors as fixes.',
-    'Return ONLY a single JSON object with keys: updated (array of {name, from, to}), newFeatures (array of {title, plainEnglish, machineUse}), fixes (array of {title, plainEnglish}), outcome (string), toddAction (string), needsToddDecision (boolean), hasNewFeatures (boolean), failed (boolean).',
-  ].join(' ');
+    major ? 'This is a MAJOR update awaiting Todd\'s decision: set needsToddDecision to true, cover what it brings, what breaking or behavioral changes it introduces, and what the machine could gain in machineSummary, and ask Todd in toddAction whether to merge it.' : '',
+    security ? 'This is a SECURITY advisory update: explain the vulnerability and patched version in plain English in fixes, and state what Julia gains in safety.' : '',
+    'Return ONLY a single JSON object with keys: updated (array of {name, from, to}), newFeatures (array of {title, plainEnglish, machineUse}), fixes (array of {title, plainEnglish}), machineSummary (string), outcome (string), toddAction (string), needsToddDecision (boolean), hasNewFeatures (boolean), failed (boolean).',
+  ].filter(Boolean).join(' ');
 
   const prompt = JSON.stringify({
     pullRequest: {
@@ -453,7 +501,7 @@ export async function generateUpdateReport({ pr, updates, releaseNotes, ciSummar
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error(`Model ${modelId} did not return JSON.`);
       const parsed = JSON.parse(jsonMatch[0]);
-      const report = validateReport(parsed, { prFailed: ciSummary.failed });
+      const report = validateReport(parsed, { prFailed: ciSummary.failed, isMajor: major });
       return { report, modelId };
     } catch (error) {
       lastError = error;
@@ -664,7 +712,11 @@ export async function runUpdateReports({
 
   const results = [];
   for (const pr of candidates) {
-    results.push(await processPullRequest(pr, { owner, repo, token, state, statePath, configDir, dryRun }));
+    try {
+      results.push(await processPullRequest(pr, { owner, repo, token, state, statePath, configDir, dryRun }));
+    } catch (error) {
+      results.push({ prNumber: pr.number, status: 'error', error: error instanceof Error ? error.message : String(error) });
+    }
   }
   return results;
 }
