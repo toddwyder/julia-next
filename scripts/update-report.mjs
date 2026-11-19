@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { loadCatalog, readCorrections } from '../dashboard/lib/model-prices.js';
 import { pricedModels, readModels } from '../dashboard/lib/models.js';
-import { ensureAnthropicTrackingIssue, fetchAnthropicReleases } from './anthropic-releases.mjs';
+import { fetchAnthropicReleases } from './anthropic-releases.mjs';
 import { getInstallationToken, githubApi, runnerConfigDir } from './julia-runner-app.mjs';
 
 const COMMANDCODE_CHAT_URL = 'https://api.commandcode.ai/provider/v1/chat/completions';
@@ -75,7 +75,102 @@ export function truncateUtf8Bytes(text, maxBytes = NTFY_MAX_BYTES) {
   return `${input.slice(0, end)}${suffix}`;
 }
 
-export function validateReport(raw, { prFailed = false, isMajor = false } = {}) {
+const STOP_WORDS = new Set([
+  'about', 'after', 'also', 'always', 'another', 'automatic', 'automatically', 'before',
+  'being', 'better', 'build', 'changes', 'code', 'could', 'current', 'default', 'during',
+  'each', 'every', 'feature', 'fixes', 'from', 'have', 'into', 'julia', 'keeps', 'machine',
+  'major', 'makes', 'more', 'most', 'need', 'needs', 'newer', 'only', 'other', 'over',
+  'package', 'plain', 'pull', 'release', 'releases', 'request', 'routine', 'should', 'some',
+  'such', 'support', 'supports', 'system', 'that', 'their', 'them', 'then', 'there', 'these',
+  'they', 'this', 'those', 'through', 'tool', 'tools', 'update', 'updated', 'updates', 'using',
+  'version', 'when', 'where', 'which', 'while', 'will', 'with', 'without', 'your',
+]);
+
+function contentTokens(text) {
+  return [...new Set(
+    String(text ?? '')
+      .toLowerCase()
+      .replace(/[^a-z0-9@/_.-]+/g, ' ')
+      .split(/\s+/)
+      .filter(token => token.length >= 4 && !STOP_WORDS.has(token)),
+  )];
+}
+
+export function extractBreakingChanges(releaseNotes = []) {
+  const breaking = [];
+  for (const entry of releaseNotes) {
+    const lines = String(entry?.notes ?? '').split(/\r?\n/);
+    let inBreakingSection = false;
+    for (const line of lines) {
+      const heading = line.match(/^#{1,4}\s+(.+)$/);
+      if (heading) {
+        inBreakingSection = /\bbreaking\b/i.test(heading[1]);
+        continue;
+      }
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      if (inBreakingSection && /^[-*]\s+/.test(trimmed)) {
+        breaking.push(trimmed.replace(/^[-*]\s+/, '').replace(/\s*\(#\d+\)\s*$/, '').trim());
+      } else if (/\bbreaking change\b/i.test(trimmed)) {
+        breaking.push(trimmed.replace(/^[-*]\s+/, '').trim());
+      }
+    }
+  }
+  return [...new Set(breaking)].slice(0, 20);
+}
+
+function assertFeaturesGroundedInNotes({ newFeatures, releaseNotes, pr }) {
+  const notesText = (releaseNotes ?? []).map(r => String(r?.notes ?? '')).join('\n').trim();
+  if (notesText.length < 40 || newFeatures.length === 0) return;
+  const corpus = `${notesText}\n${pr?.title ?? ''}\n${pr?.body ?? ''}`.toLowerCase();
+  for (const feat of newFeatures) {
+    const titleTokens = contentTokens(feat.title);
+    if (titleTokens.length === 0) continue;
+    const matched = titleTokens.filter(tok => corpus.includes(tok));
+    if (matched.length === 0 || matched.length / titleTokens.length < 0.5) {
+      throw new Error(`Report invents a feature absent from the release notes: "${feat.title}".`);
+    }
+  }
+}
+
+function assertBreakingChangesCovered({ releaseNotes, newFeatures, fixes, outcome, isMajor }) {
+  if (isMajor && /\broutine\b/i.test(outcome) && !/\bbreaking\b/i.test(outcome)) {
+    throw new Error('Major update report cannot describe the update as routine without marking it breaking.');
+  }
+  const breakingItems = extractBreakingChanges(releaseNotes);
+  if (breakingItems.length === 0) return;
+  const reportText = [
+    ...newFeatures.map(f => `${f.title} ${f.plainEnglish}`),
+    ...fixes.map(f => `${f.title} ${f.plainEnglish}`),
+    outcome,
+  ].join('\n').toLowerCase();
+
+  for (const item of breakingItems) {
+    const tokens = contentTokens(item);
+    if (tokens.length === 0) continue;
+    const covered = tokens.some(tok => reportText.includes(tok));
+    if (!covered) {
+      throw new Error(`Report omits breaking change named in release notes: "${item.slice(0, 100)}".`);
+    }
+  }
+}
+
+function assertPartsSeparated({ machineSummary, newFeatures, outcome }) {
+  const statusInMachine = /\b(all \d+ (?:automated )?checks passed|ci checks passed|pull request is (?:open|merged)|awaiting merge|routine sync check|no actual change to how it works|merged to main|update pending merge)\b/i;
+  if (statusInMachine.test(machineSummary)) {
+    throw new Error('Report places outcome or CI status text under "How the machine could use this".');
+  }
+  for (const feat of newFeatures) {
+    if (statusInMachine.test(feat.machineUse)) {
+      throw new Error('Report places outcome or CI status text under a feature\'s "How the machine could use this".');
+    }
+  }
+  if (/\bwhat todd needs to do\b/i.test(outcome)) {
+    throw new Error('Report places Todd action text under "What happened".');
+  }
+}
+
+export function validateReport(raw, { prFailed = false, isMajor = false, releaseNotes = [], pr = null } = {}) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new Error('Report agent output must be a JSON object.');
   }
@@ -109,6 +204,11 @@ export function validateReport(raw, { prFailed = false, isMajor = false } = {}) 
   const needsToddDecision = Boolean(isMajor || raw.needsToddDecision);
   const failed = Boolean(prFailed || raw.failed);
   const hasNewFeatures = newFeatures.length > 0 || Boolean(raw.hasNewFeatures);
+  const isBreaking = Boolean(isMajor || raw.isBreaking || extractBreakingChanges(releaseNotes).length > 0);
+
+  assertFeaturesGroundedInNotes({ newFeatures, releaseNotes, pr });
+  assertBreakingChangesCovered({ releaseNotes, newFeatures, fixes, outcome, isMajor });
+  assertPartsSeparated({ machineSummary, newFeatures, outcome });
 
   return {
     updated,
@@ -120,6 +220,7 @@ export function validateReport(raw, { prFailed = false, isMajor = false } = {}) 
     needsToddDecision,
     hasNewFeatures,
     failed,
+    isBreaking,
   };
 }
 
@@ -142,6 +243,9 @@ export function assertReportHasAllFiveParts(markdown) {
 export function formatReportMarkdown({ report, prNumber, commitSha, modelId, releaseUrls = [] }) {
   const lines = ['## Update report', ''];
   lines.push('**What was updated**');
+  if (report.isBreaking) {
+    lines.push('- **Breaking major update**');
+  }
   if (report.updated.length === 0) {
     lines.push('- See pull request diff.');
   } else {
@@ -475,8 +579,9 @@ export async function generateUpdateReport({ pr, updates, releaseNotes, ciSummar
     'Classify genuine new capabilities, new CLI/API flags, new runtime support, or new tools as newFeatures.',
     'For each new feature, explain what it does in plain English AND how Julia (a Next.js household cookbook + Mastra/pstack coding machine) could use it.',
     'Classify bug fixes, security patches, dependency bumps, and refactors as fixes.',
-    major ? 'This is a MAJOR update awaiting Todd\'s decision: set needsToddDecision to true, cover what it brings, what breaking or behavioral changes it introduces, and what the machine could gain in machineSummary, and ask Todd in toddAction whether to merge it.' : '',
+    major ? 'This is a BREAKING MAJOR update awaiting Todd\'s decision: set needsToddDecision to true, never call it routine, list every breaking change from the release notes in fixes, explain what it brings and what the machine could gain in machineSummary, and ask Todd in toddAction whether to approve or decline.' : '',
     security ? 'This is a SECURITY advisory update: explain the vulnerability and patched version in plain English in fixes, and state what Julia gains in safety.' : '',
+    'Keep each part strictly separate: put CI/merge status ONLY in outcome, never in machineSummary or machineUse.',
     'Return ONLY a single JSON object with keys: updated (array of {name, from, to}), newFeatures (array of {title, plainEnglish, machineUse}), fixes (array of {title, plainEnglish}), machineSummary (string), outcome (string), toddAction (string), needsToddDecision (boolean), hasNewFeatures (boolean), failed (boolean).',
   ].filter(Boolean).join(' ');
 
@@ -502,7 +607,7 @@ export async function generateUpdateReport({ pr, updates, releaseNotes, ciSummar
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error(`Model ${modelId} did not return JSON.`);
       const parsed = JSON.parse(jsonMatch[0]);
-      const report = validateReport(parsed, { prFailed: ciSummary.failed, isMajor: major });
+      const report = validateReport(parsed, { prFailed: ciSummary.failed, isMajor: major, releaseNotes, pr });
       return { report, modelId };
     } catch (error) {
       lastError = error;
@@ -517,6 +622,7 @@ function postIpv4(urlString, { headers, body }) {
   return new Promise((resolve, reject) => {
     const req = transport.request(url, {
       method: 'POST',
+      family: 4,
       lookup: (hostname, opts, cb) => dns.lookup(hostname, { ...opts, family: 4 }, cb),
       headers: {
         ...headers,
@@ -528,7 +634,12 @@ function postIpv4(urlString, { headers, body }) {
       res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => {
         const text = Buffer.concat(chunks).toString('utf8');
-        resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, text: async () => text });
+        resolve({
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          status: res.statusCode,
+          headers: res.headers,
+          text: async () => text,
+        });
       });
     });
     req.on('timeout', () => req.destroy(new Error('ntfy request timed out')));
@@ -537,7 +648,10 @@ function postIpv4(urlString, { headers, body }) {
   });
 }
 
-export async function sendNtfyNotification({ report, pr, commentUrl, configDir = runnerConfigDir(), fetchImpl }) {
+export async function sendNtfyNotification({ report, pr, commentUrl, configDir = runnerConfigDir(), fetchImpl, state = null, statePath = stateFilePath() }) {
+  if (state?.ntfyBackoffUntil && Date.parse(state.ntfyBackoffUntil) > Date.now()) {
+    throw new Error(`ntfy backoff active until ${state.ntfyBackoffUntil}`);
+  }
   const ntfyPath = join(configDir, 'ntfy.json');
   if (!existsSync(ntfyPath)) {
     throw new Error(`Missing ntfy config at ${ntfyPath}.`);
@@ -559,7 +673,17 @@ export async function sendNtfyNotification({ report, pr, commentUrl, configDir =
     ? await fetchImpl(endpoint, { method: 'POST', headers, body: message, signal: AbortSignal.timeout(15_000) })
     : await postIpv4(endpoint, { headers, body: message });
   if (!response.ok) {
+    if (response.status === 429 && state) {
+      const retryAfterSec = Number(response.headers?.['retry-after'] ?? response.headers?.get?.('retry-after'));
+      const waitMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0 ? retryAfterSec * 1000 : 30 * 60 * 1000;
+      state.ntfyBackoffUntil = new Date(Date.now() + waitMs).toISOString();
+      writeStateAtomic(state, statePath);
+    }
     throw new Error(`ntfy POST failed (${response.status}): ${await response.text()}`);
+  }
+  if (state?.ntfyBackoffUntil) {
+    delete state.ntfyBackoffUntil;
+    writeStateAtomic(state, statePath);
   }
   return { title, target, bytes: Buffer.byteLength(message, 'utf8') };
 }
@@ -582,6 +706,112 @@ export function isUpdatePr(pr) {
   if (author.includes('renovate') || author.includes('dependabot')) return true;
   if (branch.startsWith('renovate/') || branch.startsWith('dependabot/') || branch.startsWith('chore/update-') || branch.startsWith('chore/skills-') || branch.startsWith('fix/security-') || branch.startsWith('chore/security-')) return true;
   return /^(chore|fix)\((deps|skills|renovate|security)\):/.test(title);
+}
+
+export function parseToddDecision(comments = [], { owner = DEFAULT_OWNER, afterIso = null } = {}) {
+  const afterMs = afterIso ? Date.parse(afterIso) : 0;
+  for (const comment of comments) {
+    const login = String(comment?.user?.login ?? '').toLowerCase();
+    if (login !== owner.toLowerCase()) continue;
+    const createdMs = Date.parse(comment?.created_at ?? '');
+    if (Number.isFinite(afterMs) && afterMs > 0 && (!Number.isFinite(createdMs) || createdMs <= afterMs)) continue;
+    const body = String(comment?.body ?? '').trim();
+    if (/\b(decline|declined|reject|skip|close|ignore|no)\b/i.test(body)) {
+      return { decision: 'decline', commentUrl: comment.html_url, body };
+    }
+    if (/\b(approve|approved|yes|merge|lgtm|go ahead|ship it)\b/i.test(body)) {
+      return { decision: 'approve', commentUrl: comment.html_url, body };
+    }
+  }
+  return null;
+}
+
+export function addSkippedMajorToRenovateConfig(config, packageNames = []) {
+  const names = [...new Set(packageNames.filter(Boolean))];
+  if (names.length === 0) return config;
+  const rules = Array.isArray(config.packageRules) ? [...config.packageRules] : [];
+  for (const pkgName of names) {
+    const exists = rules.some(
+      r => r.enabled === false && Array.isArray(r.matchPackageNames) && r.matchPackageNames.includes(pkgName) && Array.isArray(r.matchUpdateTypes) && r.matchUpdateTypes.includes('major'),
+    );
+    if (!exists) {
+      rules.push({
+        matchPackageNames: [pkgName],
+        matchUpdateTypes: ['major'],
+        enabled: false,
+      });
+    }
+  }
+  return { ...config, packageRules: rules };
+}
+
+export async function enablePullRequestAutoMerge({ pullRequestId, token, fetchImpl = fetch, mergeMethod = 'SQUASH' }) {
+  const response = await fetchImpl('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'julia-runner',
+    },
+    body: JSON.stringify({
+      query: 'mutation($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) { enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod }) { pullRequest { number autoMergeRequest { enabledAt } } } }',
+      variables: { pullRequestId, mergeMethod },
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const data = await response.json();
+  if (!response.ok || data?.errors?.length) {
+    throw new Error(`enablePullRequestAutoMerge failed: ${JSON.stringify(data?.errors ?? response.statusText)}`);
+  }
+  return data?.data?.enablePullRequestAutoMerge?.pullRequest ?? null;
+}
+
+export async function skipMajorInRenovate({ owner = DEFAULT_OWNER, repo = DEFAULT_REPO, packageNames = [], prNumber, token, fetchImpl = fetch }) {
+  const fileRes = await githubApi(`/repos/${owner}/${repo}/contents/renovate.json`, { token, fetchImpl });
+  const current = JSON.parse(Buffer.from(fileRes.content, 'base64').toString('utf8'));
+  const updated = addSkippedMajorToRenovateConfig(current, packageNames);
+  if (JSON.stringify(current) === JSON.stringify(updated)) return null;
+
+  const mainRef = await githubApi(`/repos/${owner}/${repo}/git/ref/heads/main`, { token, fetchImpl });
+  const baseSha = mainRef.object.sha;
+  const branch = `chore/renovate-skip-pr-${prNumber}`;
+  try {
+    await githubApi(`/repos/${owner}/${repo}/git/refs`, {
+      token,
+      method: 'POST',
+      body: { ref: `refs/heads/${branch}`, sha: baseSha },
+      fetchImpl,
+    });
+  } catch {
+    // Branch may already exist on retry.
+  }
+  await githubApi(`/repos/${owner}/${repo}/contents/renovate.json`, {
+    token,
+    method: 'PUT',
+    body: {
+      message: `chore(deps): skip declined major update from PR #${prNumber}`,
+      content: Buffer.from(`${JSON.stringify(updated, null, 2)}\n`, 'utf8').toString('base64'),
+      sha: fileRes.sha,
+      branch,
+    },
+    fetchImpl,
+  });
+  const existing = await githubApi(`/repos/${owner}/${repo}/pulls?state=open&head=${encodeURIComponent(`${owner}:${branch}`)}`, { token, fetchImpl });
+  const skipPr = existing[0] ?? await githubApi(`/repos/${owner}/${repo}/pulls`, {
+    token,
+    method: 'POST',
+    body: {
+      title: `chore(deps): skip declined major update from PR #${prNumber}`,
+      head: branch,
+      base: 'main',
+      body: `## Why\n\nEvery update to Julia's software, its skills and the Anthropic tools it uses reaches Todd as a plain-English report, starts without anyone launching it, and tells him when a report could not be written or a decision is his.\n\nTodd declined PR #${prNumber}; configures Renovate to skip ${packageNames.join(', ')} major updates.`,
+    },
+    fetchImpl,
+  });
+  if (skipPr?.node_id) {
+    await enablePullRequestAutoMerge({ pullRequestId: skipPr.node_id, token, fetchImpl });
+  }
+  return skipPr;
 }
 
 export async function getCiSummary(owner, repo, sha, { token, fetchImpl = fetch }) {
@@ -621,7 +851,53 @@ export async function processPullRequest(pr, {
   if (!pr.merged_at && !ciSummary.failed && !(isOpenReportPr(pr) && !ciSummary.pending)) {
     return { prNumber: pr.number, status: 'skipped-open-not-failed' };
   }
+
+  const reportComment = comments.find(c => String(c?.body ?? '').includes(reportMarker({ prNumber: pr.number, commitSha })));
+  if (!pr.merged_at && pr.state === 'open' && alreadyCommented && existingRecord.commentedAt && existingRecord.needsToddDecision && !existingRecord.decisionHandledAt && !dryRun) {
+    const toddReply = parseToddDecision(comments, { owner, afterIso: reportComment?.created_at ?? existingRecord.commentedAt });
+    if (toddReply?.decision === 'approve') {
+      if (pr.node_id) {
+        await enablePullRequestAutoMerge({ pullRequestId: pr.node_id, token, fetchImpl });
+      }
+      await githubApi(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, {
+        token,
+        method: 'POST',
+        body: { body: `Enabled auto-merge per Todd's decision (${toddReply.commentUrl ?? 'comment'}).` },
+        fetchImpl,
+      });
+      state.reports[key] = { ...existingRecord, decision: 'approve', decisionHandledAt: new Date().toISOString() };
+      writeStateAtomic(state, statePath);
+      return { prNumber: pr.number, commitSha, status: 'decision-approved' };
+    }
+    if (toddReply?.decision === 'decline') {
+      const files = await githubApi(`/repos/${owner}/${repo}/pulls/${pr.number}/files?per_page=100`, { token, fetchImpl });
+      const declinedPkgs = parsePackageUpdatesFromDiff(files, pr.title).map(u => u.name);
+      await githubApi(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, {
+        token,
+        method: 'POST',
+        body: { body: `Closed per Todd's decision; Renovate will skip ${declinedPkgs.join(', ') || 'this'} major update.` },
+        fetchImpl,
+      });
+      await githubApi(`/repos/${owner}/${repo}/pulls/${pr.number}`, {
+        token,
+        method: 'PATCH',
+        body: { state: 'closed' },
+        fetchImpl,
+      });
+      await skipMajorInRenovate({ owner, repo, packageNames: declinedPkgs, prNumber: pr.number, token, fetchImpl });
+      state.reports[key] = { ...existingRecord, decision: 'decline', decisionHandledAt: new Date().toISOString() };
+      writeStateAtomic(state, statePath);
+      return { prNumber: pr.number, commitSha, status: 'decision-declined' };
+    }
+  }
+
   if (alreadyCommented && existingRecord.commentedAt && (!existingRecord.needsNotification || existingRecord.notifiedAt)) {
+    if (!pr.merged_at && pr.state === 'open' && !ciSummary.failed && !existingRecord.needsToddDecision && !existingRecord.autoMergeEnabledAt && !dryRun && pr.node_id) {
+      await enablePullRequestAutoMerge({ pullRequestId: pr.node_id, token, fetchImpl });
+      state.reports[key] = { ...existingRecord, autoMergeEnabledAt: new Date().toISOString() };
+      writeStateAtomic(state, statePath);
+      return { prNumber: pr.number, commitSha, status: 'auto-merge-enabled' };
+    }
     return { prNumber: pr.number, status: 'already-handled' };
   }
 
@@ -659,15 +935,25 @@ export async function processPullRequest(pr, {
       commitSha,
       modelId,
       needsNotification,
+      needsToddDecision: report.needsToddDecision,
       commentedAt: new Date().toISOString(),
       commentUrl,
     };
     writeStateAtomic(state, statePath);
   }
 
+  if (!pr.merged_at && pr.state === 'open' && !reportGenerationFailed && !ciSummary.failed && !report.needsToddDecision && !existingRecord.autoMergeEnabledAt && !dryRun && pr.node_id) {
+    await enablePullRequestAutoMerge({ pullRequestId: pr.node_id, token, fetchImpl });
+    state.reports[key] = {
+      ...state.reports[key],
+      autoMergeEnabledAt: new Date().toISOString(),
+    };
+    writeStateAtomic(state, statePath);
+  }
+
   let notified = false;
   if (needsNotification && !existingRecord.notifiedAt && !dryRun) {
-    await notifyImpl({ report, pr, commentUrl, configDir, fetchImpl });
+    await notifyImpl({ report, pr, commentUrl, configDir, fetchImpl, state, statePath });
     state.reports[key] = {
       ...existingRecord,
       ...state.reports[key],
@@ -688,14 +974,12 @@ export async function processPullRequest(pr, {
 export async function processAnthropicRelease(item, {
   owner = DEFAULT_OWNER,
   repo = DEFAULT_REPO,
-  token,
   state,
   statePath = stateFilePath(),
   configDir = runnerConfigDir(),
   fetchImpl = fetch,
   generateImpl = generateUpdateReport,
   notifyImpl = sendNtfyNotification,
-  trackingIssue = null,
   dryRun = false,
 } = {}) {
   const key = `anthropic=${item.id}`;
@@ -704,11 +988,10 @@ export async function processAnthropicRelease(item, {
     return { anthropicId: item.id, status: 'already-handled' };
   }
 
-  const issue = trackingIssue ?? await ensureAnthropicTrackingIssue({ owner, repo, token, fetchImpl });
   const pr = {
-    number: issue.number,
+    number: 0,
     title: `Anthropic release: ${item.name} ${item.version}`,
-    html_url: item.url || issue.html_url,
+    html_url: item.url || `https://github.com/${owner}/${repo}`,
     state: 'open',
     merged_at: null,
     user: { login: 'anthropic' },
@@ -729,29 +1012,17 @@ export async function processAnthropicRelease(item, {
   }
   const needsNotification = shouldNotify(report);
 
-  let commentUrl = existingRecord.commentUrl ?? null;
+  const commentUrl = existingRecord.commentUrl ?? item.url ?? pr.html_url;
   let markdown = null;
-  if (!reportGenerationFailed && !existingRecord.commentedAt && !dryRun) {
+  if (!reportGenerationFailed && !existingRecord.commentedAt) {
     markdown = formatReportMarkdown({
       report,
-      prNumber: issue.number,
+      prNumber: 0,
       commitSha: item.id,
       modelId,
       releaseUrls: [item.url].filter(Boolean),
     });
     assertReportHasAllFiveParts(markdown);
-    try {
-      const posted = await githubApi(`/repos/${owner}/${repo}/issues/${issue.number}/comments`, {
-        token,
-        method: 'POST',
-        body: { body: markdown },
-        fetchImpl,
-      });
-      commentUrl = posted.html_url;
-    } catch (error) {
-      if (!String(error?.message ?? '').includes('(403)')) throw error;
-      commentUrl = item.url || issue.html_url;
-    }
   }
   if (!reportGenerationFailed && !dryRun && !existingRecord.commentedAt) {
     state.reports[key] = {
@@ -767,7 +1038,7 @@ export async function processAnthropicRelease(item, {
 
   let notified = false;
   if (needsNotification && !existingRecord.notifiedAt && !dryRun) {
-    await notifyImpl({ report, pr: { ...pr, html_url: commentUrl || pr.html_url }, commentUrl, configDir, fetchImpl });
+    await notifyImpl({ report, pr: { ...pr, html_url: commentUrl }, commentUrl, configDir, fetchImpl, state, statePath });
     state.reports[key] = {
       ...existingRecord,
       ...state.reports[key],
@@ -775,13 +1046,13 @@ export async function processAnthropicRelease(item, {
       needsNotification,
       reportGenerationFailed,
       notifiedAt: new Date().toISOString(),
-      ...(commentUrl ? { commentUrl } : {}),
+      commentUrl,
     };
     writeStateAtomic(state, statePath);
     notified = true;
   }
 
-  return { anthropicId: item.id, issueNumber: issue.number, modelId, reportGenerationFailed, needsNotification, notified, commentUrl, report, markdown };
+  return { anthropicId: item.id, modelId, reportGenerationFailed, needsNotification, notified, commentUrl, report, markdown };
 }
 
 export async function runUpdateReports({
@@ -830,10 +1101,9 @@ export async function runUpdateReports({
           return Number.isFinite(ms) && ms >= cutoff;
         });
     if (recent.length > 0) {
-      const trackingIssue = await ensureAnthropicTrackingIssue({ owner, repo, token });
       for (const item of recent) {
         try {
-          results.push(await processAnthropicRelease(item, { owner, repo, token, state, statePath, configDir, trackingIssue, dryRun }));
+          results.push(await processAnthropicRelease(item, { owner, repo, state, statePath, configDir, dryRun }));
         } catch (error) {
           results.push({ anthropicId: item.id, status: 'error', error: error instanceof Error ? error.message : String(error) });
         }

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 import {
   NTFY_MAX_BYTES,
+  addSkippedMajorToRenovateConfig,
   assertReportHasAllFiveParts,
   formatNtfyMessage,
   formatReportMarkdown,
@@ -16,6 +17,7 @@ import {
   isSecurityUpdate,
   isUpdatePr,
   parsePackageUpdatesFromDiff,
+  parseToddDecision,
   processPullRequest,
   readState,
   reportLinkTarget,
@@ -314,4 +316,104 @@ test('major updates and security advisories are recognized and major updates for
   assert.equal(isSecurityUpdate(secPr), true);
   assert.equal(isUpdatePr(secPr), true);
   assert.equal(isOpenReportPr(secPr), true);
+});
+
+test('reporter rejects invented features, omitted breaking changes, and text under the wrong part', async () => {
+  const releaseNotes = [{
+    package: '@sentry/node',
+    notes: [
+      '### Features',
+      '- Span streaming enabled by default (#22642)',
+      '### Breaking Changes',
+      '- Drop support for Node < 20.19.0 (#22558)',
+      '- Remove profilesSampleRate from @sentry/node (#23216)',
+    ].join('\n'),
+  }];
+  const pr = { number: 575, title: 'fix(deps): update dependency @sentry/node to v11', head: { ref: 'renovate/major-sentry-javascript-monorepo' } };
+
+  // 1. Invented feature absent from release notes.
+  await assert.rejects(
+    () => generateUpdateReport({
+      pr,
+      updates: [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }],
+      releaseNotes,
+      ciSummary: { failed: false, pending: false },
+      modelCandidates: ['commandcode/test'],
+      modelCaller: async () => JSON.stringify({
+        updated: [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }],
+        newFeatures: [{ title: 'Automatic Hidden Source Maps', plainEnglish: 'Uploads hidden source maps.', machineUse: 'Cleaner builds.' }],
+        fixes: [{ title: 'Drop Node < 20.19.0 and profilesSampleRate', plainEnglish: 'Drops old Node and profilesSampleRate.' }],
+        machineSummary: 'Could stream spans earlier.',
+        outcome: 'Breaking major update waiting for decision.',
+        toddAction: 'Approve or decline.',
+        needsToddDecision: true,
+      }),
+    }),
+    /invents a feature absent from the release notes/i,
+  );
+
+  // 2. Omitted breaking change.
+  await assert.rejects(
+    () => generateUpdateReport({
+      pr,
+      updates: [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }],
+      releaseNotes,
+      ciSummary: { failed: false, pending: false },
+      modelCandidates: ['commandcode/test'],
+      modelCaller: async () => JSON.stringify({
+        updated: [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }],
+        newFeatures: [{ title: 'Span streaming enabled by default', plainEnglish: 'Streams spans immediately.', machineUse: 'Faster error traces.' }],
+        fixes: [{ title: 'Drop Node < 20.19.0', plainEnglish: 'Drops old Node.' }],
+        machineSummary: 'Faster error traces.',
+        outcome: 'Breaking major update waiting for decision.',
+        toddAction: 'Approve or decline.',
+        needsToddDecision: true,
+      }),
+    }),
+    /omits breaking change/i,
+  );
+
+  // 3. Text under the wrong part (outcome/CI status under "How the machine could use this").
+  await assert.rejects(
+    () => generateUpdateReport({
+      pr,
+      updates: [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }],
+      releaseNotes,
+      ciSummary: { failed: false, pending: false },
+      modelCandidates: ['commandcode/test'],
+      modelCaller: async () => JSON.stringify({
+        updated: [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }],
+        newFeatures: [{ title: 'Span streaming enabled by default', plainEnglish: 'Streams spans immediately.', machineUse: 'Faster error traces.' }],
+        fixes: [{ title: 'Drop Node < 20.19.0 and profilesSampleRate', plainEnglish: 'Removes profilesSampleRate and old Node.' }],
+        machineSummary: 'All 7 automated checks passed; this was a routine sync check.',
+        outcome: 'Breaking major update waiting for decision.',
+        toddAction: 'Approve or decline.',
+        needsToddDecision: true,
+      }),
+    }),
+    /places outcome or CI status text/i,
+  );
+});
+
+test('parseToddDecision and addSkippedMajorToRenovateConfig handle approve and decline cleanly', () => {
+  const afterIso = '2026-11-19T07:00:00Z';
+  assert.equal(
+    parseToddDecision([{ user: { login: 'toddwyder' }, created_at: '2026-11-19T08:00:00Z', body: 'approve', html_url: 'https://example/1' }], { afterIso })?.decision,
+    'approve',
+  );
+  assert.equal(
+    parseToddDecision([{ user: { login: 'toddwyder' }, created_at: '2026-11-19T08:00:00Z', body: 'decline this major update', html_url: 'https://example/2' }], { afterIso })?.decision,
+    'decline',
+  );
+  assert.equal(
+    parseToddDecision([{ user: { login: 'other-user' }, created_at: '2026-11-19T08:00:00Z', body: 'approve' }], { afterIso }),
+    null,
+  );
+
+  const updated = addSkippedMajorToRenovateConfig({ packageRules: [] }, ['@sentry/node']);
+  assert.deepEqual(updated.packageRules[0], {
+    matchPackageNames: ['@sentry/node'],
+    matchUpdateTypes: ['major'],
+    enabled: false,
+  });
 });
