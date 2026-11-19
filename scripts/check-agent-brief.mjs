@@ -102,6 +102,9 @@ export function parseCriteria(text) {
   return criteria;
 }
 
+// Every brief opens with this line (AGENTS.md), so the copied-text check leaves it out.
+const REQUIRED_OPENER = /^[ \t]*Read \.agents\/skills\/poteto-mode\/SKILL\.md and follow it\.?[ \t]*$/gim;
+
 function shingles(wordsList, size) {
   const values = new Set();
   for (let index = 0; index + size <= wordsList.length; index += 1) {
@@ -111,7 +114,7 @@ function shingles(wordsList, size) {
 }
 
 export function findCopiedText({ text, docs }) {
-  const brief = String(text ?? '');
+  const brief = String(text ?? '').replace(REQUIRED_OPENER, '');
   const briefWords = words(brief);
   const briefShingles = shingles(briefWords, SHINGLE);
   const findings = [];

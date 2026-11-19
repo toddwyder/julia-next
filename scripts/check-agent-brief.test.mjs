@@ -112,3 +112,11 @@ test('refuses a criterion naming a model family only', () => {
   assert.equal(findings.length, 1);
   assert.match(findings[0], /names the model "deepseek"/i);
 });
+
+test('the required poteto-mode opener is not reported as copied text', () => {
+  const opener = 'Read .agents/skills/poteto-mode/SKILL.md and follow it.';
+  const docs = [{ file: 'handoff.md', text: `Prompt: ${opener} Then the work.` }];
+  assert.deepEqual(findCopiedText({ text: `${opener}\n\n## Goal\n\nSomething new.`, docs }), []);
+  const copied = 'The dashboard shows every finished step together with the time each step took to finish.';
+  assert.equal(findCopiedText({ text: `${opener}\n\n${copied}`, docs: [{ file: 'AGENTS.md', text: `Rule: ${copied}` }] }).length, 1);
+});
