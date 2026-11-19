@@ -175,3 +175,28 @@ test('the subscription provider exception keeps the rest of Mastra Code forbidde
     assert.match(result.report, /flow-denies-mastra-code-sdk/);
   }
 });
+
+test('an imported npm package absent from package.json fails the dependency check and names no-non-package-json', () => {
+  const root = mkdtempSync(join(tmpdir(), 'flow-guard-non-pkg-'));
+  try {
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'fixture', private: true, type: 'module' }));
+    mkdirSync(join(root, 'app'), { recursive: true });
+    mkdirSync(join(root, 'node_modules/undeclared-pkg'), { recursive: true });
+    writeFileSync(
+      join(root, 'node_modules/undeclared-pkg/package.json'),
+      JSON.stringify({ name: 'undeclared-pkg', version: '1.0.0', main: 'index.js' }),
+    );
+    writeFileSync(join(root, 'node_modules/undeclared-pkg/index.js'), 'export const x = 1;\n');
+    writeFileSync(join(root, 'app/sample.mjs'), "import 'undeclared-pkg';\n");
+    const result = spawnSync(process.execPath, [DEPCRUISE, '--config', CRUISE_CONFIG, 'app'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    const report = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+    assert.notEqual(result.status, 0, report);
+    assert.match(report, /no-non-package-json/);
+    assert.match(report, /undeclared-pkg/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

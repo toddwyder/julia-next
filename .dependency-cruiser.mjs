@@ -83,6 +83,15 @@ export default {
       from: { path: MACHINE },
       to: { path: JULIA },
     },
+    {
+      name: 'no-non-package-json',
+      severity: 'error',
+      comment: 'Every imported npm package must be declared in package.json so Renovate tracks it.',
+      from: {},
+      to: {
+        dependencyTypes: ['npm-no-pkg', 'npm-unknown'],
+      },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },
