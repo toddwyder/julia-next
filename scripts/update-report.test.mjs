@@ -417,3 +417,22 @@ test('parseToddDecision and addSkippedMajorToRenovateConfig handle approve and d
     enabled: false,
   });
 });
+
+test('a report that needs nothing from Todd never asks him anything', () => {
+  const report = validateReport({
+    updated: [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }],
+    newFeatures: [],
+    fixes: [{ title: 'Breaking major update', plainEnglish: 'Breaking changes are listed in the notes.' }],
+    machineSummary: 'No machine change needed for this update.',
+    outcome: 'Breaking major update, merging once checks pass.',
+    toddAction: 'Do you want to approve this upgrade or decline it?',
+    needsToddDecision: false,
+  }, { isMajor: true });
+  assert.equal(report.toddAction, 'Nothing.');
+  const failed = validateReport({
+    updated: [], newFeatures: [], fixes: [],
+    machineSummary: 'No machine change needed for this update.',
+    outcome: 'Checks failed.', toddAction: 'Open the pull request.', failed: true,
+  }, {});
+  assert.equal(failed.toddAction, 'Open the pull request.');
+});

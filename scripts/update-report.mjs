@@ -200,9 +200,12 @@ export function validateReport(raw, { prFailed = false, isMajor = false, release
   ).trim();
   const outcome = String(raw.outcome ?? '').trim();
   if (!outcome) throw new Error('Report agent output must include a non-empty outcome.');
-  const toddAction = String(raw.toddAction ?? 'Nothing.').trim() || 'Nothing.';
   const needsToddDecision = Boolean(raw.needsToddDecision);
   const failed = Boolean(prFailed || raw.failed);
+  // The model's wording reaches Todd only when something needs him; otherwise the code says Nothing.
+  const toddAction = needsToddDecision || failed
+    ? String(raw.toddAction ?? 'Nothing.').trim() || 'Nothing.'
+    : 'Nothing.';
   const hasNewFeatures = newFeatures.length > 0 || Boolean(raw.hasNewFeatures);
   const isBreaking = Boolean(isMajor || raw.isBreaking || extractBreakingChanges(releaseNotes).length > 0);
 
