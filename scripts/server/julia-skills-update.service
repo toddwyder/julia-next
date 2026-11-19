@@ -1,0 +1,12 @@
+[Unit]
+Description=Julia weekly skills update (pstack and Pocock)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/julia-dashboard
+ExecStart=/usr/bin/node scripts/julia-agents.mjs -- node scripts/update-skills.mjs
+StandardOutput=journal
+StandardError=journal

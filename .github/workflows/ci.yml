@@ -81,6 +81,10 @@ jobs:
         run: npx --yes --package renovate@44.251.0 -- renovate-config-validator --strict
       - name: Check skill names are unique
         run: node scripts/check-skill-names.mjs
+      - name: Check skill version records agree
+        run: node scripts/check-skill-versions.mjs
+      - name: Check installed pstack matches its pinned commit
+        run: node scripts/check-pstack-pin.mjs
       - name: Check agent-read files point at paths that exist
         run: node scripts/check-agent-links.mjs
       - name: Check the machine program list is up to date

@@ -237,8 +237,25 @@ export function parsePackageUpdatesFromDiff(files = [], prTitle = '') {
     } else if (file.filename === '.agents/skills/PSTACK-SOURCE.md') {
       const from = patch.match(/^-Version:\s*(\S+)/m)?.[1] ?? patch.match(/^-Commit:\s*([0-9a-f]{7,40})/m)?.[1];
       const to = patch.match(/^\+Version:\s*(\S+)/m)?.[1] ?? patch.match(/^\+Commit:\s*([0-9a-f]{7,40})/m)?.[1];
+      const fromCommit = patch.match(/^-Commit:\s*([0-9a-f]{7,40})/m)?.[1];
+      const toCommit = patch.match(/^\+Commit:\s*([0-9a-f]{7,40})/m)?.[1];
       if (from && to && from !== to) {
-        updates.set('backnotprop/pstack', { name: 'backnotprop/pstack', from, to });
+        updates.set('backnotprop/pstack', {
+          name: 'backnotprop/pstack',
+          from,
+          to,
+          ...(fromCommit && toCommit ? { fromCommit, toCommit } : {}),
+        });
+      }
+    } else if (file.filename === 'skills-lock.json') {
+      const minusRef = patch.match(/^-\s*"ref":\s*"([^"]+)"/m)?.[1];
+      const plusRef = patch.match(/^\+\s*"ref":\s*"([^"]+)"/m)?.[1];
+      if (minusRef && plusRef && minusRef !== plusRef) {
+        const isPocock = /^v?\d+\.\d+\.\d+/.test(plusRef);
+        const name = isPocock ? 'mattpocock/skills' : 'backnotprop/pstack';
+        if (!updates.has(name)) {
+          updates.set(name, { name, from: minusRef, to: plusRef });
+        }
       }
     }
   }
@@ -320,7 +337,30 @@ export async function fetchReleaseNotesForPackage(pkg, { fetchImpl = fetch, gith
       }
     }
   } catch {
-    // Fall through to empty notes.
+    // Fall through to commit compare or empty notes.
+  }
+
+  if (pkg.name === 'backnotprop/pstack' && pkg.fromCommit && pkg.toCommit) {
+    try {
+      const cmpRes = await fetchImpl(`https://api.github.com/repos/${repoSlug}/compare/${pkg.fromCommit}...${pkg.toCommit}`, {
+        headers,
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (cmpRes.ok) {
+        const cmp = await cmpRes.json();
+        const commits = (cmp.commits ?? []).slice(0, 30);
+        if (commits.length > 0) {
+          return {
+            package: pkg.name,
+            repo: repoSlug,
+            urls: [cmp.html_url].filter(Boolean),
+            notes: commits.map(c => `- ${String(c.commit?.message ?? '').split('\n')[0]}`).join('\n').slice(0, 12_000),
+          };
+        }
+      }
+    } catch {
+      // Fall through to empty notes.
+    }
   }
   return { package: pkg.name, repo: repoSlug, urls: [], notes: '' };
 }
@@ -475,13 +515,24 @@ export async function sendNtfyNotification({ report, pr, commentUrl, configDir =
   return { title, target, bytes: Buffer.byteLength(message, 'utf8') };
 }
 
+export function isOpenReportPr(pr) {
+  const branch = String(pr.head?.ref ?? '').toLowerCase();
+  const title = String(pr.title ?? '').toLowerCase();
+  if (branch.startsWith('chore/skills-') || /^chore\(skills\):/.test(title)) return true;
+  if (branch.startsWith('renovate/major-') || branch.startsWith('renovate/node-') || branch.startsWith('renovate/ubuntu-')) return true;
+  if (branch.startsWith('fix/security-') || branch.startsWith('chore/security-') || branch.startsWith('dependabot/')) return true;
+  if (/^(fix|chore)\(security\):/.test(title)) return true;
+  if (/\bmajor\b/.test(title)) return true;
+  return false;
+}
+
 export function isUpdatePr(pr) {
   const author = String(pr.user?.login ?? '').toLowerCase();
   const branch = String(pr.head?.ref ?? '').toLowerCase();
   const title = String(pr.title ?? '').toLowerCase();
-  if (author.includes('renovate')) return true;
-  if (branch.startsWith('renovate/') || branch.startsWith('chore/update-') || branch.startsWith('chore/skills-')) return true;
-  return /^(chore|fix)\((deps|skills|renovate)\):/.test(title);
+  if (author.includes('renovate') || author.includes('dependabot')) return true;
+  if (branch.startsWith('renovate/') || branch.startsWith('dependabot/') || branch.startsWith('chore/update-') || branch.startsWith('chore/skills-') || branch.startsWith('fix/security-') || branch.startsWith('chore/security-')) return true;
+  return /^(chore|fix)\((deps|skills|renovate|security)\):/.test(title);
 }
 
 export async function getCiSummary(owner, repo, sha, { token, fetchImpl = fetch }) {
@@ -518,7 +569,7 @@ export async function processPullRequest(pr, {
   const alreadyCommented = Boolean(existingRecord.commentedAt) || hasExistingReport(comments, { prNumber: pr.number, commitSha });
 
   const ciSummary = await getCiSummary(owner, repo, pr.head.sha, { token, fetchImpl });
-  if (!pr.merged_at && !ciSummary.failed) {
+  if (!pr.merged_at && !ciSummary.failed && !(isOpenReportPr(pr) && !ciSummary.pending)) {
     return { prNumber: pr.number, status: 'skipped-open-not-failed' };
   }
   if (alreadyCommented && existingRecord.commentedAt && (!existingRecord.needsNotification || existingRecord.notifiedAt)) {

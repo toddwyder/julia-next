@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Julia weekly skills update every Monday
+
+[Timer]
+OnCalendar=Mon *-*-* 09:00:00 UTC
+Persistent=true
+Unit=julia-skills-update.service
+
+[Install]
+WantedBy=timers.target
