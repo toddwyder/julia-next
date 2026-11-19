@@ -18,7 +18,7 @@ const SKIPPED = new Set([
   'scripts/no-fakes-repository.test.mjs',
 ]);
 // The machine's stages are stand-ins on purpose: the flow was built whole on
-// stand-ins, and each card swaps one stand-in for the real thing (ADR 0026).
+// stand-ins, and each card swaps one stand-in for the real thing.
 // Its proof is a real card started in Studio and recorded on the card, not a
 // test, so the flow's own tests carry a stand-in model. That folder is the
 // only one excused.

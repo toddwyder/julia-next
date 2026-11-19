@@ -20,9 +20,9 @@ Mastra Code's stock coding agent and stock subagents are used. There are no cust
 
 | Cursor | Mastra Code |
 | --- | --- |
-| A role's model slug, such as `anthropic/claude-opus-5-5` | Pass it as `modelId` on that `subagent` call (`tools.d.ts:66-71`). The call override wins over the controller's per-type model and the definition's `defaultModelId` (`dist/agent-controller-DRiP9C5v.js:6429-6432`). |
+| A role's model slug, such as `<provider>/<model>` | Pass it as `modelId` on that `subagent` call (`tools.d.ts:66-71`). The call override wins over the controller's per-type model and the definition's `defaultModelId` (`dist/agent-controller-DRiP9C5v.js:6429-6432`). |
 | `auto` or `inherit-parent` | Pass the parent chat's model id as `modelId`. Omitting `modelId` does not inherit the chat model; it falls through to the per-type session model, then the definition default (`tools.d.ts:66-71`; `DRiP9C5v.js:6429-6432`). |
-| A role value `<model> <effort>`, such as `anthropic/claude-opus-5-5 xhigh` | Pass `<model>` as `modelId`. There is no per-subagent effort field in the tool or in `AgentControllerSubagent` (`tools.d.ts:66-71`; `types.d.ts:120-168`). Effort is session-scoped: `thinkingLevel` in session state (`dist/schema.d.ts:100`) and `modeThinkingDefaults` or `preferences.thinkingLevel` in settings (`dist/onboarding/settings.d.ts:218,275`). Mark the effort part **unproven** per subagent. |
+| A role value `<model> <effort>`, such as `<provider>/<model> xhigh` | Pass `<model>` as `modelId`. There is no per-subagent effort field in the tool or in `AgentControllerSubagent` (`tools.d.ts:66-71`; `types.d.ts:120-168`). Effort is session-scoped: `thinkingLevel` in session state (`dist/schema.d.ts:100`) and `modeThinkingDefaults` or `preferences.thinkingLevel` in settings (`dist/onboarding/settings.d.ts:218,275`). Mark the effort part **unproven** per subagent. |
 | `~/.cursor/rules/pstack-models.mdc` | `~/.agents/pstack-models.md` (`skills/setup-pstack/SKILL.md:12`). Read it at task start if it exists (`skills/poteto-mode/SKILL.md:110`). Mastra Code does not load it by itself; the root `AGENTS.md` tells every session to read it. |
 | A panel list | One `subagent` call per entry, with that entry's model as `modelId`. The list length sets the fan-out (`skills/setup-pstack/SKILL.md:37`). |
 | `arena cross-judge pool` | A preference order, not a fan-out: Arena runs one judge and tries only entries from a family other than the parent chat's, in list order (`skills/arena/SKILL.md:28`). An `inherit-parent` or `auto` entry never judges, so a pool with no other-family value runs no judge and the coordinator picks the base itself (`skills/setup-pstack/SKILL.md:37`). |
@@ -82,7 +82,7 @@ After a squash merge the branch is not an ancestor of `main`, so `git branch -d`
 
 Mastra Code loads hooks from the session's project directory and from the user-level `~/.mastracode/hooks.json`.
 
-Julia's stop ping hook was removed on 7 November 2026 (ADR 0024). The repository no longer wires a `Notification` hook. A server still carrying the old user-level entry, a `Notification` hook that runs `stop-ping.mjs --global`, should have that entry deleted: the script it calls is gone. The `SessionStart` hook that re-applies the retry patch (below) stays.
+Julia's stop ping hook was removed on 7 November 2026. The repository no longer wires a `Notification` hook. A server still carrying the old user-level entry, a `Notification` hook that runs `stop-ping.mjs --global`, should have that entry deleted: the script it calls is gone. The `SessionStart` hook that re-applies the retry patch (below) stays.
 
 ## A reset, a retry, and a retry that never comes back
 

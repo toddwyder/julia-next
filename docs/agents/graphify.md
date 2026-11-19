@@ -35,9 +35,9 @@ uv tool install "graphifyy[mcp,openai]"
 
 Both graphs use the Command Code endpoint already configured for the agents, so
 no new service is involved. `scripts/julia-agents.mjs` supplies the key. The
-flags below are the low-token path from Graphify's docs: the cheaper flash model,
-thinking off, and a small chunk budget, because this model truncates a large
-chunk and the retry re-sends it.
+flags below are the low-token path from Graphify's docs: the paid everyday-coding
+model from `dashboard/config/roles.json`, thinking off, and a small chunk budget,
+because this model truncates a large chunk and the retry re-sends it.
 
 ### Julia and pstack
 
@@ -47,7 +47,8 @@ node scripts/julia-agents.mjs -- bash -lc '
   export OPENAI_BASE_URL=https://api.commandcode.ai/provider/v1
   export OPENAI_API_KEY="$COMMANDCODE_API_KEY"
   export GRAPHIFY_DISABLE_THINKING=1
-  graphify extract . --backend openai --model deepseek/deepseek-v4.1-flash \
+  MODEL=$(node -p "JSON.parse(require(\"fs\").readFileSync(\"dashboard/config/roles.json\",\"utf8\")).groups.find(g=>g.id===\"building\").roles.find(r=>r.id===\"feature-refactoring\").default.replace(/^commandcode\//,\"\")")
+  graphify extract . --backend openai --model "$MODEL" \
     --max-concurrency 4 --token-budget 10000
 '
 ```
@@ -64,9 +65,10 @@ node scripts/julia-agents.mjs -- bash -lc '
   export OPENAI_BASE_URL=https://api.commandcode.ai/provider/v1
   export OPENAI_API_KEY="$COMMANDCODE_API_KEY"
   export GRAPHIFY_DISABLE_THINKING=1
+  MODEL=$(node -p "JSON.parse(require(\"fs\").readFileSync(\"dashboard/config/roles.json\",\"utf8\")).groups.find(g=>g.id===\"building\").roles.find(r=>r.id===\"feature-refactoring\").default.replace(/^commandcode\//,\"\")")
   for docs in node_modules/@mastra/*/dist/docs; do
     pkg=$(basename "$(dirname "$(dirname "$docs")")")
-    graphify extract "$docs" --backend openai --model deepseek/deepseek-v4.1-flash \
+    graphify extract "$docs" --backend openai --model "$MODEL" \
       --max-concurrency 4 --token-budget 10000 --out "graphify-out/mastra-src/$pkg"
   done
   graphify merge-graphs graphify-out/mastra-src/*/graphify-out/graph.json \

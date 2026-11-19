@@ -147,7 +147,7 @@ async function main() {
       }
       return comment.url;
     },
-    // The stop ping was removed on 7 Nov 2026 (ADR 0024). A stop is still written to the run
+    // The stop ping was removed on 7 Nov 2026. A stop is still written to the run
     // record; nothing posts to Linear.
     ping: async () => ({ posted: false, error: 'stop ping removed' }),
     saveRecord: record => writeRecord(runDir, { ...record, pr: options.pr, runDir }),

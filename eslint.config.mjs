@@ -156,8 +156,7 @@ export const frameworkPlugins = {
 };
 
 // The runner files below write the run record, the cost record, the per-card spending record and
-// the exit timer. ADR 0026 gives them that job, so the framework rules cover the flow definitions
-// only.
+// the exit timer, so the framework rules cover the flow definitions only.
 const flowRunnerFiles = [
   'machine/flow/run.mjs',
   'machine/flow/start.mjs',
