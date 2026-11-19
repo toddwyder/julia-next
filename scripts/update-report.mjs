@@ -730,21 +730,28 @@ export async function processAnthropicRelease(item, {
   const needsNotification = shouldNotify(report);
 
   let commentUrl = existingRecord.commentUrl ?? null;
+  let markdown = null;
   if (!reportGenerationFailed && !existingRecord.commentedAt && !dryRun) {
-    const body = formatReportMarkdown({
+    markdown = formatReportMarkdown({
       report,
       prNumber: issue.number,
       commitSha: item.id,
       modelId,
       releaseUrls: [item.url].filter(Boolean),
     });
-    const posted = await githubApi(`/repos/${owner}/${repo}/issues/${issue.number}/comments`, {
-      token,
-      method: 'POST',
-      body: { body },
-      fetchImpl,
-    });
-    commentUrl = posted.html_url;
+    assertReportHasAllFiveParts(markdown);
+    try {
+      const posted = await githubApi(`/repos/${owner}/${repo}/issues/${issue.number}/comments`, {
+        token,
+        method: 'POST',
+        body: { body: markdown },
+        fetchImpl,
+      });
+      commentUrl = posted.html_url;
+    } catch (error) {
+      if (!String(error?.message ?? '').includes('(403)')) throw error;
+      commentUrl = item.url || issue.html_url;
+    }
   }
   if (!reportGenerationFailed && !dryRun && !existingRecord.commentedAt) {
     state.reports[key] = {
@@ -774,7 +781,7 @@ export async function processAnthropicRelease(item, {
     notified = true;
   }
 
-  return { anthropicId: item.id, issueNumber: issue.number, modelId, reportGenerationFailed, needsNotification, notified, commentUrl, report };
+  return { anthropicId: item.id, issueNumber: issue.number, modelId, reportGenerationFailed, needsNotification, notified, commentUrl, report, markdown };
 }
 
 export async function runUpdateReports({
