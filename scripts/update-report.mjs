@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { loadCatalog, readCorrections } from '../dashboard/lib/model-prices.js';
 import { pricedModels, readModels } from '../dashboard/lib/models.js';
+import { ensureAnthropicTrackingIssue, fetchAnthropicReleases } from './anthropic-releases.mjs';
 import { getInstallationToken, githubApi, runnerConfigDir } from './julia-runner-app.mjs';
 
 const COMMANDCODE_CHAT_URL = 'https://api.commandcode.ai/provider/v1/chat/completions';
@@ -684,12 +685,105 @@ export async function processPullRequest(pr, {
   return { prNumber: pr.number, commitSha, modelId, reportGenerationFailed, needsNotification, notified, commentUrl, report };
 }
 
+export async function processAnthropicRelease(item, {
+  owner = DEFAULT_OWNER,
+  repo = DEFAULT_REPO,
+  token,
+  state,
+  statePath = stateFilePath(),
+  configDir = runnerConfigDir(),
+  fetchImpl = fetch,
+  generateImpl = generateUpdateReport,
+  notifyImpl = sendNtfyNotification,
+  trackingIssue = null,
+  dryRun = false,
+} = {}) {
+  const key = `anthropic=${item.id}`;
+  const existingRecord = state.reports[key] ?? {};
+  if (existingRecord.commentedAt && (!existingRecord.needsNotification || existingRecord.notifiedAt)) {
+    return { anthropicId: item.id, status: 'already-handled' };
+  }
+
+  const issue = trackingIssue ?? await ensureAnthropicTrackingIssue({ owner, repo, token, fetchImpl });
+  const pr = {
+    number: issue.number,
+    title: `Anthropic release: ${item.name} ${item.version}`,
+    html_url: item.url || issue.html_url,
+    state: 'open',
+    merged_at: null,
+    user: { login: 'anthropic' },
+    body: item.notes.slice(0, 2000),
+  };
+  const updates = [{ name: item.name, from: 'previous', to: item.version }];
+  const releaseNotes = [{ package: item.name, repo: item.source, urls: [item.url].filter(Boolean), notes: item.notes }];
+  const ciSummary = { total: 0, failed: false, pending: false, failedNames: [] };
+
+  let report;
+  let modelId = null;
+  let reportGenerationFailed = false;
+  try {
+    ({ report, modelId } = await generateImpl({ pr, updates, releaseNotes, ciSummary }));
+  } catch (error) {
+    reportGenerationFailed = true;
+    report = buildFailureReport({ pr, updates, error });
+  }
+  const needsNotification = shouldNotify(report);
+
+  let commentUrl = existingRecord.commentUrl ?? null;
+  if (!reportGenerationFailed && !existingRecord.commentedAt && !dryRun) {
+    const body = formatReportMarkdown({
+      report,
+      prNumber: issue.number,
+      commitSha: item.id,
+      modelId,
+      releaseUrls: [item.url].filter(Boolean),
+    });
+    const posted = await githubApi(`/repos/${owner}/${repo}/issues/${issue.number}/comments`, {
+      token,
+      method: 'POST',
+      body: { body },
+      fetchImpl,
+    });
+    commentUrl = posted.html_url;
+  }
+  if (!reportGenerationFailed && !dryRun && !existingRecord.commentedAt) {
+    state.reports[key] = {
+      ...existingRecord,
+      anthropicId: item.id,
+      modelId,
+      needsNotification,
+      commentedAt: new Date().toISOString(),
+      commentUrl,
+    };
+    writeStateAtomic(state, statePath);
+  }
+
+  let notified = false;
+  if (needsNotification && !existingRecord.notifiedAt && !dryRun) {
+    await notifyImpl({ report, pr: { ...pr, html_url: commentUrl || pr.html_url }, commentUrl, configDir, fetchImpl });
+    state.reports[key] = {
+      ...existingRecord,
+      ...state.reports[key],
+      anthropicId: item.id,
+      needsNotification,
+      reportGenerationFailed,
+      notifiedAt: new Date().toISOString(),
+      ...(commentUrl ? { commentUrl } : {}),
+    };
+    writeStateAtomic(state, statePath);
+    notified = true;
+  }
+
+  return { anthropicId: item.id, issueNumber: issue.number, modelId, reportGenerationFailed, needsNotification, notified, commentUrl, report };
+}
+
 export async function runUpdateReports({
   owner = DEFAULT_OWNER,
   repo = DEFAULT_REPO,
   prNumber = null,
   lookbackHours = 24,
   dryRun = false,
+  anthropicLatest = false,
   configDir = runnerConfigDir(),
   statePath = stateFilePath(),
 } = {}) {
@@ -718,15 +812,37 @@ export async function runUpdateReports({
       results.push({ prNumber: pr.number, status: 'error', error: error instanceof Error ? error.message : String(error) });
     }
   }
+
+  if (!prNumber) {
+    const releases = await fetchAnthropicReleases({ githubToken: token });
+    const cutoff = Date.now() - lookbackHours * 60 * 60 * 1000;
+    const recent = anthropicLatest
+      ? releases.slice(0, 1)
+      : releases.filter(item => {
+          const ms = item.publishedAt ? Date.parse(item.publishedAt) : NaN;
+          return Number.isFinite(ms) && ms >= cutoff;
+        });
+    if (recent.length > 0) {
+      const trackingIssue = await ensureAnthropicTrackingIssue({ owner, repo, token });
+      for (const item of recent) {
+        try {
+          results.push(await processAnthropicRelease(item, { owner, repo, token, state, statePath, configDir, trackingIssue, dryRun }));
+        } catch (error) {
+          results.push({ anthropicId: item.id, status: 'error', error: error instanceof Error ? error.message : String(error) });
+        }
+      }
+    }
+  }
   return results;
 }
 
 function parseCliArgs(argv) {
-  const options = { prNumber: null, lookbackHours: 24, dryRun: false };
+  const options = { prNumber: null, lookbackHours: 24, dryRun: false, anthropicLatest: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--pr' && argv[i + 1]) options.prNumber = Number(argv[++i]);
     else if (argv[i] === '--lookback-hours' && argv[i + 1]) options.lookbackHours = Number(argv[++i]);
     else if (argv[i] === '--dry-run') options.dryRun = true;
+    else if (argv[i] === '--anthropic-latest') options.anthropicLatest = true;
   }
   return options;
 }
