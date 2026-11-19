@@ -53,3 +53,41 @@ test('applyPstackMirrorToTree and applyPocockReleaseToTree keep PSTACK-SOURCE.md
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('applyPocockReleaseToTree preserves Julia retro step when updating retro skill', () => {
+  const root = mkdtempSync(join(tmpdir(), 'update-skills-retro-test-'));
+  const pocockMirror = join(root, 'pocock-mirror');
+  const repo = join(root, 'repo');
+
+  try {
+    const oldSha = '83a729a182a29b59a2a42fc3d7736b0c376b55d4';
+    const juliaLine =
+      "5. Mastra's storage retention prunes old trace rows at the end of every card. There is no list of sessions, no census file, no sweep, and nothing in the retro deletes anything.";
+
+    write(join(repo, '.agents/skills/PSTACK-SOURCE.md'), `Mirror: ${MIRROR}\nCommit: ${oldSha}\nVersion: 0.15.43\nInstalled: 3 November 2026\n`);
+    write(
+      join(repo, '.claude/skills/retro/SKILL.md'),
+      `4. Present these candidates to the user, in order of severity.\n\n${juliaLine}\n\n## Reference\n`,
+    );
+    write(join(repo, 'skills-lock.json'), JSON.stringify({
+      version: 1,
+      skills: {
+        retro: { source: 'mattpocock/skills', ref: 'v1.3.1', skillPath: 'skills/engineering/retro/SKILL.md', computedHash: 'old' },
+      },
+    }));
+
+    write(
+      join(pocockMirror, 'skills/engineering/retro/SKILL.md'),
+      '4. Present these candidates to the user, in order of severity.\n\n## Reference\n',
+    );
+
+    applyPocockReleaseToTree({ root: repo, mirrorDir: pocockMirror, tag: 'v1.3.2' });
+
+    const updated = readFileSync(join(repo, '.claude/skills/retro/SKILL.md'), 'utf8');
+    assert.match(updated, /5\. Mastra's storage retention prunes old trace rows at the end of every card\./);
+    assert.match(updated, /## Reference/);
+    assert.deepEqual(checkSkillVersions(repo).problems, []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

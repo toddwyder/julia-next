@@ -14,6 +14,21 @@ export const DEFAULT_REPO = 'julia-next';
 export const PSTACK_REPO = 'backnotprop/pstack';
 export const POCOCK_REPO = 'mattpocock/skills';
 
+const RETRO_JULIA_STEP =
+  '5. Mastra\'s storage retention prunes old trace rows at the end of every card. There is no list of sessions, no census file, no sweep, and nothing in the retro deletes anything.';
+
+function preserveJuliaRetroStep(skillMdPath) {
+  const content = readFileSync(skillMdPath, 'utf8');
+  if (content.includes(RETRO_JULIA_STEP)) return;
+  const refHeading = '\n## Reference';
+  const idx = content.indexOf(refHeading);
+  const updated =
+    idx >= 0
+      ? `${content.slice(0, idx)}\n${RETRO_JULIA_STEP}\n${content.slice(idx)}`
+      : `${content.trimEnd()}\n\n${RETRO_JULIA_STEP}\n`;
+  writeFileSync(skillMdPath, updated, 'utf8');
+}
+
 function sha256File(filePath) {
   return createHash('sha256').update(readFileSync(filePath)).digest('hex');
 }
@@ -96,6 +111,9 @@ export function applyPocockReleaseToTree({ root, mirrorDir, tag }) {
         cpSync(upstreamSkillDir, targetDir, { recursive: true });
       }
       const installedMd = join(targetDir, 'SKILL.md');
+      if (name === 'retro' && existsSync(installedMd)) {
+        preserveJuliaRetroStep(installedMd);
+      }
       if (existsSync(installedMd)) entry.computedHash = sha256File(installedMd);
     }
   }
