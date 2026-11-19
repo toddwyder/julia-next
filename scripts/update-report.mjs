@@ -200,9 +200,12 @@ export function validateReport(raw, { prFailed = false, isMajor = false, release
   ).trim();
   const outcome = String(raw.outcome ?? '').trim();
   if (!outcome) throw new Error('Report agent output must include a non-empty outcome.');
-  const toddAction = String(raw.toddAction ?? (isMajor ? 'Decide whether to merge this major update.' : 'Nothing.')).trim() || 'Nothing.';
-  const needsToddDecision = Boolean(isMajor || raw.needsToddDecision);
+  const needsToddDecision = Boolean(raw.needsToddDecision);
   const failed = Boolean(prFailed || raw.failed);
+  // The model's wording reaches Todd only when something needs him; otherwise the code says Nothing.
+  const toddAction = needsToddDecision || failed
+    ? String(raw.toddAction ?? 'Nothing.').trim() || 'Nothing.'
+    : 'Nothing.';
   const hasNewFeatures = newFeatures.length > 0 || Boolean(raw.hasNewFeatures);
   const isBreaking = Boolean(isMajor || raw.isBreaking || extractBreakingChanges(releaseNotes).length > 0);
 
@@ -579,7 +582,7 @@ export async function generateUpdateReport({ pr, updates, releaseNotes, ciSummar
     'Classify genuine new capabilities, new CLI/API flags, new runtime support, or new tools as newFeatures.',
     'For each new feature, explain what it does in plain English AND how Julia (a Next.js household cookbook + Mastra/pstack coding machine) could use it.',
     'Classify bug fixes, security patches, dependency bumps, and refactors as fixes.',
-    major ? 'This is a BREAKING MAJOR update awaiting Todd\'s decision: set needsToddDecision to true, never call it routine, list every breaking change from the release notes in fixes, explain what it brings and what the machine could gain in machineSummary, and ask Todd in toddAction whether to approve or decline.' : '',
+    major ? 'This is a BREAKING MAJOR update that merges on its own once its checks pass: never call it routine, list every breaking change from the release notes in fixes, and explain what it brings and what the machine could gain in machineSummary. Set needsToddDecision to false.' : '',
     security ? 'This is a SECURITY advisory update: explain the vulnerability and patched version in plain English in fixes, and state what Julia gains in safety.' : '',
     'Keep each part strictly separate: put CI/merge status ONLY in outcome, never in machineSummary or machineUse.',
     'Return ONLY a single JSON object with keys: updated (array of {name, from, to}), newFeatures (array of {title, plainEnglish, machineUse}), fixes (array of {title, plainEnglish}), machineSummary (string), outcome (string), toddAction (string), needsToddDecision (boolean), hasNewFeatures (boolean), failed (boolean).',

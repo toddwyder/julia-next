@@ -277,7 +277,7 @@ test('assertReportHasAllFiveParts fails when any of the five report parts is mis
   }
 });
 
-test('major updates and security advisories are recognized and major updates force needsToddDecision', async () => {
+test('major updates and security advisories are recognized and major updates merge on their own', async () => {
   const majorPr = {
     number: 575,
     title: 'fix(deps): update dependency @sentry/node to v11',
@@ -304,7 +304,7 @@ test('major updates and security advisories are recognized and major updates for
       needsToddDecision: false,
     }),
   });
-  assert.equal(report.needsToddDecision, true);
+  assert.equal(report.needsToddDecision, false);
 
   const secPr = {
     number: 576,
@@ -416,4 +416,23 @@ test('parseToddDecision and addSkippedMajorToRenovateConfig handle approve and d
     matchUpdateTypes: ['major'],
     enabled: false,
   });
+});
+
+test('a report that needs nothing from Todd never asks him anything', () => {
+  const report = validateReport({
+    updated: [{ name: '@sentry/node', from: '10.75.0', to: '11.0.0' }],
+    newFeatures: [],
+    fixes: [{ title: 'Breaking major update', plainEnglish: 'Breaking changes are listed in the notes.' }],
+    machineSummary: 'No machine change needed for this update.',
+    outcome: 'Breaking major update, merging once checks pass.',
+    toddAction: 'Do you want to approve this upgrade or decline it?',
+    needsToddDecision: false,
+  }, { isMajor: true });
+  assert.equal(report.toddAction, 'Nothing.');
+  const failed = validateReport({
+    updated: [], newFeatures: [], fixes: [],
+    machineSummary: 'No machine change needed for this update.',
+    outcome: 'Checks failed.', toddAction: 'Open the pull request.', failed: true,
+  }, {});
+  assert.equal(failed.toddAction, 'Open the pull request.');
 });

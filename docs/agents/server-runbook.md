@@ -175,3 +175,18 @@ GitHub granted it checks write, statuses write, pull requests write, contents wr
 To act as the runner, sign an RS256 JWT with `private-key.pem` (issuer is the app id, expiry within ten minutes), trade it for an installation token at `POST /app/installations/177375308/access_tokens`, and call the API with that token. A personal token cannot do this: `POST /check-runs` answers 403 for one.
 
 The page that created the App was a one-off script, never a service. It ran on 1 November 2026, wrote these four files and stopped; nothing on the server starts it, and its code lived only in the closed pull request 398.
+
+## Update notifications
+
+`scripts/update-report.mjs` posts Julia update alerts to the ntfy topic named in `/home/ubuntu/.config/julia-runner/ntfy.json`. On ntfy.sh the topic name works as a password: anyone who knows it can read the alerts and post to it. It stays in that file and is never written in the repository.
+
+Join the topic on a new device by reading the name from that file on the server, then:
+
+- Desktop Chrome: open `https://ntfy.sh/<topic>` and allow notifications when the browser prompts you.
+- Android: install the ntfy app and subscribe to `<topic>` on `ntfy.sh`.
+
+To verify delivery after subscribing, post a test message from the server:
+
+```sh
+curl -H "Title: Julia update test" -d "Test notification from Julia." "$(jq -r '.server + "/" + .topic' /home/ubuntu/.config/julia-runner/ntfy.json)"
+```
