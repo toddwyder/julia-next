@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -137,8 +137,15 @@ test('a piece the entry cannot reach fails the dependency check and names flow-p
 });
 
 test('the clean tree passes the dependency check', () => {
-  const result = cruiseFixture('clean');
-  assert.equal(result.status, 0, result.report);
+  const root = mkdtempSync(join(tmpdir(), 'flow-guard-clean-'));
+  try {
+    cpSync(join(FIXTURES, 'depcruise', 'clean'), root, { recursive: true });
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'fixture', private: true, type: 'module', dependencies: { zod: '*' } }));
+    const result = cruise(root);
+    assert.equal(result.status, 0, `${result.stdout ?? ''}${result.stderr ?? ''}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('a missing entry or an empty workflow folder fails the dependency check', () => {

@@ -1,7 +1,0 @@
-{
-  "name": "clean-fixture",
-  "private": true,
-  "devDependencies": {
-    "zod": "*"
-  }
-}
