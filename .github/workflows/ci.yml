@@ -91,6 +91,8 @@ jobs:
         run: node scripts/check-no-adr-folder.mjs
       - name: Check agent-facing docs name kinds of model only
         run: node scripts/check-doc-models.mjs
+      - name: Check the knowledge graph answers only from tracked paths
+        run: node scripts/check-graph-sources.mjs
       - name: Check the machine program list is up to date
         run: node scripts/machine-programs.mjs --check
       - name: Check every font is read from a file in this repository

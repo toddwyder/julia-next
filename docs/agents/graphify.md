@@ -23,6 +23,8 @@ semantically, so the Markdown corpora are the only token cost.
 `.graphifyignore` keeps historical records, throwaway fixtures, duplicate skill
 catalogs, and images out of the graph. Graphify reads `.gitignore` first, so
 `.artifacts/`, `.commandcode/`, `.mastra/`, and `node_modules/` are already out.
+`node scripts/check-graph-sources.mjs` fails CI if `graphify-out/graph.json`
+references any path the repository does not carry.
 
 ## Build
 
