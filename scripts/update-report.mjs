@@ -488,7 +488,7 @@ export async function processPullRequest(pr, {
   if (!pr.merged_at && !ciSummary.failed) {
     return { prNumber: pr.number, status: 'skipped-open-not-failed' };
   }
-  if (alreadyCommented && (!existingRecord.needsNotification || existingRecord.notifiedAt)) {
+  if (alreadyCommented && existingRecord.commentedAt && (!existingRecord.needsNotification || existingRecord.notifiedAt)) {
     return { prNumber: pr.number, status: 'already-handled' };
   }
 
@@ -500,7 +500,7 @@ export async function processPullRequest(pr, {
   const { report, modelId } = await generateImpl({ pr, updates, releaseNotes, ciSummary });
   const needsNotification = shouldNotify(report);
 
-  let commentUrl = existingRecord.commentUrl ?? null;
+  let commentUrl = existingRecord.commentUrl ?? comments.find(c => String(c?.body ?? '').includes(reportMarker({ prNumber: pr.number, commitSha })))?.html_url ?? null;
   if (!alreadyCommented && !dryRun) {
     const body = formatReportMarkdown({ report, prNumber: pr.number, commitSha, modelId, releaseUrls });
     const posted = await githubApi(`/repos/${owner}/${repo}/issues/${pr.number}/comments`, {
@@ -510,6 +510,8 @@ export async function processPullRequest(pr, {
       fetchImpl,
     });
     commentUrl = posted.html_url;
+  }
+  if (!dryRun && !existingRecord.commentedAt) {
     state.reports[key] = {
       ...existingRecord,
       prNumber: pr.number,
