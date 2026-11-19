@@ -71,7 +71,7 @@ export async function checkStudioStart({ root = process.cwd(), timeoutMs = 18000
   const dir = mkdtempSync(join(scratchDir, 'studio-check-'));
   const port = await freePort();
   const log = { text: '' };
-  const child = spawn('npm', ['exec', '--yes', 'mastra@1.38.0', 'dev'], {
+  const child = spawn('npm', ['exec', '--no', '--', 'mastra', 'dev'], {
     cwd: root,
     detached: process.platform !== 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
