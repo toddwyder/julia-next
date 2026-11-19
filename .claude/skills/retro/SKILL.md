@@ -24,8 +24,6 @@ The user has asked for a **retrospective**. You are suggesting improvements to t
 
 4. Present these candidates to the user, in order of severity.
 
-5. Mastra's storage retention prunes old trace rows at the end of every card. There is no list of sessions, no census file, no sweep, and nothing in the retro deletes anything.
-
 ## Reference
 
 ### Implementation vs Review
