@@ -277,7 +277,7 @@ test('assertReportHasAllFiveParts fails when any of the five report parts is mis
   }
 });
 
-test('major updates and security advisories are recognized and major updates force needsToddDecision', async () => {
+test('major updates and security advisories are recognized and major updates merge on their own', async () => {
   const majorPr = {
     number: 575,
     title: 'fix(deps): update dependency @sentry/node to v11',
@@ -304,7 +304,7 @@ test('major updates and security advisories are recognized and major updates for
       needsToddDecision: false,
     }),
   });
-  assert.equal(report.needsToddDecision, true);
+  assert.equal(report.needsToddDecision, false);
 
   const secPr = {
     number: 576,
