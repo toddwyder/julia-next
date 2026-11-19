@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Julia update report and ntfy notifier every 2 minutes
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=2min
+Unit=julia-update-report.service
+
+[Install]
+WantedBy=timers.target

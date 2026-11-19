@@ -1,0 +1,12 @@
+[Unit]
+Description=Julia update report and ntfy notifier
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/julia-dashboard
+ExecStart=/usr/bin/node scripts/julia-agents.mjs -- node scripts/update-report.mjs
+StandardOutput=journal
+StandardError=journal
