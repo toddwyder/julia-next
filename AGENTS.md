@@ -9,7 +9,7 @@ Julia uses pstack (adopted 22 October 2026). pstack builds and proves. This file
 - Fix every correction as high in [the inverse pyramid](docs/principles/inverse-pyramid.md) as it will go; a written rule is the last resort.
 - A build run stops at Mastra's $4 cost guard and the card's own dollar ledger; [docs/agents/cost-guard.md](docs/agents/cost-guard.md) says what the guard cannot count.
 - Framework facts come from the installed packages and their version-matched official docs.
-- A rule or an acceptance criterion names a kind of model, a free model or a paid model. A specific model lives in the pstack models file and in the dated decision that chose it; Triage runs `node scripts/check-agent-brief.mjs`, which flags a criterion that names one.
+- A rule, agent-facing doc, or acceptance criterion names a kind of model, a free model or a paid model. A specific model lives in the pstack models file or settings (`dashboard/config/roles.json`), never in docs; `node scripts/check-agent-brief.mjs` flags a criterion that names one.
 - A card begins in Mastra Studio's run form and nowhere else; no script starts one. [docs/agents/machine-programs.md](docs/agents/machine-programs.md) names every program that begins a card or carries a stage.
 - Commit and push as you go, and open the pull request in the same step: `check-branch-pr` fails any branch that is pushed without one. Publish with gh using the ordinary signed-in GitHub access.
 
@@ -49,6 +49,8 @@ After a slice merges, run the retro skill on that slice's session and put its fi
 | --- | --- |
 | Skill names are unique across the installed catalogs. | `node scripts/check-skill-names.mjs` rejects duplicate frontmatter names. |
 | Current agent-read files point only at paths that exist. | `node scripts/check-agent-links.mjs` checks the entry points, pstack skills, and `ask-matt`. |
+| The ADR folder stays retired; no document may be added to `docs/adr`. | `node scripts/check-no-adr-folder.mjs` runs in the `repository-hygiene` CI job. `scripts/check-no-adr-folder.test.mjs` plants a document in `docs/adr` and fails if the check stops catching it. |
+| Agent-facing docs name kinds of model only (free or paid), never specific models. | `node scripts/check-doc-models.mjs` runs in the `repository-hygiene` CI job. `scripts/check-doc-models.test.mjs` plants a specific model name in an agent-facing doc and fails if the check stops catching it. |
 | Every branch except `main` has an open pull request to `main`. | `node scripts/check-branch-pr.mjs` audits GitHub branches and open pull requests in CI. |
 | The machine program list names every program that begins a card or carries a stage, and stays current. | `node scripts/machine-programs.mjs --check` fails when a listed program's file changed, when a listed program is gone, or when `machine/flow` holds a program the list never names. CI runs it in the hygiene job, and the failure names the program and the `--write` command. |
 | The workflow folder keeps the stock shape: no old stage, no library outside the allowed set, no piece the entry cannot reach, no timer or retry loop, no hand-built progress file, no comment that switches a guard off. | `npm run guard:flow` runs ESLint and dependency-cruiser on `machine/flow` as the one CI guard check. `machine/guards/guard.test.mjs` plants one violation per kind and fails if a rule stops catching it. |

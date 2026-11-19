@@ -87,6 +87,10 @@ jobs:
         run: node scripts/check-pstack-pin.mjs
       - name: Check agent-read files point at paths that exist
         run: node scripts/check-agent-links.mjs
+      - name: Check the ADR folder stays retired
+        run: node scripts/check-no-adr-folder.mjs
+      - name: Check agent-facing docs name kinds of model only
+        run: node scripts/check-doc-models.mjs
       - name: Check the machine program list is up to date
         run: node scripts/machine-programs.mjs --check
       - name: Check every font is read from a file in this repository
