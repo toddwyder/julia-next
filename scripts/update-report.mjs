@@ -1,3 +1,4 @@
+import dns from 'node:dns';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
@@ -395,7 +396,7 @@ function postIpv4(urlString, { headers, body }) {
   return new Promise((resolve, reject) => {
     const req = transport.request(url, {
       method: 'POST',
-      family: 4,
+      lookup: (hostname, opts, cb) => dns.lookup(hostname, { ...opts, family: 4 }, cb),
       headers: {
         ...headers,
         'Content-Length': Buffer.byteLength(body, 'utf8'),
