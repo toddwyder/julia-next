@@ -58,6 +58,7 @@ test('start.mjs readState succeeds and direct resumeCard rejects lock while anot
     id: CARD_PATH,
     inputSchema: z.object({ card: z.string() }),
     outputSchema: z.object({ card: z.string() }),
+    options: { autoRestartActiveRuns: false },
   })
     .then(waitStep)
     .commit();
@@ -163,6 +164,7 @@ test('run.mjs status and resume through Studio API write spans to trace.duckdb w
     id: CARD_PATH,
     inputSchema: z.object({ card: z.string() }),
     outputSchema: z.object({ card: z.string() }),
+    options: { autoRestartActiveRuns: false },
   })
     .then(waitStep)
     .then(afterResumeStep)

@@ -324,7 +324,12 @@ export async function createMergeWorkflow({ mastra, deps, log = console.log }) {
     },
   });
 
-  const workflow = createWorkflow({ id: WORKFLOW_ID, inputSchema: startSchema, outputSchema: recordSchema })
+  const workflow = createWorkflow({
+    id: WORKFLOW_ID,
+    inputSchema: startSchema,
+    outputSchema: recordSchema,
+    options: { autoRestartActiveRuns: false },
+  })
     .then(gather)
     .then(checks)
     .then(land)

@@ -26,7 +26,12 @@ import {
 } from './schema.mjs';
 import { createStages } from './steps.mjs';
 
-const schema = { inputSchema: flowData, outputSchema: flowData, stateSchema: cardState };
+const schema = {
+  inputSchema: flowData,
+  outputSchema: flowData,
+  stateSchema: cardState,
+  options: { autoRestartActiveRuns: false },
+};
 
 // Mastra builds an agent step from the agent itself: it takes `{ prompt }` and
 // returns `{ text }`. This mapper is the whole of the translation between the
@@ -138,6 +143,7 @@ export function buildCardPath({ agents, dir, repo, review, check }) {
     inputSchema: runInput,
     outputSchema: flowData,
     stateSchema: cardState,
+    options: { autoRestartActiveRuns: false },
   })
     .then(stage.start)
     .dountil(attempt, answered)
