@@ -2,6 +2,7 @@ export const IN_USE_SPEC = {
   userUnits: new Map([
     ['julia-studio.service', 'Live Mastra Studio on :4111'],
     ['card-machine-studio.service', 'Card Machine Mastra Studio on :4112'],
+    ['card-machine-self-studio.service', 'Card Machine Self Mastra Studio on :4113'],
     ['datasette-viewer.service', 'Datasette read-only viewer on :8801 opened by Todd'],
     ['julia-disk-check.timer', 'Daily server resource check alerting Todd on JUL-276'],
     ['julia-disk-check.service', 'Daily server resource check service'],
@@ -36,6 +37,10 @@ export const IN_USE_SPEC = {
     ['/home/ubuntu/julia-dashboard', 'julia-dashboard.service checkout (main worktree)'],
     ['/home/ubuntu/julia-mastra', 'Parent git repository for /home/ubuntu/julia-dashboard worktree'],
     ['/home/ubuntu/card-machine', 'card-machine-studio.service WorkingDirectory and FLOW_REPO'],
+    ['/home/ubuntu/card-machine-project', 'card-machine-self-studio.service FLOW_PROJECT_REPO'],
+  ]),
+  flowDirs: new Map([
+    ['/home/ubuntu/card-machine/.artifacts/flow/self-studio', 'card-machine-self-studio.service FLOW_DIR'],
   ]),
   scratchFixed: new Map([
     ['cards', 'Container for active card worktrees (empty when no card is running)'],
@@ -141,6 +146,15 @@ export function evaluateServerState(snapshot) {
       kept.push({ kind: 'checkout', name: checkout.path, rssMb: 0, diskMb: checkout.diskMb ?? 0, usedBy: allowedReason });
     } else {
       leftovers.push({ kind: 'checkout', name: checkout.path, rssMb: 0, diskMb: checkout.diskMb ?? 0, reason: 'Extra checkout outside in-use list' });
+    }
+  }
+
+  for (const dir of snapshot.flowDirs ?? []) {
+    const allowedReason = IN_USE_SPEC.flowDirs.get(dir.path);
+    if (allowedReason) {
+      kept.push({ kind: 'flow-dir', name: dir.path, rssMb: 0, diskMb: dir.diskMb ?? 0, usedBy: allowedReason });
+    } else {
+      leftovers.push({ kind: 'flow-dir', name: dir.path, rssMb: 0, diskMb: dir.diskMb ?? 0, reason: 'Extra FLOW_DIR outside in-use list' });
     }
   }
 
