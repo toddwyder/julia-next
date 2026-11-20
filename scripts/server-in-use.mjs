@@ -1,6 +1,7 @@
 export const IN_USE_SPEC = {
   userUnits: new Map([
     ['julia-studio.service', 'Live Mastra Studio on :4111'],
+    ['card-machine-studio.service', 'Card Machine Mastra Studio on :4112'],
     ['datasette-viewer.service', 'Datasette read-only viewer on :8801 opened by Todd'],
     ['julia-disk-check.timer', 'Daily server resource check alerting Todd on JUL-276'],
     ['julia-disk-check.service', 'Daily server resource check service'],
@@ -34,6 +35,7 @@ export const IN_USE_SPEC = {
     ['/home/ubuntu/julia-flow-repo', 'julia-studio.service FLOW_REPO and julia-disk-check.service'],
     ['/home/ubuntu/julia-dashboard', 'julia-dashboard.service checkout (main worktree)'],
     ['/home/ubuntu/julia-mastra', 'Parent git repository for /home/ubuntu/julia-dashboard worktree'],
+    ['/home/ubuntu/card-machine', 'card-machine-studio.service WorkingDirectory and FLOW_REPO'],
   ]),
   scratchFixed: new Map([
     ['cards', 'Container for active card worktrees (empty when no card is running)'],
