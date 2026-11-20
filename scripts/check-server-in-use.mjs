@@ -92,7 +92,7 @@ checkouts = []
 worktrees = []
 seen_wt = set()
 for name in sorted(os.listdir('/home/ubuntu')):
-    if not name.startswith('julia-') and name != 'card-machine':
+    if not name.startswith('julia-') and not name.startswith('card-machine'):
         continue
     p = os.path.join('/home/ubuntu', name)
     if os.path.isdir(p):
@@ -116,6 +116,13 @@ for name in ('dist', '%ln'):
         mb = int(out.split()[0]) if out else 0
         home_extras.append({'name': name, 'path': p, 'diskMb': mb})
 
+flow_dirs = []
+for fpath in ('/home/ubuntu/card-machine/.artifacts/flow/self-studio',):
+    if os.path.isdir(fpath):
+        fout = run(['du', '-sm', fpath]).strip()
+        fmb = int(fout.split()[0]) if fout else 0
+        flow_dirs.append({'path': fpath, 'diskMb': fmb})
+
 print(json.dumps({
     'studioReachable': studio_reachable,
     'studioError': studio_error,
@@ -125,6 +132,7 @@ print(json.dumps({
     'processes': processes,
     'checkouts': checkouts,
     'worktrees': worktrees,
+    'flowDirs': flow_dirs,
     'scratchEntries': du_entries('/home/ubuntu/.local/state/julia-scratch'),
     'scratchCards': du_entries('/home/ubuntu/.local/state/julia-scratch/cards'),
     'builderArtifacts': du_entries('/home/ubuntu/julia-builder/.artifacts'),

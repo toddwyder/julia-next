@@ -80,6 +80,32 @@ test('treats card-machine-studio.service and /home/ubuntu/card-machine as in use
   assert.equal(result.leftovers.length, 0);
 });
 
+test('treats card-machine-self-studio.service, /home/ubuntu/card-machine-project, and its FLOW_DIR as in use', () => {
+  const base = cleanSnapshot();
+  const result = evaluateServerState(cleanSnapshot({
+    userUnits: [
+      ...base.userUnits,
+      { name: 'card-machine-self-studio.service', load: 'loaded', active: 'active', sub: 'running' },
+    ],
+    processes: [
+      ...base.processes,
+      { pid: 105, rssKb: 720000, cmd: 'node mastra dev', serviceUnit: 'card-machine-self-studio.service' },
+    ],
+    checkouts: [
+      ...base.checkouts,
+      { path: '/home/ubuntu/card-machine-project', diskMb: 500 },
+    ],
+    flowDirs: [
+      { path: '/home/ubuntu/card-machine/.artifacts/flow/self-studio', diskMb: 12 },
+    ],
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(result.leftovers.length, 0);
+  assert.ok(result.kept.some(item => item.kind === 'user-unit' && item.name === 'card-machine-self-studio.service'));
+  assert.ok(result.kept.some(item => item.kind === 'checkout' && item.name === '/home/ubuntu/card-machine-project'));
+  assert.ok(result.kept.some(item => item.kind === 'flow-dir' && item.name === '/home/ubuntu/card-machine/.artifacts/flow/self-studio'));
+});
+
 test('fails on leftover timer/service, failed unit, process, worktree, scratch, artifacts, and trace files', () => {
   const result = evaluateServerState(cleanSnapshot({
     userUnits: [
