@@ -60,6 +60,26 @@ test('passes when the server holds only items in use right now', () => {
   assert.match(formatReport(result), /Server in-use check: PASS/);
 });
 
+test('treats card-machine-studio.service and /home/ubuntu/card-machine as in use', () => {
+  const base = cleanSnapshot();
+  const result = evaluateServerState(cleanSnapshot({
+    userUnits: [
+      ...base.userUnits,
+      { name: 'card-machine-studio.service', load: 'loaded', active: 'active', sub: 'running' },
+    ],
+    processes: [
+      ...base.processes,
+      { pid: 104, rssKb: 720000, cmd: 'node mastra dev', serviceUnit: 'card-machine-studio.service' },
+    ],
+    checkouts: [
+      ...base.checkouts,
+      { path: '/home/ubuntu/card-machine', diskMb: 500 },
+    ],
+  }));
+  assert.equal(result.ok, true);
+  assert.equal(result.leftovers.length, 0);
+});
+
 test('fails on leftover timer/service, failed unit, process, worktree, scratch, artifacts, and trace files', () => {
   const result = evaluateServerState(cleanSnapshot({
     userUnits: [

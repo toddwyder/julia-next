@@ -83,7 +83,7 @@ for line in run(['ps', '-u', 'ubuntu', '-o', 'pid=,rss=,args=']).splitlines():
     if re.search(r'\\bop daemon\\b', cmd):
         try:
             cwd = os.readlink(f'/proc/{pid}/cwd')
-            in_use_op = cwd == '/home/ubuntu' or cwd == '/home/ubuntu/julia-builder'
+            in_use_op = cwd in ('/home/ubuntu', '/home/ubuntu/julia-builder', '/home/ubuntu/card-machine')
         except Exception:
             pass
     processes.append({'pid': pid, 'rssKb': rss_kb, 'cmd': cmd, 'serviceUnit': service_unit, 'inUseOpDaemon': in_use_op, 'isSelfOrAncestor': pid in ancestor_pids})
@@ -92,7 +92,7 @@ checkouts = []
 worktrees = []
 seen_wt = set()
 for name in sorted(os.listdir('/home/ubuntu')):
-    if not name.startswith('julia-'):
+    if not name.startswith('julia-') and name != 'card-machine':
         continue
     p = os.path.join('/home/ubuntu', name)
     if os.path.isdir(p):
