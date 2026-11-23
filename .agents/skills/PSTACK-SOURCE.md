@@ -1,9 +1,9 @@
 # pstack source
 
 Mirror: https://github.com/backnotprop/pstack
-Commit: 0d2dc00df47d7686c94324cfe9c3444710d9f16d
-Version: 0.15.43 (.cursor-plugin/plugin.json and plugin.json at that commit)
-Installed: 19 November 2026
+Commit: c3464c11c60b1352d5e8f5f0428a3a6943837568
+Version: 0.15.46 (.cursor-plugin/plugin.json and plugin.json at that commit)
+Installed: 23 November 2026
 
 This is the backnotprop mirror, not Cursor's `cursor/plugins` copy. The mirror's harness-neutral rewrites are what let pstack run outside Cursor.
 
@@ -12,7 +12,7 @@ This is the backnotprop mirror, not Cursor's `cursor/plugins` copy. The mirror's
 The mirror documents `npx skills add backnotprop/pstack` (README.md:32-38). The `skills` CLI accepts a `#<commit>` fragment, so the install is pinned to the commit above:
 
 ```sh
-npx skills add 'backnotprop/pstack#0d2dc00df47d7686c94324cfe9c3444710d9f16d' \
+npx skills add 'backnotprop/pstack#c3464c11c60b1352d5e8f5f0428a3a6943837568' \
   --skill '*' --agent codex --copy -y
 ```
 
