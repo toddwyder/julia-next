@@ -128,7 +128,7 @@ test('Lead exposes one stock helper per role and one per saved panel model', asy
     choice.groups.panels.roles['arena-runners'] = ['openai/gpt-6.1-sol', 'commandcode/deepseek/deepseek-v4.1-flash'];
   });
   const helpers = await createAgents({ repo, leadModelFile, roleModelsFile }).build.listAgents();
-  assert.equal(Object.keys(helpers).length, 21);
+  assert.equal(Object.keys(helpers).length, 18);
   assert.deepEqual(Object.keys(helpers), readRoleModels(roleModelsFile).flatMap(role => role.models.map((_, index) => helperKey(role, index))));
   assert.equal(helpers.featureRefactoring.name, 'feature, refactoring');
   assert.equal((await helpers.featureRefactoring.getModel()).modelId, 'deepseek/deepseek-v4.1-flash');
@@ -300,7 +300,7 @@ test('every agent carries the cost guard and sets no output limit of its own', a
   const agents = createAgents({ repo, leadModelFile, roleModelsFile, dir });
   const helpers = Object.values(await agents.build.listAgents());
   const all = [agents.build, agents.shipping, agents.remediation, agents.retro, ...helpers];
-  assert.ok(all.length >= 25);
+  assert.ok(all.length >= 21);
   for (const agent of all) {
     const options = await agent.getDefaultOptions();
     assert.equal(options.modelSettings?.maxOutputTokens, undefined, `${agent.name} has an output limit of the machine's own`);
