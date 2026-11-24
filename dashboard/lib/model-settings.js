@@ -10,7 +10,7 @@ const EFFORT = { unlimited: 'max', large: 'xhigh', medium: 'high', small: 'mediu
 
 // The model a Lead run uses before anyone saves a pick: what scripts/install-lead-model.mjs
 // writes into the Lead setting file on a fresh machine.
-export const LEAD_DEFAULT_MODEL = 'openai/gpt-6.1-sol';
+export const LEAD_DEFAULT_MODEL = 'commandcode/deepseek/deepseek-v4.1-flash';
 
 export function settingsPaths(home = homedir()) {
   return {

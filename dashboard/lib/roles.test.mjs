@@ -29,16 +29,16 @@ test('a fresh choice mirrors pstack: every role starts on the model its pstack l
   const flash = 'mastracode/commandcode/deepseek/deepseek-v4.1-flash';
   assert.deepEqual(Object.values(choice.groups.building.roles), Array(4).fill(flash));
   assert.equal(choice.groups.building.model, flash);
-  assert.deepEqual(Object.values(choice.groups.judgment.roles), Array(2).fill('openai/gpt-6.1-sol'));
+  assert.deepEqual(Object.values(choice.groups.judgment.roles), Array(2).fill(flash));
   assert.equal(choice.groups.investigating.roles['how-explorer'], flash);
-  assert.equal(choice.groups.investigating.roles['how-explainer'], 'openai/gpt-6.1-sol');
-  assert.deepEqual(choice.groups.panels.models, [flash, 'openai/gpt-6.1-sol']);
-  assert.deepEqual(choice.groups.panels.roles['arena-runners'], [flash, 'openai/gpt-6.1-sol']);
+  assert.equal(choice.groups.investigating.roles['how-explainer'], flash);
+  assert.deepEqual(choice.groups.panels.models, [flash]);
+  assert.deepEqual(choice.groups.panels.roles['arena-runners'], [flash]);
   assert.equal(choice.effort, 'large');
 });
 
 test('a tie for the group model goes to the first role, and the others show as set on their own', () => {
-  const choice = fresh();
+  const choice = setRoleModel(fresh(), 'investigating', 'how-explainer', 'openai/gpt-6.1-sol');
   assert.equal(choice.groups.investigating.model, 'mastracode/commandcode/deepseek/deepseek-v4.1-flash');
   assert.equal(isRoleOverride(choice, 'investigating', 'how-explorer'), false);
   assert.equal(isRoleOverride(choice, 'investigating', 'how-explainer'), true);
@@ -72,11 +72,9 @@ test('a panel keeps at least one model and refuses removing the last', () => {
   const one = addPanelModel(fresh(), 'panels', 'anthropic/claude-opus-5-5');
   assert.deepEqual(one.groups.panels.models, [
     'mastracode/commandcode/deepseek/deepseek-v4.1-flash',
-    'openai/gpt-6.1-sol',
     'anthropic/claude-opus-5-5',
   ]);
-  const two = removePanelModel(one, 'panels', 'mastracode/commandcode/deepseek/deepseek-v4.1-flash');
-  const last = removePanelModel(two, 'panels', 'openai/gpt-6.1-sol');
+  const last = removePanelModel(one, 'panels', 'mastracode/commandcode/deepseek/deepseek-v4.1-flash');
   assert.deepEqual(last.groups.panels.models, ['anthropic/claude-opus-5-5']);
   assert.throws(() => removePanelModel(last, 'panels', 'anthropic/claude-opus-5-5'), new RegExp(PANEL_MINIMUM));
   assert.deepEqual(last.groups.panels.roles['architect-runners'], ['anthropic/claude-opus-5-5']);
@@ -86,13 +84,11 @@ test('a panel role can keep its own list, and a role cannot lose its last model'
   const choice = addPanelModel(fresh(), 'panels', 'anthropic/claude-opus-5-5', 'interrogate-reviewers');
   assert.deepEqual(choice.groups.panels.roles['interrogate-reviewers'], [
     'mastracode/commandcode/deepseek/deepseek-v4.1-flash',
-    'openai/gpt-6.1-sol',
     'anthropic/claude-opus-5-5',
   ]);
   assert.equal(isRoleOverride(choice, 'panels', 'interrogate-reviewers'), true);
   assert.equal(isRoleOverride(choice, 'panels', 'arena-runners'), false);
-  const one = removePanelModel(choice, 'panels', 'mastracode/commandcode/deepseek/deepseek-v4.1-flash', 'interrogate-reviewers');
-  const last = removePanelModel(one, 'panels', 'openai/gpt-6.1-sol', 'interrogate-reviewers');
+  const last = removePanelModel(choice, 'panels', 'mastracode/commandcode/deepseek/deepseek-v4.1-flash', 'interrogate-reviewers');
   assert.deepEqual(last.groups.panels.roles['interrogate-reviewers'], ['anthropic/claude-opus-5-5']);
   assert.throws(
     () => removePanelModel(last, 'panels', 'anthropic/claude-opus-5-5', 'interrogate-reviewers'),
@@ -172,6 +168,6 @@ test('two choices are equal only when the effort, the Lead and every role match'
   assert.equal(picksEqual(loaded, { ...loaded, effort: 'small' }), false);
   assert.equal(picksEqual(loaded, { ...loaded, lead: 'anthropic/claude-opus-5-5' }), false);
   assert.equal(picksEqual(loaded, setRoleModel(loaded, 'building', 'bug-fix', 'anthropic/claude-opus-5-5')), false);
-  assert.equal(picksEqual(loaded, removePanelModel(loaded, 'panels', 'openai/gpt-6.1-sol', 'arena-runners')), false);
+  assert.equal(picksEqual(loaded, addPanelModel(loaded, 'panels', 'anthropic/claude-opus-5-5', 'arena-runners')), false);
   assert.equal(picksEqual(loaded, null), false);
 });
