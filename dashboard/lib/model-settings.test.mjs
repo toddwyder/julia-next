@@ -38,8 +38,8 @@ test('Save writes Lead-only role settings and leaves Codex role settings unchang
   const text = readFileSync(paths.pstack, 'utf8');
   assert.ok(text.startsWith('# budget: small (medium)\n'));
   assert.ok(text.includes('feature, refactoring: commandcode/deepseek/deepseek-v4.1-flash\n'));
-  assert.ok(text.includes('reflect judgment, divergent, synthesizer: openai/gpt-6.1-sol\n'));
-  assert.ok(text.includes('arena runners: commandcode/deepseek/deepseek-v4.1-flash, openai/gpt-6.1-sol\n'));
+  assert.ok(text.includes('reflect judgment, divergent, synthesizer: commandcode/deepseek/deepseek-v4.1-flash\n'));
+  assert.ok(text.includes('arena runners: commandcode/deepseek/deepseek-v4.1-flash\n'));
   assert.ok(text.includes('bug-fix: openai/gpt-6-astra\n'));
   assert.ok(!text.includes('retired role'));
   assert.ok(!text.includes('---'));
@@ -66,7 +66,7 @@ test('with no settings files the screen still shows the models a fresh run uses'
   const shown = readSettings({ paths, modelIds });
   assert.equal(shown.lead, LEAD_DEFAULT_MODEL);
   assert.equal(shown.groups.building.roles['feature-refactoring'], models[2].id);
-  assert.deepEqual(shown.groups.panels.roles['arena-runners'], [models[2].id, models[0].id]);
+  assert.deepEqual(shown.groups.panels.roles['arena-runners'], [models[2].id]);
   mkdirSync(join(paths.lead, '..'), { recursive: true });
   writeFileSync(paths.lead, 'openai/gpt-retired\n');
   assert.equal(readSettings({ paths, modelIds }).lead, 'openai/gpt-retired');

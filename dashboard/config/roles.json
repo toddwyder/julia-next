@@ -37,13 +37,13 @@
         {
           "id": "judgment-and-prose",
           "name": "judgment and prose",
-          "default": "openai/gpt-6.1-sol",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
           "explanation": "Writing, and judgment calls about what the work should say."
         },
         {
           "id": "hardest-tasks",
           "name": "hardest tasks",
-          "default": "openai/gpt-6.1-sol",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
           "explanation": "The trickiest code changes, where getting it wrong costs the most."
         }
       ]
@@ -61,7 +61,7 @@
         {
           "id": "how-explainer",
           "name": "how explainer",
-          "default": "openai/gpt-6.1-sol",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
           "explanation": "Turns that reading into a plain explanation."
         },
         {
@@ -73,7 +73,7 @@
         {
           "id": "why-synthesizer",
           "name": "why synthesizer",
-          "default": "openai/gpt-6.1-sol",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
           "explanation": "Pulls those findings into one answer with sources."
         }
       ]
@@ -91,7 +91,7 @@
         {
           "id": "reflect-judgment",
           "name": "reflect judgment, divergent, synthesizer",
-          "default": "openai/gpt-6.1-sol",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
           "explanation": "Reviews the session for lessons about decisions."
         }
       ]
@@ -104,25 +104,25 @@
         {
           "id": "arena-runners",
           "name": "arena runners",
-          "default": ["commandcode/deepseek/deepseek-v4.1-flash", "openai/gpt-6.1-sol"],
+          "default": ["commandcode/deepseek/deepseek-v4.1-flash"],
           "explanation": "Several models attempt the same task side by side."
         },
         {
           "id": "arena-cross-judge-pool",
           "name": "arena cross-judge pool",
-          "default": ["commandcode/deepseek/deepseek-v4.1-flash", "openai/gpt-6.1-sol"],
+          "default": ["commandcode/deepseek/deepseek-v4.1-flash"],
           "explanation": "Models that may judge those attempts; the judge is never from the parent chat's model family."
         },
         {
           "id": "architect-runners",
           "name": "architect runners",
-          "default": ["commandcode/deepseek/deepseek-v4.1-flash", "openai/gpt-6.1-sol"],
+          "default": ["commandcode/deepseek/deepseek-v4.1-flash"],
           "explanation": "Several models sketch the design before code."
         },
         {
           "id": "interrogate-reviewers",
           "name": "interrogate reviewers",
-          "default": ["commandcode/deepseek/deepseek-v4.1-flash", "openai/gpt-6.1-sol"],
+          "default": ["commandcode/deepseek/deepseek-v4.1-flash"],
           "explanation": "Models that try to break the change, and must prove each finding by running it."
         }
       ]
@@ -147,7 +147,7 @@
         {
           "id": "shipping",
           "name": "Shipping",
-          "default": "commandcode/moonshotai/Kimi-K3.1-Pro",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
           "explanation": "The independent review of a pull request."
         },
         {
@@ -159,7 +159,7 @@
         {
           "id": "retro",
           "name": "Retro",
-          "default": "openai/gpt-6.1-sol",
+          "default": "commandcode/deepseek/deepseek-v4.1-flash",
           "explanation": "The lesson pass after a card lands."
         },
         {

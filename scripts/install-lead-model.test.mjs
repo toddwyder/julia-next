@@ -12,9 +12,9 @@ test('installing the Lead setting twice keeps an existing model', t => {
   const file = join(dir, 'lead-model');
 
   assert.equal(installLeadModel(file).created, true);
-  assert.equal(readFileSync(file, 'utf8'), 'openai/gpt-6.1-sol\n');
+  assert.equal(readFileSync(file, 'utf8'), 'commandcode/deepseek/deepseek-v4.1-flash\n');
 
   const { created } = installLeadModel(file);
   assert.equal(created, false);
-  assert.equal(readFileSync(file, 'utf8'), 'openai/gpt-6.1-sol\n', 'a second install leaves the setting alone');
+  assert.equal(readFileSync(file, 'utf8'), 'commandcode/deepseek/deepseek-v4.1-flash\n', 'a second install leaves the setting alone');
 });
