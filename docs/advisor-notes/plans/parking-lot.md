@@ -20,3 +20,5 @@ Ideas Todd wants eventually but that aren't needed to get the machine going. Not
   - Reference: OpenAI's Product Design plugin (`openai/plugins`, `plugins/product-design`): get context → ideate (three visual options) → image to code → design QA → share. Licence "Proprietary": copy ideas, not text. Its OpenAI-only parts are image generation and OpenAI hosting.
   - Candidate tools: Google Stitch through its MCP connection for sketches (free tier; any agent can reach it); Vercel previews for sharing. No Figma.
   - Considered and set aside: OpenDesign (open-source design workspace; overlaps with Stitch).
+
+- **The model picker sets the spending limits** (parked 10 Nov 2026). Todd: the dollar and token limits a card runs under should be added to the model picker. Today they are built into Studio by JUL-363. When it comes back, it goes through `/triage` like any card.
